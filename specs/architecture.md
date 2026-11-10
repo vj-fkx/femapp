@@ -67,7 +67,7 @@ app ──► render ──────────► core
 | `geom` | lib estática | STL, Eigen, OpenCASCADE |
 | `mesher` | lib estática | `core` (apenas `Mesh`), `geom`, oneTBB |
 | `io` | lib estática | `core`, `geom`, nlohmann/json |
-| `render` | lib estática | `core`, `geom`, Qt Gui (RHI) |
+| `render` | lib estática | `core`, `geom`, Qt Gui (RHI, headers privados), Qt Widgets (`QRhiWidget`); Qt Shader Tools no build — ver ADR 0002 |
 | `app` | executável | todos, Qt Widgets |
 
 ## 3. Núcleo (`core`)

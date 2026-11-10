@@ -1,6 +1,6 @@
 # Tarefas — 002 gpu-viewport
 
-Status: rascunho
+Status: em andamento
 Design: [design.md](design.md) · Requisitos: [requirements.md](requirements.md)
 
 Regras:
@@ -14,14 +14,14 @@ Regras:
 
 ## Fase 0 — Pré-requisitos
 
-- [ ] **T00** `[M]` Autorizar a instalação local do módulo Qt Shader Tools
+- [x] **T00** `[M]` Autorizar a instalação local do módulo Qt Shader Tools
   (`aqt install-qt windows desktop 6.8.3 win64_msvc2022_64 -m qtshadertools -O C:\Qt`,
   cerca de 10 MB); conferir que `qsb.exe` existe em `C:\Qt\6.8.3\msvc2022_64\bin`.
-- [ ] **T01** Acrescentar `ShaderTools` ao `find_package(Qt6 …)` da raiz, com a
+- [x] **T01** Acrescentar `ShaderTools` ao `find_package(Qt6 …)` da raiz, com a
   mesma mensagem de erro orientada da 001; acrescentar `modules: qtshadertools`
   ao passo de instalação do Qt no CI; atualizar pré-requisitos no `README.md` —
   arquivos: `CMakeLists.txt`, `.github/workflows/ci.yml`, `README.md` — cobre: 30
-- [ ] **T02** Preparar o módulo `render` para as novas peças: dependências
+- [x] **T02** Preparar o módulo `render` para as novas peças: dependências
   `Qt6::Widgets` (pública), `Qt6::GuiPrivate` e `Eigen3::Eigen`, `AUTOMOC`;
   permitir vários arquivos de teste por módulo em `femapp_add_test`; atualizar a
   tabela de dependências em `specs/architecture.md` (ADR 0002). Build e testes
@@ -30,38 +30,38 @@ Regras:
 
 ## Fase 1 — Lógica sem GPU
 
-- [ ] **T03** Testes de `parseBackendName`, `isBackendSupported` e
+- [x] **T03** Testes de `parseBackendName`, `isBackendSupported` e
   `planBackends` (três plataformas, sem variável, variável válida, inválida,
   não suportada, `null`, `fail`) — arquivo: `tests/unit/render/test_backend.cpp`
   — cobre: 02, 03, 04, 05
-- [ ] **T04** Implementar `backend.hpp/.cpp` até a T03 passar — cobre: 02–05
-- [ ] **T05** `[P]` Testes de `gridSpacing`: resultado é potência de 10,
+- [x] **T04** Implementar `backend.hpp/.cpp` até a T03 passar — cobre: 02–05
+- [x] **T05** `[P]` Testes de `gridSpacing`: resultado é potência de 10,
   `major = 10·minor`, monotônico em relação ao zoom, `minorFade ∈ [0, 1]` e
   contínuo na troca de nível — arquivo: `tests/unit/render/test_grid_spacing.cpp`
   — cobre: 21
-- [ ] **T06** Implementar `grid_spacing.hpp/.cpp` até a T05 passar — cobre: 21
-- [ ] **T07** Testes da base da câmera: ortonormal, `up.z ≥ 0` após sequências
+- [x] **T06** Implementar `grid_spacing.hpp/.cpp` até a T05 passar — cobre: 21
+- [x] **T07** Testes da base da câmera: ortonormal, `up.z ≥ 0` após sequências
   de órbita, elevação limitada a ±90°, base definida nos polos; direção e "para
   cima" de cada vista padrão; estado inicial isométrico em perspectiva —
   arquivo: `tests/unit/render/test_camera.cpp` — cobre: 11, 13, 17, 19, 28
-- [ ] **T08** Implementar `Camera`: estado, base, `orbit`, `setStandardView`,
+- [x] **T08** Implementar `Camera`: estado, base, `orbit`, `setStandardView`,
   `viewMatrix`, `viewMatrixRelativeToTarget` até a T07 passar —
   arquivos: `camera.hpp/.cpp` — cobre: 11, 13, 17, 19, 28
-- [ ] **T09** Testes de projeção e raio: `projectionMatrix` com profundidade em
+- [x] **T09** Testes de projeção e raio: `projectionMatrix` com profundidade em
   [0, 1], `rayThrough` consistente com as matrizes nas duas projeções, troca de
   projeção preserva foco e altura visível no plano de foco, viewport de tamanho
   zero é ignorado — cobre: 08, 16, 28
-- [ ] **T10** Implementar `setViewportSize`, `setProjection`,
+- [x] **T10** Implementar `setViewportSize`, `setProjection`,
   `projectionMatrix`, `rayThrough` até a T09 passar — cobre: 08, 16, 28
-- [ ] **T11** Testes de pan e zoom: o ponto sob o cursor permanece sob o cursor
+- [x] **T11** Testes de pan e zoom: o ponto sob o cursor permanece sob o cursor
   (tolerância 1e−6 px) nas duas projeções; limites de distância respeitados sem
   mover o foco — cobre: 12, 14, 15, 28
-- [ ] **T12** Implementar `pan` e `zoomAt` até a T11 passar — cobre: 12, 14, 15
-- [ ] **T13** Testes de `fit`: os oito cantos de uma caixa conhecida ficam
+- [x] **T12** Implementar `pan` e `zoomAt` até a T11 passar — cobre: 12, 14, 15
+- [x] **T13** Testes de `fit`: os oito cantos de uma caixa conhecida ficam
   dentro do quadro com folga ≤ 25 %, em janelas larga e alta; caixa vazia usa a
   região padrão — cobre: 18, 19, 28
-- [ ] **T14** Implementar `fit` até a T13 passar — cobre: 18, 19
-- [ ] **T15** Teste de precisão: com o foco em (1e6, 1e6, 0), a matriz relativa
+- [x] **T14** Implementar `fit` até a T13 passar — cobre: 18, 19
+- [x] **T15** Teste de precisão: com o foco em (1e6, 1e6, 0), a matriz relativa
   convertida para `float` projeta pontos próximos com erro < 1e−3 px; conferir
   que os testes de `render` rodam em menos de 1 s — cobre: N03, N04
 

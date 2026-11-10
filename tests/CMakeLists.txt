@@ -1,11 +1,19 @@
 find_package(Catch2 3 CONFIG REQUIRED)
 include(Catch)
 
-# femapp_add_test(<module>) builds tests/unit/<module>/test_<module>.cpp
-# against fem::<module> and registers its test cases with CTest.
+# femapp_add_test(<module> [SOURCES <files...>]) builds the test executable
+# test_<module> against fem::<module> and registers its test cases with CTest.
+# Without SOURCES it builds tests/unit/<module>/test_<module>.cpp; file names
+# in SOURCES are relative to tests/unit/<module>/.
 function(femapp_add_test module)
+    cmake_parse_arguments(ARG "" "" "SOURCES" ${ARGN})
+    if(NOT ARG_SOURCES)
+        set(ARG_SOURCES "test_${module}.cpp")
+    endif()
+    list(TRANSFORM ARG_SOURCES PREPEND "unit/${module}/")
+
     set(target test_${module})
-    add_executable(${target} "unit/${module}/test_${module}.cpp")
+    add_executable(${target} ${ARG_SOURCES})
     target_link_libraries(${target} PRIVATE fem::${module} Catch2::Catch2WithMain)
     femapp_set_warnings(${target})
     # PRE_TEST: discover at ctest time, when the shared libraries are in place.
@@ -18,7 +26,11 @@ target_compile_definitions(test_core PRIVATE FEMAPP_EXPECTED_VERSION="${PROJECT_
 femapp_add_test(geom)
 femapp_add_test(mesher)
 femapp_add_test(io)
-femapp_add_test(render)
+femapp_add_test(render SOURCES
+    test_render.cpp
+    test_backend.cpp
+    test_camera.cpp
+    test_grid_spacing.cpp)
 
 # REQ-001-09: the Qt-free modules must not include Qt headers.
 add_test(NAME check_no_qt_includes

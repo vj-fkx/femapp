@@ -54,13 +54,20 @@ include(FemappModule)
 
 # --- Qt (installed separately, not through vcpkg) -----------------------------
 set(FEMAPP_QT_MIN_VERSION 6.7)
-find_package(Qt6 ${FEMAPP_QT_MIN_VERSION} QUIET COMPONENTS Core Gui Widgets LinguistTools)
+find_package(Qt6 ${FEMAPP_QT_MIN_VERSION} QUIET
+    COMPONENTS Core Gui Widgets LinguistTools ShaderTools)
 if(NOT Qt6_FOUND)
     message(FATAL_ERROR
-        "Qt ${FEMAPP_QT_MIN_VERSION} or newer (Core, Gui, Widgets, LinguistTools) was not found.\n"
+        "Qt ${FEMAPP_QT_MIN_VERSION} or newer (Core, Gui, Widgets, LinguistTools, ShaderTools) was not found.\n"
         "Install Qt and point CMake to it with CMAKE_PREFIX_PATH, for example:\n"
         "  cmake --preset dev -DCMAKE_PREFIX_PATH=C:/Qt/6.8.3/msvc2022_64\n"
-        "or set the CMAKE_PREFIX_PATH environment variable.")
+        "or set the CMAKE_PREFIX_PATH environment variable.\n"
+        "The Qt Shader Tools add-on module is required too.")
+endif()
+# QRhi is semi-public API: its headers come with the GuiPrivate target, which
+# is a separate package component from Qt 6.10 on.
+if(Qt6_VERSION VERSION_GREATER_EQUAL 6.10)
+    find_package(Qt6 REQUIRED COMPONENTS GuiPrivate)
 endif()
 
 # --- Modules ------------------------------------------------------------------

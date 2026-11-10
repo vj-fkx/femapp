@@ -80,6 +80,7 @@ jobs:
         with:
           version: ${{ env.QT_VERSION }}
           arch: ${{ matrix.qt-arch }}
+          modules: qtshadertools
           cache: true
 
       - name: Check out vcpkg at the pinned baseline

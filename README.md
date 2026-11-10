@@ -15,7 +15,7 @@ Estado atual: esqueleto do projeto (versão 0.1.0). O plano completo está em
 | Ninja | qualquer versão recente |
 | Git | qualquer versão recente |
 | vcpkg | com a variável de ambiente `VCPKG_ROOT` apontando para ele |
-| Qt | 6.7 ou mais novo (o CI usa a 6.8.3), componentes Core, Gui, Widgets e Linguist Tools |
+| Qt | 6.7 ou mais novo (o CI usa a 6.8.3), componentes Core, Gui, Widgets e Linguist Tools, mais o módulo adicional Qt Shader Tools |
 
 As demais dependências (Eigen, spdlog, Catch2, OpenCASCADE) são baixadas e
 compiladas pelo vcpkg na primeira configuração. **A primeira vez demora**: o
@@ -26,7 +26,7 @@ OpenCASCADE leva cerca de 40 minutos. Depois disso o vcpkg reutiliza o cache.
 - Visual Studio 2022 com a carga "Desenvolvimento para desktop com C++" (traz
   MSVC, CMake, Ninja e vcpkg).
 - Qt para `msvc2022_64`, pelo instalador oficial ou com
-  `aqt install-qt windows desktop 6.8.3 win64_msvc2022_64 -O C:\Qt`.
+  `aqt install-qt windows desktop 6.8.3 win64_msvc2022_64 -m qtshadertools -O C:\Qt`.
 - Use o **Developer PowerShell for VS 2022** (ou abra a pasta no Visual Studio /
   VS Code), que já define o compilador e o `VCPKG_ROOT`.
 - Clone o repositório em um **caminho curto** (por exemplo `C:\dev\femapp`). O
@@ -37,7 +37,7 @@ OpenCASCADE leva cerca de 40 minutos. Depois disso o vcpkg reutiliza o cache.
 
 - Xcode Command Line Tools, CMake e Ninja (`brew install cmake ninja`).
 - vcpkg clonado e `VCPKG_ROOT` definido.
-- Qt para macOS (instalador oficial ou `aqt`).
+- Qt para macOS (instalador oficial ou `aqt`), com o módulo Qt Shader Tools.
 
 ### Linux (Ubuntu 22.04+)
 
@@ -45,7 +45,7 @@ OpenCASCADE leva cerca de 40 minutos. Depois disso o vcpkg reutiliza o cache.
 - Bibliotecas de sistema para o OpenCASCADE e o Qt:
   `sudo apt install libgl1-mesa-dev libx11-dev libxext-dev libxi-dev libxmu-dev libxkbcommon-dev libfontconfig1-dev`
 - vcpkg clonado e `VCPKG_ROOT` definido.
-- Qt (instalador oficial ou `aqt`).
+- Qt (instalador oficial ou `aqt`), com o módulo Qt Shader Tools.
 
 ## Compilar, testar e executar
 
