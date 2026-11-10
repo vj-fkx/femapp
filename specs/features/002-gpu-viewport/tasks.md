@@ -85,7 +85,7 @@ Regras:
 - [x] **T19** Colocar o `Viewport` como widget central do `MainWindow`, com a
   mensagem de falha no lugar dele quando `backendUnavailable` chegar; mostrar o
   backend no "Sobre" — arquivos: `main_window.hpp/.cpp` — cobre: 01, 06, 07
-- [ ] **T20** Alterar o `--smoke-test`: sair com 0 ao primeiro `frameRendered`
+- [x] **T20** Alterar o `--smoke-test`: sair com 0 ao primeiro `frameRendered`
   ou `backendUnavailable`, com 1 após 10 s; registrar no log qual dos dois
   ocorreu; configurar `femapp_smoke` com `FEM_RHI_BACKEND=null` e criar
   `femapp_smoke_no_gpu` com `FEM_RHI_BACKEND=fail` — arquivos: `main.cpp`,
@@ -231,3 +231,13 @@ Regras:
   (sem `QT_QPA_PLATFORM=offscreen`), mantendo `FEM_RHI_BACKEND=null`; no CI de
   Linux, rodar o `ctest` sob `xvfb-run`. `femapp_smoke_no_gpu` continua em
   `offscreen`.
+
+**2026-11-10 — T20 concluída (ajuste aprovado pelo mantenedor):**
+
+- `femapp_smoke` passou a rodar na plataforma nativa com
+  `FEM_RHI_BACKEND=null`; o CI de Linux roda o `ctest` sob `xvfb-run`, com os
+  pacotes `xvfb` e `libxcb-*` acrescentados. Design §8 e §10 e README
+  atualizados.
+- Local (Windows): 40 de 40 testes passando, build sem avisos.
+- Não verificado: o smoke test nos runners de macOS e Linux (depende do CI,
+  T90) e a lista de pacotes `libxcb-*` no Ubuntu 24.04.

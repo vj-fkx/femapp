@@ -370,7 +370,7 @@ comando da feature 005, que receberá as teclas simples.
 | `parseBackendName`, `planBackends` para as 3 plataformas, valores inválidos, `fail` | unitário | REQ-002-02..05 | exato |
 | `gridSpacing`: potências de 10, monotonicidade, `minorFade ∈ [0, 1]` | unitário | REQ-002-21 | exato |
 | `SceneRenderer` com `QRhi` `Null`: inicializa, desenha um quadro em alvo offscreen, libera | unitário (sem GPU) | REQ-002-29, 30 | sem erro |
-| `femapp_smoke` com `FEM_RHI_BACKEND=null` | CTest | REQ-002-29 | código 0 |
+| `femapp_smoke` com `FEM_RHI_BACKEND=null`, na plataforma nativa (`xvfb` no CI de Linux) | CTest | REQ-002-29 | código 0 |
 | `femapp_smoke_no_gpu` com `FEM_RHI_BACKEND=fail` | CTest | REQ-002-06 | código 0 e mensagem de falha no log |
 | `check_rhi_confined` | CTest | REQ-002-10 | — |
 | Roteiro manual: navegação, grade, eixos, menus, redimensionar, backend no "Sobre", `FEM_RHI_BACKEND=opengl` | manual | REQ-002-07, 08, 12–14, 20–27 | AC-2, 3, 5, 8–11, 14 |
@@ -393,11 +393,12 @@ quando houver conteúdo que justifique.
 
 ## 10. Riscos e mitigação
 
-- **`QRhiWidget` pode não funcionar na plataforma `offscreen` do Qt**, usada
-  pelo smoke test no CI → o teste de `SceneRenderer` com `QRhi` `Null` não
-  depende de janela e cobre a renderização. Se o smoke test do aplicativo não
-  conseguir um quadro em `offscreen`, **paro e proponho ajuste no REQ-002-29**
-  (por exemplo, rodar o smoke test sob `xvfb` no Linux).
+- **`QRhiWidget` não funciona na plataforma `offscreen` do Qt** (confirmado
+  na implementação, em 2026-11-10: nem o backend `null` inicializa) →
+  `femapp_smoke` roda na plataforma nativa, com `FEM_RHI_BACKEND=null`; no CI
+  de Linux o `ctest` roda sob `xvfb-run`. `femapp_smoke_no_gpu` continua em
+  `offscreen`. O teste de `SceneRenderer` com `QRhi` `Null` não depende de
+  janela. Ajuste aprovado pelo mantenedor; o texto do REQ-002-29 não mudou.
 - **Trocar de backend depois da janela visível** recria a janela nativa e pode
   piscar → a primeira tentativa é definida antes do `show()`; a troca só ocorre
   no caminho de falha.

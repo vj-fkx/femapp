@@ -73,6 +73,10 @@ cmake --build --preset dev
 ctest --preset dev
 ```
 
+Um dos testes (`femapp_smoke`) abre a janela principal por um instante. Em um
+Linux sem tela, rode os testes sob um servidor gráfico virtual:
+`xvfb-run -a ctest --preset dev`.
+
 O executável fica em `build/dev/bin/` (no macOS, dentro de `femapp.app`):
 
 ```bash

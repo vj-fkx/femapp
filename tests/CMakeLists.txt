@@ -50,10 +50,12 @@ set_tests_properties(femapp_version PROPERTIES
 
 # REQ-001-11, REQ-001-15: the main window opens and the app exits on its own.
 # REQ-002-29: the viewport renders at least one frame, here with the Null backend.
+# It runs on the native window system: QRhiWidget does not initialize on Qt's
+# "offscreen" platform. On a machine without a display, run ctest under xvfb-run.
 add_test(NAME femapp_smoke COMMAND femapp --smoke-test)
 set_tests_properties(femapp_smoke PROPERTIES
     TIMEOUT 30
-    ENVIRONMENT "QT_QPA_PLATFORM=offscreen;FEM_RHI_BACKEND=null"
+    ENVIRONMENT "FEM_RHI_BACKEND=null"
     PASS_REGULAR_EXPRESSION "smoke test: frame rendered")
 
 # REQ-002-06: with no graphics backend the window still opens and reports it.
