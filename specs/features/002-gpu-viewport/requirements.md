@@ -1,6 +1,6 @@
 # Requisitos — 002 gpu-viewport
 
-Status: rascunho · Data: 2026-11-10
+Status: aprovado · Data: 2026-11-10
 
 ## 1. Contexto e objetivo
 
@@ -141,14 +141,11 @@ principal, parcial), REQ-G-04 (órbita, pan e zoom pelo mouse).
 
 ## 8. Questões em aberto
 
-- [ ] **Botões do mouse.** Proposto o padrão do AutoCAD (meio = pan, Shift +
-  meio = órbita, roda = zoom), por coerência com o módulo de desenho e por
-  deixar o botão esquerdo livre para seleção e desenho. Alternativa: estilo de
-  pós-processadores (esquerdo = órbita, meio = pan). Confirma o padrão AutoCAD?
-- [ ] **Eixo vertical.** Proposto Z para cima, com o plano de trabalho em XY
-  (AutoCAD e a maioria dos programas de estruturas). Confirma?
-- [ ] **Linux sem Vulkan.** Proposto: Vulkan como padrão e OpenGL como
-  alternativa automática. Em máquinas virtuais e drivers antigos o Vulkan
-  costuma falhar; se preferir, o padrão no Linux pode ser OpenGL.
-- [ ] **Usuários sem botão do meio** (notebooks): fica para uma feature
-  posterior, ou incluir já uma alternativa (ex.: Alt + botão esquerdo)?
+Todas decididas em 2026-11-10, na aprovação dos requisitos:
+
+- [x] **Botões do mouse:** padrão do AutoCAD — meio = pan, Shift + meio =
+  órbita, roda = zoom.
+- [x] **Eixo vertical:** Z para cima, plano de trabalho em XY.
+- [x] **Linux sem Vulkan:** Vulkan como padrão, OpenGL como alternativa
+  automática.
+- [x] **Usuários sem botão do meio:** fica para uma feature posterior.
