@@ -271,3 +271,15 @@ do git), T23 (roteiro manual da janela), T25 (repositório no GitHub).
   escrita. A correção acima está commitada localmente e **não foi enviada**,
   porque um novo push cancelaria a execução em curso e perderia o cache do
   OpenCASCADE que ela está construindo.
+
+**2026-11-10 — Resultado da execução nº 1 do CI (T27, em andamento):**
+
+- `linux-gcc`: passou em 1 h 11 min (configuração com vcpkg: 1 h 10 min, sem
+  cache). `linux-clang`: passou em 43 min, incluindo `clang-tidy` (28 s).
+  Build, testes e verificação de ligação dinâmica verdes nos dois.
+- `windows`: falhou em "Bootstrap vcpkg". A action `ilammy/msvc-dev-cmd`
+  exporta `VCPKG_ROOT` apontando para o vcpkg embutido no Visual Studio e
+  sobrescreve o valor do job. Corrigido com um passo que regrava `VCPKG_ROOT`
+  em `GITHUB_ENV` depois da action.
+- `macos`: ainda sem nenhuma execução real (ver nota anterior).
+- A execução terminou; o push das correções não perde mais nenhum cache.

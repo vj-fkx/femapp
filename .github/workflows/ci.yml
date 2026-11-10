@@ -89,8 +89,17 @@ jobs:
           ref: ${{ env.VCPKG_COMMIT }}
           path: vcpkg
 
+      # ilammy/msvc-dev-cmd exports VCPKG_ROOT pointing at the copy bundled with
+      # Visual Studio, which overrides the job-level value. Pin it back.
+      - name: Point VCPKG_ROOT at the pinned checkout
+        shell: pwsh
+        run: |
+          "VCPKG_ROOT=${{ github.workspace }}/vcpkg" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
       - name: Bootstrap vcpkg
         shell: pwsh
+        env:
+          VCPKG_ROOT: ${{ github.workspace }}/vcpkg
         run: |
           if ($IsWindows) {
             & "$env:VCPKG_ROOT/bootstrap-vcpkg.bat" -disableMetrics
