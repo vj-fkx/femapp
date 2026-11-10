@@ -120,8 +120,8 @@ Regras:
 
 ## Fase 5 — Fechamento
 
-- [ ] **T90** Build e testes verdes nos quatro jobs do CI
-- [ ] **T91** `clang-format` e `clang-tidy` sem pendências
+- [x] **T90** Build e testes verdes nos quatro jobs do CI
+- [x] **T91** `clang-format` e `clang-tidy` sem pendências
 - [ ] **T92** Conferir os doze critérios de aceite de `requirements.md`,
   incluindo AC-10 (seguir só o README em um clone limpo)
 - [ ] **T93** Atualizar `specs/roadmap.md` para `concluída` e o `CLAUDE.md` se
@@ -323,3 +323,6 @@ do git), T23 (roteiro manual da janela), T25 (repositório no GitHub).
   40 s), `macos` 1 min 52 s (configuração 18 s); Linux como na execução nº 2
   (1 min 36 s e 2 min 2 s). Todos dentro da meta de 5 min (NFR-001-01), e o
   cache do `main` é restaurado em PRs (REQ-001-25).
+- T90 e T91: execuções nº 2 e nº 3 do CI no `main` (commits `d6039a2` e
+  `1d1c26a`) verdes nos quatro jobs de build e no `format`, com `clang-tidy`
+  sem apontamentos.
