@@ -259,3 +259,15 @@ do git), T23 (roteiro manual da janela), T25 (repositório no GitHub).
 - `main` enviado para `origin` com o Git Credential Manager (login pelo
   navegador, feito pelo mantenedor). A execução nº 1 do CI começou no commit
   `d86e743`. Resultado ainda desconhecido; as correções ficam na T27.
+
+**2026-11-10 — Execução nº 1 do CI (T27, em andamento):**
+
+- `format`: passou em 8 s.
+- `macos`: não iniciou — "The configuration 'macos-14-arm64' is not supported".
+  A imagem `macos-14` foi descontinuada; trocada por `macos-15` no workflow e
+  no design.
+- Aviso de Node.js 20 obsoleto em `actions/checkout@v4`; atualizado para `v5`.
+- `windows`, `linux-gcc` e `linux-clang`: ainda rodando quando esta nota foi
+  escrita. A correção acima está commitada localmente e **não foi enviada**,
+  porque um novo push cancelaria a execução em curso e perderia o cache do
+  OpenCASCADE que ela está construindo.

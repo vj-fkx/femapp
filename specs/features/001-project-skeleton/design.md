@@ -175,7 +175,7 @@ Arquivo `.github/workflows/ci.yml`, disparado em `push` e `pull_request`.
 | Job | Executor | Preset | Passos |
 |-----|----------|--------|--------|
 | `windows` | `windows-2022` | `windows-msvc` | configurar, compilar, `ctest` |
-| `macos` | `macos-14` (arm64) | `macos-clang` | idem |
+| `macos` | `macos-15` (arm64) | `macos-clang` | idem |
 | `linux-gcc` | `ubuntu-24.04` | `linux-gcc` | idem |
 | `linux-clang` | `ubuntu-24.04` | `linux-clang` | idem + `run-clang-tidy` sobre `compile_commands.json` |
 | `format` | `ubuntu-24.04` | — | `clang-format --dry-run --Werror` em `src/` e `tests/` |

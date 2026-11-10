@@ -31,7 +31,7 @@ jobs:
             qt-arch: win64_msvc2022_64
             vcpkg-cache: windows
           - name: macos
-            os: macos-14
+            os: macos-15
             preset: macos-clang
             qt-arch: clang_64
             vcpkg-cache: macos
@@ -53,7 +53,7 @@ jobs:
 
     steps:
       - name: Check out femapp
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Install system packages (Linux)
         if: runner.os == 'Linux'
@@ -83,7 +83,7 @@ jobs:
           cache: true
 
       - name: Check out vcpkg at the pinned baseline
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: microsoft/vcpkg
           ref: ${{ env.VCPKG_COMMIT }}
@@ -151,7 +151,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Check out femapp
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Install clang-format
         run: pipx install "clang-format==${CLANG_TOOLS_VERSION}.1.5"
