@@ -246,3 +246,9 @@ do git), T23 (roteiro manual da janela), T25 (repositório no GitHub).
   `clang-tidy-19` no `apt` do Ubuntu 24.04; triplet próprio no macOS; lista de
   pacotes de sistema para o OpenCASCADE no Linux; tempo da primeira execução
   (o vcpkg compila o OpenCASCADE em Debug e Release).
+
+**2026-11-10 — Repositório remoto criado (T25, parcial):**
+
+- Repositório público e vazio criado em `https://github.com/vj-fkx/femapp` e
+  configurado como `origin`. **O push ainda não foi feito**: aguarda confirmação
+  do mantenedor, por isso a T25 continua aberta.
