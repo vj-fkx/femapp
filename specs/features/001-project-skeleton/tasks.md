@@ -100,16 +100,16 @@ Regras:
   build, teste, execução, versão fixada do `clang-format` — cobre: 26, NFR-03
 - [x] **T25** `[M]` Criar o repositório no GitHub e informar a URL; adicionar o
   remoto e fazer o primeiro push (com sua confirmação) — cobre: 22
-- [ ] **T26** Criar `.github/workflows/ci.yml` com os jobs `windows`, `macos`,
+- [x] **T26** Criar `.github/workflows/ci.yml` com os jobs `windows`, `macos`,
   `linux-gcc` e `linux-clang`: Qt 6.8.3 com cache, vcpkg no commit do baseline
   com cache binário, pacotes `apt` no Linux, configurar, compilar, `ctest`
   (inclui o smoke test) — cobre: 22, 23, 25
-- [ ] **T27** Corrigir o que os quatro jobs revelarem até ficarem verdes. Se o
+- [x] **T27** Corrigir o que os quatro jobs revelarem até ficarem verdes. Se o
   triplet próprio falhar no macOS, aplicar o plano B do design e registrar a
   mudança no `design.md` — cobre: 01, 22, 27, 28, 30
-- [ ] **T28** Acrescentar ao CI a verificação de ligação dinâmica do
+- [x] **T28** Acrescentar ao CI a verificação de ligação dinâmica do
   OpenCASCADE (`dumpbin /dependents`, `ldd`, `otool -L`) — cobre: 27
-- [ ] **T29** Acrescentar o job `format` (`clang-format --dry-run --Werror`) e o
+- [x] **T29** Acrescentar o job `format` (`clang-format --dry-run --Werror`) e o
   passo `run-clang-tidy` no job `linux-clang`; corrigir os apontamentos —
   cobre: 24
 - [ ] **T30** Abrir um PR de teste com um aviso de compilação, um arquivo mal
@@ -283,3 +283,26 @@ do git), T23 (roteiro manual da janela), T25 (repositório no GitHub).
   em `GITHUB_ENV` depois da action.
 - `macos`: ainda sem nenhuma execução real (ver nota anterior).
 - A execução terminou; o push das correções não perde mais nenhum cache.
+
+**2026-11-10 — Execução nº 2 do CI, commit `d6039a2` (T26–T29 concluídas):**
+
+- Os quatro jobs de build e o `format` passaram:
+  <https://github.com/vj-fkx/femapp/actions/runs/42794348198>. Em todos:
+  build, `ctest` (inclui `femapp_smoke` e `test_geom`) e verificação de
+  ligação dinâmica do OpenCASCADE. `clang-tidy` sem apontamentos (33 s).
+- O triplet próprio `arm64-osx-femapp` funcionou no `macos-15`; o plano B não
+  foi necessário.
+- Tempos (T31, parcial):
+
+  | Job | Cache do vcpkg | Total | Configuração |
+  |---|---|---|---|
+  | `linux-gcc` | restaurado | 1 min 36 s | 13 s |
+  | `linux-clang` | restaurado | 2 min 2 s | 17 s |
+  | `windows` | vazio | 1 h 3 min | 1 h 1 min |
+  | `macos` | vazio | 1 h 8 min | 1 h 4 min |
+
+  Linux com cache fica dentro da meta de 5 min (NFR-001-01) e confirma a
+  restauração dos caches (REQ-001-25). Windows e macOS só terão tempo com
+  cache na próxima execução; a T31 fica aberta até lá.
+- Pendência menor: aviso de Node.js 20 obsoleto em `actions/cache@v4` e
+  `ilammy/msvc-dev-cmd@v1`.
