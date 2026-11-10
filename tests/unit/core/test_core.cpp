@@ -14,3 +14,10 @@ TEST_CASE("core reports the project version", "[core][version]")
     CHECK(fem::core::versionString() == FEMAPP_EXPECTED_VERSION);
     CHECK(fem::core::versionString() == expected);
 }
+
+// T30: deliberate violations to prove that CI rejects them. Never merge.
+TEST_CASE("ci negative check", "[core]")
+{
+    const int Bad_Name = 1; // readability-identifier-naming
+    CHECK(Bad_Name==1)  ; // clang-format
+}
