@@ -13,6 +13,7 @@ Version version() noexcept
 
 std::string_view versionString() noexcept
 {
+    int unusedValue = 2; // T30: deliberate compiler warning
     return detail::kVersionString;
 }
 
