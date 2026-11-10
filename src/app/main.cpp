@@ -5,6 +5,7 @@
 
 #include <QApplication>
 #include <QLocale>
+#include <QObject>
 #include <QString>
 #include <QTimer>
 #include <QTranslator>
@@ -17,6 +18,8 @@
 #include <string_view>
 
 namespace {
+
+constexpr int kSmokeTestTimeoutMs = 10000;
 
 int run(int argc, char** argv)
 {
@@ -45,7 +48,28 @@ int run(int argc, char** argv)
     window.show();
 
     if (options.smokeTest) {
-        QTimer::singleShot(0, &app, &QApplication::quit);
+        // REQ-002-29: succeed once the viewport has rendered a frame, or once
+        // the window has reported that no graphics backend is available
+        // (REQ-002-06); fail if neither happens in time.
+        const auto finish = [](const char* outcome) {
+            static bool finished = false;
+            if (!finished) {
+                finished = true;
+                std::cout << "femapp: smoke test: " << outcome << '\n' << std::flush;
+                QApplication::exit(EXIT_SUCCESS);
+            }
+        };
+        QObject::connect(&window, &fem::app::MainWindow::viewportFrameRendered, &window,
+                         [finish] { finish("frame rendered"); });
+        QObject::connect(&window, &fem::app::MainWindow::viewportUnavailable, &window,
+                         [finish] { finish("viewport unavailable"); });
+        if (!window.isViewportAvailable()) {
+            QTimer::singleShot(0, &window, [finish] { finish("viewport unavailable"); });
+        }
+        QTimer::singleShot(kSmokeTestTimeoutMs, &window, [] {
+            std::cout << "femapp: smoke test: timed out\n" << std::flush;
+            QApplication::exit(EXIT_FAILURE);
+        });
     }
 
     return QApplication::exec();

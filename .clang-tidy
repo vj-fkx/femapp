@@ -1,12 +1,17 @@
 ---
 # clang-analyzer-cplusplus.NewDelete is off: it reports false positives inside
 # OpenCASCADE's intrusive handles (Standard_Transient).
+# clang-analyzer-optin.core.EnumCastOutOfRange is off: it fires inside Catch2's
+# assertion macros.
+# readability-redundant-access-specifiers is off: Qt's "signals:" and
+# "public slots:" sections are separate on purpose.
 Checks: >
   -*,
   bugprone-*,
   -bugprone-easily-swappable-parameters,
   clang-analyzer-*,
   -clang-analyzer-cplusplus.NewDelete,
+  -clang-analyzer-optin.core.EnumCastOutOfRange,
   cppcoreguidelines-init-variables,
   cppcoreguidelines-owning-memory,
   cppcoreguidelines-pro-type-member-init,
@@ -20,6 +25,7 @@ Checks: >
   readability-braces-around-statements,
   readability-identifier-naming,
   readability-redundant-*,
+  -readability-redundant-access-specifiers,
   readability-simplify-boolean-expr
 WarningsAsErrors: '*'
 HeaderFilterRegex: '.*[/\\](src|tests)[/\\].*'

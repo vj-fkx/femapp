@@ -5,7 +5,6 @@
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 #include <Eigen/Geometry>
-
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -147,12 +146,30 @@ TEST_CASE("standard views look along the expected axes", "[render][camera]")
         Vec3 up;
     };
     const std::array<Expected, 6> cases = {{
-        {StandardView::Front, Vec3(0, 1, 0), Vec3(1, 0, 0), Vec3(0, 0, 1)},
-        {StandardView::Back, Vec3(0, -1, 0), Vec3(-1, 0, 0), Vec3(0, 0, 1)},
-        {StandardView::Right, Vec3(-1, 0, 0), Vec3(0, 1, 0), Vec3(0, 0, 1)},
-        {StandardView::Left, Vec3(1, 0, 0), Vec3(0, -1, 0), Vec3(0, 0, 1)},
-        {StandardView::Top, Vec3(0, 0, -1), Vec3(1, 0, 0), Vec3(0, 1, 0)},
-        {StandardView::Bottom, Vec3(0, 0, 1), Vec3(1, 0, 0), Vec3(0, -1, 0)},
+        {.view = StandardView::Front,
+         .forward = Vec3(0, 1, 0),
+         .right = Vec3(1, 0, 0),
+         .up = Vec3(0, 0, 1)},
+        {.view = StandardView::Back,
+         .forward = Vec3(0, -1, 0),
+         .right = Vec3(-1, 0, 0),
+         .up = Vec3(0, 0, 1)},
+        {.view = StandardView::Right,
+         .forward = Vec3(-1, 0, 0),
+         .right = Vec3(0, 1, 0),
+         .up = Vec3(0, 0, 1)},
+        {.view = StandardView::Left,
+         .forward = Vec3(1, 0, 0),
+         .right = Vec3(0, -1, 0),
+         .up = Vec3(0, 0, 1)},
+        {.view = StandardView::Top,
+         .forward = Vec3(0, 0, -1),
+         .right = Vec3(1, 0, 0),
+         .up = Vec3(0, 1, 0)},
+        {.view = StandardView::Bottom,
+         .forward = Vec3(0, 0, 1),
+         .right = Vec3(1, 0, 0),
+         .up = Vec3(0, -1, 0)},
     }};
 
     Camera camera = makeCamera();
@@ -333,8 +350,8 @@ TEST_CASE("zoom is clamped and stops moving the target at the limits", "[render]
 TEST_CASE("fit frames a box tightly in every view", "[render][camera]")
 {
     const Projection projection = GENERATE(Projection::Perspective, Projection::Orthographic);
-    const StandardView view = GENERATE(StandardView::Front, StandardView::Top,
-                                       StandardView::Right, StandardView::Isometric);
+    const StandardView view = GENERATE(StandardView::Front, StandardView::Top, StandardView::Right,
+                                       StandardView::Isometric);
     const auto [width, height] = GENERATE(std::pair{1600, 600}, std::pair{600, 1600});
 
     Camera camera;

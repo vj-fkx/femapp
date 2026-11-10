@@ -1,7 +1,6 @@
 #include <fem/render/camera.hpp>
 
 #include <Eigen/Geometry>
-
 #include <algorithm>
 #include <array>
 #include <cmath>

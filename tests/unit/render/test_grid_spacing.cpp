@@ -14,7 +14,9 @@ using fem::render::kGridMinPixelsPerCell;
 // REQ-002-21
 TEST_CASE("grid spacing is a power of ten with readable cells", "[render][grid]")
 {
-    for (double unitsPerPixel = 1e-7; unitsPerPixel < 1e7; unitsPerPixel *= 1.37) {
+    // Sweeps fourteen decades of zoom.
+    for (int step = 0; step < 100; ++step) {
+        const double unitsPerPixel = 1e-7 * std::pow(1.38, step);
         const GridSpacing spacing = gridSpacing(unitsPerPixel);
 
         const double exponent = std::log10(spacing.minor);
@@ -35,7 +37,8 @@ TEST_CASE("grid spacing is a power of ten with readable cells", "[render][grid]"
 TEST_CASE("grid spacing never grows while zooming in", "[render][grid]")
 {
     double previousMinor = gridSpacing(1e6).minor;
-    for (double unitsPerPixel = 1e6; unitsPerPixel > 1e-6; unitsPerPixel /= 1.2) {
+    for (int step = 0; step < 150; ++step) {
+        const double unitsPerPixel = 1e6 / std::pow(1.2, step);
         const double minor = gridSpacing(unitsPerPixel).minor;
         CHECK(minor <= previousMinor);
         previousMinor = minor;

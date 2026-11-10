@@ -16,3 +16,6 @@ Thumbs.db
 
 # Claude Code (configuração local)
 .claude/settings.local.json
+
+# aqtinstall writes its log to the working directory
+aqtinstall.log

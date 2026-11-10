@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Eigen/Core>
+#include <cstdint>
 
 namespace fem::render {
 
@@ -8,9 +9,9 @@ using Vec2 = Eigen::Vector2d;
 using Vec3 = Eigen::Vector3d;
 using Mat4 = Eigen::Matrix4d;
 
-enum class Projection { Perspective, Orthographic };
+enum class Projection : std::uint8_t { Perspective, Orthographic };
 
-enum class StandardView { Front, Back, Left, Right, Top, Bottom, Isometric };
+enum class StandardView : std::uint8_t { Front, Back, Left, Right, Top, Bottom, Isometric };
 
 // Axis-aligned bounding box.
 struct Aabb

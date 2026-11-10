@@ -6,8 +6,8 @@
 
 using fem::render::Backend;
 using fem::render::BackendPlan;
-using fem::render::Platform;
 using fem::render::planBackends;
+using fem::render::Platform;
 
 // REQ-002-04
 TEST_CASE("backend names are parsed case-insensitively", "[render][backend]")
@@ -43,8 +43,7 @@ TEST_CASE("default plan is the native backend followed by OpenGL", "[render][bac
 TEST_CASE("a valid override is tried first and keeps the fallbacks", "[render][backend]")
 {
     const BackendPlan d3d12 = planBackends(Platform::Windows, "d3d12");
-    CHECK(d3d12.attempts ==
-          std::vector{Backend::Direct3D12, Backend::Direct3D11, Backend::OpenGL});
+    CHECK(d3d12.attempts == std::vector{Backend::Direct3D12, Backend::Direct3D11, Backend::OpenGL});
     CHECK(d3d12.warning.empty());
 
     const BackendPlan opengl = planBackends(Platform::Windows, "opengl");

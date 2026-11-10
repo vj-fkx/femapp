@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -8,9 +9,9 @@
 namespace fem::render {
 
 // Graphics backends reachable through Qt RHI.
-enum class Backend { Direct3D11, Direct3D12, Metal, Vulkan, OpenGL, Null };
+enum class Backend : std::uint8_t { Direct3D11, Direct3D12, Metal, Vulkan, OpenGL, Null };
 
-enum class Platform { Windows, MacOS, Linux };
+enum class Platform : std::uint8_t { Windows, MacOS, Linux };
 
 // Platform this binary was built for.
 [[nodiscard]] Platform currentPlatform() noexcept;

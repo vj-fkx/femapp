@@ -67,22 +67,22 @@ Regras:
 
 ## Fase 2 — Renderização
 
-- [ ] **T16** Criar os shaders da grade (versões mínimas que compilam) e ligar
+- [x] **T16** Criar os shaders da grade (versões mínimas que compilam) e ligar
   `qt_add_shaders` ao módulo; criar o esqueleto de `SceneRenderer`
   (`initialize`, `render` que só limpa a tela, `release`) e o teste que cria um
   `QRhi` `Null`, um alvo offscreen e desenha um quadro —
   arquivos: `src/render/shaders/grid.vert/.frag`, `scene_renderer.hpp/.cpp`,
   `tests/unit/render/test_scene_renderer.cpp` — cobre: 29, 30
-- [ ] **T17** Criar `Viewport` (`QRhiWidget`): aplica o plano de backends antes
+- [x] **T17** Criar `Viewport` (`QRhiWidget`): aplica o plano de backends antes
   de ser mostrado, delega a `SceneRenderer`, conta quadros, emite
   `frameRendered` e `backendChanged`, `setSampleCount(4)`; remover
   `module.hpp/.cpp` e o teste antigo — arquivos: `viewport.hpp/.cpp` —
   cobre: 01, 02, 04, 08, 09
-- [ ] **T18** Tratar falha de inicialização no `Viewport`: avançar para a
+- [x] **T18** Tratar falha de inicialização no `Viewport`: avançar para a
   próxima tentativa do plano; lista esgotada ou falha de pipeline ⇒
   `backendUnavailable` com o motivo; aviso de variável inválida no log —
   cobre: 03, 05, 06
-- [ ] **T19** Colocar o `Viewport` como widget central do `MainWindow`, com a
+- [x] **T19** Colocar o `Viewport` como widget central do `MainWindow`, com a
   mensagem de falha no lugar dele quando `backendUnavailable` chegar; mostrar o
   backend no "Sobre" — arquivos: `main_window.hpp/.cpp` — cobre: 01, 06, 07
 - [ ] **T20** Alterar o `--smoke-test`: sair com 0 ao primeiro `frameRendered`
@@ -92,33 +92,33 @@ Regras:
   `tests/CMakeLists.txt` — cobre: 06, 29
   - **Ponto de parada:** se `femapp_smoke` não obtiver um quadro na plataforma
     `offscreen`, parar e propor ajuste no REQ-002-29 (risco 1 do design).
-- [ ] **T21** Criar `cmake/CheckRhiConfined.cmake` e o teste
+- [x] **T21** Criar `cmake/CheckRhiConfined.cmake` e o teste
   `check_rhi_confined`; conferir que ele falha com um `#include <rhi/qrhi.h>`
   posto de propósito em `src/app` — cobre: 10
-- [ ] **T22** Implementar a grade completa: quadrilátero sob o foco, linhas
+- [x] **T22** Implementar a grade completa: quadrilátero sob o foco, linhas
   secundárias e principais com antisserrilhamento, espaçamento e `minorFade`
   vindos de `gridSpacing`, foco reduzido módulo `major` em `double`, eixos X e Y
   coloridos, esmaecimento por distância e por ângulo rasante —
   arquivos: `grid.vert/.frag`, `scene_renderer.cpp` — cobre: 20, 21, 22, 23
-- [ ] **T23** Ligar o mouse à câmera: botão do meio = pan, Shift + meio =
+- [x] **T23** Ligar o mouse à câmera: botão do meio = pan, Shift + meio =
   órbita, roda = zoom no cursor; `update()` apenas quando a câmera muda —
   arquivo: `viewport.cpp` — cobre: 09, 12, 13, 14
-- [ ] **T24** Indicador de eixos: geometria das setas (teste unitário da
+- [x] **T24** Indicador de eixos: geometria das setas (teste unitário da
   geração: contagem de vértices, normais unitárias, cores), shaders `gizmo`,
   segundo passe em área de 96 px lógicos com profundidade própria —
   arquivos: `axis_gizmo_mesh.hpp/.cpp`, `gizmo.vert/.frag`, `scene_renderer.cpp`
   — cobre: 24, 25
-- [ ] **T25** Rótulos X, Y, Z: atlas gerado com `QPainter`, quadriláteros
+- [x] **T25** Rótulos X, Y, Z: atlas gerado com `QPainter`, quadriláteros
   voltados para a câmera, atlas refeito quando o `devicePixelRatio` muda —
   arquivos: `axis_labels.hpp/.cpp`, `label.vert/.frag` — cobre: 08, 24, 25
 
 ## Fase 3 — Interface
 
-- [ ] **T26** Menu "Exibir": sete vistas padrão (Ctrl+1 … Ctrl+7), projeção
+- [x] **T26** Menu "Exibir": sete vistas padrão (Ctrl+1 … Ctrl+7), projeção
   marcável (Ctrl+Shift+O), "Enquadrar tudo" (Home), grade (F7) e eixos
   marcáveis; itens desabilitados quando o viewport não está disponível —
   arquivos: `main_window.hpp/.cpp`, `viewport.cpp` — cobre: 16, 17, 18, 26
-- [ ] **T27** Traduzir os textos novos para pt_BR (menu, mensagem de falha,
+- [x] **T27** Traduzir os textos novos para pt_BR (menu, mensagem de falha,
   linha do backend no "Sobre") — arquivo: `i18n/femapp_pt_BR.ts` — cobre: 27
 - [ ] **T28** `[M]` Roteiro manual no Windows, escrito nas notas desta tarefa:
   navegação (AC-5), vistas e projeção (AC-7), grade (AC-8), eixos e menu
@@ -179,4 +179,55 @@ Regras:
 
 ## Notas de implementação
 
-*(preenchidas durante a implementação)*
+**2026-11-10 — Fases 0 e 1 (T00–T15):**
+
+- T00: Qt Shader Tools 6.8.3 instalado com `aqtinstall` (autorizado pelo
+  mantenedor).
+- Testes e implementação foram compilados juntos, e não em dois passos
+  separados (teste falhando, depois implementação). Mesmo desvio da 001.
+- Desvio do design §5.1 (enquadrar): em vez da esfera envolvente, `fit` projeta
+  os oito cantos da caixa nos eixos da câmera. A esfera deixava mais de 50 % de
+  folga em vistas ortogonais de caixas achatadas; com os cantos, o canto
+  limitante fica sempre a 1/1,1 da borda. Em ortográfica a profundidade é
+  ignorada.
+- 35 testes passando após a fase 1; zero avisos com `/W4`.
+
+**2026-11-10 — Fases 2 e 3 (T16–T19, T21–T27), T20 parada:**
+
+- Build sem avisos, `clang-format` e `clang-tidy` limpos, 39 de 40 testes
+  passando. O que falha é o `femapp_smoke` (T20), ver abaixo.
+- Verificado por execução no Windows: o aplicativo renderiza um quadro com
+  Direct3D 11 (padrão), com `FEM_RHI_BACKEND=opengl`, com `null` e com um valor
+  inválido (cai no padrão). `femapp_smoke_no_gpu` (`fail`) passa.
+- **Não verificado visualmente:** a aparência da grade, dos eixos e dos
+  rótulos, a navegação com o mouse e os menus. Fica para o roteiro manual
+  (T28). O teste de `SceneRenderer` com o backend `Null` só prova que shaders,
+  pipelines e comandos são aceitos, não que a imagem está certa.
+- T21: `check_rhi_confined` conferido com quatro includes proibidos postos de
+  propósito em `src/app` (todos reprovados) e com `<QRhiWidget>` (aceito).
+- Acréscimos à interface do design §4: `Viewport::isAvailable()`,
+  `unavailableReason()` e `camera()`; `SceneRenderer::initialize` devolve
+  `bool` com `errorString()`. Necessários para tratar a falha de backend de
+  forma síncrona na construção da janela.
+- Desvio do design §5.3: a profundidade não é limpa na área do indicador de
+  eixos (o QRhi não limpa parte de um passe). O indicador é desenhado em uma
+  fatia fina na frente do intervalo de profundidade (`maxDepth = 0,01`).
+  Suficiente enquanto nada mais escreve profundidade; rever na feature 004.
+- Ajustes no `.clang-tidy`: desligados
+  `clang-analyzer-optin.core.EnumCastOutOfRange` (dispara dentro das macros do
+  Catch2) e `readability-redundant-access-specifiers` (conflita com as seções
+  `signals:` / `public slots:` do Qt).
+- `aqtinstall.log` foi parar em um commit por engano; removido e acrescentado
+  ao `.gitignore`.
+
+**T20 — ponto de parada atingido (risco 1 do design):**
+
+- Com `QT_QPA_PLATFORM=offscreen`, o `QRhiWidget` não inicializa nem com o
+  backend `null`: o aplicativo cai no caminho "viewport indisponível". Na
+  plataforma nativa do Windows o mesmo comando renderiza um quadro.
+- O texto do REQ-002-29 não menciona `offscreen`; quem fixou isso foi o design
+  (§8) e a configuração do teste herdada da 001.
+- Proposta, aguardando aprovação: rodar `femapp_smoke` na plataforma nativa
+  (sem `QT_QPA_PLATFORM=offscreen`), mantendo `FEM_RHI_BACKEND=null`; no CI de
+  Linux, rodar o `ctest` sob `xvfb-run`. `femapp_smoke_no_gpu` continua em
+  `offscreen`.
