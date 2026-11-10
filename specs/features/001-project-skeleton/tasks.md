@@ -112,10 +112,10 @@ Regras:
 - [x] **T29** Acrescentar o job `format` (`clang-format --dry-run --Werror`) e o
   passo `run-clang-tidy` no job `linux-clang`; corrigir os apontamentos —
   cobre: 24
-- [ ] **T30** Abrir um PR de teste com um aviso de compilação, um arquivo mal
+- [x] **T30** Abrir um PR de teste com um aviso de compilação, um arquivo mal
   formatado e um diagnóstico de `clang-tidy`; confirmar que o CI falha nos três
   casos; fechar o PR sem mesclar (AC-9) — cobre: 06, 24
-- [ ] **T31** Medir o tempo dos jobs com cache e comparar com a meta de 5 min
+- [x] **T31** Medir o tempo dos jobs com cache e comparar com a meta de 5 min
   (NFR-01); registrar o resultado aqui
 
 ## Fase 5 — Fechamento
@@ -306,3 +306,20 @@ do git), T23 (roteiro manual da janela), T25 (repositório no GitHub).
   cache na próxima execução; a T31 fica aberta até lá.
 - Pendência menor: aviso de Node.js 20 obsoleto em `actions/cache@v4` e
   `ilammy/msvc-dev-cmd@v1`.
+
+**2026-11-10 — PR de teste (T30 e T31 concluídas):**
+
+- PR <https://github.com/vj-fkx/femapp/pull/1>, branch
+  `test/ci-negative-checks`, fechado sem mesclar. Feito em duas rodadas, porque
+  um erro de compilação impediria o passo do `clang-tidy` de rodar:
+  1. Commit `2a3d734` (formatação errada + variável `Bad_Name`): `format`
+     falhou; `linux-clang` falhou no passo "Run clang-tidy"
+     (`readability-identifier-naming`); `windows`, `macos` e `linux-gcc`
+     passaram.
+  2. Commit `1243c9c` (variável local não usada em `version.cpp`): os quatro
+     jobs de build falharam no passo "Build".
+- A branch `test/ci-negative-checks` continua no remoto; pode ser apagada.
+- Tempos com cache (execução nº 4, T31): `windows` 2 min 41 s (configuração
+  40 s), `macos` 1 min 52 s (configuração 18 s); Linux como na execução nº 2
+  (1 min 36 s e 2 min 2 s). Todos dentro da meta de 5 min (NFR-001-01), e o
+  cache do `main` é restaurado em PRs (REQ-001-25).
