@@ -98,7 +98,7 @@ Regras:
 
 - [x] **T24** Escrever o `README.md`: descrição, pré-requisitos por plataforma,
   build, teste, execução, versão fixada do `clang-format` — cobre: 26, NFR-03
-- [ ] **T25** `[M]` Criar o repositório no GitHub e informar a URL; adicionar o
+- [x] **T25** `[M]` Criar o repositório no GitHub e informar a URL; adicionar o
   remoto e fazer o primeiro push (com sua confirmação) — cobre: 22
 - [ ] **T26** Criar `.github/workflows/ci.yml` com os jobs `windows`, `macos`,
   `linux-gcc` e `linux-clang`: Qt 6.8.3 com cache, vcpkg no commit do baseline
@@ -252,3 +252,10 @@ do git), T23 (roteiro manual da janela), T25 (repositório no GitHub).
 - Repositório público e vazio criado em `https://github.com/vj-fkx/femapp` e
   configurado como `origin`. **O push ainda não foi feito**: aguarda confirmação
   do mantenedor, por isso a T25 continua aberta.
+
+**2026-11-10 — Primeiro push (T25 concluída):**
+
+- Os commits foram reescritos com o e-mail `noreply` do GitHub antes do envio.
+- `main` enviado para `origin` com o Git Credential Manager (login pelo
+  navegador, feito pelo mantenedor). A execução nº 1 do CI começou no commit
+  `d86e743`. Resultado ainda desconhecido; as correções ficam na T27.
