@@ -1,0 +1,14 @@
+{
+  "name": "femapp",
+  "version-string": "0.1.0",
+  "builtin-baseline": "9eec002df1cd109f8f104cd966a763daf9751489",
+  "dependencies": [
+    "eigen3",
+    "spdlog",
+    "catch2",
+    {
+      "name": "opencascade",
+      "default-features": false
+    }
+  ]
+}
