@@ -1,6 +1,6 @@
 # ADR 0002 — O módulo `render` depende de Qt Widgets e dos headers privados do Qt Gui
 
-Status: proposta · Data: 2026-11-10
+Status: aceita · Data: 2026-11-10
 
 ## Contexto
 

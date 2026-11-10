@@ -1,6 +1,6 @@
 # Design — 002 gpu-viewport
 
-Status: rascunho · Data: 2026-11-10
+Status: aprovado · Data: 2026-11-10
 Requisitos: [requirements.md](requirements.md)
 
 ## 1. Resumo da abordagem
