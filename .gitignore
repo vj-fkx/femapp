@@ -1,0 +1,18 @@
+# Build
+/build/
+/out/
+/cmake-build-*/
+CMakeUserPresets.json
+CMakeLists.txt.user*
+/vcpkg_installed/
+
+# IDE / SO
+.vs/
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Claude Code (configuração local)
+.claude/settings.local.json
