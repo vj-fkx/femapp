@@ -13,7 +13,7 @@ demais vêm depois da geometria completa.
 | Nº | Feature | Entrega | Depende de | Status |
 |----|---------|---------|------------|--------|
 | 001 | project-skeleton | CMake, presets, vcpkg, módulos vazios, janela Qt mínima, CI nas 3 plataformas, clang-format/tidy, verificação do OpenCASCADE | — | concluída |
-| 002 | gpu-viewport | `QRhiWidget`, câmera órbita/pan/zoom, eixos, grade | 001 | planejada |
+| 002 | gpu-viewport | `QRhiWidget`, câmera órbita/pan/zoom, eixos, grade | 001 | requisitos |
 | 003 | mesh-model | `core::Mesh` (todas as topologias, linear e quadrática), grupos, leitor `.msh` | 001 | planejada |
 | 004 | mesh-rendering | Malha no viewport: linhas, faces, arestas, casca externa 3D, seleção | 002, 003 | planejada |
 
