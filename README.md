@@ -29,6 +29,9 @@ OpenCASCADE leva cerca de 40 minutos. Depois disso o vcpkg reutiliza o cache.
   `aqt install-qt windows desktop 6.8.3 win64_msvc2022_64 -O C:\Qt`.
 - Use o **Developer PowerShell for VS 2022** (ou abra a pasta no Visual Studio /
   VS Code), que já define o compilador e o `VCPKG_ROOT`.
+- Clone o repositório em um **caminho curto** (por exemplo `C:\dev\femapp`). O
+  vcpkg compila as dependências dentro de `build/`, e caminhos longos estouram
+  o limite de 260 caracteres do Windows.
 
 ### macOS
 

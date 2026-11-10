@@ -1,6 +1,6 @@
 # Tarefas — 001 project-skeleton
 
-Status: em andamento
+Status: concluído · 2026-11-10
 Design: [design.md](design.md) · Requisitos: [requirements.md](requirements.md)
 
 Regras:
@@ -90,7 +90,7 @@ Regras:
 - [x] **T22** Tradução: todos os textos em `tr()`, `i18n/femapp_pt_BR.ts`,
   `qt_add_translations`, carga do `QTranslator` pelo idioma do sistema —
   cobre: 17
-- [ ] **T23** `[M]` Roteiro manual: abrir o aplicativo, conferir menus, "Sobre",
+- [x] **T23** `[M]` Roteiro manual: abrir o aplicativo, conferir menus, "Sobre",
   "Sair" (código 0) e o idioma em português e em inglês (AC-5, AC-7); medir o
   tempo de abertura (NFR-02) — cobre: 11, 12, 13, 17
 
@@ -122,9 +122,9 @@ Regras:
 
 - [x] **T90** Build e testes verdes nos quatro jobs do CI
 - [x] **T91** `clang-format` e `clang-tidy` sem pendências
-- [ ] **T92** Conferir os doze critérios de aceite de `requirements.md`,
+- [x] **T92** Conferir os doze critérios de aceite de `requirements.md`,
   incluindo AC-10 (seguir só o README em um clone limpo)
-- [ ] **T93** Atualizar `specs/roadmap.md` para `concluída` e o `CLAUDE.md` se
+- [x] **T93** Atualizar `specs/roadmap.md` para `concluída` e o `CLAUDE.md` se
   os comandos de build tiverem mudado
 
 ## Matriz de rastreabilidade
@@ -326,3 +326,29 @@ do git), T23 (roteiro manual da janela), T25 (repositório no GitHub).
 - T90 e T91: execuções nº 2 e nº 3 do CI no `main` (commits `d6039a2` e
   `1d1c26a`) verdes nos quatro jobs de build e no `format`, com `clang-tidy`
   sem apontamentos.
+
+**2026-11-10 — Fechamento (T23, T92, T93):**
+
+- T23: roteiro manual da janela confirmado pelo mantenedor.
+- T92, critérios de aceite:
+  - AC-1, AC-3, AC-6, AC-10: clone limpo no Windows seguindo só o README
+    (`cmake --preset dev`, build, `ctest`): zero avisos, 9/9 testes,
+    `femapp --version` imprime `femapp 0.1.0`, `--smoke-test` sai com 0. Em
+    macOS e Linux o README não foi seguido à mão; a cobertura ali é o CI.
+  - AC-2, AC-4, AC-12: verificações negativas feitas localmente durante a
+    implementação; ligação dinâmica conferida nos quatro jobs do CI.
+  - AC-5, AC-7: roteiro manual (T23), com o sistema em português. O caso
+    "outro idioma → inglês" não foi exercitado em uma máquina com outro
+    idioma; vale pelo código (textos-fonte em inglês; o tradutor só é
+    instalado quando existe tradução para o idioma do sistema).
+  - AC-8, AC-11: execuções nº 2 e nº 3 do CI. AC-9: PR de teste (T30).
+- Achados do clone limpo no Windows:
+  - Em um caminho longo (~130 caracteres), a compilação do OpenCASCADE pelo
+    vcpkg falha por causa do limite de 260 caracteres. Aviso acrescentado ao
+    README.
+  - Com o clone dentro de `%TEMP%`, os executáveis ligados a DLLs sumiam de
+    `build/dev/bin` logo após a ligação, sem erro do build. Não acontece fora
+    de `%TEMP%` (clone em `C:\Users\...` passou). Causa não investigada; parece
+    ser do ambiente (software de segurança), não do projeto.
+- T93: roadmap atualizado para `concluída`. Os comandos de build do `CLAUDE.md`
+  não mudaram.

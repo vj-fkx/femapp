@@ -102,33 +102,33 @@ sem trabalho adicional de infraestrutura.
 
 ## 5. Critérios de aceite
 
-- [ ] **AC-1** (REQ-001-01, 02, 03) Dado um clone limpo em uma máquina com os
+- [x] **AC-1** (REQ-001-01, 02, 03) Dado um clone limpo em uma máquina com os
   pré-requisitos, quando executo `cmake --preset dev` e `cmake --build --preset dev`,
   então o build termina sem erros nem avisos.
-- [ ] **AC-2** (REQ-001-04) Dado um ambiente sem Qt, quando configuro, então a
+- [x] **AC-2** (REQ-001-04) Dado um ambiente sem Qt, quando configuro, então a
   configuração falha com mensagem que cita a versão mínima e `CMAKE_PREFIX_PATH`.
-- [ ] **AC-3** (REQ-001-07, 08, 10, 18) Quando executo `ctest --preset dev`, então
+- [x] **AC-3** (REQ-001-07, 08, 10, 18) Quando executo `ctest --preset dev`, então
   há um teste por módulo e todos passam.
-- [ ] **AC-4** (REQ-001-09) Dado um `#include <QString>` acrescentado a um arquivo
+- [x] **AC-4** (REQ-001-09) Dado um `#include <QString>` acrescentado a um arquivo
   de `core`, quando compilo, então a compilação falha.
-- [ ] **AC-5** (REQ-001-11, 12, 13) Quando executo `femapp`, então vejo a janela
+- [x] **AC-5** (REQ-001-11, 12, 13) Quando executo `femapp`, então vejo a janela
   com menus e barra de status; "Sobre" mostra versão, Qt e licença; "Sair"
   encerra com código 0.
-- [ ] **AC-6** (REQ-001-14, 15, 16) `femapp --version` imprime a versão definida no
+- [x] **AC-6** (REQ-001-14, 15, 16) `femapp --version` imprime a versão definida no
   CMake; `femapp --smoke-test` encerra sozinho com código 0.
-- [ ] **AC-7** (REQ-001-17) Com o sistema em português, os menus aparecem em
+- [x] **AC-7** (REQ-001-17) Com o sistema em português, os menus aparecem em
   português; em outro idioma, em inglês.
-- [ ] **AC-8** (REQ-001-22, 23, 25) Um push dispara o CI e os quatro jobs
+- [x] **AC-8** (REQ-001-22, 23, 25) Um push dispara o CI e os quatro jobs
   (Windows, macOS, Linux GCC, Linux Clang) terminam verdes, incluindo o smoke test.
-- [ ] **AC-9** (REQ-001-06, 24) Um commit com aviso de compilação, má formatação
+- [x] **AC-9** (REQ-001-06, 24) Um commit com aviso de compilação, má formatação
   ou diagnóstico de `clang-tidy` faz o CI falhar.
-- [ ] **AC-11** (REQ-001-27, 28, 30) O teste de `fem_geom` cria um bloco com o
+- [x] **AC-11** (REQ-001-27, 28, 30) O teste de `fem_geom` cria um bloco com o
   OpenCASCADE, confere o volume e passa nos quatro jobs do CI, rodando direto da
   pasta de build.
-- [ ] **AC-12** (REQ-001-27, 29) Nenhum header público de `fem_geom` inclui o
+- [x] **AC-12** (REQ-001-27, 29) Nenhum header público de `fem_geom` inclui o
   OpenCASCADE, e nenhum outro alvo o liga diretamente; o OpenCASCADE é ligado
   como biblioteca dinâmica.
-- [ ] **AC-10** (REQ-001-26) Seguindo apenas o `README.md`, é possível compilar e
+- [x] **AC-10** (REQ-001-26) Seguindo apenas o `README.md`, é possível compilar e
   executar o aplicativo.
 
 ## 6. Fora de escopo
