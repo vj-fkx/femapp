@@ -1,9 +1,12 @@
 ---
+# clang-analyzer-cplusplus.NewDelete is off: it reports false positives inside
+# OpenCASCADE's intrusive handles (Standard_Transient).
 Checks: >
   -*,
   bugprone-*,
   -bugprone-easily-swappable-parameters,
   clang-analyzer-*,
+  -clang-analyzer-cplusplus.NewDelete,
   cppcoreguidelines-init-variables,
   cppcoreguidelines-owning-memory,
   cppcoreguidelines-pro-type-member-init,

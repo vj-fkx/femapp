@@ -6,12 +6,14 @@ namespace fem::core {
 
 Version version() noexcept
 {
-    return {FEMAPP_VERSION_MAJOR, FEMAPP_VERSION_MINOR, FEMAPP_VERSION_PATCH};
+    return {.major = detail::kVersionMajor,
+            .minor = detail::kVersionMinor,
+            .patch = detail::kVersionPatch};
 }
 
 std::string_view versionString() noexcept
 {
-    return FEMAPP_VERSION_STRING;
+    return detail::kVersionString;
 }
 
 } // namespace fem::core

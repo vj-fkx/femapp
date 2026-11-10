@@ -10,11 +10,15 @@
 #include <QTranslator>
 
 #include <cstddef>
+#include <cstdio>
+#include <cstdlib>
 #include <iostream>
 #include <span>
 #include <string_view>
 
-int main(int argc, char* argv[])
+namespace {
+
+int run(int argc, char** argv)
 {
     const std::span<const char* const> args(argv, static_cast<std::size_t>(argc));
     const fem::app::CliOptions options = fem::app::parseCliOptions(args);
@@ -23,7 +27,7 @@ int main(int argc, char* argv[])
     // Handled before QApplication exists so it works without a display.
     if (options.showVersion) {
         std::cout << "femapp " << version << '\n';
-        return 0;
+        return EXIT_SUCCESS;
     }
 
     const QApplication app(argc, argv);
@@ -45,4 +49,16 @@ int main(int argc, char* argv[])
     }
 
     return QApplication::exec();
+}
+
+} // namespace
+
+int main(int argc, char* argv[])
+{
+    try {
+        return run(argc, argv);
+    } catch (...) {
+        std::fputs("femapp: fatal error\n", stderr);
+        return EXIT_FAILURE;
+    }
 }

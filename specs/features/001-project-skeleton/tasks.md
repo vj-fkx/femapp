@@ -228,3 +228,21 @@ versão do núcleo aceita 8.x.
 
 **Pendentes que dependem do mantenedor:** T02 (primeiro commit: falta identidade
 do git), T23 (roteiro manual da janela), T25 (repositório no GitHub).
+
+**2026-11-10 — Workflow do CI escrito, ainda não executado:**
+
+- T26, T28, T29: `.github/workflows/ci.yml` escrito com os jobs `windows`,
+  `macos`, `linux-gcc`, `linux-clang` (com `clang-tidy`) e `format`, incluindo a
+  verificação de ligação dinâmica do OpenCASCADE. O YAML é válido, mas **o
+  workflow nunca rodou**: as três tarefas continuam abertas até o primeiro push
+  (T25) e serão fechadas junto com a T27.
+- `clang-tidy` 19 rodado localmente pela primeira vez sobre `src/` e `tests/`.
+  Corrigido: inicializadores designados em `version()`, constantes `constexpr`
+  no lugar de macros em `version_config.hpp.in`, `main` que não deixa escapar
+  exceções, e `char**` no lugar de array C. Desligado
+  `clang-analyzer-cplusplus.NewDelete`, que acusa falso positivo dentro dos
+  handles do OpenCASCADE. Resultado: zero diagnósticos.
+- Pontos do workflow com maior chance de precisar de ajuste na T27: pacote
+  `clang-tidy-19` no `apt` do Ubuntu 24.04; triplet próprio no macOS; lista de
+  pacotes de sistema para o OpenCASCADE no Linux; tempo da primeira execução
+  (o vcpkg compila o OpenCASCADE em Debug e Release).
