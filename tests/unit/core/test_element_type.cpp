@@ -16,10 +16,10 @@ using fem::core::ElementTypeInfo;
 using fem::core::referenceNodeCoordinates;
 
 // REQ-003-01
-TEST_CASE("all 103 fixed-size Gmsh element types are available", "[core][element]")
+TEST_CASE("all 90 Gmsh element types are available", "[core][element]")
 {
-    CHECK(fem::core::kElementTypeCount == 103);
-    REQUIRE(allElementTypes().size() == 103);
+    CHECK(fem::core::kElementTypeCount == 90);
+    REQUIRE(allElementTypes().size() == 90);
 
     std::map<ElementFamily, int> perFamily;
     std::set<int> gmshTypes;
@@ -37,12 +37,12 @@ TEST_CASE("all 103 fixed-size Gmsh element types are available", "[core][element
     CHECK(perFamily[ElementFamily::Triangle] == 18);
     CHECK(perFamily[ElementFamily::Quadrilateral] == 19);
     CHECK(perFamily[ElementFamily::Tetrahedron] == 18);
-    CHECK(perFamily[ElementFamily::Hexahedron] == 17);
+    CHECK(perFamily[ElementFamily::Hexahedron] == 11);
     CHECK(perFamily[ElementFamily::Wedge] == 3);
-    CHECK(perFamily[ElementFamily::Pyramid] == 17);
+    CHECK(perFamily[ElementFamily::Pyramid] == 10);
 
-    CHECK(gmshTypes.size() == 103);
-    CHECK(names.size() == 103);
+    CHECK(gmshTypes.size() == 90);
+    CHECK(names.size() == 90);
 }
 
 // REQ-003-02

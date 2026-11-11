@@ -27,11 +27,11 @@ Regras:
 ## Fase 1 — Tipos de elemento
 
 - [x] **T02** Escrever `tools/generate_element_types.py`: consulta a API do
-  Gmsh para os tipos 1 a 999, filtra os 103 de número fixo de nós (design
+  Gmsh para os tipos 1 a 999, filtra os 90 de número fixo de nós que o Gmsh cria (design
   §5.1) e grava `src/core/element_type_table.inc` (tabela e coordenadas de
   referência) e a lista do enum, com a versão do Gmsh no cabeçalho. Rodar e
   versionar a saída — cobre: 01, 02, 03
-- [x] **T03** Testes da tabela: 103 tipos; contagem por família (design §5.1);
+- [x] **T03** Testes da tabela: 90 tipos; contagem por família (design §5.1);
   números do Gmsh únicos; `nodeCount` igual ao tamanho das coordenadas de
   referência; vértices primeiro e iguais entre os tipos de cada família; ponto
   com ordem 0 — arquivo: `tests/unit/core/test_element_type.cpp` — cobre: 01,
@@ -61,7 +61,7 @@ Regras:
   nenhum, `findGroup`, `findGroups`, `groupNodes`, nome repetido na mesma
   dimensão, elemento de outra dimensão — cobre: 11, 12, 13, 14
 - [x] **T10** Testes e implementação de `elementMeasure`: elemento de referência
-  de cada um dos 103 tipos com a medida esperada; elemento invertido negativo;
+  de cada um dos 90 tipos com a medida esperada; elemento invertido negativo;
   área com sinal no plano XY e positiva fora dele; ponto igual a 1 — arquivos:
   `mesh_measure.hpp/.cpp`, `tests/unit/core/test_mesh_measure.cpp` — cobre: 03,
   08
@@ -71,7 +71,7 @@ Regras:
 ## Fase 3 — Arquivos de exemplo
 
 - [ ] **T12** Escrever `tests/data/gmsh/generate_test_meshes.py` (API do Gmsh)
-  e os `.geo`: arquivo com um elemento de cada um dos 103 tipos (transformação
+  e os `.geo`: arquivo com um elemento de cada um dos 90 tipos (transformação
   afim conhecida por tipo); malhas reais de ordem 1 e 2 (segmento, quadrado
   2×3, caixa 1×2×3) com grupos com e sem nome; ids esparsos; nós com
   coordenadas paramétricas; seções extras; tipo não suportado. Gravar ASCII e
@@ -92,10 +92,10 @@ Regras:
   ordem dos bytes; testes com versão 2.2 e com a ordem de bytes trocada em
   memória — arquivos: `gmsh_reader.hpp/.cpp`, `tests/unit/io/test_gmsh_reader.cpp`
   — cobre: 15, 21
-- [ ] **T16** `$Nodes` e `$Elements` em ASCII: o arquivo com os 103 tipos é
+- [ ] **T16** `$Nodes` e `$Elements` em ASCII: o arquivo com os 90 tipos é
   lido com cada nó na posição dada pelas coordenadas de referência; ids
   esparsos e coordenadas paramétricas — cobre: 15, 17
-- [ ] **T17** Mesmo caminho em binário: o arquivo binário com os 103 tipos
+- [ ] **T17** Mesmo caminho em binário: o arquivo binário com os 90 tipos
   produz malha idêntica à do ASCII — cobre: 15
 - [ ] **T18** `$PhysicalNames` e `$Entities`: grupos com nome e com nome gerado,
   elemento em mais de um grupo, ASCII e binário iguais — cobre: 16
@@ -195,6 +195,8 @@ Regras:
   103 tipos (hexaedros incompletos de ordem 4 a 9, tipos 100–105; pirâmides
   incompletas de ordem 3 a 9, tipos 125–131). Eles ficaram fora de
   `all_types`, e o design (§8) pede que o arquivo com todos os tipos seja
-  gravado pelo Gmsh. Aguardando decisão do mantenedor.
+  gravado pelo Gmsh. Decisão do mantenedor (2026-11-11): tirar os 13 tipos.
+  Requisitos, design, gerador da tabela e testes atualizados para 90 tipos;
+  os 13 passam a ser ignorados com aviso na leitura.
 - O tipo 84 ("Line 1"), usado para testar o aviso de tipo não suportado,
   também não é aceito pelo Gmsh; `extra_sections.msh` foi escrito à mão.

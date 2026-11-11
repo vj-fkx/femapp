@@ -35,6 +35,12 @@ FAMILIES = {
 }
 FAMILY_ORDER = list(FAMILIES)
 
+# Incomplete hexahedra of order 4 to 9 and incomplete pyramids of order 3 to 9:
+# Gmsh describes them, but gmsh.model.mesh.addElementsByType crashes for them in
+# Gmsh 4.15.2, so they never appear in files written by Gmsh. Left out by
+# decision of the maintainer (design section 5.1).
+GMSH_CANNOT_CREATE = {100, 101, 102, 103, 104, 105, 125, 126, 127, 128, 129, 130, 131}
+
 
 def collect():
     types = []
@@ -50,6 +56,8 @@ def collect():
         if family_name not in FAMILIES or node_count < 1:
             continue
         if order == 0 and family_name != "Point":
+            continue
+        if gmsh_type in GMSH_CANNOT_CREATE:
             continue
 
         family, prefix = FAMILIES[family_name]

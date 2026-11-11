@@ -73,12 +73,12 @@ def fixed_size_types():
 
 # Incomplete hexahedra of order 4 to 9 and incomplete pyramids of order 3 to 9:
 # gmsh.model.mesh.addElementsByType crashes in Gmsh 4.15.2 for these types, so
-# Gmsh cannot write them.
+# Gmsh cannot write them. femapp does not support them either.
 GMSH_CANNOT_WRITE = {100, 101, 102, 103, 104, 105, 125, 126, 127, 128, 129, 130, 131}
 
 
 def all_types():
-    """One element of each type Gmsh can write; element tag = Gmsh type number."""
+    """One element of each supported type; element tag = Gmsh type number."""
     gmsh.model.add("all_types")
     node_tag = 1
     for gmsh_type, dim, nodes, coords in fixed_size_types():

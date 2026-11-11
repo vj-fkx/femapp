@@ -5,7 +5,7 @@ Requisitos: [requirements.md](requirements.md)
 
 ## 1. Resumo da abordagem
 
-- **`core`** ganha os 103 tipos de elemento do Gmsh (tabela `constexpr` com
+- **`core`** ganha os 90 tipos de elemento do Gmsh (tabela `constexpr` com
   família, dimensão, ordem, nós, vértices e coordenadas de referência, **gerada
   a partir do próprio Gmsh** por um script versionado), a malha imutável
   `Mesh` e o construtor `MeshBuilder`, que valida tudo e devolve a malha ou um
@@ -38,7 +38,7 @@ Requisitos: [requirements.md](requirements.md)
 |--------|---------|---------------|------------------|
 | core | `include/fem/core/expected.hpp` | novo | `Error`, `Expected<T>` sobre `tl::expected` |
 | core | `include/fem/core/element_type.hpp`, `element_type.cpp` | novo | Enum `ElementType` e consultas sobre a tabela |
-| core | `element_type_table.inc` (privado, gerado) | novo | Tabela dos 103 tipos: dados do Gmsh, gravados pelo script abaixo |
+| core | `element_type_table.inc` (privado, gerado) | novo | Tabela dos 90 tipos: dados do Gmsh, gravados pelo script abaixo |
 | tools | `generate_element_types.py` | novo | Lê a tabela de tipos da API do Gmsh e grava `element_type_table.inc` e o enum |
 | core | `include/fem/core/mesh.hpp`, `mesh.cpp` | novo | `Mesh`, `Group`, `BoundingBox` |
 | core | `include/fem/core/mesh_builder.hpp`, `mesh_builder.cpp` | novo | `MeshBuilder` e validação |
@@ -94,7 +94,7 @@ enum class ElementType : std::uint8_t {
     Wedge6, Wedge15, Wedge18,
     Pyramid5, Pyramid13, Pyramid14, /* ... */
 };
-inline constexpr int kElementTypeCount = 103;
+inline constexpr int kElementTypeCount = 90;
 
 enum class ElementFamily : std::uint8_t {
     Point, Line, Triangle, Quadrilateral, Tetrahedron, Hexahedron, Wedge, Pyramid,
@@ -263,7 +263,7 @@ struct GmshReadResult
 
 A tabela vem da API do Gmsh (`gmsh.model.mesh.getElementProperties`), lida
 pelo script `tools/generate_element_types.py` para cada número de tipo de 1 a
-999. Entram os 103 tipos com número fixo de nós:
+999. Entram os 90 tipos com número fixo de nós que o Gmsh consegue criar:
 
 | Família | Tipos | Ordens |
 |---------|-------|--------|
@@ -272,13 +272,17 @@ pelo script `tools/generate_element_types.py` para cada número de tipo de 1 a
 | Triângulo | 18 | 1 a 10, completos e incompletos |
 | Quadrilátero | 19 | 1 a 10, completos e incompletos (serendipidade) |
 | Tetraedro | 18 | 1 a 10, completos e incompletos |
-| Hexaedro | 17 | 1 a 9, completos e incompletos |
+| Hexaedro | 11 | 1 a 9 completos; incompletos de ordem 2 e 3 |
 | Cunha | 3 | 1 e 2 (6, 15 e 18 nós) |
-| Pirâmide | 17 | 1 a 9, completos e incompletos |
+| Pirâmide | 10 | 1 a 9 completos; incompleta de ordem 2 |
 
 Ficam fora os 14 tipos que o Gmsh descreve sem número fixo de nós ou sem
 geometria pelos vértices: polígono, poliedro, borda de polígono, os quatro
-XFEM e os sete de ordem 0 com um nó.
+XFEM e os sete de ordem 0 com um nó. Ficam fora também os 13 que o Gmsh
+4.15.2 descreve mas não consegue criar — hexaedros incompletos de ordem 4 a 9
+(tipos 100–105) e pirâmides incompletas de ordem 3 a 9 (125–131): a API
+derruba o processo ao criá-los, então não aparecem em arquivos do Gmsh.
+*(Alterado em 2026-11-11, na implementação, com aprovação do mantenedor.)*
 
 Para cada tipo o script grava nome, família, dimensão, ordem, número de nós e
 de vértices, número do tipo no Gmsh e as coordenadas dos nós no elemento de
@@ -371,10 +375,11 @@ Seções tratadas (as demais são puladas até o `$End…` correspondente, REQ-0
 | `$Nodes` | Por bloco de entidade: ids, depois coordenadas; coordenadas paramétricas puladas (REQ-003-17) |
 | `$Elements` | Por bloco: dimensão, entidade, tipo do Gmsh, quantidade, depois id e nós de cada elemento |
 
-Tipos do Gmsh: os 103 da tabela de §5.1 são carregados. Os demais
+Tipos do Gmsh: os 90 da tabela de §5.1 são carregados. Os demais
 (REQ-003-19) são pulados com aviso; no binário isso exige saber quantos nós eles
-têm, e o único caso possível num `.msh` 4.1 são os de ordem 0 com um nó, já que
-polígonos, poliedros e XFEM não podem ser gravados em blocos de tamanho fixo.
+têm, então uma tabela privada do leitor guarda o número de nós dos tipos de
+tamanho fixo excluídos (os sete de ordem 0 e os 13 que o Gmsh não cria).
+Polígonos, poliedros e XFEM não podem ser gravados em blocos de tamanho fixo.
 Um número de tipo desconhecido é erro: "Unknown Gmsh element type 250 at byte
 1234."
 
@@ -427,7 +432,7 @@ o `app` (feature 004 ou 011).
 
 | Teste | Tipo | Requisito | Referência/tolerância |
 |-------|------|-----------|-----------------------|
-| Tabela de tipos: 103 tipos, contagem por família, nós, vértices, ordem, número do Gmsh únicos | unitário | REQ-003-01, 02 | exato |
+| Tabela de tipos: 90 tipos, contagem por família, nós, vértices, ordem, número do Gmsh únicos | unitário | REQ-003-01, 02 | exato |
 | Elemento de referência de cada tipo com medida positiva e igual à do elemento de referência do Gmsh | unitário | REQ-003-03, 08 | 1e−12 |
 | Vértices de referência de cada família iguais entre todos os tipos da família | unitário | REQ-003-03 | exato |
 | Malha mista montada em teste: consultas, ids não contíguos, caixa envolvente | unitário | REQ-003-04 a 07 | exato |
@@ -435,7 +440,7 @@ o `app` (feature 004 ou 011).
 | Cada erro de §5.4 com a mensagem esperada | unitário | REQ-003-09, 10, 14 | texto contém o id |
 | Grupos: elemento em dois grupos, elemento sem grupo, `groupNodes`, busca por nome | unitário | REQ-003-11, 12, 13 | exato |
 | Memória de malha sintética de 200 mil Tet4 com um grupo ≤ 1,5× os dados brutos | unitário | NFR-003-01 | razão |
-| Arquivo com um elemento de cada um dos 103 tipos, gravado pelo Gmsh (ASCII e binário): cada nó lido na posição dada pelas coordenadas de referência e medidas iguais às esperadas | unitário | REQ-003-15, AC-7 | 1e−12 relativo |
+| Arquivo com um elemento de cada um dos 90 tipos, gravado pelo Gmsh (ASCII e binário): cada nó lido na posição dada pelas coordenadas de referência e medidas iguais às esperadas | unitário | REQ-003-15, AC-7 | 1e−12 relativo |
 | Malhas reais geradas a partir de `.geo` (linhas, superfícies e volumes, de ordem 1 e 2): soma das medidas igual à da geometria, todas positivas | unitário | REQ-003-15 | 1e−9 relativo |
 | ASCII e binário do mesmo modelo produzem malhas iguais (nós, elementos, grupos) | unitário | REQ-003-15, 16 | exato |
 | Grupos físicos com nome e sem nome | unitário | REQ-003-16 | exato |
@@ -452,7 +457,7 @@ o `app` (feature 004 ou 011).
 **Arquivos de exemplo** (REQ-003-26), em `tests/data/gmsh/`, produzidos pelo
 script `generate_test_meshes.py` com a API Python do Gmsh 4.15.2:
 
-- **Todos os tipos:** um modelo com um elemento de cada um dos 103 tipos, cada
+- **Todos os tipos:** um modelo com um elemento de cada um dos 90 tipos, cada
   um numa entidade própria e afastado dos demais; os nós ficam na imagem das
   coordenadas de referência por uma transformação afim conhecida (escala,
   rotação e translação diferentes por tipo). Gravado em ASCII e em binário.
@@ -475,7 +480,7 @@ não precisa do Gmsh. O README da pasta explica como regenerá-los.
 | Conectividade única em CSR (offsets por elemento) para todos os tipos | +4 a 8 bytes por elemento e um nível de indireção; os blocos por tipo também favorecem os laços de montagem da feature 006 |
 | `std::unordered_map` para os ids externos | Cerca de 40 bytes por entrada; estoura NFR-003-01 |
 | Ordem de nós própria (ou do VTK) com permutação no leitor | Mais código e mais chance de erro; a ordem do Gmsh é tão boa quanto qualquer outra e documentada |
-| Tabela de tipos escrita à mão | 103 tipos com até 1000 nós: inviável de escrever e conferir; a API do Gmsh dá os dados exatos |
+| Tabela de tipos escrita à mão | 90 tipos com até 1000 nós: inviável de escrever e conferir; a API do Gmsh dá os dados exatos |
 | Tipo de elemento genérico (número do Gmsh guardado como inteiro, sem enum) | Perde a verificação do compilador nos `switch` das features de elementos; o enum gerado custa o mesmo byte |
 | Exceções para arquivo inválido | Contraria a arquitetura (exceções só para defeitos) |
 | `iostream >>` para ler números | Lento e dependente do locale (vírgula decimal em pt_BR) |

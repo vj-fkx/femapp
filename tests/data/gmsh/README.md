@@ -5,7 +5,7 @@ gerados pelo Gmsh existem em ASCII (`*.msh`) e binário (`*_bin.msh`).
 
 | Arquivo | Conteúdo |
 |---------|----------|
-| `all_types` | Um elemento de cada tipo que o Gmsh consegue gravar; o número do elemento é o número do tipo no Gmsh, e os nós são as coordenadas de referência levadas por uma transformação afim conhecida (`all_types_transform` no script) |
+| `all_types` | Um elemento de cada um dos 90 tipos do femapp; o número do elemento é o número do tipo no Gmsh, e os nós são as coordenadas de referência levadas por uma transformação afim conhecida (`all_types_transform` no script) |
 | `segment_o1`, `segment_o2` | Segmento de comprimento 2, grupo `segment` |
 | `square_*` | Quadrado 2×3 no plano XY em Tri3, Tri6, Quad4, Quad8 e Quad9; grupos `plate` (2D), `left` (1D) e um grupo 1D sem nome |
 | `box_hex8`, `box_hex20`, `box_wedge6`, `box_wedge15` | Caixa 1×2×3 extrudada da base; grupos `solid` (3D) e `bottom` (2D) |
@@ -39,9 +39,9 @@ ligado ao femapp, e os arquivos que ele grava não ficam sob a sua licença.
 
 - O Gmsh 4.15.2 não consegue criar elementos de 13 tipos (hexaedros
   incompletos de ordem 4 a 9 e pirâmides incompletas de ordem 3 a 9):
-  `addElementsByType` derruba o processo. Por isso eles não estão em
-  `all_types`.
-- O Gmsh também não cria elementos do tipo 84 ("Line 1"), o único tipo de
+  `addElementsByType` derruba o processo. Por isso o femapp não os suporta, e
+  eles não estão em `all_types`.
+- O Gmsh também não cria elementos do tipo 84 ("Line 1"), um dos tipos de
   tamanho fixo fora da tabela do femapp; o arquivo
   `handwritten/extra_sections.msh` usa esse tipo para testar o aviso de tipo
   não suportado, e por isso o próprio Gmsh não o abre.
