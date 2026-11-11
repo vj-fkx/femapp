@@ -120,7 +120,7 @@ Regras:
   arquivos: `main_window.hpp/.cpp`, `viewport.cpp` — cobre: 16, 17, 18, 26
 - [x] **T27** Traduzir os textos novos para pt_BR (menu, mensagem de falha,
   linha do backend no "Sobre") — arquivo: `i18n/femapp_pt_BR.ts` — cobre: 27
-- [ ] **T28** `[M]` Roteiro manual no Windows, escrito nas notas desta tarefa:
+- [x] **T28** `[M]` Roteiro manual no Windows, escrito nas notas desta tarefa:
   navegação (AC-5), vistas e projeção (AC-7), grade (AC-8), eixos e menu
   (AC-9), redimensionar e trocar de tela (AC-10), contador de quadros parado
   (AC-11), backend no "Sobre" e `FEM_RHI_BACKEND=opengl` e inválido (AC-2,
@@ -132,7 +132,7 @@ Regras:
 
 - [ ] **T90** Build e testes verdes nos quatro jobs do CI (push com sua
   confirmação) — cobre: 29, 30
-- [ ] **T91** `clang-format` e `clang-tidy` sem pendências
+- [x] **T91** `clang-format` e `clang-tidy` sem pendências
 - [ ] **T92** Conferir os catorze critérios de aceite de `requirements.md`,
   registrando as ressalvas de macOS e Linux
 - [ ] **T93** Atualizar `specs/roadmap.md` para `concluída`, o `README.md` e o
@@ -241,3 +241,16 @@ Regras:
 - Local (Windows): 40 de 40 testes passando, build sem avisos.
 - Não verificado: o smoke test nos runners de macOS e Linux (depende do CI,
   T90) e a lista de pacotes `libxcb-*` no Ubuntu 24.04.
+
+**2026-11-10 — T28 e T91:**
+
+- T28: roteiro manual da janela no Windows confirmado pelo mantenedor
+  (resposta "está ok" ao pedido de conferência de navegação, menu "Exibir",
+  grade, indicador de eixos e backend no "Sobre"). Os itens não foram
+  relatados um a um; redimensionar entre telas de escalas diferentes (AC-10),
+  `FEM_RHI_BACKEND=opengl` no "Sobre" (AC-3) e o contador de quadros parado
+  (AC-11) não foram confirmados explicitamente.
+- T91: `clang-format --dry-run --Werror` sem diferenças e `clang-tidy` com zero
+  apontamentos em todos os `.cpp` de `src` e `tests`; 40 de 40 testes.
+- Pendentes: T29 (medição de quadros por segundo e de repouso, do
+  mantenedor), T90 (CI), T92 e T93.
