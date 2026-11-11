@@ -1,15 +1,13 @@
 # Requisitos — 003 mesh-model
 
-Status: aprovado · Data: 2026-11-11
+Status: aprovado · Data: 2026-11-11 · *Alterado em 2026-11-11: todos os tipos do Gmsh (aguardando aprovação)*
 
 ## 1. Contexto e objetivo
 
 Toda a análise, a visualização e a geração de malha do femapp giram em torno de
 uma estrutura de malha comum. Esta feature cria essa estrutura no núcleo
-(`core::Mesh`): nós, elementos de todos os tipos da biblioteca do produto
-(lineares e quadráticos, de 0 a 3 dimensões, misturados no mesmo modelo),
-mais a linha de 3 nós, a cunha de 15 nós e a pirâmide de 5 nós, que aparecem
-em malhas geradas pelo Gmsh, e grupos nomeados. Também entrega o leitor de malhas do Gmsh (`.msh` 4.1, ASCII e
+(`core::Mesh`): nós, elementos de todos os tipos que o Gmsh grava (de 0 a 3
+dimensões, de ordem 1 a 10, misturados no mesmo modelo) e grupos nomeados. Também entrega o leitor de malhas do Gmsh (`.msh` 4.1, ASCII e
 binário), que fornece malhas reais para a exibição (feature 004) e para a
 verificação numérica (features 006 em diante) antes de o gerador de malha
 próprio existir. Não há interface nesta feature: tudo é biblioteca, verificada
@@ -36,9 +34,9 @@ por testes automáticos.
 
 | ID | Requisito | História |
 |----|-----------|----------|
-| REQ-003-01 | O sistema DEVE suportar os tipos de elemento: ponto (1 nó), linha de 2 e de 3 nós, triângulo de 3 e de 6 nós, quadrilátero de 4 e de 8 nós, tetraedro de 4 e de 10 nós, hexaedro de 8 e de 20 nós, cunha de 6 e de 15 nós e pirâmide de 5 nós. | US-1 |
-| REQ-003-02 | O sistema DEVE informar, para cada tipo, a dimensão topológica (0 a 3), o número de nós, o número de vértices e a ordem (linear ou quadrática). | US-1 |
-| REQ-003-03 | O sistema DEVE definir e documentar, para cada tipo, a ordem local dos nós, incluindo a posição dos nós de meio de aresta dos tipos quadráticos. | US-1 |
+| REQ-003-01 | O sistema DEVE suportar todos os tipos de elemento que o Gmsh grava num arquivo `.msh` com número fixo de nós: ponto, linhas, triângulos, quadriláteros, tetraedros, hexaedros, cunhas e pirâmides, de ordem 1 a 10, completos e incompletos — os 103 tipos que o Gmsh 4.15.2 descreve. | US-1, US-2 |
+| REQ-003-02 | O sistema DEVE informar, para cada tipo, a família, a dimensão topológica (0 a 3), a ordem, o número de nós, o número de vértices e as coordenadas dos nós no elemento de referência. | US-1 |
+| REQ-003-03 | O sistema DEVE adotar, para cada tipo, a ordem local dos nós do Gmsh, com os vértices primeiro, e documentá-la pelas coordenadas do elemento de referência. | US-1 |
 
 ### Malha
 
@@ -69,7 +67,7 @@ por testes automáticos.
 | REQ-003-16 | QUANDO o arquivo tiver grupos físicos, O sistema DEVE criar um grupo por grupo físico, com o nome definido no arquivo ou, na falta dele, um nome gerado a partir da dimensão e do número do grupo. | US-2 |
 | REQ-003-17 | O sistema DEVE aceitar números de nós e de elementos não contíguos e em qualquer ordem, e coordenadas paramétricas nos nós (que são ignoradas). | US-2 |
 | REQ-003-18 | O sistema DEVE ignorar seções do arquivo que não descrevem a malha (por exemplo, dados de resultados e periodicidade). | US-2 |
-| REQ-003-19 | SE o arquivo tiver elementos de tipos não suportados (por exemplo, pirâmide de 13 nós, quadrilátero de 9 nós ou hexaedro de 27 nós), ENTÃO O sistema DEVE ignorá-los e informar, num aviso, cada tipo ignorado e quantos elementos dele havia. | US-3 |
+| REQ-003-19 | SE o arquivo tiver elementos de tipos não suportados (polígonos, poliedros, elementos XFEM e elementos de ordem 0 com um nó), ENTÃO O sistema DEVE ignorá-los e informar, num aviso, cada tipo ignorado e quantos elementos dele havia. | US-3 |
 | REQ-003-20 | SE, depois de ignorar os tipos não suportados, não restar nenhum elemento, ENTÃO O sistema DEVE recusar o arquivo. | US-3 |
 | REQ-003-21 | SE o arquivo estiver em outra versão do formato, for uma malha particionada ou um arquivo binário com ordem de bytes diferente da do computador, ENTÃO O sistema DEVE recusar o arquivo com uma mensagem que diga qual dessas situações ocorreu. | US-3 |
 | REQ-003-22 | SE o arquivo estiver malformado (seção incompleta, número inválido, fim inesperado, referência a nó inexistente), ENTÃO O sistema DEVE recusar o arquivo com uma mensagem que indique o problema e a linha (ASCII) ou a posição em bytes (binário). | US-3 |
@@ -93,9 +91,9 @@ por testes automáticos.
 
 ## 5. Critérios de aceite
 
-- [ ] **AC-1** (REQ-003-01, 02, 03) Os testes conferem, para cada um dos catorze
-  tipos, dimensão, número de nós e de vértices, ordem, e que a ordem local dos
-  nós documentada produz medida positiva no elemento de referência.
+- [ ] **AC-1** (REQ-003-01, 02, 03) Os testes conferem, para cada um dos 103
+  tipos, família, dimensão, ordem, número de nós e de vértices e coordenadas de
+  referência iguais às do Gmsh, e medida positiva no elemento de referência.
 - [ ] **AC-2** (REQ-003-04 a 07) Uma malha montada em teste com tipos misturados
   (ponto, linha, triângulo, hexaedro) responde corretamente às consultas de
   quantidade, nós, coordenadas, conversão de identificadores e caixa
@@ -110,9 +108,10 @@ por testes automáticos.
   de um grupo está correto.
 - [ ] **AC-6** (REQ-003-15, 16, 17) Arquivos de exemplo ASCII e binários com o
   mesmo conteúdo produzem malhas idênticas, com os grupos físicos e seus nomes.
-- [ ] **AC-7** (REQ-003-15) Para cada tipo suportado há um arquivo de exemplo
-  cuja leitura reproduz a medida conhecida e mostra todos os elementos com
-  medida positiva (a ordem dos nós foi interpretada corretamente).
+- [ ] **AC-7** (REQ-003-15) Para cada um dos 103 tipos há um elemento num
+  arquivo de exemplo cuja leitura reproduz a medida conhecida e põe cada nó na
+  posição esperada pelas coordenadas de referência (a ordem dos nós foi
+  interpretada corretamente).
 - [ ] **AC-8** (REQ-003-18, 19, 20) Um arquivo com seções extras e com um tipo
   não suportado é lido com aviso que nomeia o tipo e a quantidade; um arquivo
   só com tipos não suportados é recusado.
@@ -129,12 +128,15 @@ por testes automáticos.
 
 - Menu de importação e exibição da malha na interface — feature 004.
 - Escrita de `.msh` e formatos `.msh` 2.2 e 4.0; outros formatos de malha.
-- Tipos de elemento além dos catorze de REQ-003-01 (pirâmide de 13 e de 14
-  nós, quadrilátero de 9 nós, hexaedro de 27 nós etc.).
-- Formulação de elemento para a linha de 3 nós, a cunha de 15 nós e a pirâmide:
-  aqui eles são só tipos de malha. Funções de forma e elementos finitos para
-  eles ficam para as features de elementos, que decidirão se os incluem na
-  biblioteca do produto.
+- Polígonos, poliedros, elementos XFEM e elementos de ordem 0 com um nó do
+  Gmsh: têm número variável de nós ou são de uso interno do Gmsh, sem
+  geometria definida pelos vértices.
+- Cunhas de ordem maior que 2: o Gmsh 4.15.2 não as descreve.
+- Formulação de elemento para os tipos fora da biblioteca do produto: aqui eles
+  são só tipos de malha. Funções de forma e elementos finitos para eles ficam
+  para as features de elementos.
+- Exibição da curvatura de elementos de ordem alta (a feature 004 desenha pelos
+  vértices; a curvatura vem com a feature 029).
 - Malhas particionadas, periódicas e dados de resultados do `.msh`.
 - Geração de malha, fusão de nós coincidentes (feature 009) e métricas de
   qualidade (feature 023).
@@ -153,13 +155,14 @@ quanto a memória e leitura).
 
 - [x] **Manter a importação de `.msh`?** Decidido em 2026-11-11: sim, versão 4.1
   ASCII e binário (questão em aberto de `specs/product.md`).
-- [x] **Tipos de elemento:** decidido em 2026-11-11 — só os da biblioteca do
-  produto, mais o ponto.
+- [x] ~~**Tipos de elemento:** só os da biblioteca do produto, mais o ponto.~~
+  Substituída pela decisão abaixo.
 - [x] **Menu de importação:** decidido em 2026-11-11 — fica para a feature 004.
-- [x] **Linha de 3 nós, cunha de 15 nós e pirâmide de 5 nós:** decidido em
-  2026-11-11 — entram como tipos suportados da malha, para importar malhas
-  quadráticas do Gmsh com contornos e malhas 3D mistas. Os demais tipos são
-  ignorados com aviso (REQ-003-19).
+- [x] **Tipos de elemento:** decidido em 2026-11-11 — a malha aceita todos os
+  tipos com número fixo de nós que o Gmsh grava (103 no Gmsh 4.15.2), para
+  compatibilidade total com o `.msh`. Ficam de fora polígonos, poliedros, XFEM e
+  os de ordem 0 com um nó (REQ-003-19). Substitui as decisões anteriores sobre a
+  linha de 3 nós, a cunha de 15 nós e a pirâmide.
 - [x] **Arquivos de exemplo para os testes:** decidido em 2026-11-11 — gerados
   com o Gmsh (programa GPL usado só como ferramenta, na máquina do mantenedor;
   os arquivos gerados não ficam sob GPL) e versionados junto com os scripts

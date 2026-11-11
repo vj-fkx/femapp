@@ -1,19 +1,20 @@
 # Design — 003 mesh-model
 
-Status: rascunho · Data: 2026-11-11
+Status: rascunho · Data: 2026-11-11 · *Revisado no mesmo dia: todos os tipos do Gmsh*
 Requisitos: [requirements.md](requirements.md)
 
 ## 1. Resumo da abordagem
 
-- **`core`** ganha os tipos de elemento (tabela `constexpr` com dimensão, nós,
-  vértices, ordem e posição dos nós de meio de aresta), a malha imutável
+- **`core`** ganha os 103 tipos de elemento do Gmsh (tabela `constexpr` com
+  família, dimensão, ordem, nós, vértices e coordenadas de referência, **gerada
+  a partir do próprio Gmsh** por um script versionado), a malha imutável
   `Mesh` e o construtor `MeshBuilder`, que valida tudo e devolve a malha ou um
   erro. Os elementos ficam em **blocos por tipo**, com conectividade em
   inteiros de 32 bits, e os identificadores externos ficam comprimidos em
   **faixas contíguas**, o que mantém a memória perto dos dados brutos.
-- **A ordem local dos nós é a do Gmsh** para os catorze tipos. O leitor copia a
-  conectividade sem permutar, e os testes com arquivos gerados pelo Gmsh
-  confirmam a tabela.
+- **A ordem local dos nós é a do Gmsh** para todos os tipos. O leitor copia a
+  conectividade sem permutar, e a tabela não é escrita à mão: vem da API do
+  Gmsh, então a ordem fica certa por construção.
 - **`io`** ganha `readGmsh`, que lê o arquivo inteiro para a memória e o
   percorre com um cursor que conhece a linha (ASCII) ou a posição em bytes
   (binário), para as mensagens de erro.
@@ -28,15 +29,17 @@ Requisitos: [requirements.md](requirements.md)
 | Multiplataforma (§2) | Sim | C++20 puro; caminhos por `std::filesystem::path`; números lidos sem depender do locale; testes nos quatro jobs do CI |
 | GPU somente via QRhi (§3) | N/A | Sem renderização nesta feature |
 | Camadas / `core` sem Qt (§4) | Sim | `Mesh` em `core`, leitor em `io`; nenhum dos dois inclui Qt. `io` entra na verificação `check_no_qt_includes` |
-| Correção numérica (§5) | Sim | Coordenadas em `double`; medidas com sinal para detectar elementos invertidos; ordem dos nós conferida contra arquivos do próprio Gmsh |
-| Simplicidade / dependências (§7) | Sim | Uma dependência nova, `tl-expected` (header-only, CC0), já prevista na arquitetura; Gmsh só como ferramenta para gerar arquivos de teste, nunca ligado ao projeto |
+| Correção numérica (§5) | Sim | Coordenadas em `double`; medidas com sinal para detectar elementos invertidos; tabela de tipos e ordem dos nós extraídas do próprio Gmsh e conferidas por arquivos gravados por ele |
+| Simplicidade / dependências (§7) | Sim | Uma dependência nova, `tl-expected` (header-only, CC0), já prevista na arquitetura; Gmsh só como ferramenta para gerar a tabela de tipos e os arquivos de teste, nunca ligado ao projeto |
 
 ## 3. Módulos e arquivos afetados
 
 | Módulo | Arquivo | Novo/Alterado | Responsabilidade |
 |--------|---------|---------------|------------------|
 | core | `include/fem/core/expected.hpp` | novo | `Error`, `Expected<T>` sobre `tl::expected` |
-| core | `include/fem/core/element_type.hpp`, `element_type.cpp` | novo | Enum `ElementType`, tabela de propriedades, arestas dos nós de meio de aresta |
+| core | `include/fem/core/element_type.hpp`, `element_type.cpp` | novo | Enum `ElementType` e consultas sobre a tabela |
+| core | `element_type_table.inc` (privado, gerado) | novo | Tabela dos 103 tipos: dados do Gmsh, gravados pelo script abaixo |
+| tools | `generate_element_types.py` | novo | Lê a tabela de tipos da API do Gmsh e grava `element_type_table.inc` e o enum |
 | core | `include/fem/core/mesh.hpp`, `mesh.cpp` | novo | `Mesh`, `Group`, `BoundingBox` |
 | core | `include/fem/core/mesh_builder.hpp`, `mesh_builder.cpp` | novo | `MeshBuilder` e validação |
 | core | `include/fem/core/mesh_measure.hpp`, `mesh_measure.cpp` | novo | Comprimento, área e volume com sinal |
@@ -48,7 +51,7 @@ Requisitos: [requirements.md](requirements.md)
 | io | `CMakeLists.txt` | alterado | Fontes; deixa de depender de `fem::geom` (não usa) |
 | tests | `unit/core/test_element_type.cpp`, `test_mesh.cpp`, `test_mesh_measure.cpp` | novo | Testes de `core` |
 | tests | `unit/io/test_gmsh_reader.cpp` | novo | Testes do leitor (substitui `test_io.cpp`) |
-| tests | `data/gmsh/*.geo`, `*.msh`, `Generate.cmake`, `README.md` | novo | Arquivos de exemplo e o script que os gera |
+| tests | `data/gmsh/*.geo`, `*.msh`, `generate_test_meshes.py`, `README.md` | novo | Arquivos de exemplo e o script que os gera |
 | tests | `perf/bench_gmsh_read.cpp` | novo | Medição de NFR-003-02, fora do `ctest` |
 | cmake | `CheckNoQtIncludes.cmake` | alterado | Inclui o módulo `io` |
 | raiz | `vcpkg.json` | alterado | `tl-expected` |
@@ -77,29 +80,44 @@ using Expected = tl::expected<T, Error>;
 // fem/core/element_type.hpp — REQ-003-01, 02, 03
 namespace fem::core {
 
+// Generated from Gmsh 4.15.2 by tools/generate_element_types.py; one value
+// per Gmsh element type with a fixed number of nodes. Names follow Gmsh:
+// family + number of nodes, with an "I" suffix for Gmsh's incomplete
+// variants that share a node count (e.g. Tri15 and Tri15I).
 enum class ElementType : std::uint8_t {
-    Point1, Line2, Line3, Tri3, Tri6, Quad4, Quad8,
-    Tet4, Tet10, Hex8, Hex20, Wedge6, Wedge15, Pyramid5,
+    Point1,
+    Line2, Line3, Line4, /* ... */ Line11,
+    Tri3, Tri6, Tri9, Tri10, /* ... */
+    Quad4, Quad8, Quad9, /* ... */
+    Tet4, Tet10, /* ... */
+    Hex8, Hex20, Hex27, /* ... */ Hex1000,
+    Wedge6, Wedge15, Wedge18,
+    Pyramid5, Pyramid13, Pyramid14, /* ... */
 };
-inline constexpr int kElementTypeCount = 14;
+inline constexpr int kElementTypeCount = 103;
 
-enum class ElementOrder : std::uint8_t { Linear, Quadratic };
+enum class ElementFamily : std::uint8_t {
+    Point, Line, Triangle, Quadrilateral, Tetrahedron, Hexahedron, Wedge, Pyramid,
+};
 
 struct ElementTypeInfo
 {
     std::string_view name; // "Tet10"
-    int dimension;         // 0..3
+    ElementFamily family;
+    int dimension;   // 0..3
+    int order;       // 1..10 (0 for the point)
     int nodeCount;
-    int vertexCount;
-    ElementOrder order;
+    int vertexCount; // the vertices are always the first nodes
+    int gmshType;    // Gmsh element type number, e.g. 11 for Tet10
 };
 
 [[nodiscard]] const ElementTypeInfo& elementTypeInfo(ElementType type) noexcept;
 [[nodiscard]] std::span<const ElementType> allElementTypes() noexcept;
 
-// For quadratic types: local node vertexCount + i lies on the edge between
-// the two vertices midNodeEdges(type)[i]. Empty for linear types.
-[[nodiscard]] std::span<const std::array<int, 2>> midNodeEdges(ElementType type) noexcept;
+// Coordinates of the nodes in Gmsh's reference element, in local node order:
+// nodeCount triples (u, v, w). This is what documents the node ordering.
+[[nodiscard]] std::span<const std::array<double, 3>>
+referenceNodeCoordinates(ElementType type) noexcept;
 
 } // namespace fem::core
 ```
@@ -241,28 +259,41 @@ struct GmshReadResult
 
 ## 5. Dados e algoritmos
 
-### 5.1 Ordem local dos nós (REQ-003-03)
+### 5.1 Tipos de elemento e ordem dos nós (REQ-003-01 a 03)
 
-Igual à do Gmsh ("node ordering" da documentação do Gmsh). Vértices primeiro,
-depois os nós de meio de aresta, na ordem das arestas abaixo:
+A tabela vem da API do Gmsh (`gmsh.model.mesh.getElementProperties`), lida
+pelo script `tools/generate_element_types.py` para cada número de tipo de 1 a
+999. Entram os 103 tipos com número fixo de nós:
 
-| Tipo | Vértices | Arestas dos nós de meio de aresta (nó: vértices) |
-|------|----------|------------------------------------------------|
-| Line3 | 0–1 | 2: 0-1 |
-| Tri3 / Tri6 | 0–2, anti-horário | 3: 0-1, 4: 1-2, 5: 2-0 |
-| Quad4 / Quad8 | 0–3, anti-horário | 4: 0-1, 5: 1-2, 6: 2-3, 7: 3-0 |
-| Tet4 / Tet10 | 0–2 base, 3 topo | 4: 0-1, 5: 1-2, 6: 2-0, 7: 3-0, 8: 3-2, 9: 3-1 |
-| Hex8 / Hex20 | 0–3 base, 4–7 topo | 8: 0-1, 9: 0-3, 10: 0-4, 11: 1-2, 12: 1-5, 13: 2-3, 14: 2-6, 15: 3-7, 16: 4-5, 17: 4-7, 18: 5-6, 19: 6-7 |
-| Wedge6 / Wedge15 | 0–2 base, 3–5 topo | 6: 0-1, 7: 0-2, 8: 0-3, 9: 1-2, 10: 1-4, 11: 2-5, 12: 3-4, 13: 3-5, 14: 4-5 |
-| Pyramid5 | 0–3 base, 4 ápice | — |
+| Família | Tipos | Ordens |
+|---------|-------|--------|
+| Ponto | 1 | — |
+| Linha | 10 | 1 a 10 |
+| Triângulo | 18 | 1 a 10, completos e incompletos |
+| Quadrilátero | 19 | 1 a 10, completos e incompletos (serendipidade) |
+| Tetraedro | 18 | 1 a 10, completos e incompletos |
+| Hexaedro | 17 | 1 a 9, completos e incompletos |
+| Cunha | 3 | 1 e 2 (6, 15 e 18 nós) |
+| Pirâmide | 17 | 1 a 9, completos e incompletos |
 
-A tabela foi escrita de memória da documentação do Gmsh; quem a confirma são os
-testes de AC-7 (cada nó de meio de aresta de um arquivo gerado pelo Gmsh, com
-arestas retas, tem de estar no ponto médio da aresta da tabela). Se algum
-teste discordar, a tabela é corrigida e o design atualizado.
+Ficam fora os 14 tipos que o Gmsh descreve sem número fixo de nós ou sem
+geometria pelos vértices: polígono, poliedro, borda de polígono, os quatro
+XFEM e os sete de ordem 0 com um nó.
 
-Exportações futuras (VTK na feature 014) terão de permutar Hex20 e Wedge15,
-cuja ordem no VTK é diferente.
+Para cada tipo o script grava nome, família, dimensão, ordem, número de nós e
+de vértices, número do tipo no Gmsh e as coordenadas dos nós no elemento de
+referência. A saída (`element_type_table.inc` e a lista do enum) é versionada;
+o build não precisa do Gmsh. Os dados são fatos sobre o formato (contagens e
+coordenadas), não código do Gmsh.
+
+A ordem local dos nós é a do Gmsh: vértices primeiro, depois nós de aresta,
+de face e internos. As coordenadas de referência documentam essa ordem.
+
+A ligação entre o número do tipo no Gmsh e o `ElementType` fica na própria
+tabela (`gmshType`), então o leitor não tem tabela separada.
+
+Exportações futuras (VTK na feature 014) terão de permutar alguns tipos, cuja
+ordem no VTK é diferente.
 
 ### 5.2 Armazenamento (NFR-003-01)
 
@@ -294,6 +325,9 @@ construtor devolve erro.
 - Sólidos: soma de volumes com sinal de tetraedros dos vértices — hexaedro em
   6 tetraedros que compartilham a diagonal 0-6, cunha em 3, pirâmide em 2. Exata
   para faces planas.
+- Em todos os casos só os vértices contam: a medida é a da forma de lados
+  retos, também para elementos de ordem alta. A medida exata de elementos
+  curvos precisa das funções de forma (feature 006).
 - Sinal das áreas: se todos os nós têm |Z| ≤ 1e−12 × diagonal da caixa
   envolvente, a área tem o sinal da componente Z da área vetorial; senão é
   positiva (malhas de superfície em 3D não têm orientação definida).
@@ -337,12 +371,12 @@ Seções tratadas (as demais são puladas até o `$End…` correspondente, REQ-0
 | `$Nodes` | Por bloco de entidade: ids, depois coordenadas; coordenadas paramétricas puladas (REQ-003-17) |
 | `$Elements` | Por bloco: dimensão, entidade, tipo do Gmsh, quantidade, depois id e nós de cada elemento |
 
-Tipos do Gmsh suportados: 15 Point1, 1 Line2, 8 Line3, 2 Tri3, 9 Tri6, 3 Quad4,
-16 Quad8, 4 Tet4, 11 Tet10, 5 Hex8, 17 Hex20, 6 Wedge6, 18 Wedge15, 7
-Pyramid5. Para os não suportados (REQ-003-19) o leitor precisa do número de
-nós para pular o bloco no binário; a tabela privada cobre os tipos 1 a 31 do
-Gmsh (lineares a quárticos). Um tipo fora dela é erro: "Unknown Gmsh element
-type 92 at byte 1234."
+Tipos do Gmsh: os 103 da tabela de §5.1 são carregados. Os demais
+(REQ-003-19) são pulados com aviso; no binário isso exige saber quantos nós eles
+têm, e o único caso possível num `.msh` 4.1 são os de ordem 0 com um nó, já que
+polígonos, poliedros e XFEM não podem ser gravados em blocos de tamanho fixo.
+Um número de tipo desconhecido é erro: "Unknown Gmsh element type 250 at byte
+1234."
 
 Grupos (REQ-003-16): cada elemento entra nos grupos físicos da sua entidade.
 Nome do `$PhysicalNames` ou, na falta, `group_<dim>d_<número>` (por exemplo,
@@ -393,15 +427,16 @@ o `app` (feature 004 ou 011).
 
 | Teste | Tipo | Requisito | Referência/tolerância |
 |-------|------|-----------|-----------------------|
-| Tabela de tipos: dimensão, nós, vértices, ordem dos 14 tipos | unitário | REQ-003-01, 02 | exato |
-| Elemento de referência de cada tipo com medida positiva e conhecida | unitário | REQ-003-03, 08 | 1e−12 |
-| Nós de meio de aresta do elemento de referência no ponto médio das arestas da tabela | unitário | REQ-003-03 | 1e−12 |
+| Tabela de tipos: 103 tipos, contagem por família, nós, vértices, ordem, número do Gmsh únicos | unitário | REQ-003-01, 02 | exato |
+| Elemento de referência de cada tipo com medida positiva e igual à do elemento de referência do Gmsh | unitário | REQ-003-03, 08 | 1e−12 |
+| Vértices de referência de cada família iguais entre todos os tipos da família | unitário | REQ-003-03 | exato |
 | Malha mista montada em teste: consultas, ids não contíguos, caixa envolvente | unitário | REQ-003-04 a 07 | exato |
 | Elemento invertido tem medida negativa; superfície fora do plano XY tem área positiva | unitário | REQ-003-08 | — |
 | Cada erro de §5.4 com a mensagem esperada | unitário | REQ-003-09, 10, 14 | texto contém o id |
 | Grupos: elemento em dois grupos, elemento sem grupo, `groupNodes`, busca por nome | unitário | REQ-003-11, 12, 13 | exato |
 | Memória de malha sintética de 200 mil Tet4 com um grupo ≤ 1,5× os dados brutos | unitário | NFR-003-01 | razão |
-| Um par de arquivos (ASCII e binário) por tipo, gerado pelo Gmsh: soma das medidas igual à da geometria, todas as medidas positivas, nós de meio de aresta no ponto médio | unitário | REQ-003-15, AC-7 | 1e−9 relativo |
+| Arquivo com um elemento de cada um dos 103 tipos, gravado pelo Gmsh (ASCII e binário): cada nó lido na posição dada pelas coordenadas de referência e medidas iguais às esperadas | unitário | REQ-003-15, AC-7 | 1e−12 relativo |
+| Malhas reais geradas a partir de `.geo` (linhas, superfícies e volumes, de ordem 1 e 2): soma das medidas igual à da geometria, todas positivas | unitário | REQ-003-15 | 1e−9 relativo |
 | ASCII e binário do mesmo modelo produzem malhas iguais (nós, elementos, grupos) | unitário | REQ-003-15, 16 | exato |
 | Grupos físicos com nome e sem nome | unitário | REQ-003-16 | exato |
 | Ids esparsos e fora de ordem; nós com coordenadas paramétricas | unitário | REQ-003-17 | exato |
@@ -414,16 +449,24 @@ o `app` (feature 004 ou 011).
 | `bench_gmsh_read` com 1 milhão de Tet4, ASCII e binário | manual, Release | NFR-003-02 | < 5 s / < 30 s |
 | Tempo dos testes de `core` e `io` | CTest | NFR-003-03 | < 5 s |
 
-**Arquivos de exemplo** (REQ-003-26): scripts `.geo` em `tests/data/gmsh/`,
-um por tipo e alguns para grupos e casos especiais, com geometrias de medida
-conhecida (segmento de comprimento 2, quadrado 2×3, caixa 1×2×3). O script
-`Generate.cmake` roda o Gmsh 4.15.2 em cada `.geo` e grava as versões ASCII e
-binária (`-format msh41`, com e sem `-bin`); a pirâmide, que o Gmsh não gera
-sozinha num caso simples, é um `.msh` ASCII escrito à mão e convertido para
-binário pelo próprio Gmsh. Os arquivos gerados ficam versionados (pequenos,
-dezenas de kB no total); o CI não precisa do Gmsh. O README da pasta explica
-como regenerá-los. Os arquivos de erro são pequenos `.msh` escritos à mão ou
-derivados em memória pelo próprio teste.
+**Arquivos de exemplo** (REQ-003-26), em `tests/data/gmsh/`, produzidos pelo
+script `generate_test_meshes.py` com a API Python do Gmsh 4.15.2:
+
+- **Todos os tipos:** um modelo com um elemento de cada um dos 103 tipos, cada
+  um numa entidade própria e afastado dos demais; os nós ficam na imagem das
+  coordenadas de referência por uma transformação afim conhecida (escala,
+  rotação e translação diferentes por tipo). Gravado em ASCII e em binário.
+- **Malhas reais:** scripts `.geo` com geometrias de medida conhecida (segmento
+  de comprimento 2, quadrado 2×3, caixa 1×2×3), em ordem 1 e 2, com grupos
+  físicos com e sem nome, gravados em ASCII e binário.
+- **Casos especiais:** seções extras (`$NodeData`, `$Periodic`), ids esparsos,
+  coordenadas paramétricas e um tipo não suportado, quando o Gmsh conseguir
+  gravá-los; senão, pequenos `.msh` ASCII escritos à mão.
+- **Erros:** pequenos `.msh` escritos à mão ou derivados em memória pelo
+  próprio teste (por exemplo, a ordem de bytes trocada).
+
+Os arquivos ficam versionados (dezenas a poucas centenas de kB no total); o CI
+não precisa do Gmsh. O README da pasta explica como regenerá-los.
 
 ## 9. Alternativas consideradas
 
@@ -432,6 +475,8 @@ derivados em memória pelo próprio teste.
 | Conectividade única em CSR (offsets por elemento) para todos os tipos | +4 a 8 bytes por elemento e um nível de indireção; os blocos por tipo também favorecem os laços de montagem da feature 006 |
 | `std::unordered_map` para os ids externos | Cerca de 40 bytes por entrada; estoura NFR-003-01 |
 | Ordem de nós própria (ou do VTK) com permutação no leitor | Mais código e mais chance de erro; a ordem do Gmsh é tão boa quanto qualquer outra e documentada |
+| Tabela de tipos escrita à mão | 103 tipos com até 1000 nós: inviável de escrever e conferir; a API do Gmsh dá os dados exatos |
+| Tipo de elemento genérico (número do Gmsh guardado como inteiro, sem enum) | Perde a verificação do compilador nos `switch` das features de elementos; o enum gerado custa o mesmo byte |
 | Exceções para arquivo inválido | Contraria a arquitetura (exceções só para defeitos) |
 | `iostream >>` para ler números | Lento e dependente do locale (vírgula decimal em pt_BR) |
 | SDK do Gmsh para ler `.msh` | GPL — proibido pela constituição |
@@ -439,16 +484,18 @@ derivados em memória pelo próprio teste.
 
 ## 10. Riscos e mitigação
 
-- **Ordem dos nós escrita de memória (§5.1) pode ter erro** → os testes com
-  arquivos do Gmsh conferem cada nó de meio de aresta; divergência corrige a
-  tabela antes de a feature fechar.
+- **Dados do Gmsh mudarem entre versões** → a tabela é gerada uma vez, com a
+  versão registrada no arquivo gerado (4.15.2); regenerar com outra versão
+  mostra a diferença no diff. O formato 4.1 e a numeração dos tipos são
+  estáveis desde 2018.
+- **Elementos de ordem alta são grandes** (Hex1000 tem 1000 nós) → a memória é
+  proporcional aos nós de cada elemento, como para qualquer tipo; nenhum
+  limite novo.
 - **`std::from_chars` para `double` pode não existir na libc++ do macOS do CI**
   → detecção por `__cpp_lib_to_chars`; na falta, analisador próprio de números
   reais, testado contra `from_chars` onde ele existe. Se a precisão do
   analisador próprio não chegar a arredondamento correto, o teste de
   igualdade ASCII × binário acusa.
-- **Gerar uma pirâmide com o Gmsh** pode não ser simples → arquivo escrito à
-  mão (previsto acima).
 - **Arquivos muito grandes** (dezenas de milhões de elementos) → carregar o
   arquivo inteiro dobra a memória durante a leitura; aceitável para a meta de
   1 milhão do produto; leitura em fluxo fica para quando houver necessidade.
@@ -462,9 +509,9 @@ derivados em memória pelo próprio teste.
 |-------------|--------|---------|---------------|
 | `tl-expected` (vcpkg) | a do baseline do vcpkg | CC0 1.0 | `Expected<T>` para erros esperados, já prevista em `specs/architecture.md` até C++23 ser o piso. Header-only |
 
-Ferramenta, não dependência: Gmsh 4.15.2 (GPL), usado só para gerar os arquivos
-de teste, na máquina do mantenedor; não é ligado, distribuído nem exigido pelo
-build ou pelo CI.
+Ferramenta, não dependência: Gmsh 4.15.2 (GPL), pela API Python, usado só na
+máquina do mantenedor para gerar a tabela de tipos e os arquivos de teste; não é
+ligado, distribuído nem exigido pelo build ou pelo CI.
 
 `io` deixa de depender de `fem::geom`, que não usa nesta feature (a arquitetura
 continua prevendo a dependência para STEP/IGES/DXF, que a recolocam).
