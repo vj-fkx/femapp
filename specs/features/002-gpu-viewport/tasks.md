@@ -439,7 +439,8 @@ Regras:
     para GPU integrada.
   - AC-11: evidência indireta (consumo zero em repouso); o contador de quadros
     não é exibido.
-- T93: roadmap atualizado para `concluída`. README e `CLAUDE.md` já descrevem
-  o Qt Shader Tools e o `xvfb-run`; os comandos de build não mudaram.
+- T93: roadmap atualizado para `concluída`. O README já descreve o Qt Shader
+  Tools e o `xvfb-run`; o `CLAUDE.md` passou a citar o Qt Shader Tools. Os
+  comandos de build não mudaram.
 - O CI do commit de fechamento ainda não tinha terminado quando esta nota foi
   escrita.

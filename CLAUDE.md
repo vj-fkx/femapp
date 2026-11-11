@@ -57,7 +57,7 @@ Presets por plataforma: `windows-msvc`, `macos-clang`, `linux-gcc`, `linux-clang
 
 No Windows, rode esses comandos no Developer PowerShell do Visual Studio 2022,
 com `CMAKE_PREFIX_PATH` apontando para o Qt (nesta máquina:
-`C:/Qt/6.8.3/msvc2022_64`). `clang-format` e `clang-tidy` ficam em
+`C:/Qt/6.8.3/msvc2022_64`, com o módulo Qt Shader Tools). `clang-format` e `clang-tidy` ficam em
 `VC/Tools/Llvm/x64/bin` do Visual Studio. Detalhes no `README.md`.
 
 ## Convenções de código
