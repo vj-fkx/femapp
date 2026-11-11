@@ -1,6 +1,6 @@
 # Requisitos — 003 mesh-model
 
-Status: rascunho · Data: 2026-11-11
+Status: aprovado · Data: 2026-11-11
 
 ## 1. Contexto e objetivo
 
