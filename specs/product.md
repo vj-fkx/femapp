@@ -81,7 +81,8 @@ A geometria é a base do modelo: materiais, seções, apoios e cargas são atrib
 | Ordem | Conversão de malha linear em quadrática |
 
 Importação de Gmsh `.msh` permanece como recurso auxiliar (interoperabilidade
-e malhas de referência para verificação). **[A CONFIRMAR]**
+e malhas de referência para verificação), na versão 4.1 ASCII e binário
+(decidido em 2026-11-11, na especificação da feature 003).
 
 ### 3.5 Demais áreas
 
@@ -175,7 +176,8 @@ Notação: **QUANDO** <gatilho>, **O sistema DEVE** <resposta>.
 
 ## 6. Questões em aberto
 
-- [ ] Manter a importação de `.msh` como recurso auxiliar?
+- [x] Manter a importação de `.msh` como recurso auxiliar? Sim, 4.1 ASCII e binário
+  (decidido em 2026-11-11).
 - [ ] Malha hexaédrica não estruturada é necessária, ou varredura basta?
 - [ ] Meta de desempenho do solver (REQ-G-21).
 - [ ] Importação de DWG (formato fechado da Autodesk) é necessária? DXF cobre a
