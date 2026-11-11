@@ -53,9 +53,16 @@ set_tests_properties(femapp_version PROPERTIES
 # It runs on the native window system: QRhiWidget does not initialize on Qt's
 # "offscreen" platform. On a machine without a display, run ctest under xvfb-run.
 add_test(NAME femapp_smoke COMMAND femapp --smoke-test)
+if(APPLE)
+    # Experiment (T90): on macOS QRhiWidget does not initialize with the Null
+    # backend, so the platform default (Metal) is used, with QRhi logging on.
+    set(_femapp_smoke_environment "QT_LOGGING_RULES=qt.rhi.*=true")
+else()
+    set(_femapp_smoke_environment "FEM_RHI_BACKEND=null")
+endif()
 set_tests_properties(femapp_smoke PROPERTIES
     TIMEOUT 30
-    ENVIRONMENT "FEM_RHI_BACKEND=null"
+    ENVIRONMENT "${_femapp_smoke_environment}"
     PASS_REGULAR_EXPRESSION "smoke test: frame rendered")
 
 # REQ-002-06: with no graphics backend the window still opens and reports it.
