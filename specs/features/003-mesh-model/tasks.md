@@ -1,6 +1,6 @@
 # Tarefas — 003 mesh-model
 
-Status: rascunho
+Status: em andamento
 Design: [design.md](design.md) · Requisitos: [requirements.md](requirements.md)
 
 Regras:
@@ -14,58 +14,58 @@ Regras:
 
 ## Fase 0 — Preparação
 
-- [ ] **T00** Acrescentar `tl-expected` ao `vcpkg.json` e ao `core`; criar
+- [x] **T00** Acrescentar `tl-expected` ao `vcpkg.json` e ao `core`; criar
   `expected.hpp` (`Error`, `Expected<T>`, `makeError`) com um teste mínimo de
   valor e de erro — arquivos: `vcpkg.json`, `src/core/CMakeLists.txt`,
   `src/core/include/fem/core/expected.hpp`, `tests/unit/core/test_expected.cpp`
   — cobre: 09, 22 (base)
-- [ ] **T01** `[P]` Incluir `io` em `CheckNoQtIncludes.cmake`; tirar
+- [x] **T01** `[P]` Incluir `io` em `CheckNoQtIncludes.cmake`; tirar
   `fem::geom` das dependências de `io`; dar aos testes de `io` a definição
   `FEMAPP_TEST_DATA_DIR` — arquivos: `cmake/CheckNoQtIncludes.cmake`,
   `src/io/CMakeLists.txt`, `tests/CMakeLists.txt` — cobre: 25, 26
 
 ## Fase 1 — Tipos de elemento
 
-- [ ] **T02** Escrever `tools/generate_element_types.py`: consulta a API do
+- [x] **T02** Escrever `tools/generate_element_types.py`: consulta a API do
   Gmsh para os tipos 1 a 999, filtra os 103 de número fixo de nós (design
   §5.1) e grava `src/core/element_type_table.inc` (tabela e coordenadas de
   referência) e a lista do enum, com a versão do Gmsh no cabeçalho. Rodar e
   versionar a saída — cobre: 01, 02, 03
-- [ ] **T03** Testes da tabela: 103 tipos; contagem por família (design §5.1);
+- [x] **T03** Testes da tabela: 103 tipos; contagem por família (design §5.1);
   números do Gmsh únicos; `nodeCount` igual ao tamanho das coordenadas de
   referência; vértices primeiro e iguais entre os tipos de cada família; ponto
   com ordem 0 — arquivo: `tests/unit/core/test_element_type.cpp` — cobre: 01,
   02, 03
-- [ ] **T04** Implementar `element_type.hpp/.cpp` (`elementTypeInfo`,
+- [x] **T04** Implementar `element_type.hpp/.cpp` (`elementTypeInfo`,
   `allElementTypes`, `referenceNodeCoordinates`) até a T03 passar — cobre: 01,
   02, 03
 
 ## Fase 2 — Malha
 
-- [ ] **T05** Testes e implementação de `IdRanges` (privado): faixas contíguas,
+- [x] **T05** Testes e implementação de `IdRanges` (privado): faixas contíguas,
   ids soltos, busca, detecção de repetidos, ordem de inserção qualquer —
   arquivos: `src/core/id_ranges.hpp/.cpp`, `tests/unit/core/test_id_ranges.cpp`
   — cobre: 04, 06, 10
-- [ ] **T06** Testes de `MeshBuilder`/`Mesh` sem grupos: malha mista (ponto,
+- [x] **T06** Testes de `MeshBuilder`/`Mesh` sem grupos: malha mista (ponto,
   linha, triângulo, hexaedro), ids não contíguos, consultas de quantidade, nós,
   coordenadas, tipo, conversão de ids, blocos, dimensão e caixa envolvente
   (também vazia) — arquivo: `tests/unit/core/test_mesh.cpp` — cobre: 04, 05,
   06, 07
-- [ ] **T07** Implementar `Mesh` e `MeshBuilder` (nós, `finishNodes`,
+- [x] **T07** Implementar `Mesh` e `MeshBuilder` (nós, `finishNodes`,
   elementos, `build`) até a T06 passar — arquivos: `mesh.hpp/.cpp`,
   `mesh_builder.hpp/.cpp` — cobre: 04, 05, 06, 07
-- [ ] **T08** Testes e implementação das validações do design §5.4 (número de
+- [x] **T08** Testes e implementação das validações do design §5.4 (número de
   nós, nó inexistente, nó repetido, ids repetidos de nós e de elementos,
   limite de 2³¹ − 1), com a mensagem citando o item — cobre: 09, 10
-- [ ] **T09** Testes e implementação dos grupos: elemento em dois grupos e em
+- [x] **T09** Testes e implementação dos grupos: elemento em dois grupos e em
   nenhum, `findGroup`, `findGroups`, `groupNodes`, nome repetido na mesma
   dimensão, elemento de outra dimensão — cobre: 11, 12, 13, 14
-- [ ] **T10** Testes e implementação de `elementMeasure`: elemento de referência
+- [x] **T10** Testes e implementação de `elementMeasure`: elemento de referência
   de cada um dos 103 tipos com a medida esperada; elemento invertido negativo;
   área com sinal no plano XY e positiva fora dele; ponto igual a 1 — arquivos:
   `mesh_measure.hpp/.cpp`, `tests/unit/core/test_mesh_measure.cpp` — cobre: 03,
   08
-- [ ] **T11** `Mesh::memoryUsage` e teste com malha sintética de 200 mil Tet4 e
+- [x] **T11** `Mesh::memoryUsage` e teste com malha sintética de 200 mil Tet4 e
   um grupo cobrindo tudo: razão ≤ 1,5 sobre os dados brutos — cobre: N01
 
 ## Fase 3 — Arquivos de exemplo
