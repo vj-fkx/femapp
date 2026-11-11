@@ -2,3 +2,5 @@
 *.png binary
 *.ico binary
 *.icns binary
+# Gmsh .msh files are compared byte for byte by the tests
+*.msh binary

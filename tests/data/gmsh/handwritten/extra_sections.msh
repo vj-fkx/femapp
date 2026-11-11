@@ -1,0 +1,45 @@
+$MeshFormat
+4.1 0 8
+$EndMeshFormat
+$Comments
+Sections that do not describe the mesh are skipped.
+$EndComments
+$Entities
+0 1 0 0
+1 0 0 0 2 0 0 0 0
+$EndEntities
+$Nodes
+1 3 1 3
+1 1 0 3
+1
+2
+3
+0 0 0
+1 0 0
+2 0 0
+$EndNodes
+$Elements
+2 4 1 4
+1 1 1 2
+1 1 2
+2 2 3
+1 1 84 2
+3 1
+4 3
+$EndElements
+$Periodic
+0
+$EndPeriodic
+$NodeData
+1
+"temperature"
+1
+0.0
+3
+0
+1
+3
+1 10.0
+2 20.0
+3 30.0
+$EndNodeData

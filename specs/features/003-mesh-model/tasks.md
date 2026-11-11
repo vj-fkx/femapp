@@ -77,7 +77,7 @@ Regras:
   coordenadas paramétricas; seções extras; tipo não suportado. Gravar ASCII e
   binário, rodar, versionar, com `README.md` explicando como regenerar —
   cobre: 15, 16, 17, 18, 19, 26
-- [ ] **T13** `[P]` Arquivos de erro escritos à mão: versão 2.2, particionado,
+- [x] **T13** `[P]` Arquivos de erro escritos à mão: versão 2.2, particionado,
   só tipos não suportados, truncado, número inválido, nó inexistente — cobre:
   20, 21, 22, 26
 
@@ -169,4 +169,32 @@ Regras:
 
 ## Notas de implementação
 
-*(preenchidas durante a implementação)*
+**2026-11-11 — Fases 0 a 2 (T00–T11):**
+
+- Testes e implementação compilados juntos, e não em dois passos (teste
+  falhando, depois implementação). Mesmo desvio das features anteriores.
+- 63 testes passando; o teste de memória (196 608 Tet4 com um grupo) roda em
+  menos de 1 s em Debug.
+- Desvios do design §4: `IdRanges` ficou em `include/fem/core/detail/` (e não
+  como arquivo privado), porque `Mesh` o guarda como membro; `Mesh` ganhou
+  `liesInXYPlane()`, calculado uma vez na construção, para o sinal das áreas
+  sem percorrer a malha a cada elemento.
+- A lista de tipos é um X-macro gerado (`element_types.inc`), usado no enum
+  público e na tabela; as coordenadas de referência ficam num arquivo privado
+  (`element_reference_coordinates.inc`, cerca de 320 kB).
+
+**2026-11-11 — Fase 3 (T12 parcial, T13):**
+
+- `generate_test_meshes.py` grava os exemplos pela API do Gmsh 4.15.2 (sem
+  arquivos `.geo`: a geometria fica no próprio script). Total de 1,2 MB, mais
+  que as "poucas centenas de kB" do design, por causa dos elementos de ordem
+  alta em `all_types` (465 kB em ASCII).
+- `.msh` marcados como binários no `.gitattributes`, para o git não converter
+  fins de linha dos arquivos binários.
+- **Problema:** o Gmsh 4.15.2 derruba o processo ao criar elementos de 13 dos
+  103 tipos (hexaedros incompletos de ordem 4 a 9, tipos 100–105; pirâmides
+  incompletas de ordem 3 a 9, tipos 125–131). Eles ficaram fora de
+  `all_types`, e o design (§8) pede que o arquivo com todos os tipos seja
+  gravado pelo Gmsh. Aguardando decisão do mantenedor.
+- O tipo 84 ("Line 1"), usado para testar o aviso de tipo não suportado,
+  também não é aceito pelo Gmsh; `extra_sections.msh` foi escrito à mão.
