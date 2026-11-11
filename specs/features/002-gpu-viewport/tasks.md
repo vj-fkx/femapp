@@ -392,3 +392,22 @@ Regras:
     "Sobre".
   - AC-10: redimensionar e mover entre telas com escalas diferentes não foi
     confirmado explicitamente.
+
+**2026-11-11 — Conferência do mantenedor e defeito encontrado (T92):**
+
+- AC-3: "Sobre" mostra OpenGL com `FEM_RHI_BACKEND=opengl`. AC-10:
+  redimensionar sem distorção nem borrão. Ambos confirmados pelo mantenedor.
+- **Defeito:** com zoom muito grande, as linhas da grade somem (inclusive os
+  eixos X e Y). AC-8 reaberto.
+- Causa provável, pelo design §5.1: o zoom ancora no ponto sob o cursor no
+  *plano de foco* (perpendicular à visada, passando pelo alvo), e não no plano
+  da grade. Fora do centro da tela esse ponto fica acima ou abaixo de Z = 0,
+  então cada passo de zoom tira o alvo do plano da grade. A altura do alvo
+  converge para uma fração da distância inicial enquanto a distância tende a
+  zero; o plano da grade acaba além do plano de corte distante (100 × d) e, antes
+  disso, as linhas ficam densas demais (o espaçamento é calculado no alvo) e
+  esmaecem.
+- Proposta de alteração no design, aguardando aprovação: zoom e pan ancoram no
+  ponto onde o raio do cursor encontra o plano de trabalho Z = 0, quando esse
+  ponto existe à frente da câmera e dentro do intervalo de profundidade; caso
+  contrário, continuam usando o plano de foco.
