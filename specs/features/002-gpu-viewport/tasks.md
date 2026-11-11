@@ -335,3 +335,14 @@ Regras:
     que as motivou foi descartada); ficou só a linha de diagnóstico no log.
   - Local (Windows): 40 de 40 testes, sem avisos, `clang-tidy` limpo.
 - A T90 só fecha com a próxima execução verde.
+
+**2026-11-11 — Execução nº 13 do CI, commit `9c90973` (T90, em andamento):**
+
+- <https://github.com/vj-fkx/femapp/actions/runs/43032618946>
+- `macos`, `windows` e `format`: passaram. No macOS o `femapp_smoke` passou com
+  `FEM_RHI_BACKEND=null`, o que confirma que a falha anterior com `null` tinha
+  a mesma causa (viewport sem QRhi) e dispensa a emenda ao REQ-002-29.
+- `linux-gcc` e `linux-clang`: mais de 15 minutos parados no
+  `sudo apt-get update` (espelho de pacotes do Ubuntu sem resposta). Não
+  chegaram a compilar; resultado ainda desconhecido quando esta nota foi
+  escrita.
