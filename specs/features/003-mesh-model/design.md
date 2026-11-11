@@ -1,6 +1,6 @@
 # Design — 003 mesh-model
 
-Status: rascunho · Data: 2026-11-11 · *Revisado no mesmo dia: todos os tipos do Gmsh*
+Status: aprovado · Data: 2026-11-11
 Requisitos: [requirements.md](requirements.md)
 
 ## 1. Resumo da abordagem

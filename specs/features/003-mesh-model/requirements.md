@@ -1,6 +1,6 @@
 # Requisitos — 003 mesh-model
 
-Status: aprovado · Data: 2026-11-11 · *Alterado em 2026-11-11: todos os tipos do Gmsh (aguardando aprovação)*
+Status: aprovado · Data: 2026-11-11 · Alterado e reaprovado em 2026-11-11 (todos os tipos do Gmsh)
 
 ## 1. Contexto e objetivo
 
