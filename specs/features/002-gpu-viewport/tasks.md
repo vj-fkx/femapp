@@ -318,3 +318,20 @@ Regras:
   CI.
 - A recompilação local do OpenCASCADE pelo vcpkg (cerca de 40 min) aconteceu
   nesta sessão sem mudança no projeto; causa não investigada.
+
+**2026-11-11 — Execução nº 12 do CI, commit `7126f36` (T90):**
+
+- <https://github.com/vj-fkx/femapp/actions/runs/43029686897> — os cinco jobs
+  passaram. No macOS o `femapp_smoke` renderizou um quadro com Metal.
+- Causa confirmada: o `Viewport` construído como filho de uma janela cuja
+  janela nativa já existia ficava sem QRhi no macOS. Criá-lo primeiro e sem pai
+  resolveu. Era um defeito real do aplicativo no macOS, não do CI.
+- Limpeza feita depois, ainda não verificada no CI:
+  - o `femapp_smoke` do macOS voltou a usar `FEM_RHI_BACKEND=null`, como nas
+    outras plataformas e como pede o REQ-002-29. A falha anterior com `null`
+    no macOS tinha, ao que tudo indica, a mesma causa; só a próxima execução
+    confirma;
+  - as novas tentativas antes de trocar de backend foram removidas (a hipótese
+    que as motivou foi descartada); ficou só a linha de diagnóstico no log.
+  - Local (Windows): 40 de 40 testes, sem avisos, `clang-tidy` limpo.
+- A T90 só fecha com a próxima execução verde.
