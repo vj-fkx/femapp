@@ -19,16 +19,23 @@ const float kMajorOpacity = 0.60;
 const float kAxisOpacity = 0.95;
 const float kAxisHalfWidthPx = 1.25;
 
+// Opacity of a grid with unit cells in `coord`: 1 while the cells are wide on
+// screen, going to 0 once they get too small, which is what happens towards
+// the horizon.
+float densityFade(vec2 coord)
+{
+    vec2 width = fwidth(coord);
+    return 1.0 - smoothstep(0.25, 0.6, max(width.x, width.y));
+}
+
 // Coverage of the lines of a grid with unit cells, anti-aliased with screen
-// derivatives. Lines fade out once the cells get too small on screen, which is
-// what happens towards the horizon.
+// derivatives and faded towards the horizon.
 float gridLines(vec2 coord)
 {
     vec2 width = max(fwidth(coord), vec2(1e-6));
     vec2 distanceInPixels = abs(fract(coord - 0.5) - 0.5) / width;
     float line = 1.0 - min(min(distanceInPixels.x, distanceInPixels.y), 1.0);
-    float density = max(width.x, width.y);
-    return line * (1.0 - smoothstep(0.25, 0.6, density));
+    return line * densityFade(coord);
 }
 
 // Coverage of the single line where `value` is zero.
@@ -48,9 +55,12 @@ void main()
     float alpha = max(minor, major);
 
     // The X axis is the line y = 0; the Y axis is the line x = 0.
+    // The axes fade towards the horizon together with the major lines, so they
+    // do not stick out beyond the visible grid.
     vec2 absolute = v_relative + u.axis.xy;
-    float xAxis = axisLine(absolute.y);
-    float yAxis = axisLine(absolute.x);
+    float axisFade = densityFade(world / u.spacing.y);
+    float xAxis = axisLine(absolute.y) * axisFade;
+    float yAxis = axisLine(absolute.x) * axisFade;
     color = mix(color, kXAxisColor, xAxis);
     color = mix(color, kYAxisColor, yAxis);
     alpha = max(alpha, max(xAxis, yAxis) * kAxisOpacity);

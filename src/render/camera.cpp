@@ -5,6 +5,7 @@
 #include <array>
 #include <cmath>
 #include <numbers>
+#include <optional>
 
 namespace fem::render {
 
@@ -77,6 +78,14 @@ void Camera::orbit(double deltaXPx, double deltaYPx)
 
 void Camera::pan(const Vec2& fromPx, const Vec2& toPx)
 {
+    // Both points on the work plane when possible, so that the grabbed grid
+    // point follows the cursor and the target keeps its height.
+    const std::optional<Vec3> from = workPlanePoint(fromPx);
+    const std::optional<Vec3> to = workPlanePoint(toPx);
+    if (from && to) {
+        m_target -= *to - *from;
+        return;
+    }
     m_target -= focalPlanePoint(toPx) - focalPlanePoint(fromPx);
 }
 
@@ -86,9 +95,10 @@ void Camera::zoomAt(const Vec2& cursorPx, double wheelSteps)
         std::clamp(m_distance * std::pow(kZoomBase, -wheelSteps), kMinDistance, kMaxDistance);
     const double ratio = newDistance / m_distance;
 
-    // Scaling the target towards the cursor point by the same ratio as the
-    // distance keeps that point on the same pixel.
-    const Vec3 anchor = focalPlanePoint(cursorPx);
+    // Scaling the eye and the target towards the anchor by the same ratio
+    // keeps the anchor on the same pixel, wherever it is. Anchoring on the work
+    // plane keeps a target that is on the plane there while zooming in.
+    const Vec3 anchor = anchorPoint(cursorPx);
     m_target = anchor + (m_target - anchor) * ratio;
     m_distance = newDistance;
 }
@@ -257,6 +267,31 @@ Vec3 Camera::focalPlanePoint(const Vec2& pixel) const
     // a positive component along the viewing direction.
     const double t = (m_target - ray.origin).dot(f) / ray.direction.dot(f);
     return ray.origin + t * ray.direction;
+}
+
+std::optional<Vec3> Camera::workPlanePoint(const Vec2& pixel) const
+{
+    const Ray ray = rayThrough(pixel);
+    if (ray.direction.z() == 0.0) {
+        return std::nullopt;
+    }
+    const double t = -ray.origin.z() / ray.direction.z();
+    if (!(t > 0.0)) {
+        return std::nullopt;
+    }
+    const Vec3 point = ray.origin + t * ray.direction;
+    // Beyond the far clipping plane the point is not visible, and near the
+    // horizon a small mouse move would send the view very far away.
+    const double depth = (point - position()).dot(forward());
+    if (depth > kDepthRangeFactor * m_distance) {
+        return std::nullopt;
+    }
+    return point;
+}
+
+Vec3 Camera::anchorPoint(const Vec2& pixel) const
+{
+    return workPlanePoint(pixel).value_or(focalPlanePoint(pixel));
 }
 
 double Camera::aspectRatio() const noexcept

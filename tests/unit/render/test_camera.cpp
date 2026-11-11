@@ -286,18 +286,22 @@ TEST_CASE("panning keeps the grabbed point under the cursor", "[render][camera]"
 
     const Vec2 from(300.0, 200.0);
     const Vec2 to(912.0, 541.0);
-    const Vec3 grabbed = camera.focalPlanePoint(from);
+    REQUIRE(camera.workPlanePoint(from).has_value());
+    REQUIRE(camera.workPlanePoint(to).has_value());
+    const Vec3 grabbed = camera.anchorPoint(from);
     const Vec3 forward = camera.forward();
     const double distance = camera.distance();
+    const double height = camera.target().z();
 
     camera.pan(from, to);
 
     const Vec2 projected = toPixel(camera, grabbed);
     CHECK_THAT(projected.x(), WithinAbs(to.x(), kPixelTolerance));
     CHECK_THAT(projected.y(), WithinAbs(to.y(), kPixelTolerance));
-    // Panning neither rotates nor zooms.
+    // Panning on the work plane neither rotates, zooms nor changes the height.
     checkVec(camera.forward(), forward);
     CHECK(camera.distance() == distance);
+    CHECK_THAT(camera.target().z(), WithinAbs(height, 1e-12));
 }
 
 // REQ-002-14, REQ-002-28
@@ -309,7 +313,7 @@ TEST_CASE("zooming keeps the point under the cursor fixed", "[render][camera]")
     camera.orbit(-20.0, 40.0);
 
     const Vec2 cursor(1000.0, 150.0);
-    const Vec3 anchor = camera.focalPlanePoint(cursor);
+    const Vec3 anchor = camera.anchorPoint(cursor);
     const double before = camera.distance();
 
     camera.zoomAt(cursor, steps);
@@ -322,6 +326,70 @@ TEST_CASE("zooming keeps the point under the cursor fixed", "[render][camera]")
     } else {
         CHECK(camera.distance() > before);
     }
+}
+
+// REQ-002-12: above the horizon the work plane is out of reach; panning falls
+// back to the focal plane.
+TEST_CASE("panning above the horizon uses the focal plane", "[render][camera]")
+{
+    Camera camera = makeCamera();
+    camera.setStandardView(StandardView::Front);
+
+    const Vec2 from(400.0, 100.0);
+    const Vec2 to(700.0, 200.0);
+    REQUIRE_FALSE(camera.workPlanePoint(from).has_value());
+    const Vec3 grabbed = camera.focalPlanePoint(from);
+
+    camera.pan(from, to);
+
+    const Vec2 projected = toPixel(camera, grabbed);
+    CHECK_THAT(projected.x(), WithinAbs(to.x(), kPixelTolerance));
+    CHECK_THAT(projected.y(), WithinAbs(to.y(), kPixelTolerance));
+}
+
+// REQ-002-14, REQ-002-20: zooming in on the grid away from the centre of the
+// screen keeps the target on the grid, so the grid stays in view.
+TEST_CASE("zooming in on the grid keeps the target on the work plane", "[render][camera]")
+{
+    const Projection projection = GENERATE(Projection::Perspective, Projection::Orthographic);
+    Camera camera = makeCamera(projection);
+
+    const Vec2 cursor(1000.0, 600.0);
+    REQUIRE(camera.workPlanePoint(cursor).has_value());
+    const Vec3 anchor = camera.anchorPoint(cursor);
+    CHECK_THAT(anchor.z(), WithinAbs(0.0, 1e-9));
+
+    for (int step = 0; step < 300; ++step) {
+        camera.zoomAt(cursor, 1.0);
+    }
+
+    CHECK(camera.distance() < 1e-3);
+    CHECK_THAT(camera.target().z(), WithinAbs(0.0, 1e-9));
+    const Vec2 projected = toPixel(camera, anchor);
+    CHECK_THAT(projected.x(), WithinAbs(cursor.x(), 1e-3));
+    CHECK_THAT(projected.y(), WithinAbs(cursor.y(), 1e-3));
+    // The grid under the cursor is inside the depth range.
+    const Vec3 ndc = toNdc(camera, camera.anchorPoint(cursor));
+    CHECK(ndc.z() > 0.0);
+    CHECK(ndc.z() < 1.0);
+}
+
+// REQ-002-14: pointing at the sky, zoom anchors on the focal plane.
+TEST_CASE("zooming above the horizon anchors on the focal plane", "[render][camera]")
+{
+    Camera camera = makeCamera();
+    camera.setStandardView(StandardView::Front);
+
+    const Vec2 cursor(900.0, 80.0);
+    REQUIRE_FALSE(camera.workPlanePoint(cursor).has_value());
+    const Vec3 anchor = camera.focalPlanePoint(cursor);
+    CHECK_THAT((camera.anchorPoint(cursor) - anchor).norm(), WithinAbs(0.0, 1e-12));
+
+    camera.zoomAt(cursor, 3.0);
+
+    const Vec2 projected = toPixel(camera, anchor);
+    CHECK_THAT(projected.x(), WithinAbs(cursor.x(), kPixelTolerance));
+    CHECK_THAT(projected.y(), WithinAbs(cursor.y(), kPixelTolerance));
 }
 
 // REQ-002-15

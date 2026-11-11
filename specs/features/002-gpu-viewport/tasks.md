@@ -411,3 +411,17 @@ Regras:
   ponto onde o raio do cursor encontra o plano de trabalho Z = 0, quando esse
   ponto existe à frente da câmera e dentro do intervalo de profundidade; caso
   contrário, continuam usando o plano de foco.
+
+**2026-11-11 — Correção dos dois defeitos da grade (alteração do design aprovada):**
+
+- Zoom e pan passam a ancorar no plano de trabalho Z = 0 quando o raio do
+  cursor o encontra à frente da câmera e dentro do intervalo de profundidade;
+  senão, no plano de foco (design §5.1 atualizado). Novos métodos
+  `Camera::workPlanePoint` e `Camera::anchorPoint`.
+- Eixos X e Y da grade passam a esmaecer no horizonte junto com as linhas
+  principais (`grid.frag`), em vez de seguir até a borda do quadrilátero.
+- Testes novos: zoom repetido fora do centro mantém o alvo em Z = 0 e a grade
+  dentro do intervalo de profundidade; zoom e pan acima do horizonte usam o
+  plano de foco; pan no plano mantém a altura do alvo.
+- Local (Windows): 43 de 43 testes, sem avisos, `clang-format` e `clang-tidy`
+  limpos. Falta a conferência visual do mantenedor (AC-8) e o CI.

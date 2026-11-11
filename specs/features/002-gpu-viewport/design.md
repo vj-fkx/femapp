@@ -227,12 +227,21 @@ posição = t − d·f
 
 - **Órbita:** `ψ −= k·Δx`, `θ += k·Δy`, com `k = 0,5°/pixel`; `θ` é limitado a
   `[−90°, 90°]`.
-- **Pan:** os dois pixels são projetados no plano que passa por `t` e é
-  perpendicular a `f`; `t −= (P_to − P_from)`. O ponto sob o cursor acompanha o
-  cursor (REQ-002-12).
+- **Ponto de ancoragem** de um pixel: onde o raio do pixel encontra o plano de
+  trabalho Z = 0, se o encontro está à frente da câmera e a no máximo `100·d`
+  de profundidade (dentro do plano de corte distante); senão, o ponto do raio
+  no plano que passa por `t` e é perpendicular a `f` (plano de foco).
+  *(Alterado em 2026-11-11, aprovado pelo mantenedor: antes era sempre o plano
+  de foco, o que fazia o zoom fora do centro da tela tirar o alvo do plano da
+  grade, até a grade sumir.)*
+- **Pan:** com `P_from` e `P_to` os pontos de ancoragem dos dois pixels — ambos
+  no plano Z = 0 quando os dois raios o encontram, senão ambos no plano de foco —
+  `t −= (P_to − P_from)`. O ponto sob o cursor acompanha o cursor (REQ-002-12);
+  no plano Z = 0 o alvo mantém a altura.
 - **Zoom:** `s = 1,15^(−passos)`; `d' = clamp(d·s, d_min, d_max)`; com `P` o
-  ponto sob o cursor no plano de foco, `t' = P + (t − P)·(d'/d)`, que mantém `P`
-  fixo na tela (REQ-002-14). Limites `d_min = 1e−6`, `d_max = 1e12`
+  ponto de ancoragem do cursor, `t' = P + (t − P)·(d'/d)`. É uma homotetia de
+  centro `P` aplicada ao olho e ao alvo, que mantém `P` fixo na tela para
+  qualquer `P` (REQ-002-14). Limites `d_min = 1e−6`, `d_max = 1e12`
   (REQ-002-15).
 - **Projeção:** perspectiva com `fov`; ortográfica com meia-altura
   `h = d·tan(fov/2)`. Como `h` deriva de `d`, trocar de projeção preserva o

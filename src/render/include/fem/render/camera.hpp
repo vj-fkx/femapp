@@ -2,6 +2,7 @@
 
 #include <Eigen/Core>
 #include <cstdint>
+#include <optional>
 
 namespace fem::render {
 
@@ -81,6 +82,12 @@ public:
     [[nodiscard]] Ray rayThrough(const Vec2& pixel) const;
     // Point under `pixel` on the plane through the target that faces the camera.
     [[nodiscard]] Vec3 focalPlanePoint(const Vec2& pixel) const;
+    // Point under `pixel` on the work plane Z = 0, when the ray meets it in
+    // front of the camera and within the depth range; nullopt otherwise.
+    [[nodiscard]] std::optional<Vec3> workPlanePoint(const Vec2& pixel) const;
+    // Point that zoom and pan keep under the cursor: workPlanePoint() when it
+    // exists, focalPlanePoint() otherwise.
+    [[nodiscard]] Vec3 anchorPoint(const Vec2& pixel) const;
 
     static constexpr double kMinDistance = 1e-6;
     static constexpr double kMaxDistance = 1e12;
