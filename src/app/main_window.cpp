@@ -31,16 +31,23 @@ MainWindow::MainWindow(QWidget* parent)
     setWindowTitle(QStringLiteral("femapp"));
     resize(kDefaultWidth, kDefaultHeight);
 
+    // REQ-002-01: the 3D viewport is the central area of the window.
+    //
+    // It is created first and without a parent on purpose. Qt switches a
+    // top-level window to GPU composition when a QRhiWidget is reparented into
+    // it; a viewport constructed directly as a child of a window whose native
+    // handle already exists (which the menu bar can cause on macOS) would be
+    // left without a QRhi.
+    // NOLINTNEXTLINE(cppcoreguidelines-owning-memory): setCentralWidget takes ownership.
+    auto* viewport = new render::Viewport;
+    m_viewport = viewport;
+    setCentralWidget(viewport);
+
     QMenu* fileMenu = menuBar()->addMenu(tr("&File"));
     QAction* exitAction = fileMenu->addAction(tr("E&xit"), this, &QWidget::close);
     exitAction->setShortcut(QKeySequence::Quit);
     exitAction->setMenuRole(QAction::QuitRole);
 
-    // REQ-002-01: the 3D viewport is the central area of the window.
-    // NOLINTNEXTLINE(cppcoreguidelines-owning-memory): owned by its Qt parent.
-    auto* viewport = new render::Viewport(this);
-    m_viewport = viewport;
-    setCentralWidget(viewport);
     createViewMenu();
 
     QMenu* helpMenu = menuBar()->addMenu(tr("&Help"));

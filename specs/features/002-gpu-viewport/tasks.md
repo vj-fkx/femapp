@@ -296,3 +296,25 @@ Regras:
   macOS, não só no CI.
 - Os outros 39 testes passam no macOS, incluindo o `SceneRenderer` com o
   backend `Null` e `femapp_smoke_no_gpu`.
+
+**2026-11-11 — Execução nº 11 do CI, commit `e59bfcb` (T90, em andamento):**
+
+- <https://github.com/vj-fkx/femapp/actions/runs/43028271839>
+- `Viewport` passou a repetir o quadro até cinco vezes antes de desistir de um
+  backend, registrando plataforma e estado da janela a cada falha.
+- `macos`: continua falhando, mas o diagnóstico descartou a hipótese de
+  "pintura cedo demais": as falhas persistem com a janela já exposta, e o tipo
+  de superfície da janela fica em 0 (raster) o tempo todo. Ou seja, a janela
+  principal nunca foi trocada para composição por GPU.
+- Causa provável (não confirmada): o `Viewport` era construído já como filho
+  da janela, depois de `menuBar()`. O Qt só troca a janela para composição por
+  GPU quando um `QRhiWidget` é reparentado para dentro dela; se o identificador
+  nativo da janela já existe (o que a barra de menus pode provocar no macOS),
+  a troca não acontece. No Windows a janela nativa só é criada no `show()`,
+  por isso o problema não aparecia.
+- Correção candidata, validada só no Windows (40 de 40 testes): criar o
+  `Viewport` primeiro e sem pai, deixando `setCentralWidget` fazer o
+  reparentamento. Se a causa for essa, é um defeito real no macOS, não só do
+  CI.
+- A recompilação local do OpenCASCADE pelo vcpkg (cerca de 40 min) aconteceu
+  nesta sessão sem mudança no projeto; causa não investigada.
