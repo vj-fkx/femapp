@@ -279,3 +279,20 @@ Regras:
   padrão (Metal) em vez de `null`, com o log do QRhi ligado, para descobrir se
   Metal funciona no runner. Se funcionar, o REQ-002-29 precisa de uma emenda
   para o macOS; se não, a decisão volta para o mantenedor.
+
+**2026-11-11 — Execução nº 10 do CI, commit `c2def87` (T90, em andamento):**
+
+- <https://github.com/vj-fkx/femapp/actions/runs/43018282248>
+- `windows`, `linux-gcc`, `linux-clang` (com `clang-tidy`) e `format`:
+  passaram.
+- `macos`: `femapp_smoke` continua em "viewport unavailable", agora com Metal
+  como primeira tentativa. O log mostra só "QRhiWidget: No QRhi" para Metal e
+  para OpenGL; nenhuma linha das categorias `qt.rhi.*` apareceu, o que sugere
+  que o Qt nem chegou a tentar criar o QRhi da janela.
+- Hipóteses, nenhuma confirmada: (a) o runner de macOS do GitHub não oferece
+  composição por GPU para janelas Qt; (b) o `QRhiWidget` é pintado uma vez
+  antes de a janela estar pronta no macOS, e o `Viewport` desiste do backend
+  cedo demais, na primeira falha. A hipótese (b) seria um defeito real no
+  macOS, não só no CI.
+- Os outros 39 testes passam no macOS, incluindo o `SceneRenderer` com o
+  backend `Null` e `femapp_smoke_no_gpu`.
