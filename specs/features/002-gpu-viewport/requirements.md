@@ -90,8 +90,9 @@ resultados (012) serão exibidos.
 
 - [x] **AC-1** (REQ-002-01, 19) Quando abro o `femapp`, vejo o viewport ocupando a
   área central, em vista isométrica, com grade e indicador de eixos.
-- [ ] **AC-2** (REQ-002-02, 07) Em cada plataforma, a caixa "Sobre" mostra o
-  backend esperado (Direct3D 11, Metal ou Vulkan).
+- [x] **AC-2** (REQ-002-02, 07) Em cada plataforma, a caixa "Sobre" mostra o
+  backend esperado (Direct3D 11, Metal ou Vulkan). *Ressalva: conferido só no
+  Windows; ver `tasks.md`.*
 - [x] **AC-3** (REQ-002-03, 04, 05) Com `FEM_RHI_BACKEND=opengl`, "Sobre" mostra
   OpenGL; com um valor inválido, o aplicativo abre com o backend padrão e
   registra um aviso.
@@ -106,7 +107,7 @@ resultados (012) serão exibidos.
 - [x] **AC-7** (REQ-002-16, 17, 18) Cada vista padrão e a troca de projeção
   funcionam pelo menu e pelo atalho; testes unitários conferem a direção de
   visada de cada vista e o enquadramento de uma caixa conhecida.
-- [ ] **AC-8** (REQ-002-20 a 23) Roteiro manual: a grade muda de espaçamento ao
+- [x] **AC-8** (REQ-002-20 a 23) Roteiro manual: a grade muda de espaçamento ao
   aproximar e afastar, os eixos X e Y aparecem coloridos, e não há cintilação
   ao orbitar com a câmera rasante.
 - [x] **AC-9** (REQ-002-24, 25, 26) O indicador de eixos gira com a câmera, não

@@ -1,6 +1,6 @@
 # Tarefas — 002 gpu-viewport
 
-Status: em andamento
+Status: concluído · 2026-11-11
 Design: [design.md](design.md) · Requisitos: [requirements.md](requirements.md)
 
 Regras:
@@ -133,9 +133,9 @@ Regras:
 - [x] **T90** Build e testes verdes nos quatro jobs do CI (push com sua
   confirmação) — cobre: 29, 30
 - [x] **T91** `clang-format` e `clang-tidy` sem pendências
-- [ ] **T92** Conferir os catorze critérios de aceite de `requirements.md`,
+- [x] **T92** Conferir os catorze critérios de aceite de `requirements.md`,
   registrando as ressalvas de macOS e Linux
-- [ ] **T93** Atualizar `specs/roadmap.md` para `concluída`, o `README.md` e o
+- [x] **T93** Atualizar `specs/roadmap.md` para `concluída`, o `README.md` e o
   `CLAUDE.md` se os comandos ou pré-requisitos tiverem mudado
 
 ## Matriz de rastreabilidade
@@ -425,3 +425,21 @@ Regras:
   plano de foco; pan no plano mantém a altura do alvo.
 - Local (Windows): 43 de 43 testes, sem avisos, `clang-format` e `clang-tidy`
   limpos. Falta a conferência visual do mantenedor (AC-8) e o CI.
+
+**2026-11-11 — Fechamento (T92, T93):**
+
+- AC-8: conferido pelo mantenedor depois da correção (grade visível com zoom
+  grande, eixos esmaecendo no horizonte, pan sobre a grade).
+- T92: os 14 critérios de aceite marcados. Ressalvas que ficam:
+  - AC-2: backend nativo no "Sobre" conferido só no Windows (Direct3D 11). No
+    macOS o CI renderizou com Metal (execução nº 12), sem que ninguém visse a
+    janela; no Linux o Vulkan nunca foi exercitado, só o backend `null` sob
+    `xvfb`.
+  - NFR-002-01: medido em uma GPU de modelo não informado; não está provado
+    para GPU integrada.
+  - AC-11: evidência indireta (consumo zero em repouso); o contador de quadros
+    não é exibido.
+- T93: roadmap atualizado para `concluída`. README e `CLAUDE.md` já descrevem
+  o Qt Shader Tools e o `xvfb-run`; os comandos de build não mudaram.
+- O CI do commit de fechamento ainda não tinha terminado quando esta nota foi
+  escrita.
