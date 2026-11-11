@@ -254,3 +254,13 @@ Regras:
   apontamentos em todos os `.cpp` de `src` e `tests`; 40 de 40 testes.
 - Pendentes: T29 (medição de quadros por segundo e de repouso, do
   mantenedor), T90 (CI), T92 e T93.
+
+**2026-11-11 — Execução nº 9 do CI, commit `88efb16` (T90, em andamento):**
+
+- <https://github.com/vj-fkx/femapp/actions/runs/43014696951>
+- `windows`, `linux-gcc` e `format`: passaram. O smoke test sob `xvfb-run`
+  funcionou no `linux-gcc`.
+- `linux-clang`: build e testes passaram; falhou no passo "Run clang-tidy".
+- `macos`: falhou no passo "Test".
+- Os logs dos dois jobs ainda não foram lidos (o GitHub exige login para
+  abri-los); causa desconhecida até lá.
