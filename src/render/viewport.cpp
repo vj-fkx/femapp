@@ -3,10 +3,13 @@
 #include <fem/render/backend.hpp>
 #include <fem/render/viewport.hpp>
 
+#include <QGuiApplication>
 #include <QLoggingCategory>
 #include <QMouseEvent>
 #include <QPointF>
+#include <QTimer>
 #include <QWheelEvent>
+#include <QWindow>
 
 #include <rhi/qrhi.h>
 
@@ -22,6 +25,10 @@ namespace {
 Q_LOGGING_CATEGORY(lcRender, "fem.render")
 
 constexpr int kSampleCount = 4;
+// The widget can be asked to paint before its window is ready for GPU
+// composition, so a backend is only given up on after several failed frames.
+constexpr int kMaxFailedFramesPerBackend = 5;
+constexpr int kRetryIntervalMs = 100;
 constexpr double kWheelDegreesPerStep = 15.0;
 constexpr double kWheelUnitsPerDegree = 8.0;
 
@@ -66,6 +73,7 @@ public:
 
     BackendPlan plan;
     std::size_t attempt = 0;
+    int failedFrames = 0;
     bool available = true;
     QString unavailableReason;
     QString backendName;
@@ -100,8 +108,7 @@ Viewport::Viewport(QWidget* parent)
     }
     setSampleCount(kSampleCount);
 
-    connect(this, &QRhiWidget::renderFailed, this,
-            [this] { tryNextBackend(tr("The graphics backend could not be initialized.")); });
+    connect(this, &QRhiWidget::renderFailed, this, &Viewport::handleRenderFailed);
 }
 
 Viewport::~Viewport() = default;
@@ -184,6 +191,27 @@ void Viewport::fitAll()
     update();
 }
 
+void Viewport::handleRenderFailed()
+{
+    if (!m_impl->available) {
+        return;
+    }
+
+    ++m_impl->failedFrames;
+    const QWindow* topLevel = window()->windowHandle();
+    qCWarning(lcRender, "frame %d of %d failed (platform %s, window surface type %d, exposed %d)",
+              m_impl->failedFrames, kMaxFailedFramesPerBackend,
+              qUtf8Printable(QGuiApplication::platformName()),
+              topLevel != nullptr ? static_cast<int>(topLevel->surfaceType()) : -1,
+              static_cast<int>(topLevel != nullptr && topLevel->isExposed()));
+
+    if (m_impl->failedFrames < kMaxFailedFramesPerBackend) {
+        QTimer::singleShot(kRetryIntervalMs, this, qOverload<>(&QWidget::update));
+        return;
+    }
+    tryNextBackend(tr("The graphics backend could not be initialized."));
+}
+
 void Viewport::tryNextBackend(const QString& failure)
 {
     if (!m_impl->available) {
@@ -198,6 +226,7 @@ void Viewport::tryNextBackend(const QString& failure)
     }
 
     ++m_impl->attempt;
+    m_impl->failedFrames = 0;
     if (m_impl->attempt < attempts.size()) {
         m_impl->renderer.release();
         m_impl->rhi = nullptr;
@@ -229,6 +258,7 @@ void Viewport::initialize(QRhiCommandBuffer* /*commandBuffer*/)
         return;
     }
 
+    m_impl->failedFrames = 0;
     m_impl->backendName = toQString(backendDisplayName(m_impl->plan.attempts.at(m_impl->attempt)));
     emit backendChanged(m_impl->backendName);
 }

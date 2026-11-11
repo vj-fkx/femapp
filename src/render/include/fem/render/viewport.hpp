@@ -69,6 +69,7 @@ protected:
     void wheelEvent(QWheelEvent* event) override;
 
 private:
+    void handleRenderFailed();
     void tryNextBackend(const QString& failure);
 
     class Impl;
