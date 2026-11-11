@@ -346,3 +346,8 @@ Regras:
   `sudo apt-get update` (espelho de pacotes do Ubuntu sem resposta). Não
   chegaram a compilar; resultado ainda desconhecido quando esta nota foi
   escrita.
+- Os dois jobs de Linux falharam com código 100 no `apt-get` ("Temporary
+  failure resolving 'azure.archive.ubuntu.com'"). Reexecutados uma vez; a
+  segunda tentativa encontrou o mesmo espelho sem resposta. Problema da
+  infraestrutura do GitHub; o código da limpeza ainda não foi compilado nem
+  testado em Linux.
