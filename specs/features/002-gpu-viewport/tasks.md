@@ -125,7 +125,7 @@ Regras:
   (AC-9), redimensionar e trocar de tela (AC-10), contador de quadros parado
   (AC-11), backend no "Sobre" e `FEM_RHI_BACKEND=opengl` e inválido (AC-2,
   AC-3), menus em português (AC-14) — cobre: 07, 08, 12–14, 16–18, 20–27
-- [ ] **T29** `[M]` Medir quadros por segundo em build Release durante a
+- [x] **T29** `[M]` Medir quadros por segundo em build Release durante a
   navegação e o uso de CPU/GPU em repouso; registrar aqui — cobre: N01, N02
 
 ## Fase 4 — Fechamento
@@ -355,3 +355,13 @@ Regras:
   Linux. A página de status do GitHub não registrava incidente. Acrescentado
   `Acquire::Retries=5` às chamadas do `apt-get` no workflow; isso só ajuda em
   falhas passageiras, não se o espelho ficar fora do ar por muito tempo.
+
+**2026-11-11 — T29 (medição do mantenedor, build Release, Windows, Direct3D 11):**
+
+- Navegação: média de 120 quadros por segundo. Meta NFR-002-01: ≥ 60.
+- Repouso: sem consumo de CPU nem de GPU pelo femapp (Gerenciador de
+  Tarefas). Atende NFR-002-02 e, por consequência, o AC-11.
+- Ressalvas: o modelo da GPU e a taxa de atualização do monitor não foram
+  informados, então não dá para afirmar que a medição foi feita em GPU
+  integrada, como o NFR-002-01 especifica. A medição foi com a cena desta
+  feature (grade e eixos), no Windows apenas.
