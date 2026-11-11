@@ -88,38 +88,38 @@ resultados (012) serão exibidos.
 
 ## 5. Critérios de aceite
 
-- [ ] **AC-1** (REQ-002-01, 19) Quando abro o `femapp`, vejo o viewport ocupando a
+- [x] **AC-1** (REQ-002-01, 19) Quando abro o `femapp`, vejo o viewport ocupando a
   área central, em vista isométrica, com grade e indicador de eixos.
 - [ ] **AC-2** (REQ-002-02, 07) Em cada plataforma, a caixa "Sobre" mostra o
   backend esperado (Direct3D 11, Metal ou Vulkan).
 - [ ] **AC-3** (REQ-002-03, 04, 05) Com `FEM_RHI_BACKEND=opengl`, "Sobre" mostra
   OpenGL; com um valor inválido, o aplicativo abre com o backend padrão e
   registra um aviso.
-- [ ] **AC-4** (REQ-002-06) Forçando a falha de todos os backends (teste
+- [x] **AC-4** (REQ-002-06) Forçando a falha de todos os backends (teste
   automatizado), a janela continua aberta e mostra a mensagem de falha.
-- [ ] **AC-5** (REQ-002-12, 13, 14, 15) Roteiro manual: pan com o botão do meio,
+- [x] **AC-5** (REQ-002-12, 13, 14, 15) Roteiro manual: pan com o botão do meio,
   órbita com Shift + botão do meio e zoom com a roda se comportam como
   descrito; o ponto sob o cursor fica fixo no pan e no zoom.
-- [ ] **AC-6** (REQ-002-11, 13, 28) Testes unitários: após qualquer sequência de
+- [x] **AC-6** (REQ-002-11, 13, 28) Testes unitários: após qualquer sequência de
   órbitas, o eixo Z do mundo permanece vertical na tela; pan e zoom preservam o
   ponto sob o cursor dentro de uma tolerância.
-- [ ] **AC-7** (REQ-002-16, 17, 18) Cada vista padrão e a troca de projeção
+- [x] **AC-7** (REQ-002-16, 17, 18) Cada vista padrão e a troca de projeção
   funcionam pelo menu e pelo atalho; testes unitários conferem a direção de
   visada de cada vista e o enquadramento de uma caixa conhecida.
-- [ ] **AC-8** (REQ-002-20 a 23) Roteiro manual: a grade muda de espaçamento ao
+- [x] **AC-8** (REQ-002-20 a 23) Roteiro manual: a grade muda de espaçamento ao
   aproximar e afastar, os eixos X e Y aparecem coloridos, e não há cintilação
   ao orbitar com a câmera rasante.
-- [ ] **AC-9** (REQ-002-24, 25, 26) O indicador de eixos gira com a câmera, não
+- [x] **AC-9** (REQ-002-24, 25, 26) O indicador de eixos gira com a câmera, não
   muda de tamanho com o zoom, e ele e a grade somem e voltam pelo menu "Exibir".
 - [ ] **AC-10** (REQ-002-08) Ao redimensionar a janela e ao movê-la entre telas
   com escalas diferentes, a imagem não distorce nem fica borrada.
-- [ ] **AC-11** (REQ-002-09, NFR-002-02) Com a câmera parada, o contador de
+- [x] **AC-11** (REQ-002-09, NFR-002-02) Com a câmera parada, o contador de
   quadros renderizados não aumenta.
-- [ ] **AC-12** (REQ-002-29, 30) Os quatro jobs do CI passam, incluindo o smoke
+- [x] **AC-12** (REQ-002-29, 30) Os quatro jobs do CI passam, incluindo o smoke
   test do viewport com o backend `null`.
-- [ ] **AC-13** (REQ-002-10) Nenhum arquivo fora de `src/render` inclui headers
+- [x] **AC-13** (REQ-002-10) Nenhum arquivo fora de `src/render` inclui headers
   de `QRhi` (verificação automática, como a de Qt em `core`).
-- [ ] **AC-14** (REQ-002-27) Com o sistema em português, os itens novos do menu
+- [x] **AC-14** (REQ-002-27) Com o sistema em português, os itens novos do menu
   aparecem em português.
 
 ## 6. Fora de escopo

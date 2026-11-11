@@ -130,7 +130,7 @@ Regras:
 
 ## Fase 4 — Fechamento
 
-- [ ] **T90** Build e testes verdes nos quatro jobs do CI (push com sua
+- [x] **T90** Build e testes verdes nos quatro jobs do CI (push com sua
   confirmação) — cobre: 29, 30
 - [x] **T91** `clang-format` e `clang-tidy` sem pendências
 - [ ] **T92** Conferir os catorze critérios de aceite de `requirements.md`,
@@ -365,3 +365,30 @@ Regras:
   informados, então não dá para afirmar que a medição foi feita em GPU
   integrada, como o NFR-002-01 especifica. A medição foi com a cena desta
   feature (grade e eixos), no Windows apenas.
+
+**2026-11-11 — Execução nº 14 do CI, commit `c2892ea` (T90 concluída):**
+
+- <https://github.com/vj-fkx/femapp/actions/runs/43109270385> — os cinco jobs
+  passaram, incluindo `linux-gcc` e `linux-clang` (com `clang-tidy`). É a
+  primeira execução verde com a limpeza do `Viewport` em todas as plataformas.
+
+**2026-11-11 — T92, conferência dos critérios de aceite (em andamento):**
+
+- Atendidos (11 de 14):
+  - AC-1, AC-5, AC-7 (menu e atalhos), AC-8, AC-9, AC-14: roteiro manual do
+    mantenedor (T28).
+  - AC-4: `femapp_smoke_no_gpu`. AC-6, AC-7 (vistas e enquadramento):
+    `test_camera`. AC-12: execução nº 14. AC-13: `check_rhi_confined`.
+  - AC-11: medição do mantenedor (T29), sem consumo de CPU/GPU em repouso. O
+    contador de quadros em si não é exibido; a evidência é indireta.
+- Pendentes:
+  - AC-2: Direct3D 11 no "Sobre" confirmado no Windows (T28). No macOS o CI
+    renderizou com Metal na execução nº 12, mas o "Sobre" não foi visto; no
+    Linux, Vulkan nunca foi exercitado (o CI usa `null`).
+  - AC-3: verificado em 2026-11-11 que um valor inválido (`bogus`) e um
+    backend de outra plataforma (`metal`) registram aviso e caem no padrão, e
+    que `opengl` renderiza um quadro (com `QT_FORCE_STDERR_LOGGING=1`, já que
+    no Windows o log do Qt vai para o depurador). Falta ver "OpenGL" na caixa
+    "Sobre".
+  - AC-10: redimensionar e mover entre telas com escalas diferentes não foi
+    confirmado explicitamente.
