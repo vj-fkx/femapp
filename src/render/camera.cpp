@@ -31,13 +31,12 @@ double wrapAngle(double angle)
 
 std::array<Vec3, 8> corners(const Aabb& box)
 {
-    std::array<Vec3, 8> result;
-    for (std::size_t i = 0; i < result.size(); ++i) {
-        result.at(i) = Vec3((i & 1U) != 0U ? box.max.x() : box.min.x(),
-                            (i & 2U) != 0U ? box.max.y() : box.min.y(),
-                            (i & 4U) != 0U ? box.max.z() : box.min.z());
-    }
-    return result;
+    const Vec3& lo = box.min;
+    const Vec3& hi = box.max;
+    return {Vec3(lo.x(), lo.y(), lo.z()), Vec3(hi.x(), lo.y(), lo.z()),
+            Vec3(lo.x(), hi.y(), lo.z()), Vec3(hi.x(), hi.y(), lo.z()),
+            Vec3(lo.x(), lo.y(), hi.z()), Vec3(hi.x(), lo.y(), hi.z()),
+            Vec3(lo.x(), hi.y(), hi.z()), Vec3(hi.x(), hi.y(), hi.z())};
 }
 
 bool isUsable(const Aabb& box)

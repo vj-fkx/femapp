@@ -264,3 +264,18 @@ Regras:
 - `macos`: falhou no passo "Test".
 - Os logs dos dois jobs ainda não foram lidos (o GitHub exige login para
   abri-los); causa desconhecida até lá.
+
+**2026-11-11 — Logs da execução nº 9 (T90, em andamento):**
+
+- `linux-clang`: `clang-tidy` acusou `cppcoreguidelines-pro-type-member-init`
+  em `camera.cpp` (um `std::array<Vec3, 8>` declarado sem inicializar). O
+  `clang-tidy` do Windows não acusa o mesmo. Corrigido: a função passou a
+  devolver o array já construído.
+- `macos`: `femapp_smoke` terminou em "viewport unavailable". O log mostra
+  "QRhiWidget: No QRhi" para `Null`, depois para Metal e para OpenGL. Não dá
+  para saber, só por essa execução, se Metal falha por si no runner ou se
+  falhou por ter sido tentado depois do `Null`, com a janela já aberta.
+- Proposta, aguardando aprovação: no macOS, rodar `femapp_smoke` com o backend
+  padrão (Metal) em vez de `null`, com o log do QRhi ligado, para descobrir se
+  Metal funciona no runner. Se funcionar, o REQ-002-29 precisa de uma emenda
+  para o macOS; se não, a decisão volta para o mantenedor.
