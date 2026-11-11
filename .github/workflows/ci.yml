@@ -58,8 +58,8 @@ jobs:
       - name: Install system packages (Linux)
         if: runner.os == 'Linux'
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
+          sudo apt-get -o Acquire::Retries=5 update
+          sudo apt-get -o Acquire::Retries=5 install -y --no-install-recommends \
             ninja-build pkg-config curl zip unzip tar \
             libgl1-mesa-dev libglu1-mesa-dev libegl1-mesa-dev \
             libx11-dev libxext-dev libxi-dev libxmu-dev \
@@ -160,7 +160,7 @@ jobs:
       - name: Run clang-tidy
         if: matrix.clang-tidy
         run: |
-          sudo apt-get install -y --no-install-recommends clang-tidy-${CLANG_TOOLS_VERSION}
+          sudo apt-get -o Acquire::Retries=5 install -y --no-install-recommends clang-tidy-${CLANG_TOOLS_VERSION}
           run-clang-tidy-${CLANG_TOOLS_VERSION} -quiet \
             -clang-tidy-binary clang-tidy-${CLANG_TOOLS_VERSION} \
             -p build/${{ matrix.preset }} \

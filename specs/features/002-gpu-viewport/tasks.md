@@ -351,3 +351,7 @@ Regras:
   segunda tentativa encontrou o mesmo espelho sem resposta. Problema da
   infraestrutura do GitHub; o código da limpeza ainda não foi compilado nem
   testado em Linux.
+- A reexecução também falhou com código 100 no `apt-get` nos dois jobs de
+  Linux. A página de status do GitHub não registrava incidente. Acrescentado
+  `Acquire::Retries=5` às chamadas do `apt-get` no workflow; isso só ajuda em
+  falhas passageiras, não se o espelho ficar fora do ar por muito tempo.
