@@ -22,8 +22,7 @@ int Mesh::elementCount() const noexcept
 
 int Mesh::elementCount(ElementType type) const noexcept
 {
-    const auto it = std::find_if(m_blocks.begin(), m_blocks.end(),
-                                 [type](const ElementBlock& block) { return block.type == type; });
+    const auto it = std::ranges::find(m_blocks, type, &ElementBlock::type);
     return it == m_blocks.end() ? 0 : it->elementCount();
 }
 
@@ -58,9 +57,7 @@ const ElementBlock& Mesh::blockOf(ElementIndex element) const
 {
     assert(element >= 0 && element < m_elementCount);
     // Last block whose first element is <= element.
-    const auto it = std::upper_bound(
-        m_blocks.begin(), m_blocks.end(), element,
-        [](ElementIndex value, const ElementBlock& block) { return value < block.firstElement; });
+    const auto it = std::ranges::upper_bound(m_blocks, element, {}, &ElementBlock::firstElement);
     return *(it - 1);
 }
 
@@ -94,9 +91,9 @@ BoundingBox Mesh::boundingBox() const
     if (m_x.empty()) {
         return box;
     }
-    const auto [minX, maxX] = std::minmax_element(m_x.begin(), m_x.end());
-    const auto [minY, maxY] = std::minmax_element(m_y.begin(), m_y.end());
-    const auto [minZ, maxZ] = std::minmax_element(m_z.begin(), m_z.end());
+    const auto [minX, maxX] = std::ranges::minmax_element(m_x);
+    const auto [minY, maxY] = std::ranges::minmax_element(m_y);
+    const auto [minZ, maxZ] = std::ranges::minmax_element(m_z);
     box.min = {*minX, *minY, *minZ};
     box.max = {*maxX, *maxY, *maxZ};
     box.empty = false;
@@ -105,7 +102,7 @@ BoundingBox Mesh::boundingBox() const
 
 const Group* Mesh::findGroup(std::string_view name, int dimension) const
 {
-    const auto it = std::find_if(m_groups.begin(), m_groups.end(), [&](const Group& group) {
+    const auto it = std::ranges::find_if(m_groups, [&](const Group& group) {
         return group.dimension == dimension && group.name == name;
     });
     return it == m_groups.end() ? nullptr : &*it;
@@ -129,8 +126,9 @@ std::vector<NodeIndex> Mesh::groupNodes(const Group& group) const
         const auto elementNodes = this->elementNodes(element);
         nodes.insert(nodes.end(), elementNodes.begin(), elementNodes.end());
     }
-    std::sort(nodes.begin(), nodes.end());
-    nodes.erase(std::unique(nodes.begin(), nodes.end()), nodes.end());
+    std::ranges::sort(nodes);
+    const auto duplicates = std::ranges::unique(nodes);
+    nodes.erase(duplicates.begin(), duplicates.end());
     return nodes;
 }
 

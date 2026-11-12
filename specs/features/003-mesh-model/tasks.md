@@ -70,7 +70,7 @@ Regras:
 
 ## Fase 3 — Arquivos de exemplo
 
-- [ ] **T12** Escrever `tests/data/gmsh/generate_test_meshes.py` (API do Gmsh)
+- [x] **T12** Escrever `tests/data/gmsh/generate_test_meshes.py` (API do Gmsh)
   e os `.geo`: arquivo com um elemento de cada um dos 90 tipos (transformação
   afim conhecida por tipo); malhas reais de ordem 1 e 2 (segmento, quadrado
   2×3, caixa 1×2×3) com grupos com e sem nome; ids esparsos; nós com
@@ -83,33 +83,33 @@ Regras:
 
 ## Fase 4 — Leitor `.msh`
 
-- [ ] **T14** Testes e implementação do cursor (ASCII com linha, binário com
+- [x] **T14** Testes e implementação do cursor (ASCII com linha, binário com
   byte): tokens, inteiros, reais sem depender do locale (com o sistema em
   pt_BR), fim inesperado e número inválido com a posição na mensagem —
   arquivos: `src/io/gmsh_cursor.hpp/.cpp`, `tests/unit/io/test_gmsh_cursor.cpp`
   — cobre: 22
-- [ ] **T15** `$MeshFormat`: versão 4.1, ASCII/binário, `size_t` de 8 bytes,
+- [x] **T15** `$MeshFormat`: versão 4.1, ASCII/binário, `size_t` de 8 bytes,
   ordem dos bytes; testes com versão 2.2 e com a ordem de bytes trocada em
   memória — arquivos: `gmsh_reader.hpp/.cpp`, `tests/unit/io/test_gmsh_reader.cpp`
   — cobre: 15, 21
-- [ ] **T16** `$Nodes` e `$Elements` em ASCII: o arquivo com os 90 tipos é
+- [x] **T16** `$Nodes` e `$Elements` em ASCII: o arquivo com os 90 tipos é
   lido com cada nó na posição dada pelas coordenadas de referência; ids
   esparsos e coordenadas paramétricas — cobre: 15, 17
-- [ ] **T17** Mesmo caminho em binário: o arquivo binário com os 90 tipos
+- [x] **T17** Mesmo caminho em binário: o arquivo binário com os 90 tipos
   produz malha idêntica à do ASCII — cobre: 15
-- [ ] **T18** `$PhysicalNames` e `$Entities`: grupos com nome e com nome gerado,
+- [x] **T18** `$PhysicalNames` e `$Entities`: grupos com nome e com nome gerado,
   elemento em mais de um grupo, ASCII e binário iguais — cobre: 16
-- [ ] **T19** Seções ignoradas, tipos não suportados com aviso (tipo e
+- [x] **T19** Seções ignoradas, tipos não suportados com aviso (tipo e
   quantidade) e arquivo só com tipos não suportados recusado — cobre: 18, 19,
   20
-- [ ] **T20** Erros: particionado, truncado, número inválido e nó inexistente,
+- [x] **T20** Erros: particionado, truncado, número inválido e nó inexistente,
   em ASCII (linha) e binário (byte); nenhum resultado parcial — cobre: 21, 22,
   23
-- [ ] **T21** `readGmsh(path)`: arquivo inexistente; arquivo copiado pelo teste
+- [x] **T21** `readGmsh(path)`: arquivo inexistente; arquivo copiado pelo teste
   para um caminho com acentos e lido — cobre: 22, 24
-- [ ] **T22** Malhas reais de ordem 1 e 2: soma das medidas igual à da
+- [x] **T22** Malhas reais de ordem 1 e 2: soma das medidas igual à da
   geometria e todas positivas — cobre: 08, 15
-- [ ] **T23** Remover `module.hpp/.cpp` e `test_io.cpp` de `io`; conferir que
+- [x] **T23** Remover `module.hpp/.cpp` e `test_io.cpp` de `io`; conferir que
   `check_no_qt_includes` cobre `io` e passa — cobre: 25
 
 ## Fase 5 — Desempenho e documentação
@@ -200,3 +200,23 @@ Regras:
   os 13 passam a ser ignorados com aviso na leitura.
 - O tipo 84 ("Line 1"), usado para testar o aviso de tipo não suportado,
   também não é aceito pelo Gmsh; `extra_sections.msh` foi escrito à mão.
+
+**2026-11-11 — Fase 4 (T14–T23):**
+
+- 80 testes passando no Windows, build sem avisos, `clang-format` e
+  `clang-tidy` limpos (o `clang-tidy` exigiu trocar algoritmos clássicos por
+  `std::ranges` e anotar a macro de propagação de erros do leitor).
+- `all_types` em ASCII e binário: os 90 tipos lidos com cada nó na posição
+  dada pelas coordenadas de referência (AC-7), o que confirma a ordem dos nós
+  para todos os tipos. Malhas reais de ordem 1 e 2 reproduzem comprimento 2,
+  área 6 e volume 6, todas as medidas positivas.
+- **Desvio do design §8:** "ASCII e binário produzem malhas iguais" não vale
+  bit a bit para as coordenadas: o Gmsh grava ASCII com 16 algarismos
+  significativos, um a menos que o necessário para reproduzir o `double`
+  exato. O teste compara coordenadas com tolerância de 1e−15 relativa; ids,
+  tipos, conectividade e grupos são comparados exatamente.
+- O teste de caminho com acentos usa uma pasta temporária com letras
+  portuguesas e chinesas; passou no Windows. Linux e macOS dependem do CI.
+- O teste de números independentes do locale troca o `LC_NUMERIC` para
+  pt_BR quando a máquina o tem; no Windows a leitura usa `std::from_chars`,
+  no macOS deve usar o caminho alternativo (`strtod_l`), que só o CI exercita.

@@ -44,9 +44,7 @@ std::int64_t IdRanges::idAt(std::int32_t index) const
 {
     assert(index >= 0 && static_cast<std::size_t>(index) < m_size);
     // Last range whose first index is <= index.
-    const auto it = std::upper_bound(
-        m_byIndex.begin(), m_byIndex.end(), index,
-        [](std::int32_t value, const Range& range) { return value < range.firstIndex; });
+    const auto it = std::ranges::upper_bound(m_byIndex, index, {}, &Range::firstIndex);
     const Range& range = *(it - 1);
     return range.firstId + (index - range.firstIndex);
 }
@@ -54,8 +52,7 @@ std::int64_t IdRanges::idAt(std::int32_t index) const
 std::optional<std::int64_t> IdRanges::seal()
 {
     m_byId = m_byIndex;
-    std::sort(m_byId.begin(), m_byId.end(),
-              [](const Range& a, const Range& b) { return a.firstId < b.firstId; });
+    std::ranges::sort(m_byId, {}, &Range::firstId);
     m_sealed = true;
     for (std::size_t i = 1; i < m_byId.size(); ++i) {
         const Range& previous = m_byId[i - 1];
@@ -69,9 +66,7 @@ std::optional<std::int64_t> IdRanges::seal()
 std::optional<std::int32_t> IdRanges::find(std::int64_t id) const
 {
     assert(m_sealed);
-    const auto it = std::upper_bound(
-        m_byId.begin(), m_byId.end(), id,
-        [](std::int64_t value, const Range& range) { return value < range.firstId; });
+    const auto it = std::ranges::upper_bound(m_byId, id, {}, &Range::firstId);
     if (it == m_byId.begin()) {
         return std::nullopt;
     }

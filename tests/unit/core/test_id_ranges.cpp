@@ -2,6 +2,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <vector>
@@ -43,7 +44,7 @@ TEST_CASE("consecutive ids are stored as one range", "[core][ids]")
     (void)compact.seal();
     (void)scattered.seal();
     CHECK(compact.memoryUsage() < 100);
-    CHECK(scattered.memoryUsage() > 10000 * 16);
+    CHECK(scattered.memoryUsage() > std::size_t{10000} * 16);
 }
 
 // REQ-003-10

@@ -190,7 +190,7 @@ TEST_CASE("groups are found by name and give their nodes", "[core][mesh][group]"
     // Nodes of the 1D group: 7, 101 and 105, sorted and unique.
     const std::vector<NodeIndex> nodes = mesh.groupNodes(*edges);
     REQUIRE(nodes.size() == 3);
-    CHECK(std::is_sorted(nodes.begin(), nodes.end()));
+    CHECK(std::ranges::is_sorted(nodes));
 
     // The same name in two dimensions.
     CHECK(mesh.findGroups("edges").size() == 2);

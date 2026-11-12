@@ -207,7 +207,7 @@ TEST_CASE("reference coordinates cover every node, vertices first", "[core][elem
         }
 
         // No two nodes share a position.
-        std::set<std::array<double, 3>> distinct(reference.begin(), reference.end());
+        const std::set<std::array<double, 3>> distinct(reference.begin(), reference.end());
         CHECK(distinct.size() == reference.size());
     }
 }
@@ -216,7 +216,7 @@ TEST_CASE("reference coordinates cover every node, vertices first", "[core][elem
 TEST_CASE("element types are listed by family and order", "[core][element]")
 {
     const auto types = allElementTypes();
-    CHECK(std::is_sorted(types.begin(), types.end(), [](ElementType a, ElementType b) {
+    CHECK(std::ranges::is_sorted(types, [](ElementType a, ElementType b) {
         const ElementTypeInfo& x = elementTypeInfo(a);
         const ElementTypeInfo& y = elementTypeInfo(b);
         if (x.family != y.family) {

@@ -17,11 +17,16 @@ enum class ElementType : std::uint8_t {
 #undef FEM_ELEMENT_TYPE
 };
 
-inline constexpr int kElementTypeCount = 0
-#define FEM_ELEMENT_TYPE(name, family, dimension, order, nodeCount, vertexCount, gmshType) +1
+namespace detail {
+// One entry per type, only to count them.
+inline constexpr std::array kElementTypeList = {
+#define FEM_ELEMENT_TYPE(name, family, dimension, order, nodeCount, vertexCount, gmshType) 0,
 #include <fem/core/element_types.inc>
 #undef FEM_ELEMENT_TYPE
-    ;
+};
+} // namespace detail
+
+inline constexpr int kElementTypeCount = static_cast<int>(detail::kElementTypeList.size());
 
 enum class ElementFamily : std::uint8_t {
     Point,

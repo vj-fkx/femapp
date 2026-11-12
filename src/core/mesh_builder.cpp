@@ -108,8 +108,8 @@ Expected<ElementHandle> MeshBuilder::addElement(ElementType type, ExternalId id,
     block.connectivity.insert(block.connectivity.end(), m_scratch.begin(), m_scratch.end());
 
     // Repeated nodes: compare after sorting a copy.
-    std::sort(m_scratch.begin(), m_scratch.end());
-    const auto repeated = std::adjacent_find(m_scratch.begin(), m_scratch.end());
+    std::ranges::sort(m_scratch);
+    const auto repeated = std::ranges::adjacent_find(m_scratch);
     if (repeated != m_scratch.end()) {
         block.connectivity.resize(block.connectivity.size() - nodeIds.size());
         return makeError(describe(id, type) + " uses node " +
@@ -134,10 +134,9 @@ Expected<void> MeshBuilder::addGroup(std::string name, int dimension,
     if (dimension < 0 || dimension > 3) {
         return makeError(label + " has an invalid dimension.");
     }
-    const bool duplicate =
-        std::any_of(m_groups.begin(), m_groups.end(), [&](const PendingGroup& g) {
-            return g.dimension == dimension && g.name == name;
-        });
+    const bool duplicate = std::ranges::any_of(m_groups, [&](const PendingGroup& g) {
+        return g.dimension == dimension && g.name == name;
+    });
     if (duplicate) {
         return makeError("There is already a " + std::to_string(dimension) + "D group named '" +
                          name + "'.");
@@ -211,9 +210,9 @@ Expected<Mesh> MeshBuilder::build()
         for (const ElementHandle handle : pending.elements) {
             group.elements.push_back(firstElement[indexOf(handle.type)] + handle.local);
         }
-        std::sort(group.elements.begin(), group.elements.end());
-        group.elements.erase(std::unique(group.elements.begin(), group.elements.end()),
-                             group.elements.end());
+        std::ranges::sort(group.elements);
+        const auto duplicates = std::ranges::unique(group.elements);
+        group.elements.erase(duplicates.begin(), duplicates.end());
         group.elements.shrink_to_fit();
         mesh.m_groups.push_back(std::move(group));
     }
