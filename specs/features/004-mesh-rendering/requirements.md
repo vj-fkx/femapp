@@ -74,7 +74,7 @@ mostrar resultados.
 | REQ-004-28 | QUANDO uma dimensão for ocultada, O sistema DEVE retirar da seleção os elementos dessa dimensão e, se for a 3D, as faces e arestas de sólido. *(Alterado em 2026-11-12.)* | US-3, US-5 |
 | REQ-004-32 | O sistema DEVE considerar como faces de sólido as faces da casca externa (REQ-004-09) e como arestas de sólido as arestas dessas faces; cada aresta é um único item, mesmo sendo comum a duas faces. Faces e arestas internas não são selecionáveis. *(Acrescentado em 2026-11-12.)* | US-5 |
 | REQ-004-33 | QUANDO o usuário desligar um tipo de seleção, O sistema DEVE retirar da seleção os itens desse tipo. *(Acrescentado em 2026-11-12.)* | US-5 |
-| REQ-004-34 | O sistema DEVE oferecer, no menu Exibir, a opção "Mostrar nós" (desligada por padrão), que desenha como pontos de tamanho fixo os nós dos elementos das dimensões visíveis (dos sólidos, só os da casca externa), com cor própria, diferente da de seleção. *(Acrescentado em 2026-11-12.)* | US-5 |
+| REQ-004-34 | O sistema DEVE oferecer, no menu Exibir, a opção "Mostrar nós" (ligada por padrão), que desenha como pontos pretos de tamanho fixo os nós dos elementos das dimensões visíveis (dos sólidos, só os da casca externa). *(Acrescentado em 2026-11-12; ligada por padrão e em preto a pedido do mantenedor.)* | US-5 |
 | REQ-004-35 | ENQUANTO "Mostrar nós" estiver ligada, nos modos sólido e sólido com arestas, O sistema NÃO DEVE desenhar os nós escondidos atrás de faces; no aramado, DEVE desenhar todos. *(Acrescentado em 2026-11-12.)* | US-5 |
 
 ### Interface, camadas e testes

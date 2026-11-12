@@ -50,7 +50,7 @@ struct DisplayOptions
     // REQ-004-16: visibility of the elements of each dimension, 0D to 3D.
     std::array<bool, 4> dimensionVisible = {true, true, true, true};
     // REQ-004-34: draw the nodes of the visible surface.
-    bool showNodes = false;
+    bool showNodes = true;
 
     [[nodiscard]] bool isVisible(int dimension) const noexcept
     {

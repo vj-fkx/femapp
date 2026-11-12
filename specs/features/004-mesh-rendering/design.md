@@ -466,7 +466,7 @@ struct SelectionFilter
 struct DisplayOptions
 {
     // ... (unchanged)
-    bool showNodes = false; // REQ-004-34
+    bool showNodes = true; // REQ-004-34
 };
 ```
 
@@ -582,9 +582,9 @@ Todos exigem os vértices à frente da câmera e incluem itens escondidos.
   sobreposição, sem teste de profundidade, como os nós selecionados, para que
   arestas escondidas escolhidas por janela continuem visíveis.
 - **Mostrar nós:** buffer de instâncias com a união ordenada e sem repetição
-  de `surfaceNodes` das dimensões visíveis, cor fixa `kNodeColor` (magenta;
-  corrigido na implementação: o realce de seleção já é laranja, e o laranja
-  escuro ficaria parecido demais), desenhado
+  de `surfaceNodes` das dimensões visíveis, cor fixa `kNodeColor` (preto, a
+  pedido do mantenedor; os nós selecionados ficam com o realce laranja por
+  cima), desenhado
   com o pipeline de pontos existente, com teste de profundidade. Nos modos
   sólidos as faces, empurradas para trás pelo viés de profundidade, escondem
   os nós de trás; no aramado não há faces e todos aparecem (REQ-004-35). Os
@@ -605,7 +605,7 @@ triângulo (≈ 0,4 MB); os vetores de seleção de faces e arestas, poucos kB.
   Faces de sólidos, Arestas de sólidos e Nós. Desmarcar a última ligada é
   desfeito na hora (a ação volta marcada). Desligar um tipo chama
   `Selection::clear(kind)` (REQ-004-33); ligar não mexe na seleção.
-- **Exibir ▸ Mostrar nós**, ação marcável, desligada por padrão.
+- **Exibir ▸ Mostrar nós**, ação marcável, ligada por padrão.
 - **Barra de status:** "2 elementos, 5 faces, 1 nó selecionados" — uma parte
   por tipo com itens, cada uma com `tr("%n element(s)", nullptr, n)` para o
   plural em pt_BR, unidas por vírgula; vazia quando nada está selecionado.

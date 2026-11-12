@@ -31,9 +31,9 @@ constexpr Rgba kElementLineFlag = 2U << 24U;
 
 constexpr std::array<float, 4> kEdgeColor = {0.12F, 0.13F, 0.15F, 1.0F};
 constexpr std::array<float, 4> kHighlightColor = {1.0F, 0.55F, 0.0F, 1.0F};
-// REQ-004-34: shown nodes, magenta, away from the highlight and the
-// dimension and group colors.
-constexpr Rgba kNodeColor = 0x00A020C0U;
+// REQ-004-34: shown nodes, black (the selected ones get the highlight on
+// top).
+constexpr Rgba kNodeColor = 0x00000000U;
 
 // Two triangles covering the square [-1, 1]^2, for the point instances.
 constexpr std::array<float, 12> kCorners = {-1, -1, 1, -1, 1, 1, -1, -1, 1, 1, -1, 1};
