@@ -451,3 +451,24 @@ TEST_CASE("zooming in on the mesh keeps it pickable", "[render][picker]")
     CHECK(elementId(*mesh, picker.pick(camera, cursor, kElements, DisplayOptions{}, kTolerance)) ==
           1 + 1 + 3 * (1 + 3 * 2));
 }
+
+// REQ-004-20: a 2D boundary triangle lying on a solid face (as Gmsh writes
+// physical surfaces) does not hide the solid from a click.
+TEST_CASE("a click on a solid face covered by a 2D triangle picks the solid", "[render][picker]")
+{
+    const auto mesh = fem::render::test::buildMesh(
+        {{0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1}},
+        {{ElementType::Tri3, {0, 1, 3}}, {ElementType::Tet4, {0, 1, 2, 3}}});
+    const MeshPicker picker(fem::render::buildMeshScene(mesh));
+    const Projection projection = GENERATE(Projection::Perspective, Projection::Orthographic);
+    const Camera camera = cameraFor(*mesh, StandardView::Front, projection);
+    // The face y = 0 of the tetrahedron, where the triangle lies too.
+    const Vec2 onFace = toPixel(camera, {0.25, 0.0, 0.25});
+    CHECK(elementId(*mesh, picker.pick(camera, onFace, kElements, DisplayOptions{}, kTolerance)) ==
+          2);
+
+    // With the solids hidden, the triangle is picked.
+    DisplayOptions noSolids;
+    noSolids.dimensionVisible[3] = false;
+    CHECK(elementId(*mesh, picker.pick(camera, onFace, kElements, noSolids, kTolerance)) == 1);
+}

@@ -192,6 +192,12 @@ Regras:
   — arquivos: `mesh_scene.hpp/.cpp`, `viewport.cpp`, `test_mesh_scene.cpp` —
   cobre: 36
 
+- [x] **T49** Clique num tet com triângulo 2D de fronteira em cima (grupos
+  físicos de superfície do Gmsh): o sólido vence o empate de profundidade, como
+  é ele que aparece na tela; antes o triângulo era escolhido e o realce dele
+  ficava escondido pela face do tet (defeito relatado pelo mantenedor) —
+  arquivos: `mesh_picker.cpp`, `test_mesh_picker.cpp` — cobre: 20, 26
+
 ## Fase 5 — Conferência e medições
 
 - [ ] **T26** `[M]` Roteiro manual no Windows: importar pelos três caminhos;

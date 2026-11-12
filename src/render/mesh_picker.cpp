@@ -111,14 +111,22 @@ struct TriangleHit
 // closest first (design §12.10).
 constexpr std::size_t kMaxEdgeCandidates = 16;
 
-// Closest triangle of the visible dimensions along a ray.
+// Relative depth difference under which a 2D triangle and a solid face count
+// as the same surface (float positions).
+constexpr double kSameSurface = 1e-5;
+
+// Closest triangle of the visible dimensions along a ray. Solid faces are
+// tested first and win ties: Gmsh meshes often carry 2D boundary triangles
+// lying exactly on the faces of the solids, and the solid is what is seen
+// (it is drawn last) and what the user means.
 TriangleHit closestTriangle(const MeshScene& scene, const LocalRay& ray, const Vec3f& eye,
                             const Vec3f& forward, const DisplayOptions& display)
 {
     TriangleHit best;
     const auto vertices = scene.triangleVertices();
     const auto elements = scene.triangleElements();
-    for (const int dimension : {2, 3}) {
+    for (const int dimension : {3, 2}) {
+        const double margin = dimension == 2 ? kSameSurface : 0.0;
         if (!display.isVisible(dimension)) {
             continue;
         }
@@ -131,7 +139,7 @@ TriangleHit closestTriangle(const MeshScene& scene, const LocalRay& ray, const V
             }
             const Vec3f point = ray.origin + hit * ray.direction;
             const double depth = (point - eye).dot(forward);
-            if (depth > 0.0 && depth < best.depth) {
+            if (depth > 0.0 && depth < best.depth * (1.0 - margin)) {
                 best = {.depth = depth, .element = elements[t], .triangle = t};
             }
         }
