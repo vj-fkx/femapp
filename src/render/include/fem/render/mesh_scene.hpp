@@ -2,12 +2,14 @@
 
 #include <fem/core/mesh.hpp>
 #include <fem/core/mesh_surface.hpp>
+#include <fem/render/camera.hpp>
 #include <fem/render/display_options.hpp>
 
 #include <Eigen/Core>
 #include <array>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <span>
 #include <vector>
 
@@ -121,6 +123,11 @@ private:
 // Builds the scene of a mesh (REQ-004-09, 10, 16, 18).
 [[nodiscard]] std::shared_ptr<const MeshScene>
 buildMeshScene(std::shared_ptr<const core::Mesh> mesh);
+
+// REQ-004-36: the standard view looking straight at a mesh without solids
+// that lies in a coordinate plane (Top for XY, Front for XZ, Right for YZ);
+// nothing for other meshes.
+[[nodiscard]] std::optional<StandardView> planarView(const MeshScene& scene);
 
 // Colors used by elementColors (exposed for tests and the legend of later
 // features).

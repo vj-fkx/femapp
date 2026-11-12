@@ -54,7 +54,7 @@ resultados (012) serão exibidos.
 | REQ-002-16 | O sistema DEVE oferecer projeção perspectiva e ortográfica, e alternar entre elas por comando de menu, preservando o ponto de foco e o tamanho aparente da cena nesse ponto. | US-3 |
 | REQ-002-17 | O sistema DEVE oferecer, no menu "Exibir", as vistas padrão Frontal, Posterior, Esquerda, Direita, Superior, Inferior e Isométrica, cada uma com atalho de teclado. | US-3 |
 | REQ-002-18 | QUANDO o usuário escolher "Enquadrar tudo", O sistema DEVE ajustar a câmera para que todo o conteúdo visível caiba no viewport; sem conteúdo, DEVE enquadrar a região padrão da grade. | US-3 |
-| REQ-002-19 | QUANDO o aplicativo iniciar, O sistema DEVE mostrar a vista isométrica em projeção perspectiva, enquadrando a região padrão da grade. | US-1 |
+| REQ-002-19 | QUANDO o aplicativo iniciar, O sistema DEVE mostrar a vista isométrica em projeção ortográfica, enquadrando a região padrão da grade. *(Alterado em 2026-11-12, a pedido do mantenedor, durante a feature 004: antes, perspectiva.)* | US-1 |
 
 ### Grade e eixos
 
@@ -62,11 +62,11 @@ resultados (012) serão exibidos.
 |----|-----------|----------|
 | REQ-002-20 | O sistema DEVE desenhar uma grade no plano XY (Z = 0), com linhas principais e secundárias distinguíveis. | US-4 |
 | REQ-002-21 | QUANDO o zoom mudar, O sistema DEVE adaptar o espaçamento da grade em potências de 10, de modo que a densidade de linhas na tela permaneça legível. | US-4 |
-| REQ-002-22 | O sistema DEVE destacar na grade as linhas dos eixos X e Y que passam pela origem, com as cores dos eixos. | US-4 |
+| REQ-002-22 | O sistema DEVE desenhar as linhas dos eixos X e Y que passam pela origem, com as cores dos eixos, também quando a grade estiver desligada. *(Alterado em 2026-11-12, a pedido do mantenedor.)* | US-4 |
 | REQ-002-23 | O sistema DEVE esmaecer a grade com a distância e próximo ao horizonte, sem cintilação visível ao mover a câmera. | US-4 |
 | REQ-002-24 | O sistema DEVE desenhar, em um canto do viewport, um indicador de eixos que acompanha a orientação da câmera, com X em vermelho, Y em verde e Z em azul, e rótulos "X", "Y" e "Z". | US-4 |
 | REQ-002-25 | O sistema DEVE manter o indicador de eixos com tamanho fixo em pixels lógicos, independente do zoom e do tamanho do viewport. | US-4 |
-| REQ-002-26 | O sistema DEVE permitir ligar e desligar a grade e o indicador de eixos pelo menu "Exibir". | US-4 |
+| REQ-002-26 | O sistema DEVE permitir ligar e desligar a grade e o indicador de eixos pelo menu "Exibir"; a grade começa desligada. *(Alterado em 2026-11-12, a pedido do mantenedor: a grade começava ligada.)* | US-4 |
 | REQ-002-27 | O sistema DEVE traduzir para pt_BR todos os textos novos de menu e de mensagens. | US-1 |
 
 ### Testes e CI

@@ -696,3 +696,23 @@ hexaedro e um quadrilátero ao lado); ocultar 2D retira só as arestas 2D;
 `surfaceNodes(3)` de um Tet10 isolado tem 10 nós e de um Hex27 isolado tem 26
 (todos menos o central); de dois Hex27 colados (45 nós), 42: ficam de fora os
 dois centrais e o centro da face comum.
+
+## 14. Padrões de exibição e vista de malhas planas (2026-11-12)
+
+Pedido do mantenedor. Atende ao REQ-004-36 e aos REQ-002-19, 22 e 26
+alterados.
+
+- **Projeção ortográfica por padrão:** `Camera` nasce em ortográfica; a ação
+  Exibir ▸ Projeção ortográfica começa marcada.
+- **Grade desligada, eixos visíveis:** o passe da grade passa a ser desenhado
+  sempre; o quarto componente de `spacing` (antes 0) diz se as linhas da grade
+  entram (1) ou não (0). As linhas dos eixos X e Y continuam, com o mesmo
+  esmaecimento. `Viewport` começa com a grade desligada.
+- **Vista de malha plana (REQ-004-36):** função sem GPU
+  `planarView(const MeshScene&) -> std::optional<StandardView>`: sem elementos
+  3D e com a extensão da caixa envolvente num eixo até 1e−9 × a diagonal, a
+  vista Superior (Z constante), Frontal (Y constante) ou Direita (X constante),
+  nessa ordem de preferência. `Viewport::setScene` aplica a vista antes de
+  enquadrar. Testes: quadrado em XY → Superior; em XZ → Frontal; em YZ →
+  Direita; com um hexaedro → nenhuma; placa inclinada → nenhuma.
+

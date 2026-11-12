@@ -76,6 +76,7 @@ mostrar resultados.
 | REQ-004-33 | QUANDO o usuário desligar um tipo de seleção, O sistema DEVE retirar da seleção os itens desse tipo. *(Acrescentado em 2026-11-12.)* | US-5 |
 | REQ-004-34 | O sistema DEVE oferecer, no menu Exibir, a opção "Mostrar nós" (ligada por padrão), que desenha como pontos pretos de tamanho fixo todos os nós dos elementos das dimensões visíveis, inclusive os intermediários dos elementos de ordem alta (dos sólidos, só os que ficam sobre a casca externa); esses nós também podem ser escolhidos por clique. *(Acrescentado em 2026-11-12; ligada por padrão, em preto e com os nós intermediários a pedido do mantenedor.)* | US-5 |
 | REQ-004-35 | ENQUANTO "Mostrar nós" estiver ligada, nos modos sólido e sólido com arestas, O sistema NÃO DEVE desenhar os nós escondidos atrás de faces; no aramado, DEVE desenhar todos. *(Acrescentado em 2026-11-12.)* | US-5 |
+| REQ-004-36 | QUANDO for importada uma malha sem elementos 3D contida num plano coordenado, O sistema DEVE mostrar a vista padrão perpendicular a esse plano (Superior para XY, Frontal para XZ, Direita para YZ) antes de enquadrá-la. *(Acrescentado em 2026-11-12, a pedido do mantenedor.)* | US-2 |
 
 ### Interface, camadas e testes
 

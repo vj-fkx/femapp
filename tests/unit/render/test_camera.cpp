@@ -76,10 +76,10 @@ void checkOrthonormalBasis(const Camera& camera)
 } // namespace
 
 // REQ-002-19
-TEST_CASE("camera starts in the isometric perspective view", "[render][camera]")
+TEST_CASE("camera starts in the isometric orthographic view", "[render][camera]")
 {
     const Camera camera;
-    CHECK(camera.projection() == Projection::Perspective);
+    CHECK(camera.projection() == Projection::Orthographic);
 
     const double s = 1.0 / std::numbers::sqrt3;
     checkVec(camera.forward(), Vec3(-s, s, -s));

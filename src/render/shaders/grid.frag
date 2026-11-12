@@ -7,7 +7,7 @@ layout(location = 0) out vec4 fragColor;
 layout(std140, binding = 0) uniform GridUniforms {
     mat4 viewProjection;
     vec4 plane;
-    vec4 spacing;
+    vec4 spacing; // minor, major, minor fade, grid lines on (1) or off (0)
     vec4 axis;
 } u;
 
@@ -49,8 +49,8 @@ void main()
 {
     vec2 world = v_relative + u.plane.xy;
 
-    float minor = gridLines(world / u.spacing.x) * u.spacing.z * kMinorOpacity;
-    float major = gridLines(world / u.spacing.y) * kMajorOpacity;
+    float minor = gridLines(world / u.spacing.x) * u.spacing.z * kMinorOpacity * u.spacing.w;
+    float major = gridLines(world / u.spacing.y) * kMajorOpacity * u.spacing.w;
     vec3 color = kLineColor;
     float alpha = max(minor, major);
 

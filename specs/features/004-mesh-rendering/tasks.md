@@ -184,6 +184,14 @@ Regras:
   `mesh_picker.hpp/.cpp`, `test_mesh_picker.cpp` — cobre: REQ-002-14
   (alterado), 20 (alterado)
 
+- [x] **T47** Ortográfica e grade desligada por padrão, com as linhas dos
+  eixos sempre visíveis (flag no uniforme da grade) — arquivos: `camera.hpp`,
+  `viewport.cpp`, `scene_renderer.cpp`, `grid.frag`, `main_window.cpp`,
+  `test_camera.cpp` — cobre: REQ-002-19, 22, 26 (alterados)
+- [x] **T48** `planarView` com testes e vista automática ao abrir malha plana
+  — arquivos: `mesh_scene.hpp/.cpp`, `viewport.cpp`, `test_mesh_scene.cpp` —
+  cobre: 36
+
 ## Fase 5 — Conferência e medições
 
 - [ ] **T26** `[M]` Roteiro manual no Windows: importar pelos três caminhos;
@@ -249,6 +257,7 @@ Regras:
 | REQ-004-33 | T31, T36 | `test_mesh_scene` (Selection) (AC-13) |
 | REQ-004-34 | T31, T37, T38, T42, T26 | `test_scene_renderer`; roteiro manual (AC-15) |
 | REQ-004-35 | T37, T26 | Roteiro manual (AC-15) |
+| REQ-004-36 | T48 | `test_mesh_scene`; roteiro manual |
 | NFR-004-01 | T28 | Medição manual (AC-12) |
 | NFR-004-02 | T28 | Medição manual (AC-2, AC-12) |
 | NFR-004-03 | T28 | Medição manual (AC-12) |

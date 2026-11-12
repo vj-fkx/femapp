@@ -321,7 +321,9 @@ void SceneRenderer::updateGridUniforms(const FrameParams& params, QRhiResourceUp
     data.at(i++) = static_cast<float>(spacing.minor);
     data.at(i++) = static_cast<float>(spacing.major);
     data.at(i++) = static_cast<float>(spacing.minorFade);
-    data.at(i++) = 0.0F;
+    // REQ-002-22, 26: the grid lines only when the grid is on; the axis lines
+    // always.
+    data.at(i++) = params.showGrid ? 1.0F : 0.0F;
     data.at(i++) = static_cast<float>(target.x());
     data.at(i++) = static_cast<float>(target.y());
 
@@ -375,13 +377,11 @@ bool SceneRenderer::render(QRhiCommandBuffer* commandBuffer, QRhiRenderTarget* t
     const auto width = static_cast<float>(params.pixelSize.width());
     const auto height = static_cast<float>(params.pixelSize.height());
 
-    const bool drawGrid = params.showGrid;
     const bool drawAxes = params.showAxes && width >= gizmoSize + gizmoMargin &&
                           height >= gizmoSize + gizmoMargin &&
                           updateLabelAtlas(params.devicePixelRatio, updates);
-    if (drawGrid) {
-        updateGridUniforms(params, updates);
-    }
+    // The grid pass also draws the axis lines, so it always runs.
+    updateGridUniforms(params, updates);
     if (drawAxes) {
         updateGizmoUniforms(params, updates);
     }
@@ -399,7 +399,7 @@ bool SceneRenderer::render(QRhiCommandBuffer* commandBuffer, QRhiRenderTarget* t
 
     m_mesh.draw(commandBuffer, sceneViewport, params.mesh.display);
 
-    if (drawGrid) {
+    {
         commandBuffer->setGraphicsPipeline(m_gridPipeline.get());
         commandBuffer->setViewport(sceneViewport);
         commandBuffer->setShaderResources();

@@ -109,7 +109,7 @@ private:
     double m_yaw = 0.0;   // radians; azimuth of the camera around Z
     double m_pitch = 0.0; // radians; elevation, in [-pi/2, pi/2]
     double m_distance = 1.0;
-    Projection m_projection = Projection::Perspective;
+    Projection m_projection = Projection::Orthographic; // REQ-002-19
     int m_width = 1;
     int m_height = 1;
 };

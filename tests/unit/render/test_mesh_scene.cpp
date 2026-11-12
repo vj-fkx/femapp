@@ -290,3 +290,27 @@ TEST_CASE("surface nodes include the higher order nodes on the outer faces", "[r
     const auto quad = fem::render::buildMeshScene(referenceElements(ElementType::Quad9, 1));
     CHECK(quad->surfaceNodes(2).size() == 9);
 }
+
+// REQ-004-36: flat meshes without solids are seen straight on.
+TEST_CASE("planar meshes get the view normal to their plane", "[render][scene]")
+{
+    using fem::render::StandardView;
+    const auto viewOf = [](const std::vector<Eigen::Vector3d>& nodes, ElementType type,
+                           const std::vector<fem::core::ExternalId>& ids) {
+        return fem::render::planarView(
+            *fem::render::buildMeshScene(fem::render::test::buildMesh(nodes, {{type, ids}})));
+    };
+    CHECK(viewOf({{0, 0, 5}, {2, 0, 5}, {2, 1, 5}, {0, 1, 5}}, ElementType::Quad4, {0, 1, 2, 3}) ==
+          StandardView::Top);
+    CHECK(viewOf({{0, 3, 0}, {2, 3, 0}, {2, 3, 1}, {0, 3, 1}}, ElementType::Quad4, {0, 1, 2, 3}) ==
+          StandardView::Front);
+    CHECK(viewOf({{4, 0, 0}, {4, 2, 0}, {4, 2, 1}, {4, 0, 1}}, ElementType::Quad4, {0, 1, 2, 3}) ==
+          StandardView::Right);
+    // A tilted plate and a solid keep the current view.
+    CHECK_FALSE(
+        viewOf({{0, 0, 0}, {1, 0, 0}, {1, 1, 1}}, ElementType::Tri3, {0, 1, 2}).has_value());
+    CHECK_FALSE(fem::render::planarView(*fem::render::buildMeshScene(mixedMesh())).has_value());
+    // A planar bar structure counts too.
+    CHECK(viewOf({{0, 0, 0}, {1, 0, 0}, {1, 0, 1}}, ElementType::Line2, {0, 2}) ==
+          StandardView::Front);
+}

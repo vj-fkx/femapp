@@ -163,6 +163,7 @@ void MainWindow::createViewMenu()
     // REQ-002-16
     QAction* orthographic = viewMenu->addAction(tr("Orthographic &Projection"));
     orthographic->setCheckable(true);
+    orthographic->setChecked(m_viewport->projection() == render::Projection::Orthographic);
     orthographic->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_O));
     connect(orthographic, &QAction::toggled, m_viewport, [this](bool checked) {
         m_viewport->setProjection(checked ? render::Projection::Orthographic

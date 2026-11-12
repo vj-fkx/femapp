@@ -192,6 +192,34 @@ std::vector<Rgba> MeshScene::elementColors(ColorMode mode) const
     return colors;
 }
 
+std::optional<StandardView> planarView(const MeshScene& scene)
+{
+    for (const core::ElementBlock& block : scene.mesh().blocks()) {
+        if (core::elementTypeInfo(block.type).dimension == 3) {
+            return std::nullopt;
+        }
+    }
+    const core::BoundingBox& box = scene.bounds();
+    if (box.isEmpty()) {
+        return std::nullopt;
+    }
+    const Eigen::Vector3d extent = box.max - box.min;
+    const double tolerance = 1e-9 * extent.norm();
+    if (!(extent.norm() > 0.0)) {
+        return std::nullopt;
+    }
+    if (extent.z() <= tolerance) {
+        return StandardView::Top;
+    }
+    if (extent.y() <= tolerance) {
+        return StandardView::Front;
+    }
+    if (extent.x() <= tolerance) {
+        return StandardView::Right;
+    }
+    return std::nullopt;
+}
+
 std::shared_ptr<const MeshScene> buildMeshScene(std::shared_ptr<const core::Mesh> mesh)
 {
     // NOLINTNEXTLINE(modernize-make-shared): the constructor is private.

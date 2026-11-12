@@ -83,7 +83,7 @@ public:
 
     QRhi* rhi = nullptr;
     bool initialFitDone = false;
-    bool showGrid = true;
+    bool showGrid = false; // REQ-002-26: off by default; the axis lines stay
     bool showAxes = true;
     quint64 frameCount = 0;
 
@@ -231,6 +231,12 @@ void Viewport::setScene(std::shared_ptr<const MeshScene> scene)
         m_impl->selection.reset(nullptr);
     }
     m_impl->initialFitDone = true;
+    // REQ-004-36: a flat mesh without solids is seen straight on.
+    if (m_impl->scene) {
+        if (const auto view = planarView(*m_impl->scene)) {
+            m_impl->camera.setStandardView(*view);
+        }
+    }
     fitAll();
     emit selectionChanged();
 }
