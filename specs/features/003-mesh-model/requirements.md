@@ -91,37 +91,37 @@ por testes automáticos.
 
 ## 5. Critérios de aceite
 
-- [ ] **AC-1** (REQ-003-01, 02, 03) Os testes conferem, para cada um dos 90
+- [x] **AC-1** (REQ-003-01, 02, 03) Os testes conferem, para cada um dos 90
   tipos, família, dimensão, ordem, número de nós e de vértices e coordenadas de
   referência iguais às do Gmsh, e medida positiva no elemento de referência.
-- [ ] **AC-2** (REQ-003-04 a 07) Uma malha montada em teste com tipos misturados
+- [x] **AC-2** (REQ-003-04 a 07) Uma malha montada em teste com tipos misturados
   (ponto, linha, triângulo, hexaedro) responde corretamente às consultas de
   quantidade, nós, coordenadas, conversão de identificadores e caixa
   envolvente.
-- [ ] **AC-3** (REQ-003-08) A soma das medidas dos elementos reproduz o
+- [x] **AC-3** (REQ-003-08) A soma das medidas dos elementos reproduz o
   comprimento, a área e o volume conhecidos de malhas de referência; um
   elemento invertido tem medida negativa.
-- [ ] **AC-4** (REQ-003-09, 10, 14) Cada situação de erro de malha e de grupo é
+- [x] **AC-4** (REQ-003-09, 10, 14) Cada situação de erro de malha e de grupo é
   recusada com mensagem que identifica o item.
-- [ ] **AC-5** (REQ-003-11, 12, 13) Grupos com elementos compartilhados e
+- [x] **AC-5** (REQ-003-11, 12, 13) Grupos com elementos compartilhados e
   elementos sem grupo são consultados corretamente por nome, e o conjunto de nós
   de um grupo está correto.
-- [ ] **AC-6** (REQ-003-15, 16, 17) Arquivos de exemplo ASCII e binários com o
+- [x] **AC-6** (REQ-003-15, 16, 17) Arquivos de exemplo ASCII e binários com o
   mesmo conteúdo produzem malhas idênticas, com os grupos físicos e seus nomes.
-- [ ] **AC-7** (REQ-003-15) Para cada um dos 90 tipos há um elemento num
+- [x] **AC-7** (REQ-003-15) Para cada um dos 90 tipos há um elemento num
   arquivo de exemplo cuja leitura reproduz a medida conhecida e põe cada nó na
   posição esperada pelas coordenadas de referência (a ordem dos nós foi
   interpretada corretamente).
-- [ ] **AC-8** (REQ-003-18, 19, 20) Um arquivo com seções extras e com um tipo
+- [x] **AC-8** (REQ-003-18, 19, 20) Um arquivo com seções extras e com um tipo
   não suportado é lido com aviso que nomeia o tipo e a quantidade; um arquivo
   só com tipos não suportados é recusado.
-- [ ] **AC-9** (REQ-003-21, 22, 23) Cada caso de arquivo inválido é recusado
+- [x] **AC-9** (REQ-003-21, 22, 23) Cada caso de arquivo inválido é recusado
   com a mensagem esperada (com linha ou posição) e sem malha parcial.
-- [ ] **AC-10** (REQ-003-24) Um arquivo num caminho com acentos é lido nas três
+- [x] **AC-10** (REQ-003-24) Um arquivo num caminho com acentos é lido nas três
   plataformas do CI.
-- [ ] **AC-11** (REQ-003-25) `check_no_qt_includes` passa, e o módulo `io` não
+- [x] **AC-11** (REQ-003-25) `check_no_qt_includes` passa, e o módulo `io` não
   liga Qt.
-- [ ] **AC-12** (NFR-003-01, 02) Medições de memória e de tempo registradas em
+- [x] **AC-12** (NFR-003-01, 02) Medições de memória e de tempo registradas em
   `tasks.md`, dentro das metas.
 
 ## 6. Fora de escopo

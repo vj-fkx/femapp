@@ -1,6 +1,6 @@
 # Tarefas — 003 mesh-model
 
-Status: em andamento
+Status: concluído · 2026-11-12
 Design: [design.md](design.md) · Requisitos: [requirements.md](requirements.md)
 
 Regras:
@@ -126,11 +126,11 @@ Regras:
 
 ## Fase 6 — Fechamento
 
-- [ ] **T90** Build e testes verdes nos quatro jobs do CI (push com sua
+- [x] **T90** Build e testes verdes nos quatro jobs do CI (push com sua
   confirmação) — cobre: 24, 26
 - [x] **T91** `clang-format` e `clang-tidy` sem pendências
-- [ ] **T92** Conferir os doze critérios de aceite de `requirements.md`
-- [ ] **T93** Atualizar `specs/roadmap.md` para `concluída` e o `README.md` se
+- [x] **T92** Conferir os doze critérios de aceite de `requirements.md`
+- [x] **T93** Atualizar `specs/roadmap.md` para `concluída` e o `README.md` se
   algo do build tiver mudado
 
 ## Matriz de rastreabilidade
@@ -257,3 +257,24 @@ Regras:
   `Eigen::Vector3d` sem inicialização e uso após `std::move` dentro de
   `REQUIRE`). Corrigidos em commit local: os testes usam um auxiliar
   `required()` em vez de `operator*`. Os demais jobs passaram.
+
+**2026-11-12 — Fechamento (T90, T92, T93):**
+
+- T90: execução nº 19 (`e594b53`) verde nos cinco jobs, incluindo o
+  `clang-tidy` do Linux: <https://github.com/vj-fkx/femapp/actions/runs/43128536370>.
+- T92, os doze critérios de aceite:
+  - AC-1 a AC-5: testes de `core` (tabela de tipos, malha mista, medidas,
+    erros, grupos).
+  - AC-6 a AC-9: testes de `io` com os arquivos do Gmsh e os escritos à mão.
+    Ressalva em AC-6: coordenadas de ASCII e binário comparadas com tolerância
+    de 1e−15, porque o Gmsh grava ASCII com 16 algarismos.
+  - AC-10: caminho com acentos e caracteres chineses lido nas três plataformas
+    do CI.
+  - AC-11: `check_no_qt_includes` cobre `io`, e `io` só depende de `core`.
+  - AC-12: medições registradas acima (1 milhão de Tet4: 0,65 s em ASCII,
+    0,45 s em binário, memória 1,20× os dados brutos), feitas pelo agente na
+    máquina do mantenedor, só no Windows.
+- T93: roadmap atualizado para `concluída`. O README não precisa mudar: o
+  build não ganhou passos novos (o `tl-expected` vem pelo vcpkg); o Gmsh só é
+  necessário para regenerar os exemplos, o que está em
+  `tests/data/gmsh/README.md`.
