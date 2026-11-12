@@ -5,6 +5,7 @@
 #include "rhi_util.hpp"
 
 #include <fem/render/grid_spacing.hpp>
+#include <fem/render/viewport.hpp>
 
 #include <QColor>
 #include <QFile>
@@ -23,7 +24,7 @@ namespace fem::render {
 
 namespace {
 
-constexpr QColor kBackgroundColor(38, 41, 48);
+constexpr QColor kBackgroundColor = kViewportBackground;
 
 // The grid quad reaches this many camera distances away from the target.
 constexpr double kGridExtentFactor = 40.0;

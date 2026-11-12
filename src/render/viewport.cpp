@@ -8,6 +8,7 @@
 #include <QGuiApplication>
 #include <QLoggingCategory>
 #include <QMouseEvent>
+#include <QPalette>
 #include <QPointF>
 #include <QWheelEvent>
 #include <QWindow>
@@ -139,6 +140,13 @@ Viewport::Viewport(QWidget* parent)
         setApi(toApi(m_impl->plan.attempts.front()));
     }
     setSampleCount(kSampleCount);
+    // Until the GPU has produced the first frame the widget shows its
+    // background: make it the color of the 3D view instead of the light
+    // system color, which flashed at startup.
+    QPalette palette = this->palette();
+    palette.setColor(QPalette::Window, kViewportBackground);
+    setPalette(palette);
+    setAutoFillBackground(true);
     // NOLINTNEXTLINE(cppcoreguidelines-owning-memory): owned by its Qt parent.
     m_impl->overlay = new SelectionOverlay(this);
 

@@ -5,12 +5,17 @@
 #include <fem/render/mesh_scene.hpp>
 #include <fem/render/selection.hpp>
 
+#include <QColor>
 #include <QRhiWidget>
 #include <QString>
 
 #include <memory>
 
 namespace fem::render {
+
+// Background of the 3D view: the color the frames are cleared to, and the
+// color the widget shows before the first frame is ready.
+inline constexpr QColor kViewportBackground(38, 41, 48);
 
 // 3D viewport rendered on the GPU through Qt RHI.
 //
