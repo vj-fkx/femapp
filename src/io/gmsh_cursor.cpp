@@ -18,7 +18,9 @@ namespace fem::io::detail {
 
 namespace {
 
+#if !(defined(__cpp_lib_to_chars) && __cpp_lib_to_chars >= 201611L)
 constexpr std::size_t kMaxNumberLength = 64;
+#endif
 
 bool isSpace(char c) noexcept
 {
