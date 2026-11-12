@@ -63,7 +63,7 @@ mostrar resultados.
 | ID | Requisito | História |
 |----|-----------|----------|
 | REQ-004-19 | O sistema DEVE oferecer, no menu Editar, quatro tipos de seleção que podem ser ligados ao mesmo tempo: elementos, faces de sólidos, arestas (de sólidos e de elementos 2D) e nós, todos ligados por padrão; pelo menos um tipo fica sempre ligado. *(Alterado em 2026-11-12, a pedido do mantenedor: antes eram dois modos exclusivos; depois, os quatro ligados por padrão.)* | US-3, US-5 |
-| REQ-004-20 | QUANDO o usuário clicar com o botão esquerdo, O sistema DEVE acrescentar à seleção um único item, de um tipo ligado: o nó visível até alguns pixels do cursor; senão, a aresta visível até alguns pixels; senão, sob o cursor, a face de sólido visível mais próxima da câmera, ou o elemento visível mais próximo, se faces não estiver ligado. *(Alterado em 2026-11-12: prioridade entre os tipos.)* | US-3, US-5 |
+| REQ-004-20 | QUANDO o usuário clicar com o botão esquerdo, O sistema DEVE acrescentar à seleção um único item, de um tipo ligado, nesta ordem: o elemento visível mais próximo da câmera sob o cursor (linhas e pontos até alguns pixels); senão, a face de sólido visível mais próxima; senão, a aresta visível até alguns pixels; senão, o nó visível até alguns pixels. *(Alterado em 2026-11-12: prioridade entre os tipos; depois, a pedido do mantenedor, a ordem elemento → face → aresta → nó.)* | US-3, US-5 |
 | REQ-004-21 | QUANDO o usuário arrastar com o botão esquerdo da esquerda para a direita (janela), O sistema DEVE acrescentar à seleção os itens de todos os tipos ligados, das dimensões visíveis, cuja projeção na tela esteja inteiramente dentro do retângulo, mesmo que escondidos por outros. *(Alterado em 2026-11-12: tipos ligados.)* | US-3, US-5 |
 | REQ-004-22 | QUANDO o usuário arrastar com o botão esquerdo da direita para a esquerda (cruzamento), O sistema DEVE acrescentar à seleção os itens de todos os tipos ligados, das dimensões visíveis, cuja projeção na tela esteja dentro do retângulo ou o cruze, mesmo que escondidos por outros. *(Alterado em 2026-11-12: tipos ligados.)* | US-3, US-5 |
 | REQ-004-23 | ENQUANTO o usuário arrasta, O sistema DEVE desenhar o retângulo: contínuo e azul para janela, tracejado e verde para cruzamento. | US-3 |
@@ -179,8 +179,10 @@ atribuições), REQ-G-20 (≥ 30 FPS com 1 milhão de elementos).
   a 004; só faces e arestas da casca externa; tipos de seleção combináveis;
   "Mostrar nós" liga e desliga os pontos de todos os nós, sem numeração.
 - [x] **Prioridade do clique (REQ-004-20):** decidido em 2026-11-12 — nó →
-  aresta → face → elemento; com faces ligadas, um clique na casca pega a face,
-  e o elemento 3D só por janela ou cruzamento, ou desligando faces.
+  aresta → face → elemento; depois trocado, a pedido do mantenedor, para
+  elemento → face → aresta → nó. Com elementos ligados, um clique sobre a
+  malha pega o elemento; faces, arestas e nós por clique pedem desligar os
+  tipos anteriores (ou janela e cruzamento).
 - [x] **GPU da medição:** a máquina do mantenedor tem uma NVIDIA GeForce RTX
   2060 (consultado no sistema em 2026-11-12), uma GPU dedicada de gama média,
   que é o caso do REQ-G-20.

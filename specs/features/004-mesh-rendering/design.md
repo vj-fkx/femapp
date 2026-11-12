@@ -538,24 +538,22 @@ public:
 
 ### 12.3 Clique (REQ-004-20)
 
-Na ordem, o primeiro tipo ligado que achar algo vence:
+*(Ordem alterada em 2026-11-12, a pedido do mantenedor.)* Na ordem, o
+primeiro tipo ligado que achar algo vence:
 
-1. **Nó:** como hoje — `surfaceNodes` das dimensões visíveis dentro da
-   tolerância, do mais próximo para o mais longe; vence o primeiro não
-   escondido por um triângulo.
-2. **Aresta de sólido** (só com 3D visível): segmentos de `lines(Edges3d)`
-   projetados, com distância ao cursor até a tolerância; candidatos ordenados
-   pela profundidade do ponto mais próximo; vence o primeiro não escondido,
-   com o mesmo teste e a mesma folga dos nós (a aresta fica sobre a casca, à
-   profundidade das faces vizinhas).
-3. **Face de sólido:** o triângulo mais próximo sob o cursor (`closestTriangle`
-   passa a devolver também o índice do triângulo); se for da faixa 3D, vence a
-   face `triangleFaces()[t]`. Um triângulo 2D ou outro sólido à frente esconde
-   as faces de trás, como na tela.
-4. **Elemento:** como hoje (triângulos, linhas 1D e pontos 0D, o mais próximo).
+1. **Elemento:** triângulos, linhas 1D e pontos 0D, o mais próximo da câmera.
+2. **Face de sólido:** o triângulo mais próximo sob o cursor
+   (`closestTriangle` devolve também o índice do triângulo); se for da faixa
+   3D, vence a face `triangleFaces()[t]`.
+3. **Aresta** (2D ou de sólido, com a dimensão visível): segmentos projetados
+   até a tolerância, ordenados pela profundidade do ponto mais próximo; vence o
+   primeiro não escondido por um triângulo, com a folga usada para os nós.
+4. **Nó:** `surfaceNodes` das dimensões visíveis até a tolerância, do mais
+   próximo para o mais longe; vence o primeiro não escondido.
 
-Com faces ligadas, um clique sobre a casca pega a face; o elemento 3D é
-alcançado por janela, cruzamento ou desligando faces (decisão aprovada).
+Com elementos ligados, o clique sobre a malha sempre pega o elemento; faces,
+arestas e nós por clique pedem desligar os tipos anteriores no menu, ou usar
+janela e cruzamento.
 
 ### 12.4 Janela e cruzamento (REQ-004-21, 22)
 

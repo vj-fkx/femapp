@@ -576,7 +576,14 @@ void Viewport::wheelEvent(QWheelEvent* event)
     }
 
     m_impl->camera.setViewportSize(width(), height());
-    m_impl->camera.zoomAt(toVec2(event->position()), steps);
+    // REQ-002-14: anchored on the mesh under the cursor when there is one, so
+    // that zooming in never goes through it.
+    const Vec2 cursor = toVec2(event->position());
+    std::optional<Vec3> anchor;
+    if (m_impl->picker) {
+        anchor = m_impl->picker->surfacePoint(m_impl->camera, cursor, m_impl->display);
+    }
+    m_impl->camera.zoomAt(cursor, steps, anchor);
     event->accept();
     update();
 }

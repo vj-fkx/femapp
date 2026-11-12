@@ -58,7 +58,10 @@ public:
     // Moves the view so that the point under `fromPx` ends up under `toPx`.
     void pan(const Vec2& fromPx, const Vec2& toPx);
     // Zooms keeping the point under the cursor fixed. Positive steps zoom in.
-    void zoomAt(const Vec2& cursorPx, double wheelSteps);
+    // `anchor` is that point when the caller knows it (the mesh under the
+    // cursor, REQ-002-14); otherwise the work plane or the focal plane.
+    void zoomAt(const Vec2& cursorPx, double wheelSteps,
+                const std::optional<Vec3>& anchor = std::nullopt);
     void setStandardView(StandardView view);
     void setProjection(Projection projection) noexcept { m_projection = projection; }
     // Frames `bounds`; an empty or invalid box frames defaultSceneBounds().

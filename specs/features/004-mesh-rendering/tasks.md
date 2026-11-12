@@ -177,6 +177,12 @@ Regras:
   cobre: 26
 - [x] **T45** Menu "Arestas" e tradução — arquivos: `main_window.cpp`,
   `femapp_pt_BR.ts` — cobre: 19, 29
+- [x] **T46** Zoom ancorado no ponto da malha sob o cursor (a câmera não
+  atravessa mais o sólido e a seleção continua funcionando de perto), com
+  teste de regressão; ordem do clique trocada para elemento → face → aresta →
+  nó (pedidos do mantenedor) — arquivos: `camera.hpp/.cpp`, `viewport.cpp`,
+  `mesh_picker.hpp/.cpp`, `test_mesh_picker.cpp` — cobre: REQ-002-14
+  (alterado), 20 (alterado)
 
 ## Fase 5 — Conferência e medições
 

@@ -282,7 +282,7 @@ Eigen::Vector3d nodeAt(const fem::core::Mesh& mesh, fem::core::NodeIndex node)
 
 } // namespace
 
-// REQ-004-20, REQ-004-32: a click picks by priority node, edge, face, element.
+// REQ-004-20, REQ-004-32: a click picks by priority element, face, edge, node.
 TEST_CASE("a click picks solid faces, edges and nodes by priority", "[render][picker]")
 {
     const auto mesh = fem::render::test::hexGrid(3);
@@ -306,11 +306,17 @@ TEST_CASE("a click picks solid faces, edges and nodes by priority", "[render][pi
             CHECK(nodeAt(*mesh, face.nodes.at(v)).y() == 0.0);
         }
     }
-    SECTION("faces and elements: the face wins")
+    SECTION("all kinds: the element wins")
     {
-        const auto picked =
-            picker.pick(camera, centre, only({SelectionKind::Face, SelectionKind::Element}),
-                        DisplayOptions{}, kTolerance);
+        const SelectionFilter all;
+        CHECK(elementId(*mesh, picker.pick(camera, centre, all, DisplayOptions{}, kTolerance)) ==
+              1 + 1 + 3 * (0 + 3 * 1));
+    }
+    SECTION("faces, edges and nodes: the face wins")
+    {
+        const auto picked = picker.pick(
+            camera, centre, only({SelectionKind::Face, SelectionKind::Edge, SelectionKind::Node}),
+            DisplayOptions{}, kTolerance);
         CHECK(indexOf(picked, SelectionKind::Face) >= 0);
     }
     SECTION("elements only: the element")
@@ -321,7 +327,7 @@ TEST_CASE("a click picks solid faces, edges and nodes by priority", "[render][pi
     SECTION("edges: the front edge near the cursor")
     {
         const Vec2 near = toPixel(camera, {1.5, 0.0, 1.0}) + Vec2(0.0, 2.0);
-        const auto filter = only({SelectionKind::Edge, SelectionKind::Face});
+        const auto filter = only({SelectionKind::Edge, SelectionKind::Node});
         const int e = indexOf(picker.pick(camera, near, filter, DisplayOptions{}, kTolerance),
                               SelectionKind::Edge);
         REQUIRE(e >= 0);
@@ -330,11 +336,18 @@ TEST_CASE("a click picks solid faces, edges and nodes by priority", "[render][pi
         const Eigen::Vector3d b = nodeAt(*mesh, edge.b);
         CHECK((0.5 * (a + b) - Eigen::Vector3d(1.5, 0.0, 1.0)).norm() < 1e-9);
     }
-    SECTION("nodes and edges: the node at a vertex")
+    SECTION("edges and nodes at a vertex: an edge wins")
     {
         const Vec2 vertex = toPixel(camera, {1.0, 0.0, 1.0}) + Vec2(1.0, -1.0);
-        const auto filter = only({SelectionKind::Node, SelectionKind::Edge});
-        const int n = indexOf(picker.pick(camera, vertex, filter, DisplayOptions{}, kTolerance),
+        const auto picked =
+            picker.pick(camera, vertex, only({SelectionKind::Node, SelectionKind::Edge}),
+                        DisplayOptions{}, kTolerance);
+        CHECK(indexOf(picked, SelectionKind::Edge) >= 0);
+    }
+    SECTION("nodes only: the node at a vertex")
+    {
+        const Vec2 vertex = toPixel(camera, {1.0, 0.0, 1.0}) + Vec2(1.0, -1.0);
+        const int n = indexOf(picker.pick(camera, vertex, kNodes, DisplayOptions{}, kTolerance),
                               SelectionKind::Node);
         REQUIRE(n >= 0);
         CHECK((nodeAt(*mesh, n) - Eigen::Vector3d(1.0, 0.0, 1.0)).norm() < 1e-9);
@@ -418,4 +431,23 @@ TEST_CASE("edges of 2D elements are picked by click and rectangle", "[render][pi
     hidden.dimensionVisible[2] = false;
     CHECK_FALSE(picker.pick(camera, near, edgesOnly, hidden, kTolerance).has_value());
     CHECK(picker.pickRect(camera, all, edgesOnly, hidden).empty());
+}
+
+// REQ-002-14 (changed in feature 004): zooming in on the mesh under the
+// cursor never goes through it, so a click there still picks the element.
+TEST_CASE("zooming in on the mesh keeps it pickable", "[render][picker]")
+{
+    const auto mesh = fem::render::test::hexGrid(3);
+    const MeshPicker picker(fem::render::buildMeshScene(mesh));
+    const Projection projection = GENERATE(Projection::Perspective, Projection::Orthographic);
+    Camera camera = cameraFor(*mesh, StandardView::Isometric, projection);
+    // The middle of the top face; the work plane (z = 0) is below the block.
+    const Vec2 cursor = toPixel(camera, {1.5, 1.5, 3.0});
+    for (int step = 0; step < 20; ++step) {
+        camera.zoomAt(cursor, 3.0, picker.surfacePoint(camera, cursor, DisplayOptions{}));
+    }
+    CHECK(camera.position().z() > 3.0); // still above the top face
+    CHECK((toPixel(camera, {1.5, 1.5, 3.0}) - cursor).norm() < 1e-3);
+    CHECK(elementId(*mesh, picker.pick(camera, cursor, kElements, DisplayOptions{}, kTolerance)) ==
+          1 + 1 + 3 * (1 + 3 * 2));
 }

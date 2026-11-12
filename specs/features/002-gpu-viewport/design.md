@@ -249,7 +249,10 @@ posição = t − d·f
   ponto de ancoragem do cursor, `t' = P + (t − P)·(d'/d)`. É uma homotetia de
   centro `P` aplicada ao olho e ao alvo, que mantém `P` fixo na tela para
   qualquer `P` (REQ-002-14). Limites `d_min = 1e−6`, `d_max = 1e12`
-  (REQ-002-15).
+  (REQ-002-15). Com malha (feature 004), `P` é o ponto da malha visível sob o
+  cursor (`MeshPicker::surfacePoint`), passado a `zoomAt`; só sem malha sob o
+  cursor vale a ancoragem no plano Z = 0 ou no plano de foco. Como a
+  homotetia nunca leva o olho além de `P`, a câmera não atravessa a malha.
 - **Projeção:** perspectiva com `fov`; ortográfica com meia-altura
   `h = d·tan(fov/2)`. Como `h` deriva de `d`, trocar de projeção preserva o
   foco e o tamanho aparente no plano de foco (REQ-002-16). Planos de corte:

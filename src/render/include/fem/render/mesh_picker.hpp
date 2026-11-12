@@ -35,9 +35,9 @@ public:
     explicit MeshPicker(std::shared_ptr<const MeshScene> scene);
 
     // REQ-004-20: one item under `pixel`, of a kind turned on in `filter`, by
-    // priority: a visible node within `tolerancePx`, else a visible solid edge
-    // within `tolerancePx`, else the closest visible solid face, else the
-    // closest visible element (lines and points within `tolerancePx`).
+    // priority: the closest visible element (lines and points within
+    // `tolerancePx`), else the closest visible solid face, else a visible
+    // edge within `tolerancePx`, else a visible node within `tolerancePx`.
     [[nodiscard]] std::optional<PickedItem> pick(const Camera& camera, const Vec2& pixel,
                                                  const SelectionFilter& filter,
                                                  const DisplayOptions& display,

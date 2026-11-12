@@ -107,7 +107,7 @@ void Camera::pan(const Vec2& fromPx, const Vec2& toPx)
     m_target -= focalPlanePoint(toPx) - focalPlanePoint(fromPx);
 }
 
-void Camera::zoomAt(const Vec2& cursorPx, double wheelSteps)
+void Camera::zoomAt(const Vec2& cursorPx, double wheelSteps, const std::optional<Vec3>& anchorHint)
 {
     const double newDistance =
         std::clamp(m_distance * std::pow(kZoomBase, -wheelSteps), kMinDistance, kMaxDistance);
@@ -116,7 +116,7 @@ void Camera::zoomAt(const Vec2& cursorPx, double wheelSteps)
     // Scaling the eye and the target towards the anchor by the same ratio
     // keeps the anchor on the same pixel, wherever it is. Anchoring on the work
     // plane keeps a target that is on the plane there while zooming in.
-    const Vec3 anchor = anchorPoint(cursorPx);
+    const Vec3 anchor = anchorHint.value_or(anchorPoint(cursorPx));
     m_target = anchor + (m_target - anchor) * ratio;
     m_distance = newDistance;
 }
