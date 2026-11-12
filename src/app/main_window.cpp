@@ -14,16 +14,16 @@
 #include <QDropEvent>
 #include <QFileDialog>
 #include <QFileInfo>
-#include <QMimeData>
-#include <QProgressBar>
-#include <QUrl>
 #include <QKeySequence>
 #include <QLabel>
 #include <QMenu>
 #include <QMenuBar>
 #include <QMessageBox>
+#include <QMimeData>
+#include <QProgressBar>
 #include <QStatusBar>
 #include <QString>
+#include <QUrl>
 
 #include <array>
 #include <iostream>
@@ -176,6 +176,7 @@ void MainWindow::createViewMenu()
 
     // REQ-004-11: display modes.
     QMenu* displayMenu = viewMenu->addMenu(tr("&Display"));
+    // NOLINTNEXTLINE(cppcoreguidelines-owning-memory): owned by its Qt parent.
     auto* displayGroup = new QActionGroup(displayMenu);
     struct DisplayEntry
     {
@@ -189,8 +190,8 @@ void MainWindow::createViewMenu()
     }};
     for (const DisplayEntry& entry : displayModes) {
         const render::DisplayMode mode = entry.mode;
-        QAction* action = displayMenu->addAction(entry.text, m_viewport,
-                                                 [this, mode] { m_viewport->setDisplayMode(mode); });
+        QAction* action = displayMenu->addAction(
+            entry.text, m_viewport, [this, mode] { m_viewport->setDisplayMode(mode); });
         action->setCheckable(true);
         action->setChecked(mode == m_viewport->displayOptions().mode);
         displayGroup->addAction(action);
@@ -199,6 +200,7 @@ void MainWindow::createViewMenu()
 
     // REQ-004-14: colors.
     QMenu* colorMenu = viewMenu->addMenu(tr("&Color"));
+    // NOLINTNEXTLINE(cppcoreguidelines-owning-memory): owned by its Qt parent.
     auto* colorGroup = new QActionGroup(colorMenu);
     struct ColorEntry
     {
@@ -224,11 +226,13 @@ void MainWindow::createViewMenu()
     const std::array<QString, 4> dimensionNames = {tr("&0D (Points)"), tr("&1D (Lines)"),
                                                    tr("&2D (Surfaces)"), tr("&3D (Solids)")};
     for (int dimension = 0; dimension < 4; ++dimension) {
-        QAction* action = showMenu->addAction(dimensionNames.at(static_cast<std::size_t>(dimension)));
+        QAction* action =
+            showMenu->addAction(dimensionNames.at(static_cast<std::size_t>(dimension)));
         action->setCheckable(true);
         action->setChecked(m_viewport->displayOptions().isVisible(dimension));
-        connect(action, &QAction::toggled, m_viewport,
-                [this, dimension](bool visible) { m_viewport->setDimensionVisible(dimension, visible); });
+        connect(action, &QAction::toggled, m_viewport, [this, dimension](bool visible) {
+            m_viewport->setDimensionVisible(dimension, visible);
+        });
         m_viewActions.append(action);
     }
 
@@ -254,6 +258,7 @@ void MainWindow::createEditMenu()
     QMenu* editMenu = menuBar()->addMenu(tr("&Edit"));
 
     // REQ-004-19
+    // NOLINTNEXTLINE(cppcoreguidelines-owning-memory): owned by its Qt parent.
     auto* modeGroup = new QActionGroup(editMenu);
     QAction* elements = editMenu->addAction(tr("Select &Elements"), m_viewport, [this] {
         m_viewport->setSelectionMode(render::SelectionMode::Elements);
@@ -279,8 +284,8 @@ void MainWindow::createEditMenu()
 
 void MainWindow::chooseMeshFile()
 {
-    const QString path = QFileDialog::getOpenFileName(
-        this, tr("Import Mesh"), QString(), tr("Gmsh meshes (*.msh);;All files (*)"));
+    const QString path = QFileDialog::getOpenFileName(this, tr("Import Mesh"), QString(),
+                                                      tr("Gmsh meshes (*.msh);;All files (*)"));
     if (!path.isEmpty()) {
         importMesh(path);
     }
@@ -298,8 +303,7 @@ void MainWindow::importMesh(const QString& path)
     m_import->start(path);
 }
 
-void MainWindow::meshImported(const QString& path,
-                              std::shared_ptr<const render::MeshScene> scene,
+void MainWindow::meshImported(const QString& path, std::shared_ptr<const render::MeshScene> scene,
                               const QStringList& warnings)
 {
     m_importAction->setEnabled(true);

@@ -8,7 +8,6 @@
 #include <catch2/generators/catch_generators.hpp>
 
 #include <Eigen/Geometry>
-
 #include <algorithm>
 #include <array>
 #include <optional>
@@ -46,7 +45,8 @@ Vec2 toPixel(const Camera& camera, const Eigen::Vector3d& world)
 {
     const Eigen::Vector4d clip =
         camera.projectionMatrix() * camera.viewMatrix() * world.homogeneous();
-    return {(clip.x() / clip.w() + 1.0) * 0.5 * kWidth, (1.0 - clip.y() / clip.w()) * 0.5 * kHeight};
+    return {(clip.x() / clip.w() + 1.0) * 0.5 * kWidth,
+            (1.0 - clip.y() / clip.w()) * 0.5 * kHeight};
 }
 
 int elementId(const fem::core::Mesh& mesh, std::optional<int> element)
@@ -58,6 +58,7 @@ int elementId(const fem::core::Mesh& mesh, std::optional<int> element)
 std::vector<int> ids(const fem::core::Mesh& mesh, const std::vector<int>& elements)
 {
     std::vector<int> result;
+    result.reserve(elements.size());
     for (const int e : elements) {
         result.push_back(static_cast<int>(mesh.elementId(e)));
     }
@@ -110,9 +111,9 @@ TEST_CASE("a click ignores hidden dimensions", "[render][picker]")
 // REQ-004-20: lines and points are picked within the tolerance.
 TEST_CASE("a click picks lines and points within the tolerance", "[render][picker]")
 {
-    const auto mesh = fem::render::test::buildMesh(
-        {{0, 0, 0}, {2, 0, 0}, {1, 1, 0}},
-        {{ElementType::Line2, {0, 1}}, {ElementType::Point1, {2}}});
+    const auto mesh =
+        fem::render::test::buildMesh({{0, 0, 0}, {2, 0, 0}, {1, 1, 0}},
+                                     {{ElementType::Line2, {0, 1}}, {ElementType::Point1, {2}}});
     const MeshPicker picker(fem::render::buildMeshScene(mesh));
     const Camera camera = cameraFor(*mesh, StandardView::Top);
 
@@ -188,6 +189,7 @@ TEST_CASE("window and crossing select by inclusion and by touch", "[render][pick
     // Nodes inside: (1,1), (2,1), (1,2), (2,2).
     const auto nodes = picker.pickRect(camera, window, SelectionMode::Nodes, DisplayOptions{});
     std::vector<int> nodeIds;
+    nodeIds.reserve(nodes.size());
     for (const int n : nodes) {
         nodeIds.push_back(static_cast<int>(mesh->nodeId(n)));
     }

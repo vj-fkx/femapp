@@ -5,7 +5,6 @@
 #include <fem/render/display_options.hpp>
 
 #include <Eigen/Core>
-
 #include <array>
 #include <cstdint>
 #include <memory>
@@ -103,7 +102,8 @@ private:
 };
 
 // Builds the scene of a mesh (REQ-004-09, 10, 16, 18).
-[[nodiscard]] std::shared_ptr<const MeshScene> buildMeshScene(std::shared_ptr<const core::Mesh> mesh);
+[[nodiscard]] std::shared_ptr<const MeshScene>
+buildMeshScene(std::shared_ptr<const core::Mesh> mesh);
 
 // Colors used by elementColors (exposed for tests and the legend of later
 // features).

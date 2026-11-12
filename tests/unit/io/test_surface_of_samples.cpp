@@ -6,7 +6,6 @@
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 #include <Eigen/Geometry>
-
 #include <algorithm>
 #include <cstddef>
 #include <filesystem>
@@ -23,7 +22,8 @@ TEST_CASE("outer surface of sample boxes is closed and outward", "[io][surface]"
 {
     const std::string file = GENERATE("box_tet4.msh", "box_wedge6.msh", "box_hex20.msh");
     INFO(file);
-    const auto result = fem::io::readGmsh(std::filesystem::path(FEMAPP_TEST_DATA_DIR) / "gmsh" / file);
+    const auto result =
+        fem::io::readGmsh(std::filesystem::path(FEMAPP_TEST_DATA_DIR) / "gmsh" / file);
     REQUIRE(result.has_value());
     const fem::core::Mesh& mesh = result->mesh;
     const fem::core::MeshSurface surface = fem::core::extractSurface(mesh);
@@ -50,8 +50,8 @@ TEST_CASE("outer surface of sample boxes is closed and outward", "[io][surface]"
         }
     }
 
-    CHECK_THAT(area, WithinRel(22.0, 1e-9));   // 2 * (1*2 + 1*3 + 2*3)
-    CHECK_THAT(volume, WithinRel(6.0, 1e-9));  // positive: faces point out
+    CHECK_THAT(area, WithinRel(22.0, 1e-9));  // 2 * (1*2 + 1*3 + 2*3)
+    CHECK_THAT(volume, WithinRel(6.0, 1e-9)); // positive: faces point out
     CHECK(std::ranges::all_of(uses, [](const auto& entry) { return entry.second == 2; }));
     CHECK(uses.size() == surface.edges3d.size());
 }

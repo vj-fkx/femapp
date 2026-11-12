@@ -105,7 +105,7 @@ Regras:
   por grupo; ocultar dimensões; seleção por clique, janela, cruzamento, Shift e
   Esc nos dois modos; realce; textos em português; malha deslocada 1e6 —
   cobre: 01 a 29
-- [ ] **T27** Gerar a malha de 1 milhão de Tet4 deslocada 1e6 da origem para o
+- [x] **T27** Gerar a malha de 1 milhão de Tet4 deslocada 1e6 da origem para o
   roteiro (opção no script de exemplos) — cobre: 18
 - [ ] **T28** `[M]` Medir em Release: FPS navegando com 1 milhão de Tet4 em
   1920×1080, tempo do diálogo até a malha aparecer, tempo de clique e de
@@ -116,7 +116,7 @@ Regras:
 
 - [ ] **T90** Build e testes verdes nos quatro jobs do CI (push com sua
   confirmação) — cobre: 31
-- [ ] **T91** `clang-format` e `clang-tidy` sem pendências (também o
+- [x] **T91** `clang-format` e `clang-tidy` sem pendências (também o
   `clang-tidy` do Linux, pelo CI)
 - [ ] **T92** Conferir os doze critérios de aceite de `requirements.md`
 - [ ] **T93** Atualizar `specs/roadmap.md` para `concluída` e o `README.md` se
@@ -213,3 +213,13 @@ Regras:
     para inglês, aparecem como "3 element(s) selected".
 - T25: `specs/architecture.md` atualizado (`extractSurface`, `MeshScene`,
   seleção na CPU).
+
+**2026-11-12 — T27 e T91:**
+
+- T27: `generate_test_meshes.py --large <pasta>` grava também
+  `box_shifted_1e6` (caixa 1×2×3 deslocada 1e6 em cada eixo), fora do
+  repositório, junto da caixa de 1 milhão de Tet4.
+- T91: `clang-format` sem diferenças e `clang-tidy` (Windows) sem apontamentos.
+  Para isso a importação deixou de usar `QMetaObject::invokeMethod` (falso
+  positivo de vazamento dentro do Qt): o resultado volta pela conexão com
+  `QThread::finished`. O `clang-tidy` do Linux só será conferido no CI.

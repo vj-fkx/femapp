@@ -17,10 +17,10 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
-#include <utility>
-#include <vector>
 #include <string>
 #include <string_view>
+#include <utility>
+#include <vector>
 
 namespace fem::render {
 
@@ -322,8 +322,8 @@ void Viewport::finishPick(const QPointF& releasePosition, bool remove)
         items = m_impl->picker->pickRect(m_impl->camera, rect, m_impl->selection.mode(),
                                          m_impl->display);
     } else if (const auto item = m_impl->picker->pick(m_impl->camera, toVec2(releasePosition),
-                                                      m_impl->selection.mode(),
-                                                      m_impl->display, kPickTolerancePx)) {
+                                                      m_impl->selection.mode(), m_impl->display,
+                                                      kPickTolerancePx)) {
         items.push_back(*item);
     }
     if (items.empty()) {

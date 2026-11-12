@@ -164,10 +164,10 @@ def box_extruded(stem, order, quads, incomplete=False):
     gmsh.model.remove()
 
 
-def box_tets(stem, order, size, folder=HERE):
-    """Box 1 x 2 x 3 meshed with tetrahedra."""
+def box_tets(stem, order, size, folder=HERE, shift=0.0):
+    """Box 1 x 2 x 3 meshed with tetrahedra, optionally moved by `shift` on each axis."""
     gmsh.model.add(stem)
-    box = gmsh.model.occ.addBox(0, 0, 0, 1, 2, 3)
+    box = gmsh.model.occ.addBox(shift, shift, shift, 1, 2, 3)
     gmsh.model.occ.synchronize()
     gmsh.model.addPhysicalGroup(3, [box], name="solid")
     faces = [tag for _, tag in gmsh.model.getBoundary([(3, box)], oriented=False)]
@@ -190,6 +190,8 @@ def main():
             folder = pathlib.Path(sys.argv[2]).resolve()
             folder.mkdir(parents=True, exist_ok=True)
             box_tets("box_1m_tet4", 1, 0.030, folder)
+            # REQ-004-18: a small mesh 1e6 units away from the origin.
+            box_tets("box_shifted_1e6", 1, 0.25, folder, shift=1.0e6)
             return
         all_types()
         segment(1)

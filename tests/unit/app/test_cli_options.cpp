@@ -22,8 +22,8 @@ TEST_CASE("command line flags are recognised", "[app][cli]")
 // REQ-004-03: the first .msh argument, in any case, is the mesh to import.
 TEST_CASE("a mesh file on the command line is recognised", "[app][cli]")
 {
-    const std::array<const char*, 6> args = {"femapp",       "-platform",  "offscreen",
-                                             "C:/Malhas/Viga.MSH", "other.msh", "--smoke-test"};
+    const std::array<const char*, 6> args = {
+        "femapp", "-platform", "offscreen", "C:/Malhas/Viga.MSH", "other.msh", "--smoke-test"};
     const CliOptions options = parseCliOptions(args);
     CHECK(options.smokeTest);
     CHECK(options.meshFile == std::optional<std::string>("C:/Malhas/Viga.MSH"));

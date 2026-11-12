@@ -6,6 +6,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
+#include <cstddef>
 #include <set>
 
 using Catch::Matchers::WithinAbs;
@@ -21,19 +22,18 @@ std::shared_ptr<const fem::core::Mesh> mixedMesh()
 {
     // A hexahedron, a quadrilateral and a triangle beside it, a line and a point.
     const std::vector<Eigen::Vector3d> nodes = {
-        {0, 0, 0}, {1, 0, 0}, {1, 1, 0}, {0, 1, 0}, {0, 0, 1}, {1, 0, 1}, {1, 1, 1}, {0, 1, 1},
-        {2, 0, 0}, {2, 1, 0}, {3, 0, 0}, {4, 0, 0},
+        {0, 0, 0}, {1, 0, 0}, {1, 1, 0}, {0, 1, 0}, {0, 0, 1}, {1, 0, 1},
+        {1, 1, 1}, {0, 1, 1}, {2, 0, 0}, {2, 1, 0}, {3, 0, 0}, {4, 0, 0},
     };
-    return fem::render::test::buildMesh(
-        nodes,
-        {
-            {ElementType::Hex8, {0, 1, 2, 3, 4, 5, 6, 7}},
-            {ElementType::Quad4, {1, 8, 9, 2}},
-            {ElementType::Tri3, {8, 10, 9}},
-            {ElementType::Line2, {10, 11}},
-            {ElementType::Point1, {11}},
-        },
-        {{"plates", {1, 2}}, {"plate", {1}}, {"bar", {3}}});
+    return fem::render::test::buildMesh(nodes,
+                                        {
+                                            {ElementType::Hex8, {0, 1, 2, 3, 4, 5, 6, 7}},
+                                            {ElementType::Quad4, {1, 8, 9, 2}},
+                                            {ElementType::Tri3, {8, 10, 9}},
+                                            {ElementType::Line2, {10, 11}},
+                                            {ElementType::Point1, {11}},
+                                        },
+                                        {{"plates", {1, 2}}, {"plate", {1}}, {"bar", {3}}});
 }
 
 } // namespace
@@ -48,7 +48,7 @@ TEST_CASE("scene splits primitives by dimension", "[render][scene]")
     CHECK(scene->triangles(2).count == 3);
     CHECK(scene->triangles(3).first == 3);
     CHECK(scene->triangles(3).count == 12);
-    CHECK(scene->triangleVertices().size() == 3 * 15);
+    CHECK(scene->triangleVertices().size() == std::size_t{3} * 15);
     CHECK(scene->triangleElements().size() == 15);
 
     // 1D element, 2D edges (4 + 3 - 1 shared), 3D edges (12).
@@ -56,7 +56,7 @@ TEST_CASE("scene splits primitives by dimension", "[render][scene]")
     CHECK(scene->lines(LineSet::Edges2d).count == 6);
     CHECK(scene->lines(LineSet::Edges3d).count == 12);
     CHECK(scene->lines(LineSet::Edges3d).first == 7);
-    CHECK(scene->lineVertices().size() == 2 * 19);
+    CHECK(scene->lineVertices().size() == std::size_t{2} * 19);
 
     CHECK(scene->pointElements().size() == 1);
     CHECK(scene->surfaceNodes(0).size() == 1);

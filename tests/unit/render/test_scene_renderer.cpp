@@ -123,20 +123,28 @@ TEST_CASE("scene renderer draws frames with the Null backend", "[render][rendere
 
         // REQ-004-09, 11, 14, 16, 26: a mesh with faces, lines, points and a
         // selection, in every display mode and color mode.
-        const auto mesh = fem::render::test::buildMesh(
-            {{0, 0, 0}, {1, 0, 0}, {1, 1, 0}, {0, 1, 0}, {0, 0, 1}, {1, 0, 1}, {1, 1, 1}, {0, 1, 1},
-             {2, 0, 0}, {3, 0, 0}},
-            {{fem::core::ElementType::Hex8, {0, 1, 2, 3, 4, 5, 6, 7}},
-             {fem::core::ElementType::Tri3, {1, 8, 2}},
-             {fem::core::ElementType::Line2, {8, 9}},
-             {fem::core::ElementType::Point1, {9}}},
-            {{"solid", {0}}});
+        const auto mesh =
+            fem::render::test::buildMesh({{0, 0, 0},
+                                          {1, 0, 0},
+                                          {1, 1, 0},
+                                          {0, 1, 0},
+                                          {0, 0, 1},
+                                          {1, 0, 1},
+                                          {1, 1, 1},
+                                          {0, 1, 1},
+                                          {2, 0, 0},
+                                          {3, 0, 0}},
+                                         {{fem::core::ElementType::Hex8, {0, 1, 2, 3, 4, 5, 6, 7}},
+                                          {fem::core::ElementType::Tri3, {1, 8, 2}},
+                                          {fem::core::ElementType::Line2, {8, 9}},
+                                          {fem::core::ElementType::Point1, {9}}},
+                                         {{"solid", {0}}});
         const auto scene = fem::render::buildMeshScene(mesh);
         fem::render::Selection selection;
         std::uint64_t colorVersion = 0;
-        for (const auto mode : {fem::render::DisplayMode::ShadedWithEdges,
-                                fem::render::DisplayMode::Shaded,
-                                fem::render::DisplayMode::Wireframe}) {
+        for (const auto mode :
+             {fem::render::DisplayMode::ShadedWithEdges, fem::render::DisplayMode::Shaded,
+              fem::render::DisplayMode::Wireframe}) {
             for (const auto selectionMode :
                  {fem::render::SelectionMode::Elements, fem::render::SelectionMode::Nodes}) {
                 selection.reset(selectionMode, *mesh);
@@ -150,7 +158,8 @@ TEST_CASE("scene renderer draws frames with the Null backend", "[render][rendere
                 frame.display.color = selectionMode == fem::render::SelectionMode::Elements
                                           ? fem::render::ColorMode::ByGroup
                                           : fem::render::ColorMode::ByDimension;
-                frame.display.dimensionVisible = {true, true, mode != fem::render::DisplayMode::Shaded, true};
+                frame.display.dimensionVisible = {true, true,
+                                                  mode != fem::render::DisplayMode::Shaded, true};
                 frame.selection = &selection;
 
                 QRhiCommandBuffer* commandBuffer = nullptr;

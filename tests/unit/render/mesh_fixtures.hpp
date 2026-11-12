@@ -7,7 +7,6 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <Eigen/Core>
-
 #include <cstddef>
 #include <memory>
 #include <utility>
@@ -18,9 +17,9 @@ namespace fem::render::test {
 using ElementList = std::vector<std::pair<core::ElementType, std::vector<core::ExternalId>>>;
 
 // Nodes get ids 0, 1, 2...; elements 1, 2, 3...
-inline std::shared_ptr<const core::Mesh> buildMesh(const std::vector<Eigen::Vector3d>& nodes,
-                                                   const ElementList& elements,
-                                                   const std::vector<std::pair<std::string, std::vector<int>>>& groups = {})
+inline std::shared_ptr<const core::Mesh>
+buildMesh(const std::vector<Eigen::Vector3d>& nodes, const ElementList& elements,
+          const std::vector<std::pair<std::string, std::vector<int>>>& groups = {})
 {
     core::MeshBuilder builder;
     for (std::size_t i = 0; i < nodes.size(); ++i) {
@@ -48,14 +47,15 @@ inline std::shared_ptr<const core::Mesh> buildMesh(const std::vector<Eigen::Vect
 
 // n x n x n unit hexahedra from the origin; element (i, j, k) has id
 // 1 + i + n * (j + n * k).
-inline std::shared_ptr<const core::Mesh> hexGrid(int n, const Eigen::Vector3d& shift = Eigen::Vector3d::Zero())
+inline std::shared_ptr<const core::Mesh>
+hexGrid(int n, const Eigen::Vector3d& shift = Eigen::Vector3d::Zero())
 {
     const int side = n + 1;
     std::vector<Eigen::Vector3d> nodes;
     for (int k = 0; k < side; ++k) {
         for (int j = 0; j < side; ++j) {
             for (int i = 0; i < side; ++i) {
-                nodes.push_back(Eigen::Vector3d(i, j, k) + shift);
+                nodes.emplace_back(Eigen::Vector3d(i, j, k) + shift);
             }
         }
     }
@@ -66,12 +66,11 @@ inline std::shared_ptr<const core::Mesh> hexGrid(int n, const Eigen::Vector3d& s
     for (int k = 0; k < n; ++k) {
         for (int j = 0; j < n; ++j) {
             for (int i = 0; i < n; ++i) {
-                elements.emplace_back(
-                    core::ElementType::Hex8,
-                    std::vector<core::ExternalId>{at(i, j, k), at(i + 1, j, k), at(i + 1, j + 1, k),
-                                                  at(i, j + 1, k), at(i, j, k + 1),
-                                                  at(i + 1, j, k + 1), at(i + 1, j + 1, k + 1),
-                                                  at(i, j + 1, k + 1)});
+                elements.emplace_back(core::ElementType::Hex8,
+                                      std::vector<core::ExternalId>{
+                                          at(i, j, k), at(i + 1, j, k), at(i + 1, j + 1, k),
+                                          at(i, j + 1, k), at(i, j, k + 1), at(i + 1, j, k + 1),
+                                          at(i + 1, j + 1, k + 1), at(i, j + 1, k + 1)});
             }
         }
     }

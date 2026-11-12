@@ -4,10 +4,10 @@
 
 #include <fem/render/camera.hpp>
 
-#include <rhi/qrhi.h>
-
 #include <QMatrix4x4>
 #include <QString>
+
+#include <rhi/qrhi.h>
 
 namespace fem::render::detail {
 

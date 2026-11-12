@@ -2,11 +2,11 @@
 
 #include <fem/io/gmsh_reader.hpp>
 
-#include <QMetaObject>
-#include <QPointer>
 #include <QThread>
 
+#include <exception>
 #include <filesystem>
+#include <memory>
 #include <string>
 #include <utility>
 
@@ -14,8 +14,7 @@ namespace fem::app {
 
 MeshImport::MeshImport(QObject* parent)
     : QObject(parent)
-{
-}
+{}
 
 void MeshImport::start(const QString& path)
 {
@@ -25,41 +24,46 @@ void MeshImport::start(const QString& path)
     m_running = true;
     emit started(path);
 
-    const QPointer<MeshImport> self(this);
     // REQ-003-24: through UTF-16, so that accents survive on every platform.
     const std::filesystem::path file(path.toStdU16String());
 
-    QThread* thread = QThread::create([self, path, file] {
-        auto result = io::readGmsh(file);
+    // Filled on the worker thread, read back on the thread of this object
+    // once the worker has finished.
+    struct Result
+    {
         std::shared_ptr<const render::MeshScene> scene;
         QStringList warnings;
         QString error;
-        if (result) {
-            for (const std::string& warning : result->warnings) {
-                warnings.push_back(QString::fromStdString(warning));
-            }
-            scene = render::buildMeshScene(
-                std::make_shared<const core::Mesh>(std::move(result->mesh)));
-        } else {
-            error = QString::fromStdString(result.error().message);
-        }
+    };
+    auto result = std::make_shared<Result>();
 
-        // Back on the thread of the MeshImport object.
-        QMetaObject::invokeMethod(
-            self.data(),
-            [self, path, scene = std::move(scene), warnings = std::move(warnings),
-             error = std::move(error)] {
-                if (self.isNull()) {
-                    return;
-                }
-                self->m_running = false;
-                if (scene) {
-                    emit self->finished(path, scene, warnings);
-                } else {
-                    emit self->failed(path, error);
-                }
-            },
-            Qt::QueuedConnection);
+    // NOLINTNEXTLINE(bugprone-exception-escape): only allocation failures can escape.
+    QThread* thread = QThread::create([result, file] {
+        try {
+            auto read = io::readGmsh(file);
+            if (!read) {
+                result->error = QString::fromStdString(read.error().message);
+                return;
+            }
+            for (const std::string& warning : read->warnings) {
+                result->warnings.push_back(QString::fromStdString(warning));
+            }
+            result->scene =
+                render::buildMeshScene(std::make_shared<const core::Mesh>(std::move(read->mesh)));
+        } catch (const std::exception& exception) {
+            result->error = QString::fromUtf8(exception.what());
+        } catch (...) {
+            result->error = QStringLiteral("Unexpected error while importing the mesh.");
+        }
+    });
+    // Queued: QThread::finished is emitted on the worker thread.
+    connect(thread, &QThread::finished, this, [this, path, result] {
+        m_running = false;
+        if (result->scene) {
+            emit finished(path, result->scene, result->warnings);
+        } else {
+            emit failed(path, result->error);
+        }
     });
     connect(thread, &QThread::finished, thread, &QObject::deleteLater);
     thread->start();

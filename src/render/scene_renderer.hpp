@@ -56,7 +56,7 @@ public:
     // Returns false, with errorString() set, if the mesh cannot be sent to
     // the GPU.
     [[nodiscard]] bool render(QRhiCommandBuffer* commandBuffer, QRhiRenderTarget* target,
-                const FrameParams& params);
+                              const FrameParams& params);
 
     void release();
 

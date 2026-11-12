@@ -24,9 +24,9 @@ constexpr std::array<Rgba, 4> kDimensionColors = {
 
 // Twelve well separated colors, repeated after the twelfth group.
 constexpr std::array<Rgba, 12> kGroupPalette = {
-    rgb(31, 119, 180), rgb(255, 127, 14), rgb(44, 160, 44),  rgb(214, 39, 40),
-    rgb(148, 103, 189), rgb(140, 86, 75), rgb(227, 119, 194), rgb(188, 189, 34),
-    rgb(23, 190, 207), rgb(255, 187, 120), rgb(152, 223, 138), rgb(197, 176, 213),
+    rgb(31, 119, 180),  rgb(255, 127, 14),  rgb(44, 160, 44),   rgb(214, 39, 40),
+    rgb(148, 103, 189), rgb(140, 86, 75),   rgb(227, 119, 194), rgb(188, 189, 34),
+    rgb(23, 190, 207),  rgb(255, 187, 120), rgb(152, 223, 138), rgb(197, 176, 213),
 };
 
 void sortUnique(std::vector<core::NodeIndex>& nodes)
@@ -106,6 +106,7 @@ std::vector<Rgba> MeshScene::elementColors(ColorMode mode) const
 
 std::shared_ptr<const MeshScene> buildMeshScene(std::shared_ptr<const core::Mesh> mesh)
 {
+    // NOLINTNEXTLINE(modernize-make-shared): the constructor is private.
     auto scene = std::shared_ptr<MeshScene>(new MeshScene());
     scene->m_mesh = std::move(mesh);
     const core::Mesh& m = *scene->m_mesh;
@@ -119,7 +120,7 @@ std::shared_ptr<const MeshScene> buildMeshScene(std::shared_ptr<const core::Mesh
     // Node positions relative to the centre, in float (REQ-004-18).
     scene->m_nodePositions.reserve(static_cast<std::size_t>(m.nodeCount()));
     for (core::NodeIndex n = 0; n < m.nodeCount(); ++n) {
-        scene->m_nodePositions.push_back((m.nodeCoordinates(n) - scene->m_origin).cast<float>());
+        scene->m_nodePositions.emplace_back((m.nodeCoordinates(n) - scene->m_origin).cast<float>());
     }
     const auto& positions = scene->m_nodePositions;
     const auto at = [&](core::NodeIndex node) { return positions[static_cast<std::size_t>(node)]; };
@@ -151,7 +152,9 @@ std::shared_ptr<const MeshScene> buildMeshScene(std::shared_ptr<const core::Mesh
         scene->m_lineVertices.push_back(at(b));
         scene->m_lineElements.push_back(element);
     };
-    const auto segmentCount = [&] { return static_cast<std::uint32_t>(scene->m_lineElements.size()); };
+    const auto segmentCount = [&] {
+        return static_cast<std::uint32_t>(scene->m_lineElements.size());
+    };
 
     std::uint32_t first = segmentCount();
     for (const core::ElementBlock& block : m.blocks()) {

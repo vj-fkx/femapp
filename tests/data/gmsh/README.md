@@ -25,8 +25,9 @@ python -m pip install gmsh
 python tests/data/gmsh/generate_test_meshes.py
 ```
 
-O arquivo grande da medição de desempenho (cerca de 1 milhão de Tet4) não é
-versionado; gere-o fora do repositório:
+Os arquivos grandes da medição de desempenho (cerca de 1 milhão de Tet4) e a
+caixa deslocada 1e6 da origem (feature 004) não são versionados; gere-os fora
+do repositório:
 
 ```bash
 python tests/data/gmsh/generate_test_meshes.py --large build/perf-data

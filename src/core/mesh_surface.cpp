@@ -69,8 +69,7 @@ std::vector<SurfaceEdge> uniqueEdges(const std::vector<SurfaceFace>& faces)
         for (std::size_t i = 0; i < face.nodeCount; ++i) {
             const NodeIndex a = face.nodes.at(i);
             const NodeIndex b = face.nodes.at((i + 1) % face.nodeCount);
-            edges.push_back(
-                {.a = std::min(a, b), .b = std::max(a, b), .element = face.element});
+            edges.push_back({.a = std::min(a, b), .b = std::max(a, b), .element = face.element});
         }
     }
     std::ranges::sort(edges, [](const SurfaceEdge& x, const SurfaceEdge& y) {

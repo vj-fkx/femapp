@@ -1,9 +1,7 @@
+#include <fem/core/mesh_surface.hpp>
 #include <fem/render/mesh_picker.hpp>
 
-#include <fem/core/mesh_surface.hpp>
-
 #include <Eigen/Geometry>
-
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
@@ -72,7 +70,8 @@ struct LocalRay
 LocalRay localRay(const Camera& camera, const Vec2& pixel, const Eigen::Vector3d& origin)
 {
     const Ray ray = camera.rayThrough(pixel);
-    return {.origin = (ray.origin - origin).cast<float>(), .direction = ray.direction.cast<float>()};
+    return {.origin = (ray.origin - origin).cast<float>(),
+            .direction = ray.direction.cast<float>()};
 }
 
 // Möller–Trumbore; returns the ray parameter of the hit, or a negative value.
@@ -219,7 +218,8 @@ Outline outlineOf(const core::ElementTypeInfo& info)
         outline.edges.emplace_back(0, 1);
     } else if (info.dimension == 2) {
         const std::array<int, 4> polygon = {0, 1, 2, 3};
-        addPolygon(std::span<const int>(polygon.data(), static_cast<std::size_t>(info.vertexCount)));
+        addPolygon(
+            std::span<const int>(polygon.data(), static_cast<std::size_t>(info.vertexCount)));
     } else if (info.dimension == 3) {
         for (const core::LocalFace& face : core::elementFaces(info.family)) {
             std::array<int, 4> polygon{};
@@ -236,8 +236,7 @@ Outline outlineOf(const core::ElementTypeInfo& info)
 
 MeshPicker::MeshPicker(std::shared_ptr<const MeshScene> scene)
     : m_scene(std::move(scene))
-{
-}
+{}
 
 std::optional<int> MeshPicker::pick(const Camera& camera, const Vec2& pixel, SelectionMode mode,
                                     const DisplayOptions& display, double tolerancePx) const
@@ -300,8 +299,8 @@ std::optional<int> MeshPicker::pick(const Camera& camera, const Vec2& pixel, Sel
     }
     std::ranges::sort(candidates);
     const auto& box = scene.bounds();
-    const double epsilon = box.isEmpty() ? 1e-9
-                                         : 1e-4 * (box.max - box.min).norm() + 1e-6 * camera.distance();
+    const double epsilon =
+        box.isEmpty() ? 1e-9 : 1e-4 * (box.max - box.min).norm() + 1e-6 * camera.distance();
     for (const auto& [depth, node] : candidates) {
         const ScreenPoint p = projector.project(at(node));
         const LocalRay toNode = localRay(camera, p.pixel, scene.origin());

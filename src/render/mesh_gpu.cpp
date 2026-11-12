@@ -81,10 +81,10 @@ struct MeshGpu::Impl
     bool uploaded = false;
 
     [[nodiscard]] QRhiGraphicsPipeline* makePipeline(const QShader& vertex, const QShader& fragment,
-                                                    const QRhiVertexInputLayout& layout,
-                                                    QRhiGraphicsPipeline::Topology topology,
-                                                    QRhiRenderPassDescriptor* renderPass,
-                                                    int sampleCount) const
+                                                     const QRhiVertexInputLayout& layout,
+                                                     QRhiGraphicsPipeline::Topology topology,
+                                                     QRhiRenderPassDescriptor* renderPass,
+                                                     int sampleCount) const
     {
         QRhiGraphicsPipeline* pipeline = rhi->newGraphicsPipeline();
         pipeline->setShaderStages(
@@ -122,8 +122,7 @@ struct MeshGpu::Impl
 
 MeshGpu::MeshGpu()
     : m_impl(std::make_unique<Impl>())
-{
-}
+{}
 
 MeshGpu::~MeshGpu() = default;
 
@@ -140,8 +139,8 @@ bool MeshGpu::create(QRhi* rhi, QRhiRenderPassDescriptor* renderPass, int sample
     const QShader lineFrag = loadShader(QStringLiteral("mesh_line.frag"), error);
     const QShader pointVert = loadShader(QStringLiteral("mesh_point.vert"), error);
     const QShader pointFrag = loadShader(QStringLiteral("mesh_point.frag"), error);
-    if (!faceVert.isValid() || !faceFrag.isValid() || !lineVert.isValid() ||
-        !lineFrag.isValid() || !pointVert.isValid() || !pointFrag.isValid()) {
+    if (!faceVert.isValid() || !faceFrag.isValid() || !lineVert.isValid() || !lineFrag.isValid() ||
+        !pointVert.isValid() || !pointFrag.isValid()) {
         return false;
     }
 
@@ -170,14 +169,13 @@ bool MeshGpu::create(QRhi* rhi, QRhiRenderPassDescriptor* renderPass, int sample
 
     // Points: corner per vertex, position and color per instance.
     QRhiVertexInputLayout instanced;
-    instanced.setBindings({{2 * sizeof(float)},
-                           {sizeof(PointInstance), QRhiVertexInputBinding::PerInstance}});
-    instanced.setAttributes(
-        {{0, 0, QRhiVertexInputAttribute::Float2, 0},
-         {1, 1, QRhiVertexInputAttribute::Float3,
-          static_cast<quint32>(offsetof(PointInstance, position))},
-         {1, 2, QRhiVertexInputAttribute::UNormByte4,
-          static_cast<quint32>(offsetof(PointInstance, color))}});
+    instanced.setBindings(
+        {{2 * sizeof(float)}, {sizeof(PointInstance), QRhiVertexInputBinding::PerInstance}});
+    instanced.setAttributes({{0, 0, QRhiVertexInputAttribute::Float2, 0},
+                             {1, 1, QRhiVertexInputAttribute::Float3,
+                              static_cast<quint32>(offsetof(PointInstance, position))},
+                             {1, 2, QRhiVertexInputAttribute::UNormByte4,
+                              static_cast<quint32>(offsetof(PointInstance, color))}});
 
     d.facePipeline.reset(d.makePipeline(faceVert, faceFrag, surface,
                                         QRhiGraphicsPipeline::Triangles, renderPass, sampleCount));
@@ -187,11 +185,9 @@ bool MeshGpu::create(QRhi* rhi, QRhiRenderPassDescriptor* renderPass, int sample
     d.linePipeline.reset(d.makePipeline(lineVert, lineFrag, surface, QRhiGraphicsPipeline::Lines,
                                         renderPass, sampleCount));
     d.pointPipeline.reset(d.makePipeline(pointVert, pointFrag, instanced,
-                                         QRhiGraphicsPipeline::Triangles, renderPass,
-                                         sampleCount));
-    d.overlayPipeline.reset(d.makePipeline(pointVert, pointFrag, instanced,
-                                           QRhiGraphicsPipeline::Triangles, renderPass,
-                                           sampleCount));
+                                         QRhiGraphicsPipeline::Triangles, renderPass, sampleCount));
+    d.overlayPipeline.reset(d.makePipeline(
+        pointVert, pointFrag, instanced, QRhiGraphicsPipeline::Triangles, renderPass, sampleCount));
     d.overlayPipeline->setDepthTest(false);
     d.overlayPipeline->setDepthWrite(false);
 
@@ -283,20 +279,24 @@ bool MeshGpu::prepare(QRhiResourceUpdateBatch* updates, const MeshFrame& frame,
         const auto positions = scene->nodePositions();
         for (const core::ElementIndex element : scene->pointElements()) {
             const auto node = scene->mesh().elementNodes(element)[0];
-            points.push_back({toArray(positions[static_cast<std::size_t>(node)]), colorOf(element)});
+            points.push_back({.position = toArray(positions[static_cast<std::size_t>(node)]),
+                              .color = colorOf(element)});
         }
         std::vector<PointInstance> selectedNodes;
         if (selection != nullptr && selection->mode() == SelectionMode::Nodes) {
             for (const int node : selection->items()) {
                 selectedNodes.push_back(
-                    {toArray(positions[static_cast<std::size_t>(node)]), kSelectedFlag});
+                    {.position = toArray(positions[static_cast<std::size_t>(node)]),
+                     .color = kSelectedFlag});
             }
         }
 
-        d.triangleColors = d.staticBuffer(bytes(triangleColors), triangleColors.data(), updates, error);
+        d.triangleColors =
+            d.staticBuffer(bytes(triangleColors), triangleColors.data(), updates, error);
         d.lineColors = d.staticBuffer(bytes(lineColors), lineColors.data(), updates, error);
         d.points = d.staticBuffer(bytes(points), points.data(), updates, error);
-        d.selectedNodes = d.staticBuffer(bytes(selectedNodes), selectedNodes.data(), updates, error);
+        d.selectedNodes =
+            d.staticBuffer(bytes(selectedNodes), selectedNodes.data(), updates, error);
         if (!error->isEmpty()) {
             return false;
         }

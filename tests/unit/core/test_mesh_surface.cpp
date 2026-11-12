@@ -6,7 +6,6 @@
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 #include <Eigen/Geometry>
-
 #include <array>
 #include <cstddef>
 #include <map>
@@ -54,9 +53,7 @@ Mesh hexGrid(int n)
             }
         }
     }
-    const auto at = [side](int i, int j, int k) -> ExternalId {
-        return i + side * (j + side * k);
-    };
+    const auto at = [side](int i, int j, int k) -> ExternalId { return i + side * (j + side * k); };
     std::vector<std::pair<ElementType, std::vector<ExternalId>>> elements;
     for (int k = 0; k < n; ++k) {
         for (int j = 0; j < n; ++j) {
@@ -161,7 +158,7 @@ TEST_CASE("surface of a block of hexahedra has only outer faces", "[core][surfac
     constexpr int kN = 4;
     const Mesh mesh = hexGrid(kN);
     const MeshSurface surface = fem::core::extractSurface(mesh);
-    CHECK(surface.faces3d.size() == 6 * kN * kN);
+    CHECK(surface.faces3d.size() == std::size_t{6} * kN * kN);
     // Outer edges: 12 cube edges of kN segments plus the grid lines on each face.
     CHECK(surface.edges3d.size() == 12 * kN + 6 * 2 * (kN - 1) * kN);
     CHECK_THAT(enclosedVolume(mesh, surface.faces3d), WithinRel(kN * kN * kN, 1e-12));
@@ -178,7 +175,7 @@ TEST_CASE("surface of a block of hexahedra has only outer faces", "[core][surfac
 TEST_CASE("surface of mixed solids has no internal face", "[core][surface]")
 {
     const std::vector<Vec3> nodes = {
-        {0, 0, 0}, {1, 0, 0}, {1, 1, 0}, {0, 1, 0}, {0, 0, 1},
+        {0, 0, 0}, {1, 0, 0}, {1, 1, 0}, {0, 1, 0},       {0, 0, 1},
         {1, 0, 1}, {1, 1, 1}, {0, 1, 1}, {0.5, 0.5, 1.5}, {0.5, -0.5, 1.2},
     };
     const Mesh mesh = build(nodes, {
@@ -191,7 +188,8 @@ TEST_CASE("surface of mixed solids has no internal face", "[core][surface]")
     CHECK(surface.faces3d.size() == 11);
 
     // Closed and outward: hexahedron 1, pyramid 1/6, tetrahedron 0.35/6.
-    CHECK_THAT(enclosedVolume(mesh, surface.faces3d), WithinRel(1.0 + 1.0 / 6.0 + 0.35 / 6.0, 1e-12));
+    CHECK_THAT(enclosedVolume(mesh, surface.faces3d),
+               WithinRel(1.0 + 1.0 / 6.0 + 0.35 / 6.0, 1e-12));
 
     // Every edge of a closed surface is shared by exactly two faces.
     std::map<std::pair<int, int>, int> uses;
@@ -213,7 +211,8 @@ TEST_CASE("surface of mixed solids has no internal face", "[core][surface]")
 TEST_CASE("surface of 2D and higher-order elements", "[core][surface]")
 {
     const std::vector<Vec3> nodes = {
-        {0, 0, 0}, {1, 0, 0}, {1, 1, 0}, {0, 1, 0}, {2, 0, 0}, {0.5, 0, 0}, {1.5, 0.5, 0}, {1, 0.5, 0},
+        {0, 0, 0}, {1, 0, 0},   {1, 1, 0},     {0, 1, 0},
+        {2, 0, 0}, {0.5, 0, 0}, {1.5, 0.5, 0}, {1, 0.5, 0},
     };
     const Mesh mesh = build(nodes, {
                                        {ElementType::Quad4, {0, 1, 2, 3}},
