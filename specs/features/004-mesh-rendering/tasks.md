@@ -220,6 +220,10 @@ Regras:
   elemento selecionado — arquivos: `mesh_gpu.cpp`, `viewport.cpp` — cobre: 37,
   39
 
+- [x] **T57** Arestas e nós selecionados com teste de profundidade (sai o
+  passe de sobreposição) — arquivos: `mesh_gpu.hpp/.cpp`,
+  `scene_renderer.cpp` — cobre: 26
+
 ## Fase 5 — Conferência e medições
 
 - [ ] **T26** `[M]` Roteiro manual no Windows: importar pelos três caminhos;

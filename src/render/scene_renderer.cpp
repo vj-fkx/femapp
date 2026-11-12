@@ -409,8 +409,6 @@ bool SceneRenderer::render(QRhiCommandBuffer* commandBuffer, QRhiRenderTarget* t
         commandBuffer->draw(4);
     }
 
-    m_mesh.drawOverlay(commandBuffer, sceneViewport);
-
     if (drawAxes) {
         // QRhi viewports have their origin at the bottom-left corner.
         const QRhiViewport corner(gizmoMargin, gizmoMargin, gizmoSize, gizmoSize, 0.0F,

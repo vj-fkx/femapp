@@ -38,7 +38,7 @@ struct MeshFrame
 };
 
 // GPU buffers and pipelines that draw a MeshScene: faces, lines, 0D points,
-// shown nodes and the selected edges and nodes (design sections 5.2, 12.5).
+// shown nodes and the selected edges and nodes (design sections 5.2, 12.5, 16).
 class MeshGpu
 {
 public:
@@ -58,11 +58,10 @@ public:
                                const Camera& camera, QSize pixelSize, double devicePixelRatio,
                                QString* error);
 
-    // Faces, lines, 0D points and shown nodes, depth tested.
+    // Faces, lines, 0D points, shown nodes and the highlight of the selected
+    // outlines, edges and nodes, all depth tested.
     void draw(QRhiCommandBuffer* commandBuffer, const QRhiViewport& viewport,
               const DisplayOptions& display) const;
-    // Selected edges and nodes, on top of everything.
-    void drawOverlay(QRhiCommandBuffer* commandBuffer, const QRhiViewport& viewport) const;
 
     [[nodiscard]] bool hasScene() const noexcept { return m_hasScene; }
 

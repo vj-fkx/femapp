@@ -72,8 +72,6 @@ struct MeshGpu::Impl
     std::unique_ptr<QRhiGraphicsPipeline> facePipeline;
     std::unique_ptr<QRhiGraphicsPipeline> linePipeline;
     std::unique_ptr<QRhiGraphicsPipeline> pointPipeline;
-    std::unique_ptr<QRhiGraphicsPipeline> overlayPipeline;
-    std::unique_ptr<QRhiGraphicsPipeline> segmentPipeline;
     std::unique_ptr<QRhiGraphicsPipeline> outlinePipeline;
     std::unique_ptr<QRhiBuffer> corners;
 
@@ -207,13 +205,8 @@ bool MeshGpu::create(QRhi* rhi, QRhiRenderPassDescriptor* renderPass, int sample
                                         renderPass, sampleCount));
     d.pointPipeline.reset(d.makePipeline(pointVert, pointFrag, instanced,
                                          QRhiGraphicsPipeline::Triangles, renderPass, sampleCount));
-    d.overlayPipeline.reset(d.makePipeline(
-        pointVert, pointFrag, instanced, QRhiGraphicsPipeline::Triangles, renderPass, sampleCount));
-    d.overlayPipeline->setDepthTest(false);
-    d.overlayPipeline->setDepthWrite(false);
 
-    // Selected edges: corner per vertex, both ends and color per instance,
-    // on top of everything like the selected nodes (design §12.5).
+    // Thick segments: corner per vertex, both ends and color per instance.
     QRhiVertexInputLayout segments;
     segments.setBindings(
         {{2 * sizeof(float)}, {sizeof(SegmentInstance), QRhiVertexInputBinding::PerInstance}});
@@ -224,20 +217,14 @@ bool MeshGpu::create(QRhi* rhi, QRhiRenderPassDescriptor* renderPass, int sample
                              static_cast<quint32>(offsetof(SegmentInstance, to))},
                             {1, 3, QRhiVertexInputAttribute::UNormByte4,
                              static_cast<quint32>(offsetof(SegmentInstance, color))}});
-    d.segmentPipeline.reset(d.makePipeline(segmentVert, pointFrag, segments,
-                                           QRhiGraphicsPipeline::Triangles, renderPass,
-                                           sampleCount));
-    d.segmentPipeline->setDepthTest(false);
-    d.segmentPipeline->setDepthWrite(false);
-    // REQ-004-26: the outlines of the selected elements, depth tested so that
-    // the faces hide the edges behind them.
+    // REQ-004-26: outlines of the selected elements and selected edges, depth
+    // tested so that the faces hide those behind them.
     d.outlinePipeline.reset(d.makePipeline(segmentVert, pointFrag, segments,
                                            QRhiGraphicsPipeline::Triangles, renderPass,
                                            sampleCount));
     d.outlinePipeline->setDepthWrite(false);
 
     if (!d.facePipeline->create() || !d.linePipeline->create() || !d.pointPipeline->create() ||
-        !d.overlayPipeline->create() || !d.segmentPipeline->create() ||
         !d.outlinePipeline->create()) {
         *error = QStringLiteral("could not create the mesh pipelines");
         return false;
@@ -533,6 +520,17 @@ void MeshGpu::draw(QRhiCommandBuffer* commandBuffer, const QRhiViewport& viewpor
         commandBuffer->setVertexInput(0, 2, inputs.data());
         commandBuffer->draw(6, d.outlineCount);
     }
+    if (d.selectedEdges && d.selectedEdgeCount > 0) {
+        commandBuffer->setGraphicsPipeline(d.outlinePipeline.get());
+        commandBuffer->setViewport(viewport);
+        commandBuffer->setShaderResources();
+        const std::array<QRhiCommandBuffer::VertexInput, 2> inputs = {{
+            {d.corners.get(), 0},
+            {d.selectedEdges.get(), 0},
+        }};
+        commandBuffer->setVertexInput(0, 2, inputs.data());
+        commandBuffer->draw(6, d.selectedEdgeCount);
+    }
 
     // REQ-004-35: depth tested, so the faces hide the nodes behind them.
     if (display.showNodes && d.shownNodes && d.shownNodeCount > 0) {
@@ -546,37 +544,19 @@ void MeshGpu::draw(QRhiCommandBuffer* commandBuffer, const QRhiViewport& viewpor
         commandBuffer->setVertexInput(0, 2, inputs.data());
         commandBuffer->draw(6, d.shownNodeCount);
     }
-}
-
-void MeshGpu::drawOverlay(QRhiCommandBuffer* commandBuffer, const QRhiViewport& viewport) const
-{
-    const Impl& d = *m_impl;
-    if (d.scene == nullptr) {
-        return;
-    }
-    if (d.selectedEdges && d.selectedEdgeCount > 0) {
-        commandBuffer->setGraphicsPipeline(d.segmentPipeline.get());
+    // REQ-004-26: selected nodes, depth tested; after the shown nodes so that
+    // they come out on top of them.
+    if (d.selectedNodes && d.selectedNodeCount > 0) {
+        commandBuffer->setGraphicsPipeline(d.pointPipeline.get());
         commandBuffer->setViewport(viewport);
         commandBuffer->setShaderResources();
         const std::array<QRhiCommandBuffer::VertexInput, 2> inputs = {{
             {d.corners.get(), 0},
-            {d.selectedEdges.get(), 0},
+            {d.selectedNodes.get(), 0},
         }};
         commandBuffer->setVertexInput(0, 2, inputs.data());
-        commandBuffer->draw(6, d.selectedEdgeCount);
+        commandBuffer->draw(6, d.selectedNodeCount);
     }
-    if (!d.selectedNodes || d.selectedNodeCount == 0) {
-        return;
-    }
-    commandBuffer->setGraphicsPipeline(d.overlayPipeline.get());
-    commandBuffer->setViewport(viewport);
-    commandBuffer->setShaderResources();
-    const std::array<QRhiCommandBuffer::VertexInput, 2> inputs = {{
-        {d.corners.get(), 0},
-        {d.selectedNodes.get(), 0},
-    }};
-    commandBuffer->setVertexInput(0, 2, inputs.data());
-    commandBuffer->draw(6, d.selectedNodeCount);
 }
 
 } // namespace fem::render

@@ -779,4 +779,11 @@ Pedido do mantenedor. Substitui partes da §13 (contorno dos selecionados), da
   força as arestas (sólido vira sólido com arestas) e "Mostrar nós" enquanto
   isolado. O modo exige elemento selecionado e desliga quando não resta
   nenhum. O buffer de faces selecionadas da §15 sai.
+- **Arestas e nós selecionados só onde visíveis (REQ-004-26):** em vez do
+  passe de sobreposição sem teste de profundidade, as arestas selecionadas
+  usam o pipeline de contorno (com teste de profundidade) e os nós
+  selecionados o pipeline de pontos, desenhados depois dos nós mostrados para
+  ficarem por cima deles. O passe de sobreposição (`drawOverlay`) sai. Itens
+  escondidos continuam selecionados (janela e cruzamento os alcançam), só não
+  são realçados enquanto escondidos; no aramado, sem faces, todos aparecem.
 
