@@ -347,6 +347,10 @@ void Viewport::finishPick(const QPointF& releasePosition, bool remove)
                    m_impl->picker->pick(m_impl->camera, toVec2(releasePosition), m_impl->filter,
                                         m_impl->display, kPickTolerancePx)) {
         items[item->kind].push_back(item->index);
+    } else if (!remove) {
+        // REQ-004-25: a plain click off the mesh clears the selection.
+        clearSelection();
+        return;
     }
     if (items.empty()) {
         return;

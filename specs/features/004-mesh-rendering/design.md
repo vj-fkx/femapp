@@ -323,7 +323,9 @@ arestas, na CPU e na GPU.
   dentro do retângulo nos dois casos. Inclui itens escondidos (REQ-004-21, 22).
 - **Gesto:** botão esquerdo pressionado e movimento acima de 4 px vira
   retângulo; senão é clique ao soltar. Shift no momento de soltar retira em vez
-  de acrescentar. Esc e Editar ▸ Limpar seleção esvaziam.
+  de acrescentar. Esc, Editar ▸ Limpar seleção e um clique sem Shift que não
+  escolhe nenhum item (fora da malha) esvaziam; arrastar um retângulo vazio
+  não limpa.
 - **Retângulo na tela (REQ-004-23):** widget filho transparente sobre o
   `Viewport`, desenhado com `QPainter` (azul contínuo / verde tracejado), sem
   receber eventos de mouse.

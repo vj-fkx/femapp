@@ -160,6 +160,10 @@ Regras:
   Qt; atualizar `specs/architecture.md` se a seleção por tipo mudar algo
   descrito lá — cobre: 30
 
+- [x] **T41** Clique sem Shift que não escolhe nenhum item limpa a seleção
+  (pedido do mantenedor); retângulo vazio não limpa — arquivo: `viewport.cpp`
+  — cobre: 25 (alterado)
+
 ## Fase 5 — Conferência e medições
 
 - [ ] **T26** `[M]` Roteiro manual no Windows: importar pelos três caminhos;
@@ -214,7 +218,7 @@ Regras:
 | REQ-004-22 | T12, T17, T35, T36 | `test_mesh_picker`; roteiro manual (AC-8, AC-14) |
 | REQ-004-23 | T18, T26 | Roteiro manual (AC-8) |
 | REQ-004-24 | T09, T17, T31, T36 | `test_selection`; roteiro manual (AC-8) |
-| REQ-004-25 | T09, T17, T22, T31 | `test_selection`; roteiro manual (AC-8) |
+| REQ-004-25 | T09, T17, T22, T31, T41 | `test_selection`; roteiro manual (AC-8) |
 | REQ-004-26 | T17, T26, T37 | `test_scene_renderer`; roteiro manual (AC-9, AC-14) |
 | REQ-004-27 | T17, T22, T38 | Roteiro manual (AC-9, AC-14) |
 | REQ-004-28 | T09, T17, T31, T36 | `test_selection`; roteiro manual (AC-9) |
