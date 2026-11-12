@@ -712,8 +712,10 @@ alterados.
   `planarView(const MeshScene&) -> std::optional<StandardView>`: sem elementos
   3D e com a extensão da caixa envolvente num eixo até 1e−9 × a diagonal, a
   vista Superior (Z constante), Frontal (Y constante) ou Direita (X constante),
-  nessa ordem de preferência. `Viewport::setScene` aplica a vista antes de
-  enquadrar. Testes: quadrado em XY → Superior; em XZ → Frontal; em YZ →
+  nessa ordem de preferência. `initialView(scene)` devolve essa vista ou, nos
+  demais casos, a Isométrica, e `Viewport::setScene` a aplica antes de
+  enquadrar (antes, uma malha 3D aberta depois de uma plana ficava na vista do
+  plano). Testes: quadrado em XY → Superior; em XZ → Frontal; em YZ →
   Direita; com um hexaedro → nenhuma; placa inclinada → nenhuma.
 
 ## 15. Realce de tets sob triângulos de fronteira e "Mostrar só a seleção" (2026-11-12)

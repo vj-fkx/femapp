@@ -220,6 +220,11 @@ std::optional<StandardView> planarView(const MeshScene& scene)
     return std::nullopt;
 }
 
+StandardView initialView(const MeshScene& scene)
+{
+    return planarView(scene).value_or(StandardView::Isometric);
+}
+
 std::shared_ptr<const MeshScene> buildMeshScene(std::shared_ptr<const core::Mesh> mesh,
                                                 const std::vector<bool>* include)
 {

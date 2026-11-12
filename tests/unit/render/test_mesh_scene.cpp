@@ -310,6 +310,12 @@ TEST_CASE("planar meshes get the view normal to their plane", "[render][scene]")
     CHECK_FALSE(
         viewOf({{0, 0, 0}, {1, 0, 0}, {1, 1, 1}}, ElementType::Tri3, {0, 1, 2}).has_value());
     CHECK_FALSE(fem::render::planarView(*fem::render::buildMeshScene(mixedMesh())).has_value());
+    // Every other mesh opens in the isometric view.
+    CHECK(fem::render::initialView(*fem::render::buildMeshScene(mixedMesh())) ==
+          StandardView::Isometric);
+    CHECK(fem::render::initialView(*fem::render::buildMeshScene(fem::render::test::buildMesh(
+              {{0, 0, 2}, {1, 0, 2}, {0, 1, 2}}, {{ElementType::Tri3, {0, 1, 2}}}))) ==
+          StandardView::Top);
     // A planar bar structure counts too.
     CHECK(viewOf({{0, 0, 0}, {1, 0, 0}, {1, 0, 1}}, ElementType::Line2, {0, 2}) ==
           StandardView::Front);

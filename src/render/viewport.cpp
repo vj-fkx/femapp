@@ -255,11 +255,10 @@ void Viewport::setScene(std::shared_ptr<const MeshScene> scene)
         m_impl->selection.reset(nullptr);
     }
     m_impl->initialFitDone = true;
-    // REQ-004-36: a flat mesh without solids is seen straight on.
+    // REQ-004-36: a flat mesh without solids is seen straight on; any other
+    // mesh opens in the isometric view, whatever the previous one was.
     if (m_impl->scene) {
-        if (const auto view = planarView(*m_impl->scene)) {
-            m_impl->camera.setStandardView(*view);
-        }
+        m_impl->camera.setStandardView(initialView(*m_impl->scene));
     }
     fitAll();
     emit selectionChanged();

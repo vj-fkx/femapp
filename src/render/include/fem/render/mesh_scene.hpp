@@ -136,6 +136,10 @@ buildMeshScene(std::shared_ptr<const core::Mesh> mesh, const std::vector<bool>* 
 // nothing for other meshes.
 [[nodiscard]] std::optional<StandardView> planarView(const MeshScene& scene);
 
+// REQ-004-36: the view a freshly imported mesh opens in: planarView, else
+// the isometric view.
+[[nodiscard]] StandardView initialView(const MeshScene& scene);
+
 // Colors used by elementColors (exposed for tests and the legend of later
 // features).
 [[nodiscard]] Rgba dimensionColor(int dimension) noexcept;
