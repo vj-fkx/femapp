@@ -224,6 +224,11 @@ Regras:
   passe de sobreposição) — arquivos: `mesh_gpu.hpp/.cpp`,
   `scene_renderer.cpp` — cobre: 26
 
+- [x] **T58** Só elementos ligado por padrão; clique de volta à ordem nó →
+  aresta → face → elemento (pedido do mantenedor) — arquivos:
+  `display_options.hpp`, `mesh_picker.hpp/.cpp`, `test_mesh_picker.cpp` —
+  cobre: 19, 20
+
 ## Fase 5 — Conferência e medições
 
 - [ ] **T26** `[M]` Roteiro manual no Windows: importar pelos três caminhos;

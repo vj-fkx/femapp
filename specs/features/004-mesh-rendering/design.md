@@ -458,8 +458,8 @@ inline constexpr std::size_t kSelectionKindCount = 4;
 
 struct SelectionFilter
 {
-    // All on by default; at least one stays on (enforced by the Viewport).
-    std::array<bool, kSelectionKindCount> enabled = {true, true, true, true};
+    // Elements only by default; at least one stays on (Viewport).
+    std::array<bool, kSelectionKindCount> enabled = {true, false, false, false};
     [[nodiscard]] bool isEnabled(SelectionKind kind) const noexcept;
 };
 
@@ -538,22 +538,21 @@ public:
 
 ### 12.3 Clique (REQ-004-20)
 
-*(Ordem alterada em 2026-11-12, a pedido do mantenedor.)* Na ordem, o
-primeiro tipo ligado que achar algo vence:
+*(Ordem final de 2026-11-12, a pedido do mantenedor; por um tempo foi
+elemento → face → aresta → nó.)* Só elementos vem ligado por padrão. Na
+ordem, o primeiro tipo ligado que achar algo vence:
 
-1. **Elemento:** triângulos, linhas 1D e pontos 0D, o mais próximo da câmera.
-2. **Face de sólido:** o triângulo mais próximo sob o cursor
-   (`closestTriangle` devolve também o índice do triângulo); se for da faixa
-   3D, vence a face `triangleFaces()[t]`.
-3. **Aresta** (2D ou de sólido, com a dimensão visível): segmentos projetados
+1. **Nó:** `surfaceNodes` das dimensões visíveis até a tolerância, do mais
+   próximo para o mais longe; vence o primeiro não escondido por um triângulo.
+2. **Aresta** (2D ou de sólido, com a dimensão visível): segmentos projetados
    até a tolerância, ordenados pela profundidade do ponto mais próximo; vence o
-   primeiro não escondido por um triângulo, com a folga usada para os nós.
-4. **Nó:** `surfaceNodes` das dimensões visíveis até a tolerância, do mais
-   próximo para o mais longe; vence o primeiro não escondido.
+   primeiro não escondido, com a mesma folga dos nós.
+3. **Face de sólido:** o triângulo mais próximo sob o cursor
+   (`closestTriangle`); se for da faixa 3D, vence a face `triangleFaces()[t]`.
+4. **Elemento:** triângulos, linhas 1D e pontos 0D, o mais próximo da câmera.
 
-Com elementos ligados, o clique sobre a malha sempre pega o elemento; faces,
-arestas e nós por clique pedem desligar os tipos anteriores no menu, ou usar
-janela e cruzamento.
+Ligar um tipo no menu já o torna alcançável pelo clique perto do item; longe
+dele, o clique cai no tipo seguinte.
 
 ### 12.4 Janela e cruzamento (REQ-004-21, 22)
 

@@ -282,7 +282,7 @@ Eigen::Vector3d nodeAt(const fem::core::Mesh& mesh, fem::core::NodeIndex node)
 
 } // namespace
 
-// REQ-004-20, REQ-004-32: a click picks by priority element, face, edge, node.
+// REQ-004-20, REQ-004-32: a click picks by priority node, edge, face, element.
 TEST_CASE("a click picks solid faces, edges and nodes by priority", "[render][picker]")
 {
     const auto mesh = fem::render::test::hexGrid(3);
@@ -306,18 +306,17 @@ TEST_CASE("a click picks solid faces, edges and nodes by priority", "[render][pi
             CHECK(nodeAt(*mesh, face.nodes.at(v)).y() == 0.0);
         }
     }
-    SECTION("all kinds: the element wins")
+    SECTION("default filter: elements only")
     {
-        const SelectionFilter all;
-        CHECK(elementId(*mesh, picker.pick(camera, centre, all, DisplayOptions{}, kTolerance)) ==
-              1 + 1 + 3 * (0 + 3 * 1));
+        const SelectionFilter defaults;
+        CHECK(elementId(*mesh, picker.pick(camera, centre, defaults, DisplayOptions{},
+                                           kTolerance)) == 1 + 1 + 3 * (0 + 3 * 1));
     }
-    SECTION("faces, edges and nodes: the face wins")
+    SECTION("all kinds in the middle of a face: the face wins")
     {
-        const auto picked = picker.pick(
-            camera, centre, only({SelectionKind::Face, SelectionKind::Edge, SelectionKind::Node}),
-            DisplayOptions{}, kTolerance);
-        CHECK(indexOf(picked, SelectionKind::Face) >= 0);
+        const SelectionFilter all{.enabled = {true, true, true, true}};
+        CHECK(indexOf(picker.pick(camera, centre, all, DisplayOptions{}, kTolerance),
+                      SelectionKind::Face) >= 0);
     }
     SECTION("elements only: the element")
     {
@@ -336,13 +335,19 @@ TEST_CASE("a click picks solid faces, edges and nodes by priority", "[render][pi
         const Eigen::Vector3d b = nodeAt(*mesh, edge.b);
         CHECK((0.5 * (a + b) - Eigen::Vector3d(1.5, 0.0, 1.0)).norm() < 1e-9);
     }
-    SECTION("edges and nodes at a vertex: an edge wins")
+    SECTION("all kinds at a vertex: the node wins")
     {
+        const SelectionFilter all{.enabled = {true, true, true, true}};
         const Vec2 vertex = toPixel(camera, {1.0, 0.0, 1.0}) + Vec2(1.0, -1.0);
-        const auto picked =
-            picker.pick(camera, vertex, only({SelectionKind::Node, SelectionKind::Edge}),
-                        DisplayOptions{}, kTolerance);
-        CHECK(indexOf(picked, SelectionKind::Edge) >= 0);
+        CHECK(indexOf(picker.pick(camera, vertex, all, DisplayOptions{}, kTolerance),
+                      SelectionKind::Node) >= 0);
+    }
+    SECTION("elements and edges near an edge: the edge wins")
+    {
+        const Vec2 near = toPixel(camera, {1.5, 0.0, 1.0}) + Vec2(0.0, 2.0);
+        CHECK(indexOf(picker.pick(camera, near, only({SelectionKind::Element, SelectionKind::Edge}),
+                                  DisplayOptions{}, kTolerance),
+                      SelectionKind::Edge) >= 0);
     }
     SECTION("nodes only: the node at a vertex")
     {

@@ -276,50 +276,30 @@ std::optional<PickedItem> MeshPicker::pick(const Camera& camera, const Vec2& pix
 
     const TriangleHit front = closestTriangle(scene, ray, eye, forward, display);
 
-    // 1. Elements: triangles, 1D lines and 0D points, the closest one.
-    if (filter.isEnabled(SelectionKind::Element)) {
-        TriangleHit best = front;
-
-        if (display.isVisible(1)) {
-            const Range range = scene.lines(LineSet::Elements1d);
-            const auto vertices = scene.lineVertices();
-            for (std::uint32_t s = range.first; s < range.first + range.count; ++s) {
-                const ScreenPoint a = projector.project(vertices[2 * static_cast<std::size_t>(s)]);
-                const ScreenPoint b =
-                    projector.project(vertices[2 * static_cast<std::size_t>(s) + 1]);
-                if (!a.inFront || !b.inFront) {
-                    continue;
-                }
-                const auto [distance, u] = distanceToSegment(pixel, a.pixel, b.pixel);
-                const double depth = a.depth + u * (b.depth - a.depth);
-                if (distance <= tolerancePx && depth < best.depth) {
-                    best = {.depth = depth, .element = scene.lineElements()[s]};
+    // 1. Nodes: candidates within the tolerance, closest first; the first one
+    // not hidden behind a face wins.
+    if (filter.isEnabled(SelectionKind::Node)) {
+        std::vector<std::pair<double, core::NodeIndex>> candidates;
+        for (int dimension = 0; dimension < 4; ++dimension) {
+            if (!display.isVisible(dimension)) {
+                continue;
+            }
+            for (const core::NodeIndex node : scene.surfaceNodes(dimension)) {
+                const ScreenPoint p = projector.project(at(node));
+                if (p.inFront && (p.pixel - pixel).norm() <= tolerancePx) {
+                    candidates.emplace_back(p.depth, node);
                 }
             }
         }
-        if (display.isVisible(0)) {
-            for (const core::ElementIndex element : scene.pointElements()) {
-                const ScreenPoint p = projector.project(at(scene.mesh().elementNodes(element)[0]));
-                if (p.inFront && (p.pixel - pixel).norm() <= tolerancePx && p.depth < best.depth) {
-                    best = {.depth = p.depth, .element = element};
-                }
+        std::ranges::sort(candidates);
+        for (const auto& [depth, node] : candidates) {
+            if (visible(projector.project(at(node)).pixel, depth)) {
+                return PickedItem{.kind = SelectionKind::Node, .index = node};
             }
-        }
-        if (best.element >= 0) {
-            return PickedItem{.kind = SelectionKind::Element, .index = best.element};
-        }
-    }
-    // 2. Solid faces: the closest triangle, if it belongs to a solid.
-    if (filter.isEnabled(SelectionKind::Face) && front.triangle >= 0) {
-        const Range solids = scene.triangles(3);
-        const auto t = static_cast<std::uint32_t>(front.triangle);
-        if (t >= solids.first && t < solids.first + solids.count) {
-            return PickedItem{.kind = SelectionKind::Face,
-                              .index = static_cast<int>(scene.triangleFaces()[t])};
         }
     }
 
-    // 3. Edges of 2D faces and of outer solid faces: candidates within the
+    // 2. Edges of 2D faces and of outer solid faces: candidates within the
     // tolerance, closest first, at the closest point of each segment; the
     // first one not hidden behind a face wins.
     if (filter.isEnabled(SelectionKind::Edge)) {
@@ -361,28 +341,49 @@ std::optional<PickedItem> MeshPicker::pick(const Camera& camera, const Vec2& pix
         }
     }
 
-    // 4. Nodes, the same way.
-    if (filter.isEnabled(SelectionKind::Node)) {
-        std::vector<std::pair<double, core::NodeIndex>> candidates;
-        for (int dimension = 0; dimension < 4; ++dimension) {
-            if (!display.isVisible(dimension)) {
-                continue;
-            }
-            for (const core::NodeIndex node : scene.surfaceNodes(dimension)) {
-                const ScreenPoint p = projector.project(at(node));
-                if (p.inFront && (p.pixel - pixel).norm() <= tolerancePx) {
-                    candidates.emplace_back(p.depth, node);
-                }
-            }
-        }
-        std::ranges::sort(candidates);
-        for (const auto& [depth, node] : candidates) {
-            if (visible(projector.project(at(node)).pixel, depth)) {
-                return PickedItem{.kind = SelectionKind::Node, .index = node};
-            }
+    // 3. Solid faces: the closest triangle, if it belongs to a solid.
+    if (filter.isEnabled(SelectionKind::Face) && front.triangle >= 0) {
+        const Range solids = scene.triangles(3);
+        const auto t = static_cast<std::uint32_t>(front.triangle);
+        if (t >= solids.first && t < solids.first + solids.count) {
+            return PickedItem{.kind = SelectionKind::Face,
+                              .index = static_cast<int>(scene.triangleFaces()[t])};
         }
     }
 
+    // 4. Elements: triangles, 1D lines and 0D points, the closest one.
+    if (filter.isEnabled(SelectionKind::Element)) {
+        TriangleHit best = front;
+
+        if (display.isVisible(1)) {
+            const Range range = scene.lines(LineSet::Elements1d);
+            const auto vertices = scene.lineVertices();
+            for (std::uint32_t s = range.first; s < range.first + range.count; ++s) {
+                const ScreenPoint a = projector.project(vertices[2 * static_cast<std::size_t>(s)]);
+                const ScreenPoint b =
+                    projector.project(vertices[2 * static_cast<std::size_t>(s) + 1]);
+                if (!a.inFront || !b.inFront) {
+                    continue;
+                }
+                const auto [distance, u] = distanceToSegment(pixel, a.pixel, b.pixel);
+                const double depth = a.depth + u * (b.depth - a.depth);
+                if (distance <= tolerancePx && depth < best.depth) {
+                    best = {.depth = depth, .element = scene.lineElements()[s]};
+                }
+            }
+        }
+        if (display.isVisible(0)) {
+            for (const core::ElementIndex element : scene.pointElements()) {
+                const ScreenPoint p = projector.project(at(scene.mesh().elementNodes(element)[0]));
+                if (p.inFront && (p.pixel - pixel).norm() <= tolerancePx && p.depth < best.depth) {
+                    best = {.depth = p.depth, .element = element};
+                }
+            }
+        }
+        if (best.element >= 0) {
+            return PickedItem{.kind = SelectionKind::Element, .index = best.element};
+        }
+    }
     return std::nullopt;
 }
 
