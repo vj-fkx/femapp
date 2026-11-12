@@ -251,3 +251,9 @@ Regras:
   quando há `std::from_chars` para `double` (`-Wunused-const-variable`).
   Corrigida em commit local, protegida pelo mesmo `#if` do caminho
   alternativo.
+- Execução nº 18 (`cd66695`): `linux-clang` compilou e passou nos testes, mas o
+  `clang-tidy` do Linux apontou 14 itens que o `clang-tidy` do Windows não
+  vê (acesso a `std::optional` sem checagem visível nos testes, um array de
+  `Eigen::Vector3d` sem inicialização e uso após `std::move` dentro de
+  `REQUIRE`). Corrigidos em commit local: os testes usam um auxiliar
+  `required()` em vez de `operator*`. Os demais jobs passaram.

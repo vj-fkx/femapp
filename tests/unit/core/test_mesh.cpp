@@ -6,6 +6,7 @@
 
 #include <Eigen/Core>
 #include <cstdint>
+#include <optional>
 #include <span>
 #include <string>
 #include <vector>
@@ -19,6 +20,15 @@ using fem::core::MeshBuilder;
 using fem::core::NodeIndex;
 
 namespace {
+
+// Value of an optional that the test requires to be present. Written without
+// operator* so that static analysis sees the check.
+template <typename T>
+T required(const std::optional<T>& value)
+{
+    REQUIRE(value.has_value());
+    return value.value_or(T{});
+}
 
 ElementHandle add(MeshBuilder& builder, ElementType type, ExternalId id,
                   std::vector<ExternalId> nodes)
@@ -108,11 +118,10 @@ TEST_CASE("a mixed mesh answers queries on nodes and elements", "[core][mesh]")
     CHECK(mesh.dimension() == 3);
 
     // Node ids and indices.
-    REQUIRE(mesh.findNode(107).has_value());
-    const NodeIndex node107 = *mesh.findNode(107);
+    const NodeIndex node107 = required(mesh.findNode(107));
     CHECK(mesh.nodeId(node107) == 107);
     CHECK(mesh.nodeCoordinates(node107) == Eigen::Vector3d(1, 1, 1));
-    CHECK(mesh.nodeCoordinates(*mesh.findNode(7)) == Eigen::Vector3d(-2, 3, 0.5));
+    CHECK(mesh.nodeCoordinates(required(mesh.findNode(7))) == Eigen::Vector3d(-2, 3, 0.5));
     CHECK_FALSE(mesh.findNode(8).has_value());
 
     // Blocks follow the ElementType order: Point1, Line2, Tri3, Hex8.
@@ -127,20 +136,18 @@ TEST_CASE("a mixed mesh answers queries on nodes and elements", "[core][mesh]")
 
     // Element ids, types and nodes.
     for (const ExternalId id : {1, 20, 21, 300, 500}) {
-        const auto element = mesh.findElement(id);
-        REQUIRE(element.has_value());
-        CHECK(mesh.elementId(*element) == id);
+        CHECK(mesh.elementId(required(mesh.findElement(id))) == id);
     }
     CHECK_FALSE(mesh.findElement(2).has_value());
 
-    const auto hex = *mesh.findElement(500);
+    const auto hex = required(mesh.findElement(500));
     CHECK(mesh.elementType(hex) == ElementType::Hex8);
     const auto hexNodes = mesh.elementNodes(hex);
     REQUIRE(hexNodes.size() == 8);
     CHECK(mesh.nodeId(hexNodes[0]) == 101);
     CHECK(mesh.nodeId(hexNodes[6]) == 107);
 
-    const auto line = *mesh.findElement(21);
+    const auto line = required(mesh.findElement(21));
     CHECK(mesh.elementType(line) == ElementType::Line2);
     REQUIRE(mesh.elementNodes(line).size() == 2);
     CHECK(mesh.nodeId(mesh.elementNodes(line)[1]) == 105);
@@ -331,7 +338,8 @@ TEST_CASE("mesh memory stays within 1.5 times the raw data", "[core][mesh][memor
             }
         }
     }
-    REQUIRE(builder.addGroup("domain", 3, std::move(all)).has_value());
+    const auto added = builder.addGroup("domain", 3, std::move(all));
+    REQUIRE(added.has_value());
     const auto mesh = builder.build();
     REQUIRE(mesh.has_value());
 

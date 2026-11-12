@@ -53,7 +53,8 @@ double elementMeasure(const Mesh& mesh, ElementIndex element)
     const ElementTypeInfo& info = elementTypeInfo(mesh.elementType(element));
     const auto nodes = mesh.elementNodes(element);
 
-    std::array<Vec3, 8> vertices;
+    std::array<Vec3, 8> vertices = {Vec3::Zero(), Vec3::Zero(), Vec3::Zero(), Vec3::Zero(),
+                                    Vec3::Zero(), Vec3::Zero(), Vec3::Zero(), Vec3::Zero()};
     for (int i = 0; i < info.vertexCount; ++i) {
         const auto index = static_cast<std::size_t>(i);
         vertices.at(index) = mesh.nodeCoordinates(nodes[index]);

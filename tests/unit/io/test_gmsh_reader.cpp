@@ -16,6 +16,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iterator>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -29,6 +30,15 @@ using fem::core::Mesh;
 using fem::io::GmshReadResult;
 
 namespace {
+
+// Value of an optional that the test requires to be present. Written without
+// operator* so that static analysis sees the check.
+template <typename T>
+T required(const std::optional<T>& value)
+{
+    REQUIRE(value.has_value());
+    return value.value_or(T{});
+}
 
 const std::filesystem::path kDataDir = std::filesystem::path(FEMAPP_TEST_DATA_DIR) / "gmsh";
 
@@ -149,11 +159,10 @@ TEST_CASE("every supported element type is read with its node order", "[io][gmsh
     for (const ElementType type : fem::core::allElementTypes()) {
         const auto& info = fem::core::elementTypeInfo(type);
         INFO(info.name);
-        const auto element = mesh.findElement(info.gmshType);
-        REQUIRE(element.has_value());
-        CHECK(mesh.elementType(*element) == type);
+        const fem::core::ElementIndex element = required(mesh.findElement(info.gmshType));
+        CHECK(mesh.elementType(element) == type);
 
-        const auto nodes = mesh.elementNodes(*element);
+        const auto nodes = mesh.elementNodes(element);
         const auto reference = fem::core::referenceNodeCoordinates(type);
         REQUIRE(nodes.size() == reference.size());
         for (std::size_t i = 0; i < nodes.size(); ++i) {
@@ -165,7 +174,7 @@ TEST_CASE("every supported element type is read with its node order", "[io][gmsh
         const double scale = 1.5 + 0.1 * (info.gmshType % 7);
         const double expectedMeasure =
             std::pow(scale, info.dimension) * referenceMeasure(info.family);
-        CHECK_THAT(fem::core::elementMeasure(mesh, *element), WithinRel(expectedMeasure, 1e-9));
+        CHECK_THAT(fem::core::elementMeasure(mesh, element), WithinRel(expectedMeasure, 1e-9));
     }
 }
 
@@ -258,10 +267,10 @@ TEST_CASE("sparse ids and parametric coordinates are accepted", "[io][gmsh]")
     const GmshReadResult result = readOk("handwritten/sparse_parametric.msh");
     const Mesh& mesh = result.mesh;
     REQUIRE(mesh.nodeCount() == 4);
-    CHECK(mesh.nodeCoordinates(*mesh.findNode(40)) == Eigen::Vector3d(0, 0, 0));
-    CHECK(mesh.nodeCoordinates(*mesh.findNode(7)) == Eigen::Vector3d(1, 0, 0));
-    CHECK(mesh.nodeCoordinates(*mesh.findNode(1000)) == Eigen::Vector3d(1, 1, 0));
-    CHECK(mesh.nodeCoordinates(*mesh.findNode(23)) == Eigen::Vector3d(0, 1, 0));
+    CHECK(mesh.nodeCoordinates(required(mesh.findNode(40))) == Eigen::Vector3d(0, 0, 0));
+    CHECK(mesh.nodeCoordinates(required(mesh.findNode(7))) == Eigen::Vector3d(1, 0, 0));
+    CHECK(mesh.nodeCoordinates(required(mesh.findNode(1000))) == Eigen::Vector3d(1, 1, 0));
+    CHECK(mesh.nodeCoordinates(required(mesh.findNode(23))) == Eigen::Vector3d(0, 1, 0));
     REQUIRE(mesh.findElement(900).has_value());
     REQUIRE(mesh.findElement(5).has_value());
 
