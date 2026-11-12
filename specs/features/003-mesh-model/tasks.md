@@ -241,3 +241,13 @@ Regras:
   A razão conta também o grupo de volume e o de superfície.
 - T91: `clang-format` sem diferenças e `clang-tidy` com zero apontamentos nos
   arquivos de `core`, `io`, testes e no `bench_gmsh_read`.
+
+**2026-11-12 — Execução nº 17 do CI, commit `c021b4d` (T90, em andamento):**
+
+- <https://github.com/vj-fkx/femapp/actions/runs/43126376582>
+- `windows`, `macos`, `linux-gcc` e `format`: passaram — incluindo o caminho
+  com acentos e caracteres chineses e a leitura de números em macOS e Linux.
+- `linux-clang`: falhou na compilação — constante `kMaxNumberLength` sem uso
+  quando há `std::from_chars` para `double` (`-Wunused-const-variable`).
+  Corrigida em commit local, protegida pelo mesmo `#if` do caminho
+  alternativo.
