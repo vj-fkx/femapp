@@ -458,8 +458,8 @@ inline constexpr std::size_t kSelectionKindCount = 4;
 
 struct SelectionFilter
 {
-    // Element on by default; at least one stays on (enforced by the Viewport).
-    std::array<bool, kSelectionKindCount> enabled = {true, false, false, false};
+    // All on by default; at least one stays on (enforced by the Viewport).
+    std::array<bool, kSelectionKindCount> enabled = {true, true, true, true};
     [[nodiscard]] bool isEnabled(SelectionKind kind) const noexcept;
 };
 

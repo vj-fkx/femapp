@@ -27,7 +27,7 @@ inline constexpr std::array<SelectionKind, kSelectionKindCount> kSelectionKinds 
 // REQ-004-19: the kinds turned on; they can be combined.
 struct SelectionFilter
 {
-    std::array<bool, kSelectionKindCount> enabled = {true, false, false, false};
+    std::array<bool, kSelectionKindCount> enabled = {true, true, true, true};
 
     [[nodiscard]] bool isEnabled(SelectionKind kind) const noexcept
     {
