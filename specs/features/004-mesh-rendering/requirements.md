@@ -1,6 +1,6 @@
 # Requisitos — 004 mesh-rendering
 
-Status: rascunho · Data: 2026-11-12
+Status: aprovado · Data: 2026-11-12
 
 ## 1. Contexto e objetivo
 
