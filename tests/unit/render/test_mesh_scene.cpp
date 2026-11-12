@@ -344,3 +344,27 @@ TEST_CASE("scene of a subset of the elements", "[render][scene]")
     // Same mesh: same origin, so the indices and positions match.
     CHECK(part->origin() == full->origin());
 }
+
+// REQ-004-26: a 2D element lying on an outer solid face (a Gmsh physical
+// surface) is found, so that its selection shows on the solid face.
+TEST_CASE("scene finds 2D elements lying on solid faces", "[render][scene]")
+{
+    const auto mesh =
+        fem::render::test::buildMesh({{0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1}, {3, 0, 0}},
+                                     {{ElementType::Tri3, {0, 3, 1}},
+                                      {ElementType::Tri3, {1, 4, 2}},
+                                      {ElementType::Tet4, {0, 1, 2, 3}}});
+    const auto scene = fem::render::buildMeshScene(mesh);
+    const auto& faces = scene->surface().faces3d;
+    REQUIRE(faces.size() == 4);
+    int covered = 0;
+    for (std::size_t f = 0; f < faces.size(); ++f) {
+        const auto element = scene->coveringElement(f);
+        if (element >= 0) {
+            ++covered;
+            CHECK(mesh->elementId(element) == 1); // the triangle on y = 0
+        }
+    }
+    CHECK(covered == 1);
+    CHECK(scene->coveringElement(99) == -1);
+}

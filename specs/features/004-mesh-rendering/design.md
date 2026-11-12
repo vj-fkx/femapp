@@ -785,4 +785,11 @@ Pedido do mantenedor. Substitui partes da §13 (contorno dos selecionados), da
   ficarem por cima deles. O passe de sobreposição (`drawOverlay`) sai. Itens
   escondidos continuam selecionados (janela e cruzamento os alcançam), só não
   são realçados enquanto escondidos; no aramado, sem faces, todos aparecem.
+- **Triângulos 2D sobre faces de sólido selecionados:** a janela pode pegar o
+  triângulo de fronteira (inteiro dentro do retângulo) sem pegar o tet embaixo
+  (que tem um vértice fora). A face do tet, desenhada por cima, escondia o
+  realce do triângulo e só o contorno aparecia. `MeshScene::coveringElement`
+  diz qual elemento 2D tem os mesmos vértices de cada face da casca (achado
+  por chave ordenada na montagem), e a face fica realçada quando ele está
+  selecionado.
 

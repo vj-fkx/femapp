@@ -267,6 +267,29 @@ std::shared_ptr<const MeshScene> buildMeshScene(std::shared_ptr<const core::Mesh
         return Range{.first = first,
                      .count = static_cast<std::uint32_t>(scene->m_triangleElements.size()) - first};
     };
+    // 2D elements lying on outer solid faces (same vertices).
+    {
+        using Key = std::array<core::NodeIndex, 4>;
+        const auto keyOf = [](const core::SurfaceFace& face) {
+            Key key{-1, -1, -1, -1};
+            std::copy_n(face.nodes.begin(), face.nodeCount, key.begin());
+            std::sort(key.begin(), key.begin() + face.nodeCount);
+            return key;
+        };
+        std::map<Key, core::ElementIndex> flat;
+        for (const core::SurfaceFace& face : scene->m_surface.faces2d) {
+            flat.emplace(keyOf(face), face.element);
+        }
+        scene->m_coveringElements.assign(scene->m_surface.faces3d.size(), -1);
+        if (!flat.empty()) {
+            for (std::size_t f = 0; f < scene->m_surface.faces3d.size(); ++f) {
+                const auto found = flat.find(keyOf(scene->m_surface.faces3d[f]));
+                if (found != flat.end()) {
+                    scene->m_coveringElements[f] = found->second;
+                }
+            }
+        }
+    }
     scene->m_triangleRanges[0] = addFaces(scene->m_surface.faces2d);
     scene->m_triangleRanges[1] = addFaces(scene->m_surface.faces3d);
 

@@ -305,9 +305,15 @@ bool MeshGpu::prepare(QRhiResourceUpdateBatch* updates, const MeshFrame& frame,
         for (std::size_t t = 0; t < triangleElements.size(); ++t) {
             Rgba color = colorOf(triangleElements[t]);
             const bool solid = t >= solids.first && t < solids.first + solids.count;
-            if (!isolated && solid && selection != nullptr &&
-                selection->contains(SelectionKind::Face, static_cast<int>(triangleFaces[t]))) {
-                color |= kSelectedFlag;
+            if (!isolated && solid && selection != nullptr) {
+                const std::uint32_t face = triangleFaces[t];
+                // A selected 2D element lying on this face would be hidden by
+                // it: the face shows it.
+                const core::ElementIndex covering = scene->coveringElement(face);
+                if (selection->contains(SelectionKind::Face, static_cast<int>(face)) ||
+                    (covering >= 0 && selection->contains(SelectionKind::Element, covering))) {
+                    color |= kSelectedFlag;
+                }
             }
             triangleColors.insert(triangleColors.end(), 3, color);
         }

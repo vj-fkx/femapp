@@ -66,6 +66,13 @@ public:
     {
         return m_triangleFaces;
     }
+    // The 2D element lying exactly on outer solid face `face` (same vertices),
+    // as Gmsh writes physical surfaces, or -1. Used to show such an element
+    // as selected on the solid face drawn over it.
+    [[nodiscard]] core::ElementIndex coveringElement(std::size_t face) const noexcept
+    {
+        return face < m_coveringElements.size() ? m_coveringElements[face] : -1;
+    }
     // `dimension` is 2 or 3.
     [[nodiscard]] Range triangles(int dimension) const noexcept;
 
@@ -116,6 +123,7 @@ private:
     std::vector<Eigen::Vector3f> m_triangleVertices;
     std::vector<core::ElementIndex> m_triangleElements;
     std::vector<std::uint32_t> m_triangleFaces;
+    std::vector<core::ElementIndex> m_coveringElements;
     std::array<Range, 2> m_triangleRanges{};
     std::vector<Eigen::Vector3f> m_lineVertices;
     std::vector<core::ElementIndex> m_lineElements;

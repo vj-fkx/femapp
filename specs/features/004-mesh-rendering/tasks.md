@@ -229,6 +229,10 @@ Regras:
   `display_options.hpp`, `mesh_picker.hpp/.cpp`, `test_mesh_picker.cpp` —
   cobre: 19, 20
 
+- [x] **T59** Face de sólido realçada quando o elemento 2D que a cobre está
+  selecionado (`coveringElement`), com teste — arquivos: `mesh_scene.hpp/.cpp`,
+  `mesh_gpu.cpp`, `test_mesh_scene.cpp` — cobre: 26
+
 ## Fase 5 — Conferência e medições
 
 - [ ] **T26** `[M]` Roteiro manual no Windows: importar pelos três caminhos;
