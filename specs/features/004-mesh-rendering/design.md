@@ -716,3 +716,41 @@ alterados.
   enquadrar. Testes: quadrado em XY → Superior; em XZ → Frontal; em YZ →
   Direita; com um hexaedro → nenhuma; placa inclinada → nenhuma.
 
+## 15. Realce de tets sob triângulos de fronteira e "Mostrar só a seleção" (2026-11-12)
+
+Pedido do mantenedor. Atende aos REQ-004-37 a 39 e corrige o REQ-004-20/26.
+
+- **Empate sólido × triângulo 2D (T49):** malhas do Gmsh com grupos físicos de
+  superfície trazem Tri3 exatamente sobre as faces dos tets. `closestTriangle`
+  testa primeiro os triângulos 3D, e um 2D só vence se estiver mais perto por
+  uma margem relativa de 1e−5; antes o 2D vencia o empate e seu realce ficava
+  escondido pela face do tet, desenhada por cima.
+- **Peça isolada:** `core::extractSurface(mesh, include)` ganha um filtro
+  opcional de elementos (`const std::vector<bool>*`); só os incluídos entram
+  na casca, que passa a ter as faces que eram internas na malha completa.
+  `buildMeshScene(mesh, include)` usa o mesmo filtro (também para elementos
+  1D e 0D e `allNodes`). Como a malha é a mesma, os índices de elementos e nós
+  e a origem da cena não mudam.
+- **Viewport:** com a opção ligada guarda a cena isolada e um `MeshPicker`
+  dela, refeitos a cada mudança da seleção (síncrono; para seleções muito
+  grandes pode levar parte de um segundo — risco aceito). `MeshFrame` passa a
+  ter `indexScene` (a cena completa, para os índices de faces e arestas) e
+  `isolated`. Desenho: a cena isolada nas cores normais (sem realce de
+  elemento nem contorno), as faces selecionadas como triângulos realçados num
+  buffer à parte (pipeline de faces), as arestas e os nós selecionados como
+  hoje. Órbita e zoom usam o picker da cena isolada.
+- **Interação (REQ-004-38):** sem Shift, clique e retângulo não fazem nada;
+  com Shift, o retângulo usa o picker completo (retirar um item não
+  selecionado não tem efeito, então itens escondidos não atrapalham) e o
+  clique usa o picker isolado só com elementos e nós.
+- **Seleção vazia (REQ-004-39):** `selectionEdited` desliga o modo quando
+  `total() == 0`; `setIsolated(true)` com a seleção vazia é recusado. O sinal
+  `isolationChanged(bool)` mantém a ação do menu em dia.
+- **Menu:** Exibir ▸ Mostrar só a seleção, marcável, atalho Ctrl+Shift+I
+  (Ctrl+I já é Importar malha).
+
+Testes: `extractSurface` com filtro (dois tets colados, só um incluído → 4
+faces; os dois → 6); `buildMeshScene` com filtro (só os incluídos nas faixas
+e em `allNodes`); clique com Shift no modo isolado e o desligamento com a
+seleção vazia ficam no roteiro manual (T26), porque dependem do widget.
+

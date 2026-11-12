@@ -220,14 +220,15 @@ std::optional<StandardView> planarView(const MeshScene& scene)
     return std::nullopt;
 }
 
-std::shared_ptr<const MeshScene> buildMeshScene(std::shared_ptr<const core::Mesh> mesh)
+std::shared_ptr<const MeshScene> buildMeshScene(std::shared_ptr<const core::Mesh> mesh,
+                                                const std::vector<bool>* include)
 {
     // NOLINTNEXTLINE(modernize-make-shared): the constructor is private.
     auto scene = std::shared_ptr<MeshScene>(new MeshScene());
     scene->m_mesh = std::move(mesh);
     const core::Mesh& m = *scene->m_mesh;
 
-    scene->m_surface = core::extractSurface(m);
+    scene->m_surface = core::extractSurface(m, include);
     scene->m_bounds = m.boundingBox();
     if (!scene->m_bounds.isEmpty()) {
         scene->m_origin = 0.5 * (scene->m_bounds.min + scene->m_bounds.max);
@@ -279,6 +280,9 @@ std::shared_ptr<const MeshScene> buildMeshScene(std::shared_ptr<const core::Mesh
         const core::ElementTypeInfo& info = core::elementTypeInfo(block.type);
         for (int i = 0; i < block.elementCount(); ++i) {
             const core::ElementIndex element = block.firstElement + i;
+            if (include != nullptr && !(*include)[static_cast<std::size_t>(element)]) {
+                continue;
+            }
             const auto nodes = m.elementNodes(element);
             auto& all = scene->m_allNodes[static_cast<std::size_t>(info.dimension)];
             all.insert(all.end(), nodes.begin(), nodes.end());

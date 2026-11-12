@@ -34,6 +34,10 @@ class MeshScene
 {
 public:
     [[nodiscard]] const core::Mesh& mesh() const noexcept { return *m_mesh; }
+    [[nodiscard]] const std::shared_ptr<const core::Mesh>& sharedMesh() const noexcept
+    {
+        return m_mesh;
+    }
     [[nodiscard]] const core::MeshSurface& surface() const noexcept { return m_surface; }
 
     // Positions are stored relative to this point, the centre of the mesh,
@@ -101,7 +105,8 @@ public:
     [[nodiscard]] std::vector<Rgba> elementColors(ColorMode mode) const;
 
 private:
-    friend std::shared_ptr<const MeshScene> buildMeshScene(std::shared_ptr<const core::Mesh> mesh);
+    friend std::shared_ptr<const MeshScene> buildMeshScene(std::shared_ptr<const core::Mesh> mesh,
+                                                           const std::vector<bool>* include);
 
     std::shared_ptr<const core::Mesh> m_mesh;
     core::MeshSurface m_surface;
@@ -121,8 +126,10 @@ private:
 };
 
 // Builds the scene of a mesh (REQ-004-09, 10, 16, 18).
+// With `include` (one flag per element), only the included elements are
+// drawn, as a part of their own (REQ-004-37); indices stay those of the mesh.
 [[nodiscard]] std::shared_ptr<const MeshScene>
-buildMeshScene(std::shared_ptr<const core::Mesh> mesh);
+buildMeshScene(std::shared_ptr<const core::Mesh> mesh, const std::vector<bool>* include = nullptr);
 
 // REQ-004-36: the standard view looking straight at a mesh without solids
 // that lies in a coordinate plane (Top for XY, Front for XZ, Right for YZ);

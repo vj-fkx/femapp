@@ -247,6 +247,18 @@ void MainWindow::createViewMenu()
     connect(nodes, &QAction::toggled, m_viewport, &render::Viewport::setNodesShown);
     m_viewActions.append(nodes);
 
+    // REQ-004-37, 39: the viewport may refuse (empty selection) or turn it off
+    // by itself (selection emptied), so the action follows it.
+    QAction* isolate = viewMenu->addAction(tr("Show &Selection Only"));
+    isolate->setCheckable(true);
+    isolate->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_I));
+    connect(isolate, &QAction::toggled, m_viewport, &render::Viewport::setIsolated);
+    connect(m_viewport, &render::Viewport::isolationChanged, isolate, [isolate](bool on) {
+        const QSignalBlocker blocker(isolate);
+        isolate->setChecked(on);
+    });
+    m_viewActions.append(isolate);
+
     viewMenu->addSeparator();
 
     // REQ-002-26

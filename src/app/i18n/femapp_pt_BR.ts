@@ -152,6 +152,10 @@
         <translation>Mostrar &amp;nós</translation>
     </message>
     <message>
+        <source>Show &amp;Selection Only</source>
+        <translation>Mostrar só a &amp;seleção</translation>
+    </message>
+    <message>
         <source>&amp;Select</source>
         <translation>&amp;Selecionar</translation>
     </message>

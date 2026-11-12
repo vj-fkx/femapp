@@ -314,3 +314,27 @@ TEST_CASE("planar meshes get the view normal to their plane", "[render][scene]")
     CHECK(viewOf({{0, 0, 0}, {1, 0, 0}, {1, 0, 1}}, ElementType::Line2, {0, 2}) ==
           StandardView::Front);
 }
+
+// REQ-004-37: a scene of the selected elements only, as a part of its own.
+TEST_CASE("scene of a subset of the elements", "[render][scene]")
+{
+    const auto mesh = fem::render::test::hexGrid(3);
+    // The middle column of the block: 3 hexahedra, i = j = 1.
+    std::vector<bool> include(static_cast<std::size_t>(mesh->elementCount()), false);
+    for (int k = 0; k < 3; ++k) {
+        const auto element = mesh->findElement(1 + 1 + 3 * (1 + 3 * k));
+        REQUIRE(element.has_value());
+        include[static_cast<std::size_t>(element.value_or(0))] = true;
+    }
+    const auto full = fem::render::buildMeshScene(mesh);
+    const auto part = fem::render::buildMeshScene(mesh, &include);
+    // A 1 x 1 x 3 column: 4 x 3 sides + 2 ends.
+    CHECK(part->surface().faces3d.size() == 14);
+    CHECK(part->triangles(3).count == 28);
+    CHECK(part->allNodes(3).size() == 16);
+    for (const auto element : part->triangleElements()) {
+        CHECK(include[static_cast<std::size_t>(element)]);
+    }
+    // Same mesh: same origin, so the indices and positions match.
+    CHECK(part->origin() == full->origin());
+}

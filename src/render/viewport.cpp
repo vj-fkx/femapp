@@ -104,8 +104,20 @@ public:
     // Left button: click or rectangle.
     bool leftPressed = false;
     bool rectangle = false;
+    bool isolated = false;
     QPointF pressPosition;
     SelectionOverlay* overlay = nullptr;
+
+    // REQ-004-37: only the selection shown, as a part of its own (on while
+    // `isolated`).
+    std::shared_ptr<const MeshScene> isolatedScene;
+    std::unique_ptr<MeshPicker> isolatedPicker;
+
+    // The picker of what is drawn.
+    [[nodiscard]] const MeshPicker* shownPicker() const
+    {
+        return isolated ? isolatedPicker.get() : picker.get();
+    }
 };
 
 Viewport::Viewport(QWidget* parent)
@@ -221,6 +233,10 @@ void Viewport::fitAll()
 void Viewport::setScene(std::shared_ptr<const MeshScene> scene)
 {
     m_impl->scene = std::move(scene);
+    m_impl->isolated = false;
+    m_impl->isolatedScene.reset();
+    m_impl->isolatedPicker.reset();
+    emit isolationChanged(false);
     ++m_impl->sceneVersion;
     ++m_impl->colorVersion;
     if (m_impl->scene) {
@@ -335,8 +351,60 @@ void Viewport::clearSelection()
 void Viewport::selectionEdited()
 {
     ++m_impl->colorVersion;
+    if (m_impl->isolated) {
+        // REQ-004-39: an empty selection shows the whole mesh again.
+        if (m_impl->selection.total() == 0) {
+            setIsolated(false);
+        } else {
+            rebuildIsolation();
+        }
+    }
     update();
     emit selectionChanged();
+}
+
+bool Viewport::isIsolated() const
+{
+    return m_impl->isolated;
+}
+
+void Viewport::setIsolated(bool isolated)
+{
+    // REQ-004-39: not with an empty selection.
+    const bool on = isolated && m_impl->scene && m_impl->selection.total() > 0;
+    if (on == m_impl->isolated) {
+        if (on != isolated) {
+            emit isolationChanged(on);
+        }
+        return;
+    }
+    m_impl->isolated = on;
+    if (on) {
+        rebuildIsolation();
+    } else {
+        m_impl->isolatedScene.reset();
+        m_impl->isolatedPicker.reset();
+        ++m_impl->sceneVersion;
+        ++m_impl->colorVersion;
+        ++m_impl->nodeVersion;
+    }
+    update();
+    emit isolationChanged(on);
+}
+
+void Viewport::rebuildIsolation()
+{
+    // REQ-004-37: the selected elements as a part of their own.
+    const core::Mesh& mesh = m_impl->scene->mesh();
+    std::vector<bool> include(static_cast<std::size_t>(mesh.elementCount()), false);
+    for (const int element : m_impl->selection.items(SelectionKind::Element)) {
+        include[static_cast<std::size_t>(element)] = true;
+    }
+    m_impl->isolatedScene = buildMeshScene(m_impl->scene->sharedMesh(), &include);
+    m_impl->isolatedPicker = std::make_unique<MeshPicker>(m_impl->isolatedScene);
+    ++m_impl->sceneVersion;
+    ++m_impl->colorVersion;
+    ++m_impl->nodeVersion;
 }
 
 void Viewport::finishPick(const QPointF& releasePosition, bool remove)
@@ -345,6 +413,10 @@ void Viewport::finishPick(const QPointF& releasePosition, bool remove)
         return;
     }
     m_impl->camera.setViewportSize(width(), height());
+    if (m_impl->isolated) {
+        finishIsolatedPick(releasePosition, remove);
+        return;
+    }
     SelectionItems items;
     if (m_impl->rectangle) {
         const PickRect rect{.from = toVec2(m_impl->pressPosition), .to = toVec2(releasePosition)};
@@ -366,6 +438,36 @@ void Viewport::finishPick(const QPointF& releasePosition, bool remove)
     } else {
         m_impl->selection.add(items);
     }
+    selectionEdited();
+}
+
+void Viewport::finishIsolatedPick(const QPointF& releasePosition, bool remove)
+{
+    // REQ-004-38: only removing, with Shift.
+    if (!remove || !m_impl->isolatedPicker) {
+        return;
+    }
+    SelectionItems items;
+    if (m_impl->rectangle) {
+        // Removing an item that is not selected changes nothing, so the whole
+        // mesh can be searched.
+        const PickRect rect{.from = toVec2(m_impl->pressPosition), .to = toVec2(releasePosition)};
+        items = m_impl->picker->pickRect(m_impl->camera, rect, m_impl->filter, m_impl->display);
+    } else {
+        // A click on the part shown: its elements and nodes.
+        SelectionFilter filter = m_impl->filter;
+        filter.enabled.at(toIndex(SelectionKind::Face)) = false;
+        filter.enabled.at(toIndex(SelectionKind::Edge)) = false;
+        if (const auto item =
+                m_impl->isolatedPicker->pick(m_impl->camera, toVec2(releasePosition), filter,
+                                             m_impl->display, kPickTolerancePx)) {
+            items[item->kind].push_back(item->index);
+        }
+    }
+    if (items.empty()) {
+        return;
+    }
+    m_impl->selection.remove(items);
     selectionEdited();
 }
 
@@ -449,7 +551,9 @@ void Viewport::render(QRhiCommandBuffer* commandBuffer)
     }
 
     MeshFrame mesh;
-    mesh.scene = m_impl->scene.get();
+    mesh.scene = m_impl->isolated ? m_impl->isolatedScene.get() : m_impl->scene.get();
+    mesh.indexScene = m_impl->scene.get();
+    mesh.isolated = m_impl->isolated;
     mesh.sceneVersion = m_impl->sceneVersion;
     mesh.colorVersion = m_impl->colorVersion;
     mesh.nodeVersion = m_impl->nodeVersion;
@@ -501,8 +605,8 @@ void Viewport::mousePressEvent(QMouseEvent* event)
         m_impl->camera.setViewportSize(width(), height());
         const Vec2 centre(0.5 * width(), 0.5 * height());
         std::optional<Vec3> pivot;
-        if (m_impl->picker) {
-            pivot = m_impl->picker->surfacePoint(m_impl->camera, centre, m_impl->display);
+        if (const MeshPicker* picker = m_impl->shownPicker()) {
+            pivot = picker->surfacePoint(m_impl->camera, centre, m_impl->display);
         }
         if (!pivot) {
             pivot = m_impl->camera.workPlanePoint(centre);
@@ -586,8 +690,8 @@ void Viewport::wheelEvent(QWheelEvent* event)
     // that zooming in never goes through it.
     const Vec2 cursor = toVec2(event->position());
     std::optional<Vec3> anchor;
-    if (m_impl->picker) {
-        anchor = m_impl->picker->surfacePoint(m_impl->camera, cursor, m_impl->display);
+    if (const MeshPicker* picker = m_impl->shownPicker()) {
+        anchor = picker->surfacePoint(m_impl->camera, cursor, m_impl->display);
     }
     m_impl->camera.zoomAt(cursor, steps, anchor);
     event->accept();

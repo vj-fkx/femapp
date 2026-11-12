@@ -60,6 +60,9 @@ public:
     // asked to turn off the last kind that is on.
     bool setSelectionKindEnabled(fem::render::SelectionKind kind, bool enabled);
 
+    // REQ-004-37: only the selection is shown.
+    [[nodiscard]] bool isIsolated() const;
+
 public slots:
     void setGridVisible(bool visible);
     void setAxesVisible(bool visible);
@@ -73,6 +76,9 @@ public slots:
     void setDimensionVisible(int dimension, bool visible);
     // REQ-004-34
     void setNodesShown(bool shown);
+    // REQ-004-37, 39: shows only the selection; refused (and reported by
+    // isolationChanged) while the selection is empty.
+    void setIsolated(bool isolated);
     void clearSelection();
 
 signals:
@@ -84,6 +90,8 @@ signals:
     void selectionChanged();
     // First frame rendered with the current scene.
     void sceneShown();
+    // REQ-004-39: the selection-only display was turned on or off.
+    void isolationChanged(bool isolated);
 
 protected:
     void initialize(QRhiCommandBuffer* commandBuffer) override;
@@ -100,6 +108,8 @@ private:
     void tryNextBackend(const QString& failure);
     void finishPick(const QPointF& releasePosition, bool remove);
     void selectionEdited();
+    void rebuildIsolation();
+    void finishIsolatedPick(const QPointF& releasePosition, bool remove);
 
     class Impl;
     std::unique_ptr<Impl> m_impl;

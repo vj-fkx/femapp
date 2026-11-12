@@ -198,6 +198,18 @@ Regras:
   ficava escondido pela face do tet (defeito relatado pelo mantenedor) —
   arquivos: `mesh_picker.cpp`, `test_mesh_picker.cpp` — cobre: 20, 26
 
+- [x] **T50** `extractSurface` e `buildMeshScene` com filtro de elementos, com
+  testes — arquivos: `mesh_surface.hpp/.cpp`, `mesh_scene.hpp/.cpp`,
+  `test_mesh_surface.cpp`, `test_mesh_scene.cpp` — cobre: 37
+- [x] **T51** `MeshGpu`: `indexScene`, modo isolado (sem realce de elemento,
+  faces selecionadas num buffer à parte) — arquivos: `mesh_gpu.hpp/.cpp` —
+  cobre: 37
+- [x] **T52** `Viewport`: `setIsolated`, cena e picker isolados, só retirar,
+  desligar com seleção vazia, sinal `isolationChanged` — arquivos:
+  `viewport.hpp/.cpp` — cobre: 37, 38, 39
+- [x] **T53** Menu Exibir ▸ Mostrar só a seleção e tradução — arquivos:
+  `main_window.cpp`, `femapp_pt_BR.ts` — cobre: 29, 37
+
 ## Fase 5 — Conferência e medições
 
 - [ ] **T26** `[M]` Roteiro manual no Windows: importar pelos três caminhos;
@@ -264,6 +276,9 @@ Regras:
 | REQ-004-34 | T31, T37, T38, T42, T26 | `test_scene_renderer`; roteiro manual (AC-15) |
 | REQ-004-35 | T37, T26 | Roteiro manual (AC-15) |
 | REQ-004-36 | T48 | `test_mesh_scene`; roteiro manual |
+| REQ-004-37 | T50–T53 | `test_mesh_surface`, `test_mesh_scene`; roteiro manual |
+| REQ-004-38 | T52 | Roteiro manual |
+| REQ-004-39 | T52 | Roteiro manual |
 | NFR-004-01 | T28 | Medição manual (AC-12) |
 | NFR-004-02 | T28 | Medição manual (AC-2, AC-12) |
 | NFR-004-03 | T28 | Medição manual (AC-12) |

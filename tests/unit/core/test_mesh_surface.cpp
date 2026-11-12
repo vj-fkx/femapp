@@ -240,3 +240,28 @@ TEST_CASE("surface of 2D and higher-order elements", "[core][surface]")
     CHECK(mesh.nodeId(tri->nodes[1]) == 4);
     CHECK(mesh.nodeId(tri->nodes[2]) == 2);
 }
+
+// REQ-004-37: with a filter, only the included elements count, and the face
+// they shared with an excluded solid becomes an outer face.
+TEST_CASE("surface of a subset of the elements", "[core][surface]")
+{
+    // Two tetrahedra sharing the face (0, 1, 2), and a triangle.
+    const Mesh mesh = build({{0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1}, {0, 0, -1}, {2, 0, 0}},
+                            {{ElementType::Tet4, {0, 1, 2, 3}},
+                             {ElementType::Tet4, {0, 2, 1, 4}},
+                             {ElementType::Tri3, {1, 5, 2}}});
+    const auto all = fem::core::extractSurface(mesh);
+    CHECK(all.faces3d.size() == 6);
+    CHECK(all.faces2d.size() == 1);
+
+    const auto first = static_cast<std::size_t>(mesh.findElement(1).value_or(0));
+    std::vector<bool> include(static_cast<std::size_t>(mesh.elementCount()), false);
+    include[first] = true;
+    const auto one = fem::core::extractSurface(mesh, &include);
+    CHECK(one.faces3d.size() == 4);
+    CHECK(one.edges3d.size() == 6);
+    CHECK(one.faces2d.empty());
+    for (const auto& face : one.faces3d) {
+        CHECK(static_cast<std::size_t>(face.element) == first);
+    }
+}

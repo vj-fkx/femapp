@@ -100,9 +100,12 @@ std::span<const LocalFace> elementFaces(ElementFamily family) noexcept
     }
 }
 
-MeshSurface extractSurface(const Mesh& mesh)
+MeshSurface extractSurface(const Mesh& mesh, const std::vector<bool>* include)
 {
     MeshSurface surface;
+    const auto included = [include](ElementIndex element) {
+        return include == nullptr || (*include)[static_cast<std::size_t>(element)];
+    };
 
     // Faces of 2D elements and records of every face of every 3D element.
     std::vector<FaceRecord> records;
@@ -113,13 +116,18 @@ MeshSurface extractSurface(const Mesh& mesh)
             const LocalFace local{.vertices = {0, 1, 2, 3},
                                   .vertexCount = static_cast<std::uint8_t>(info.vertexCount)};
             for (int i = 0; i < count; ++i) {
-                surface.faces2d.push_back(orientedFace(mesh, block.firstElement + i, local));
+                if (included(block.firstElement + i)) {
+                    surface.faces2d.push_back(orientedFace(mesh, block.firstElement + i, local));
+                }
             }
         } else if (info.dimension == 3) {
             const auto faces = elementFaces(info.family);
             records.reserve(records.size() + faces.size() * static_cast<std::size_t>(count));
             for (int i = 0; i < count; ++i) {
                 const ElementIndex element = block.firstElement + i;
+                if (!included(element)) {
+                    continue;
+                }
                 const auto nodes = mesh.elementNodes(element);
                 for (std::size_t f = 0; f < faces.size(); ++f) {
                     FaceRecord record;

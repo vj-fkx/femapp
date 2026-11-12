@@ -46,7 +46,10 @@ struct MeshSurface
     std::vector<SurfaceEdge> edges3d; // unique edges of faces3d
 };
 
-// REQ-004-09, REQ-004-10.
-[[nodiscard]] MeshSurface extractSurface(const Mesh& mesh);
+// REQ-004-09, REQ-004-10. With `include` (one flag per element), only the
+// included elements count, so faces between an included and an excluded
+// solid become outer faces (REQ-004-37).
+[[nodiscard]] MeshSurface extractSurface(const Mesh& mesh,
+                                         const std::vector<bool>* include = nullptr);
 
 } // namespace fem::core

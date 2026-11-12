@@ -83,6 +83,9 @@ struct MeshGpu::Impl
     std::unique_ptr<QRhiBuffer> points;
     std::unique_ptr<QRhiBuffer> selectedNodes;
     std::unique_ptr<QRhiBuffer> selectedEdges;
+    std::unique_ptr<QRhiBuffer> selectedFacePositions;
+    std::unique_ptr<QRhiBuffer> selectedFaceColors;
+    quint32 selectedFaceTriangles = 0;
     std::unique_ptr<QRhiBuffer> shownNodes;
     quint32 pointCount = 0;
     quint32 selectedNodeCount = 0;
@@ -285,9 +288,14 @@ bool MeshGpu::prepare(QRhiResourceUpdateBatch* updates, const MeshFrame& frame,
     if (newScene || d.colorVersion != frame.colorVersion) {
         const std::vector<Rgba> elementColors = scene->elementColors(frame.display.color);
         const Selection* selection = frame.selection;
+        const MeshScene* indexScene = frame.indexScene != nullptr ? frame.indexScene : scene;
+        // Isolated (REQ-004-37): everything drawn is selected, so the elements
+        // keep their colors and the selected components are highlighted.
+        const bool isolated = frame.isolated;
         const auto colorOf = [&](core::ElementIndex element) {
             Rgba color = elementColors[static_cast<std::size_t>(element)];
-            if (selection != nullptr && selection->contains(SelectionKind::Element, element)) {
+            if (!isolated && selection != nullptr &&
+                selection->contains(SelectionKind::Element, element)) {
                 color |= kSelectedFlag;
             }
             return color;
@@ -303,7 +311,7 @@ bool MeshGpu::prepare(QRhiResourceUpdateBatch* updates, const MeshFrame& frame,
         for (std::size_t t = 0; t < triangleElements.size(); ++t) {
             Rgba color = colorOf(triangleElements[t]);
             const bool solid = t >= solids.first && t < solids.first + solids.count;
-            if (solid && selection != nullptr &&
+            if (!isolated && solid && selection != nullptr &&
                 selection->contains(SelectionKind::Face, static_cast<int>(triangleFaces[t]))) {
                 color |= kSelectedFlag;
             }
@@ -340,12 +348,12 @@ bool MeshGpu::prepare(QRhiResourceUpdateBatch* updates, const MeshFrame& frame,
                                          .color = kSelectedFlag});
             };
             for (const int e : selection->items(SelectionKind::Edge)) {
-                const core::SurfaceEdge& edge = scene->edge(e);
+                const core::SurfaceEdge& edge = indexScene->edge(e);
                 segment(edge.a, edge.b);
             }
             // REQ-004-26: every visible edge of a selected element, also those
             // that the line buffer gives to a neighbour.
-            if (selection->count(SelectionKind::Element) > 0) {
+            if (!isolated && selection->count(SelectionKind::Element) > 0) {
                 const auto faceEdges = [&](const std::vector<core::SurfaceFace>& faces) {
                     for (const core::SurfaceFace& face : faces) {
                         if (!selection->contains(SelectionKind::Element, face.element)) {
@@ -361,6 +369,23 @@ bool MeshGpu::prepare(QRhiResourceUpdateBatch* updates, const MeshFrame& frame,
             }
         }
 
+        // Isolated: the selected solid faces as triangles of their own.
+        std::vector<Eigen::Vector3f> faceVertices;
+        if (isolated && selection != nullptr) {
+            const auto& faces = indexScene->surface().faces3d;
+            for (const int f : selection->items(SelectionKind::Face)) {
+                const core::SurfaceFace& face = faces[static_cast<std::size_t>(f)];
+                const auto at = [&](std::size_t v) {
+                    return positions[static_cast<std::size_t>(face.nodes.at(v))];
+                };
+                faceVertices.insert(faceVertices.end(), {at(0), at(1), at(2)});
+                if (face.nodeCount == 4) {
+                    faceVertices.insert(faceVertices.end(), {at(0), at(2), at(3)});
+                }
+            }
+        }
+        const std::vector<Rgba> faceColors(faceVertices.size(), kSelectedFlag);
+
         d.triangleColors =
             d.staticBuffer(bytes(triangleColors), triangleColors.data(), updates, error);
         d.lineColors = d.staticBuffer(bytes(lineColors), lineColors.data(), updates, error);
@@ -375,6 +400,13 @@ bool MeshGpu::prepare(QRhiResourceUpdateBatch* updates, const MeshFrame& frame,
         d.pointCount = static_cast<quint32>(points.size());
         d.selectedNodeCount = static_cast<quint32>(selectedNodes.size());
         d.selectedEdgeCount = static_cast<quint32>(selectedEdges.size());
+        d.selectedFacePositions =
+            d.staticBuffer(bytes(faceVertices), faceVertices.data(), updates, error);
+        d.selectedFaceColors = d.staticBuffer(bytes(faceColors), faceColors.data(), updates, error);
+        if (!error->isEmpty()) {
+            return false;
+        }
+        d.selectedFaceTriangles = static_cast<quint32>(faceVertices.size() / 3);
         d.colorVersion = frame.colorVersion;
     }
 
@@ -461,6 +493,20 @@ void MeshGpu::draw(QRhiCommandBuffer* commandBuffer, const QRhiViewport& viewpor
                 commandBuffer->draw(range.count * 3, 1, range.first * 3);
             }
         }
+    }
+
+    // REQ-004-37: selected solid faces shown on their own (isolated mode).
+    if (display.mode != DisplayMode::Wireframe && d.selectedFaceTriangles > 0 &&
+        display.isVisible(3)) {
+        commandBuffer->setGraphicsPipeline(d.facePipeline.get());
+        commandBuffer->setViewport(viewport);
+        commandBuffer->setShaderResources();
+        const std::array<QRhiCommandBuffer::VertexInput, 2> inputs = {{
+            {d.selectedFacePositions.get(), 0},
+            {d.selectedFaceColors.get(), 0},
+        }};
+        commandBuffer->setVertexInput(0, 2, inputs.data());
+        commandBuffer->draw(d.selectedFaceTriangles * 3);
     }
 
     // 1D elements always; edges except in the shaded mode.

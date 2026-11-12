@@ -31,6 +31,10 @@ struct MeshFrame
     std::uint64_t nodeVersion = 0;  // changes with showNodes or the visible dimensions
     DisplayOptions display;
     const Selection* selection = nullptr;
+    // REQ-004-37: `scene` holds the selected elements only; the indices of the
+    // selected faces and edges refer to `indexScene`, the whole mesh.
+    bool isolated = false;
+    const MeshScene* indexScene = nullptr; // nullptr: `scene`
 };
 
 // GPU buffers and pipelines that draw a MeshScene: faces, lines, 0D points,
