@@ -26,14 +26,16 @@ femapp_add_test(core SOURCES
     test_expected.cpp
     test_id_ranges.cpp
     test_mesh.cpp
-    test_mesh_measure.cpp)
+    test_mesh_measure.cpp
+    test_mesh_surface.cpp)
 target_compile_definitions(test_core PRIVATE FEMAPP_EXPECTED_VERSION="${PROJECT_VERSION}")
 
 femapp_add_test(geom)
 femapp_add_test(mesher)
 femapp_add_test(io SOURCES
     test_gmsh_cursor.cpp
-    test_gmsh_reader.cpp)
+    test_gmsh_reader.cpp
+    test_surface_of_samples.cpp)
 target_include_directories(test_io PRIVATE "${PROJECT_SOURCE_DIR}/src/io")
 # REQ-003-26: sample .msh files live in tests/data.
 target_compile_definitions(test_io PRIVATE FEMAPP_TEST_DATA_DIR="${PROJECT_SOURCE_DIR}/tests/data")

@@ -12,6 +12,7 @@ femapp_add_module(core
         mesh.cpp
         mesh_builder.cpp
         mesh_measure.cpp
+        mesh_surface.cpp
         version.cpp
     PUBLIC_DEPS
         Eigen3::Eigen

@@ -1,6 +1,6 @@
 # Tarefas — 004 mesh-rendering
 
-Status: rascunho
+Status: em andamento
 Design: [design.md](design.md) · Requisitos: [requirements.md](requirements.md)
 
 Regras:
@@ -14,18 +14,18 @@ Regras:
 
 ## Fase 1 — Casca externa (`core`)
 
-- [ ] **T01** Testes de `elementFaces`: cada face do elemento de referência de
+- [x] **T01** Testes de `elementFaces`: cada face do elemento de referência de
   tetraedro, hexaedro, cunha e pirâmide tem normal para fora — arquivo:
   `tests/unit/core/test_mesh_surface.cpp` — cobre: 09
-- [ ] **T02** Implementar `elementFaces` (tabela do design §5.1) até a T01
+- [x] **T02** Implementar `elementFaces` (tabela do design §5.1) até a T01
   passar — arquivos: `mesh_surface.hpp/.cpp` — cobre: 09
-- [ ] **T03** Testes de `extractSurface`: 1 hexaedro (6 faces, 12 arestas);
+- [x] **T03** Testes de `extractSurface`: 1 hexaedro (6 faces, 12 arestas);
   n³ hexaedros (6n² faces); malha mista à mão (hexaedro + pirâmide +
   tetraedro) sem face interna; elementos 2D e 1D; elementos de ordem 2 pelos
   vértices — cobre: 09, 10, 30
-- [ ] **T04** Implementar `extractSurface` (chaves ordenadas, faces que aparecem
+- [x] **T04** Implementar `extractSurface` (chaves ordenadas, faces que aparecem
   uma vez, arestas únicas por classe) até a T03 passar — cobre: 09, 10, 30
-- [ ] **T05** Teste com os exemplos `box_tet4`, `box_wedge6` e `box_hex20` da
+- [x] **T05** Teste com os exemplos `box_tet4`, `box_wedge6` e `box_hex20` da
   feature 003: área 22, volume 6 pelo teorema da divergência, cada aresta em
   exatamente 2 faces — cobre: 09, 10, 30
 
@@ -164,4 +164,13 @@ Regras:
 
 ## Notas de implementação
 
-*(preenchidas durante a implementação)*
+**2026-11-12 — Fase 1 (T01–T05):**
+
+- 86 testes passando no Windows. A tabela de faces do design §5.1 está certa:
+  normais para fora nos elementos de referência das quatro famílias, e as
+  caixas da feature 003 (Tet4, Wedge6, Hex20) dão área 22, volume 6 pelo
+  teorema da divergência e cada aresta em exatamente duas faces.
+- Desvio: o teste da T05 ficou em `tests/unit/io/test_surface_of_samples.cpp`,
+  junto dos testes de `io`, porque lê os arquivos `.msh` e o executável de
+  testes de `core` não liga com `io`.
+- Testes e implementação compilados juntos, como nas features anteriores.
