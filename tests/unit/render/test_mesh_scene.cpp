@@ -6,7 +6,9 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
+#include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <set>
 
 using Catch::Matchers::WithinAbs;
@@ -123,44 +125,99 @@ TEST_CASE("element colors by dimension and by group", "[render][scene][color]")
     CHECK(palette.size() == 12);
 }
 
-// REQ-004-24, REQ-004-25, REQ-004-28
+// REQ-004-32: each outer face of a block of hexahedra gives two triangles,
+// and the 3D segments follow the order of the outer edges.
+TEST_CASE("scene maps triangles to faces and segments to edges", "[render][scene]")
+{
+    const auto scene = fem::render::buildMeshScene(fem::render::test::hexGrid(3));
+    const auto& faces = scene->surface().faces3d;
+    CHECK(faces.size() == 54);
+    const fem::render::Range solids = scene->triangles(3);
+    CHECK(solids.count == 108);
+    const auto triangleFaces = scene->triangleFaces();
+    REQUIRE(triangleFaces.size() == scene->triangleElements().size());
+    std::vector<int> perFace(faces.size(), 0);
+    for (std::uint32_t t = solids.first; t < solids.first + solids.count; ++t) {
+        const std::uint32_t f = triangleFaces[t];
+        REQUIRE(f < faces.size());
+        ++perFace[f];
+        CHECK(scene->triangleElements()[t] == faces[f].element);
+    }
+    CHECK(std::ranges::all_of(perFace, [](int n) { return n == 2; }));
+
+    const fem::render::Range edges = scene->lines(LineSet::Edges3d);
+    REQUIRE(edges.count == scene->surface().edges3d.size());
+    const auto positions = scene->nodePositions();
+    for (std::uint32_t s = 0; s < edges.count; ++s) {
+        const auto& edge = scene->surface().edges3d[s];
+        const std::size_t v = 2 * static_cast<std::size_t>(edges.first + s);
+        CHECK(scene->lineVertices()[v] == positions[static_cast<std::size_t>(edge.a)]);
+        CHECK(scene->lineVertices()[v + 1] == positions[static_cast<std::size_t>(edge.b)]);
+    }
+}
+
+// REQ-004-24, REQ-004-25, REQ-004-28, REQ-004-33
 TEST_CASE("selection adds, removes, clears and drops a dimension", "[render][selection]")
 {
+    using fem::render::SelectionKind;
     const auto mesh = mixedMesh();
+    const auto scene = fem::render::buildMeshScene(mesh);
     fem::render::Selection selection;
-    selection.reset(fem::render::SelectionMode::Elements, *mesh);
-    CHECK(selection.count() == 0);
+    selection.reset(scene.get());
+    CHECK(selection.total() == 0);
 
-    const std::vector<int> all = {0, 1, 2, 3, 4};
+    fem::render::SelectionItems all;
+    all[SelectionKind::Element] = {0, 1, 2, 3, 4};
+    all[SelectionKind::Face] = {0, 5};
+    all[SelectionKind::Edge] = {0, 11};
+    all[SelectionKind::Node] = {0, 11};
     selection.add(all);
     selection.add(all); // twice: no change
-    CHECK(selection.count() == 5);
+    CHECK(selection.count(SelectionKind::Element) == 5);
+    CHECK(selection.count(SelectionKind::Face) == 2);
+    CHECK(selection.count(SelectionKind::Edge) == 2);
+    CHECK(selection.count(SelectionKind::Node) == 2);
+    CHECK(selection.total() == 11);
 
-    const std::vector<int> some = {1, 4, 99, -1};
+    // Out of range indices are ignored: 6 faces and 12 edges.
+    fem::render::SelectionItems some;
+    some[SelectionKind::Element] = {1, 4, 99, -1};
+    some[SelectionKind::Face] = {6};
+    some[SelectionKind::Edge] = {12};
     selection.remove(some);
-    CHECK(selection.count() == 3);
-    CHECK_FALSE(selection.contains(1));
-    CHECK(selection.contains(0));
+    CHECK(selection.count(SelectionKind::Element) == 3);
+    CHECK_FALSE(selection.contains(SelectionKind::Element, 1));
+    CHECK(selection.contains(SelectionKind::Element, 0));
+    CHECK(selection.count(SelectionKind::Face) == 2);
+    CHECK(selection.items(SelectionKind::Edge) == std::vector<int>{0, 11});
 
     // Internal order follows the element types: point, line, triangle,
     // quadrilateral, hexahedron. Left: point, triangle and quadrilateral.
-    // Hiding 2D takes out the triangle and the quadrilateral.
+    // Hiding 2D takes out the triangle and the quadrilateral, not the solid
+    // faces and edges.
     const int point = mesh->findElement(5).value_or(-1);
     const int triangle = mesh->findElement(3).value_or(-1);
-    REQUIRE(selection.contains(triangle));
+    REQUIRE(selection.contains(SelectionKind::Element, triangle));
     selection.removeElementsOfDimension(*mesh, 2);
-    CHECK_FALSE(selection.contains(triangle));
-    CHECK(selection.contains(point));
-    CHECK(selection.count() == 1);
-    CHECK(selection.items() == std::vector<int>{point});
+    CHECK_FALSE(selection.contains(SelectionKind::Element, triangle));
+    CHECK(selection.items(SelectionKind::Element) == std::vector<int>{point});
+    CHECK(selection.count(SelectionKind::Face) == 2);
+
+    // Hiding 3D takes out the solid faces and edges; nodes stay.
+    selection.removeElementsOfDimension(*mesh, 3);
+    CHECK(selection.count(SelectionKind::Face) == 0);
+    CHECK(selection.count(SelectionKind::Edge) == 0);
+    CHECK(selection.count(SelectionKind::Node) == 2);
+
+    // REQ-004-33: clearing one kind keeps the others.
+    selection.clear(SelectionKind::Node);
+    CHECK(selection.count(SelectionKind::Node) == 0);
+    CHECK(selection.count(SelectionKind::Element) == 1);
 
     selection.clear();
-    CHECK(selection.count() == 0);
+    CHECK(selection.total() == 0);
 
-    selection.reset(fem::render::SelectionMode::Nodes, *mesh);
-    const std::vector<int> nodes = {0, 11};
-    selection.add(nodes);
-    CHECK(selection.count() == 2);
-    selection.removeElementsOfDimension(*mesh, 0); // no effect on nodes
-    CHECK(selection.count() == 2);
+    selection.reset(nullptr);
+    selection.add(all);
+    CHECK(selection.total() == 0);
 }

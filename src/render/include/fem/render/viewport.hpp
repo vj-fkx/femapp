@@ -53,6 +53,12 @@ public:
     [[nodiscard]] const std::shared_ptr<const MeshScene>& scene() const;
     [[nodiscard]] const DisplayOptions& displayOptions() const;
     [[nodiscard]] const Selection& selection() const;
+    [[nodiscard]] const SelectionFilter& selectionFilter() const;
+
+    // REQ-004-19, 33: turns a selection kind on or off; turning one off takes
+    // its items out of the selection. Returns false (and changes nothing) when
+    // asked to turn off the last kind that is on.
+    bool setSelectionKindEnabled(fem::render::SelectionKind kind, bool enabled);
 
 public slots:
     void setGridVisible(bool visible);
@@ -65,7 +71,8 @@ public slots:
     void setDisplayMode(fem::render::DisplayMode mode);
     void setColorMode(fem::render::ColorMode mode);
     void setDimensionVisible(int dimension, bool visible);
-    void setSelectionMode(fem::render::SelectionMode mode);
+    // REQ-004-34
+    void setNodesShown(bool shown);
     void clearSelection();
 
 signals:
@@ -73,8 +80,8 @@ signals:
     void backendChanged(const QString& name);
     // Emitted once, when no graphics backend could be initialized.
     void backendUnavailable(const QString& reason);
-    // REQ-004-27
-    void selectionChanged(int count, fem::render::SelectionMode mode);
+    // REQ-004-27: the counts are read from selection().
+    void selectionChanged();
     // First frame rendered with the current scene.
     void sceneShown();
 

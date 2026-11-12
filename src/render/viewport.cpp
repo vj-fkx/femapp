@@ -97,6 +97,8 @@ public:
     Selection selection;
     std::uint64_t sceneVersion = 0;
     std::uint64_t colorVersion = 0;
+    std::uint64_t nodeVersion = 0;
+    SelectionFilter filter;
     std::uint64_t shownSceneVersion = 0;
 
     // Left button: click or rectangle.
@@ -223,14 +225,14 @@ void Viewport::setScene(std::shared_ptr<const MeshScene> scene)
     ++m_impl->colorVersion;
     if (m_impl->scene) {
         m_impl->picker = std::make_unique<MeshPicker>(m_impl->scene);
-        m_impl->selection.reset(m_impl->selection.mode(), m_impl->scene->mesh());
+        m_impl->selection.reset(m_impl->scene.get());
     } else {
         m_impl->picker.reset();
-        m_impl->selection = Selection();
+        m_impl->selection.reset(nullptr);
     }
     m_impl->initialFitDone = true;
     fitAll();
-    emit selectionChanged(0, m_impl->selection.mode());
+    emit selectionChanged();
 }
 
 const std::shared_ptr<const MeshScene>& Viewport::scene() const
@@ -273,32 +275,52 @@ void Viewport::setDimensionVisible(int dimension, bool visible)
     m_impl->display.dimensionVisible.at(static_cast<std::size_t>(dimension)) = visible;
     // REQ-004-28: hidden elements leave the selection.
     if (!visible && m_impl->scene) {
-        const int before = m_impl->selection.count();
+        const int before = m_impl->selection.total();
         m_impl->selection.removeElementsOfDimension(m_impl->scene->mesh(), dimension);
-        if (m_impl->selection.count() != before) {
+        if (m_impl->selection.total() != before) {
             selectionEdited();
         }
     }
+    ++m_impl->nodeVersion; // the nodes shown follow the visible dimensions
     update();
 }
 
-void Viewport::setSelectionMode(SelectionMode mode)
+const SelectionFilter& Viewport::selectionFilter() const
 {
-    if (m_impl->selection.mode() == mode) {
-        return;
+    return m_impl->filter;
+}
+
+bool Viewport::setSelectionKindEnabled(SelectionKind kind, bool enabled)
+{
+    bool& slot = m_impl->filter.enabled.at(toIndex(kind));
+    if (slot == enabled) {
+        return true;
     }
-    if (m_impl->scene) {
-        m_impl->selection.reset(mode, m_impl->scene->mesh());
-    } else {
-        m_impl->selection = Selection();
-        m_impl->selection.reset(mode, core::Mesh());
+    // REQ-004-19: at least one kind stays on.
+    if (!enabled && m_impl->filter.enabledCount() == 1) {
+        return false;
     }
-    selectionEdited();
+    slot = enabled;
+    // REQ-004-33: a kind turned off leaves the selection.
+    if (!enabled && m_impl->selection.count(kind) > 0) {
+        m_impl->selection.clear(kind);
+        selectionEdited();
+    }
+    return true;
+}
+
+void Viewport::setNodesShown(bool shown)
+{
+    if (m_impl->display.showNodes != shown) {
+        m_impl->display.showNodes = shown;
+        ++m_impl->nodeVersion;
+        update();
+    }
 }
 
 void Viewport::clearSelection()
 {
-    if (m_impl->selection.count() > 0) {
+    if (m_impl->selection.total() > 0) {
         m_impl->selection.clear();
         selectionEdited();
     }
@@ -308,7 +330,7 @@ void Viewport::selectionEdited()
 {
     ++m_impl->colorVersion;
     update();
-    emit selectionChanged(m_impl->selection.count(), m_impl->selection.mode());
+    emit selectionChanged();
 }
 
 void Viewport::finishPick(const QPointF& releasePosition, bool remove)
@@ -317,15 +339,14 @@ void Viewport::finishPick(const QPointF& releasePosition, bool remove)
         return;
     }
     m_impl->camera.setViewportSize(width(), height());
-    std::vector<int> items;
+    SelectionItems items;
     if (m_impl->rectangle) {
         const PickRect rect{.from = toVec2(m_impl->pressPosition), .to = toVec2(releasePosition)};
-        items = m_impl->picker->pickRect(m_impl->camera, rect, m_impl->selection.mode(),
-                                         m_impl->display);
-    } else if (const auto item = m_impl->picker->pick(m_impl->camera, toVec2(releasePosition),
-                                                      m_impl->selection.mode(), m_impl->display,
-                                                      kPickTolerancePx)) {
-        items.push_back(*item);
+        items = m_impl->picker->pickRect(m_impl->camera, rect, m_impl->filter, m_impl->display);
+    } else if (const auto item =
+                   m_impl->picker->pick(m_impl->camera, toVec2(releasePosition), m_impl->filter,
+                                        m_impl->display, kPickTolerancePx)) {
+        items[item->kind].push_back(item->index);
     }
     if (items.empty()) {
         return;
@@ -421,6 +442,7 @@ void Viewport::render(QRhiCommandBuffer* commandBuffer)
     mesh.scene = m_impl->scene.get();
     mesh.sceneVersion = m_impl->sceneVersion;
     mesh.colorVersion = m_impl->colorVersion;
+    mesh.nodeVersion = m_impl->nodeVersion;
     mesh.display = m_impl->display;
     mesh.selection = &m_impl->selection;
     const FrameParams params{.camera = &m_impl->camera,

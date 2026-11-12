@@ -55,4 +55,5 @@ qt_add_shaders(fem_render "fem_render_shaders"
         shaders/mesh_line.vert
         shaders/mesh_line.frag
         shaders/mesh_point.vert
-        shaders/mesh_point.frag)
+        shaders/mesh_point.frag
+        shaders/mesh_segment.vert)

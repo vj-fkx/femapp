@@ -148,12 +148,28 @@
         <translation>E&amp;ditar</translation>
     </message>
     <message>
-        <source>Select &amp;Elements</source>
-        <translation>Selecionar &amp;elementos</translation>
+        <source>Show &amp;Nodes</source>
+        <translation>Mostrar &amp;nós</translation>
     </message>
     <message>
-        <source>Select &amp;Nodes</source>
-        <translation>Selecionar &amp;nós</translation>
+        <source>&amp;Select</source>
+        <translation>&amp;Selecionar</translation>
+    </message>
+    <message>
+        <source>&amp;Elements</source>
+        <translation>&amp;Elementos</translation>
+    </message>
+    <message>
+        <source>Solid &amp;Faces</source>
+        <translation>&amp;Faces de sólidos</translation>
+    </message>
+    <message>
+        <source>Solid E&amp;dges</source>
+        <translation>&amp;Arestas de sólidos</translation>
+    </message>
+    <message>
+        <source>&amp;Nodes</source>
+        <translation>&amp;Nós</translation>
     </message>
     <message>
         <source>&amp;Clear Selection</source>
@@ -184,18 +200,36 @@
         <translation>Não foi possível importar a malha</translation>
     </message>
     <message numerus="yes">
-        <source>%n element(s) selected</source>
+        <source>%n element(s)</source>
         <translation>
-            <numerusform>%n elemento selecionado</numerusform>
-            <numerusform>%n elementos selecionados</numerusform>
+            <numerusform>%n elemento</numerusform>
+            <numerusform>%n elementos</numerusform>
         </translation>
     </message>
     <message numerus="yes">
-        <source>%n node(s) selected</source>
+        <source>%n face(s)</source>
         <translation>
-            <numerusform>%n nó selecionado</numerusform>
-            <numerusform>%n nós selecionados</numerusform>
+            <numerusform>%n face</numerusform>
+            <numerusform>%n faces</numerusform>
         </translation>
+    </message>
+    <message numerus="yes">
+        <source>%n edge(s)</source>
+        <translation>
+            <numerusform>%n aresta</numerusform>
+            <numerusform>%n arestas</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%n node(s)</source>
+        <translation>
+            <numerusform>%n nó</numerusform>
+            <numerusform>%n nós</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Selected: %1</source>
+        <translation>Selecionados: %1</translation>
     </message>
 </context>
 <context>

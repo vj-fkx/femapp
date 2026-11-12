@@ -6,6 +6,7 @@
 #include <fem/render/camera.hpp>
 #include <fem/render/display_options.hpp>
 #include <fem/render/mesh_scene.hpp>
+#include <fem/render/selection.hpp>
 #include <fem/render/viewport.hpp>
 
 #include <QAction>
@@ -21,8 +22,10 @@
 #include <QMessageBox>
 #include <QMimeData>
 #include <QProgressBar>
+#include <QSignalBlocker>
 #include <QStatusBar>
 #include <QString>
+#include <QStringList>
 #include <QUrl>
 
 #include <array>
@@ -236,6 +239,13 @@ void MainWindow::createViewMenu()
         m_viewActions.append(action);
     }
 
+    // REQ-004-34
+    QAction* nodes = viewMenu->addAction(tr("Show &Nodes"));
+    nodes->setCheckable(true);
+    nodes->setChecked(m_viewport->displayOptions().showNodes);
+    connect(nodes, &QAction::toggled, m_viewport, &render::Viewport::setNodesShown);
+    m_viewActions.append(nodes);
+
     viewMenu->addSeparator();
 
     // REQ-002-26
@@ -257,21 +267,26 @@ void MainWindow::createEditMenu()
 {
     QMenu* editMenu = menuBar()->addMenu(tr("&Edit"));
 
-    // REQ-004-19
-    // NOLINTNEXTLINE(cppcoreguidelines-owning-memory): owned by its Qt parent.
-    auto* modeGroup = new QActionGroup(editMenu);
-    QAction* elements = editMenu->addAction(tr("Select &Elements"), m_viewport, [this] {
-        m_viewport->setSelectionMode(render::SelectionMode::Elements);
-    });
-    QAction* nodes = editMenu->addAction(tr("Select &Nodes"), m_viewport, [this] {
-        m_viewport->setSelectionMode(render::SelectionMode::Nodes);
-    });
-    for (QAction* action : {elements, nodes}) {
+    // REQ-004-19: kinds that can be combined; the last one on cannot be
+    // turned off (the action is checked again).
+    QMenu* selectMenu = editMenu->addMenu(tr("&Select"));
+    const std::array<std::pair<render::SelectionKind, QString>, render::kSelectionKindCount> kinds =
+        {{{render::SelectionKind::Element, tr("&Elements")},
+          {render::SelectionKind::Face, tr("Solid &Faces")},
+          {render::SelectionKind::Edge, tr("Solid E&dges")},
+          {render::SelectionKind::Node, tr("&Nodes")}}};
+    for (const auto& [kind, name] : kinds) {
+        QAction* action = selectMenu->addAction(name);
         action->setCheckable(true);
-        modeGroup->addAction(action);
+        action->setChecked(m_viewport->selectionFilter().isEnabled(kind));
+        connect(action, &QAction::toggled, m_viewport, [this, action, kind = kind](bool on) {
+            if (!m_viewport->setSelectionKindEnabled(kind, on)) {
+                const QSignalBlocker blocker(action);
+                action->setChecked(true);
+            }
+        });
         m_viewActions.append(action);
     }
-    elements->setChecked(true);
 
     editMenu->addSeparator();
 
@@ -337,16 +352,29 @@ void MainWindow::meshFailed(const QString& /*path*/, const QString& message)
     emit meshImportFailed(message);
 }
 
-void MainWindow::showSelection(int count, render::SelectionMode mode)
+void MainWindow::showSelection()
 {
-    // REQ-004-27
-    if (count == 0) {
+    // REQ-004-27: one part per kind with items.
+    if (m_viewport.isNull()) {
+        return;
+    }
+    const render::Selection& selection = m_viewport->selection();
+    QStringList parts;
+    const auto add = [&](render::SelectionKind kind, const char* text) {
+        const int count = selection.count(kind);
+        if (count > 0) {
+            parts.append(tr(text, nullptr, count));
+        }
+    };
+    add(render::SelectionKind::Element, QT_TR_NOOP("%n element(s)"));
+    add(render::SelectionKind::Face, QT_TR_NOOP("%n face(s)"));
+    add(render::SelectionKind::Edge, QT_TR_NOOP("%n edge(s)"));
+    add(render::SelectionKind::Node, QT_TR_NOOP("%n node(s)"));
+    if (parts.isEmpty()) {
         m_selectionInfo->clear();
         return;
     }
-    m_selectionInfo->setText(mode == render::SelectionMode::Elements
-                                 ? tr("%n element(s) selected", nullptr, count)
-                                 : tr("%n node(s) selected", nullptr, count));
+    m_selectionInfo->setText(tr("Selected: %1").arg(parts.join(QStringLiteral(", "))));
 }
 
 void MainWindow::showMessage(const QString& title, const QString& text, bool error)

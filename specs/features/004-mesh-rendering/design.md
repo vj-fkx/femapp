@@ -1,6 +1,9 @@
 # Design — 004 mesh-rendering
 
-Status: aprovado · Data: 2026-11-12
+Status: aprovado (ampliação da §12 aprovada em 2026-11-12) · Data: 2026-11-12
+
+> As interfaces de seleção da §4 (`SelectionMode`, `Selection`, `MeshPicker`)
+> e o desenho dos nós selecionados da §5.2 foram substituídos pela §12.
 Requisitos: [requirements.md](requirements.md)
 
 ## 1. Resumo da abordagem
@@ -424,3 +427,236 @@ mouse esquerdo ─→ Viewport: clique ou retângulo ─→ MeshPicker (CPU)
 
 Nenhuma. `QThread`, `QDropEvent`, `QProgressBar` e `QPainter` já vêm de Qt
 Core, Gui e Widgets.
+
+## 12. Ampliação — faces e arestas de sólidos, tipos combináveis e nós (2026-11-12)
+
+Atende aos REQ-004-19 a 22, 26 a 28 alterados e aos novos REQ-004-32 a 35.
+
+### 12.1 Resumo
+
+- **Itens novos sem estrutura nova:** a face de sólido é um índice em
+  `surface().faces3d` e a aresta de sólido, um índice em `surface().edges3d`,
+  que já existem, são únicos e estão na ordem dos buffers (REQ-004-32).
+- **Seleção por tipo:** `SelectionMode` sai; entram `SelectionKind` (elemento,
+  face, aresta, nó) e `SelectionFilter` com os tipos ligados. `Selection`
+  guarda um conjunto por tipo.
+- **Clique** em ordem de prioridade nó → aresta → face → elemento; **janela e
+  cruzamento** devolvem os itens de todos os tipos ligados.
+- **GPU:** faces selecionadas usam o mesmo bit de realce dos triângulos;
+  arestas selecionadas são quadriláteros instanciados de 3 px (linhas largas
+  não são portáveis); "Mostrar nós" reutiliza o pipeline de pontos com um
+  buffer de nós à parte, com teste de profundidade.
+
+### 12.2 Interfaces
+
+```cpp
+// fem/render/display_options.hpp — REQ-004-19, 34
+enum class SelectionKind : std::uint8_t { Element, Face, Edge, Node };
+inline constexpr std::size_t kSelectionKindCount = 4;
+
+struct SelectionFilter
+{
+    // Element on by default; at least one stays on (enforced by the Viewport).
+    std::array<bool, kSelectionKindCount> enabled = {true, false, false, false};
+    [[nodiscard]] bool isEnabled(SelectionKind kind) const noexcept;
+};
+
+struct DisplayOptions
+{
+    // ... (unchanged)
+    bool showNodes = false; // REQ-004-34
+};
+```
+
+```cpp
+// fem/render/selection.hpp — REQ-004-19, 24 a 28, 33
+// Items by kind; indices are elements, faces3d, edges3d or nodes.
+struct SelectionItems
+{
+    std::array<std::vector<int>, kSelectionKindCount> byKind;
+    [[nodiscard]] std::vector<int>& operator[](SelectionKind kind);
+    [[nodiscard]] const std::vector<int>& operator[](SelectionKind kind) const;
+    [[nodiscard]] bool empty() const noexcept;
+};
+
+class Selection
+{
+public:
+    // Empties the selection and sizes it for a scene (nullptr: nothing).
+    void reset(const MeshScene* scene);
+
+    [[nodiscard]] int count(SelectionKind kind) const noexcept;
+    [[nodiscard]] int total() const noexcept;
+    [[nodiscard]] bool contains(SelectionKind kind, int index) const noexcept;
+    [[nodiscard]] std::vector<int> items(SelectionKind kind) const;
+
+    void add(const SelectionItems& items);
+    void remove(const SelectionItems& items);
+    void clear();
+    void clear(SelectionKind kind);                                        // REQ-004-33
+    void removeElementsOfDimension(const core::Mesh& mesh, int dimension); // 3: faces, edges too
+};
+```
+
+```cpp
+// fem/render/mesh_scene.hpp — acréscimo
+// Per triangle, the index of its face in surface().faces2d (triangles(2))
+// or surface().faces3d (triangles(3)). Segment s of lines(Edges3d) is
+// surface().edges3d[s - lines(Edges3d).first].
+[[nodiscard]] std::span<const std::uint32_t> triangleFaces() const noexcept;
+```
+
+```cpp
+// fem/render/mesh_picker.hpp — REQ-004-20 a 22, 32
+struct PickedItem
+{
+    SelectionKind kind;
+    int index;
+};
+
+[[nodiscard]] std::optional<PickedItem> pick(const Camera& camera, const Vec2& pixel,
+                                             const SelectionFilter& filter,
+                                             const DisplayOptions& display,
+                                             double tolerancePx) const;
+[[nodiscard]] SelectionItems pickRect(const Camera& camera, const PickRect& rect,
+                                      const SelectionFilter& filter,
+                                      const DisplayOptions& display) const;
+```
+
+```cpp
+// Viewport (alterações) — REQ-004-19, 27, 33, 34
+public slots:
+    void setSelectionKindEnabled(fem::render::SelectionKind kind, bool enabled); // replaces setSelectionMode
+    void setNodesShown(bool shown);
+signals:
+    void selectionChanged(); // counts read from selection(); replaces (int, SelectionMode)
+public:
+    [[nodiscard]] const SelectionFilter& selectionFilter() const;
+```
+
+### 12.3 Clique (REQ-004-20)
+
+Na ordem, o primeiro tipo ligado que achar algo vence:
+
+1. **Nó:** como hoje — `surfaceNodes` das dimensões visíveis dentro da
+   tolerância, do mais próximo para o mais longe; vence o primeiro não
+   escondido por um triângulo.
+2. **Aresta de sólido** (só com 3D visível): segmentos de `lines(Edges3d)`
+   projetados, com distância ao cursor até a tolerância; candidatos ordenados
+   pela profundidade do ponto mais próximo; vence o primeiro não escondido,
+   com o mesmo teste e a mesma folga dos nós (a aresta fica sobre a casca, à
+   profundidade das faces vizinhas).
+3. **Face de sólido:** o triângulo mais próximo sob o cursor (`closestTriangle`
+   passa a devolver também o índice do triângulo); se for da faixa 3D, vence a
+   face `triangleFaces()[t]`. Um triângulo 2D ou outro sólido à frente esconde
+   as faces de trás, como na tela.
+4. **Elemento:** como hoje (triângulos, linhas 1D e pontos 0D, o mais próximo).
+
+Com faces ligadas, um clique sobre a casca pega a face; o elemento 3D é
+alcançado por janela, cruzamento ou desligando faces (decisão aprovada).
+
+### 12.4 Janela e cruzamento (REQ-004-21, 22)
+
+Os nós são projetados uma vez, como hoje, e cada tipo ligado é testado:
+
+- **Elementos e nós:** sem mudança.
+- **Faces de sólido** (3D visível): polígono dos vértices da face; janela =
+  todos os vértices dentro; cruzamento = algum vértice dentro, algum lado
+  cruza o retângulo ou o centro do retângulo cai dentro do polígono (mesmos
+  auxiliares `segmentTouchesBox` e `pointInTriangle`).
+- **Arestas de sólido** (3D visível): janela = as duas pontas dentro;
+  cruzamento = `segmentTouchesBox`.
+
+Todos exigem os vértices à frente da câmera e incluem itens escondidos.
+
+### 12.5 Desenho (REQ-004-26, 34, 35)
+
+- **Faces selecionadas:** o triângulo 3D recebe o bit de realce se o elemento
+  ou a face estiver selecionado; nada muda no shader de faces.
+- **Arestas selecionadas:** novo shader `mesh_segment.vert` (com o
+  `mesh_point.frag` existente): por instância, as duas pontas e a cor; o
+  quadrilátero de canto [−1, 1]² já existente é esticado entre as pontas na
+  tela, com 3 px × razão de pixels de largura. Desenhado no passe de
+  sobreposição, sem teste de profundidade, como os nós selecionados, para que
+  arestas escondidas escolhidas por janela continuem visíveis.
+- **Mostrar nós:** buffer de instâncias com a união ordenada e sem repetição
+  de `surfaceNodes` das dimensões visíveis, cor fixa `kNodeColor` (magenta;
+  corrigido na implementação: o realce de seleção já é laranja, e o laranja
+  escuro ficaria parecido demais), desenhado
+  com o pipeline de pontos existente, com teste de profundidade. Nos modos
+  sólidos as faces, empurradas para trás pelo viés de profundidade, escondem
+  os nós de trás; no aramado não há faces e todos aparecem (REQ-004-35). Os
+  nós selecionados continuam por cima, no passe de sobreposição. O buffer é
+  refeito quando mudam `showNodes` ou a visibilidade das dimensões.
+- **Ordem alta:** como no resto da feature (REQ-004-10), são mostrados e
+  clicáveis só os vértices; os nós intermediários entram por janela e
+  cruzamento (`allNodes`), como hoje. Desenhar os intermediários fica com a
+  feature 029.
+
+Memória extra para 1 milhão de tetraedros (casca de ≈ 50 mil nós e ≈ 150 mil
+arestas): menos de 1 MB para os nós; `triangleFaces` soma 4 bytes por
+triângulo (≈ 0,4 MB); os vetores de seleção de faces e arestas, poucos kB.
+
+### 12.6 Interface (REQ-004-19, 27, 29, 33, 34)
+
+- **Editar ▸ Selecionar**, submenu com quatro ações marcáveis: Elementos,
+  Faces de sólidos, Arestas de sólidos e Nós. Desmarcar a última ligada é
+  desfeito na hora (a ação volta marcada). Desligar um tipo chama
+  `Selection::clear(kind)` (REQ-004-33); ligar não mexe na seleção.
+- **Exibir ▸ Mostrar nós**, ação marcável, desligada por padrão.
+- **Barra de status:** "2 elementos, 5 faces, 1 nó selecionados" — uma parte
+  por tipo com itens, cada uma com `tr("%n element(s)", nullptr, n)` para o
+  plural em pt_BR, unidas por vírgula; vazia quando nada está selecionado.
+- **Ocultar a dimensão 3D** retira elementos 3D, faces e arestas
+  (REQ-004-28); ocultar 2D não afeta faces de sólido.
+
+### 12.7 Arquivos afetados
+
+| Módulo | Arquivo | Alteração |
+|--------|---------|-----------|
+| render | `display_options.hpp` | `SelectionKind`, `SelectionFilter`, `showNodes`; sai `SelectionMode` |
+| render | `selection.hpp/.cpp` | Conjuntos por tipo, `SelectionItems` |
+| render | `mesh_scene.hpp/.cpp` | `triangleFaces()` |
+| render | `mesh_picker.hpp/.cpp` | `PickedItem`, prioridade do clique, faces e arestas no retângulo |
+| render | `mesh_gpu.hpp/.cpp`, `shaders/mesh_segment.vert` (novo) | Realce de faces, arestas selecionadas, nós mostrados |
+| render | `viewport.hpp/.cpp` | Filtro, `setNodesShown`, novo sinal |
+| app | `main_window.hpp/.cpp`, `i18n/femapp_pt_BR.ts` | Submenu Selecionar, Mostrar nós, barra de status |
+| tests | `test_selection.cpp`, `test_mesh_picker.cpp`, `test_mesh_scene.cpp` | Casos novos |
+
+### 12.8 Testes
+
+| Teste | Tipo | Requisito | Referência |
+|-------|------|-----------|------------|
+| `triangleFaces`: bloco 3×3×3 de hexaedros, 54 faces da casca, 108 triângulos, cada face com 2 triângulos | unitário | REQ-004-32 | exato |
+| `Selection`: acrescentar e retirar itens de tipos misturados; `count` por tipo; `clear(kind)`; ocultar 3D retira elementos 3D, faces e arestas | unitário | REQ-004-24, 25, 28, 33 | exato |
+| `pick`, bloco 3×3×3 em vista frontal: só faces → a face central da frente (centro (1,5; 0; 1,5)); faces e elementos → a face; só elementos → o elemento (1,0,1); arestas → clique perto do meio de uma aresta da frente pega essa aresta; nós e arestas → clique num vértice pega o nó | unitário | REQ-004-20, 32 | exato |
+| `pick`: aresta da face de trás não é escolhida (escondida) | unitário | REQ-004-20 | exato |
+| `pickRect`, bloco 1×1×1 em vista frontal: janela em volta de tudo com faces e arestas → 6 faces e 12 arestas; cruzamento pequeno no meio da frente → só a face da frente; com 3D oculto → nada | unitário | REQ-004-21, 22, 32 | exato |
+| Roteiro manual: submenu Selecionar com tipos combinados; realce de faces, arestas e nós nos três modos; contagem por tipo; "Mostrar nós" no sólido e no aramado; textos em pt_BR | manual | REQ-004-19 a 29, 33 a 35 | AC-13 a AC-15 |
+| Medição: clique e janela com os quatro tipos ligados na malha de 1 milhão de Tet4 | manual, Release | NFR-004-03 | metas |
+
+### 12.9 Alternativas consideradas
+
+| Alternativa | Por que foi descartada |
+|-------------|------------------------|
+| Arestas selecionadas como linhas de 1 px com outra cor | Pouco visíveis sobre as arestas normais; o requisito pede linhas mais grossas |
+| `setLineWidth` no pipeline | Largura maior que 1 não é garantida no QRhi (D3D11, Metal, núcleo do OpenGL) |
+| Arestas selecionadas com teste de profundidade | Uma aresta escondida escolhida por janela ficaria invisível, ao contrário dos nós selecionados |
+| Clique escolhendo o item mais próximo da câmera entre todos os tipos | Nó, aresta e face estão à mesma profundidade; a prioridade por tipo é previsível e segue os snaps de CAD |
+| Um modo exclusivo por vez | Recusado pelo mantenedor: os tipos são combináveis |
+
+### 12.10 Riscos
+
+- **Quadriláteros das arestas com uma ponta atrás da câmera** (perspectiva
+  muito próxima) → o shader descarta a instância se alguma ponta tiver
+  `w ≤ 0`, o mesmo critério de "à frente da câmera" da seleção.
+- **Nós mostrados cintilando sobre as faces** em algum backend → aumentar o
+  viés de profundidade das faces, ajustado no roteiro manual no Windows; macOS
+  e Linux só pelo CI (ressalva).
+- **Clique em aresta lento** com muitos candidatos escondidos (cada um percorre
+  os triângulos) → limitar a 16 candidatos; medir no NFR-004-03.
+
+### 12.11 Verificação da constituição e dependências
+
+Sem mudança em relação à §2: tudo em `render` e `app`, `core` intocado, só
+QRhi; nenhuma dependência nova.

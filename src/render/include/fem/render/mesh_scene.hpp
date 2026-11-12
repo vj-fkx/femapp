@@ -53,6 +53,13 @@ public:
     {
         return m_triangleElements;
     }
+    // REQ-004-32: per triangle, the index of its face in surface().faces2d
+    // (triangles(2)) or surface().faces3d (triangles(3)). Likewise, segment s
+    // of lines(Edges3d) is surface().edges3d[s - lines(Edges3d).first].
+    [[nodiscard]] std::span<const std::uint32_t> triangleFaces() const noexcept
+    {
+        return m_triangleFaces;
+    }
     // `dimension` is 2 or 3.
     [[nodiscard]] Range triangles(int dimension) const noexcept;
 
@@ -92,6 +99,7 @@ private:
     std::vector<Eigen::Vector3f> m_nodePositions;
     std::vector<Eigen::Vector3f> m_triangleVertices;
     std::vector<core::ElementIndex> m_triangleElements;
+    std::vector<std::uint32_t> m_triangleFaces;
     std::array<Range, 2> m_triangleRanges{};
     std::vector<Eigen::Vector3f> m_lineVertices;
     std::vector<core::ElementIndex> m_lineElements;

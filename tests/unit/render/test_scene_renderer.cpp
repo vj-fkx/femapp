@@ -145,19 +145,28 @@ TEST_CASE("scene renderer draws frames with the Null backend", "[render][rendere
         for (const auto mode :
              {fem::render::DisplayMode::ShadedWithEdges, fem::render::DisplayMode::Shaded,
               fem::render::DisplayMode::Wireframe}) {
-            for (const auto selectionMode :
-                 {fem::render::SelectionMode::Elements, fem::render::SelectionMode::Nodes}) {
-                selection.reset(selectionMode, *mesh);
-                const std::vector<int> picked = {0, 1, 2};
+            // Elements only, then faces, edges and nodes with the nodes shown
+            // (REQ-004-26, 34).
+            for (const bool mixed : {false, true}) {
+                selection.reset(scene.get());
+                fem::render::SelectionItems picked;
+                if (mixed) {
+                    picked[fem::render::SelectionKind::Face] = {0, 1};
+                    picked[fem::render::SelectionKind::Edge] = {0, 5};
+                    picked[fem::render::SelectionKind::Node] = {0, 1, 2};
+                } else {
+                    picked[fem::render::SelectionKind::Element] = {0, 1, 2};
+                }
                 selection.add(picked);
                 fem::render::MeshFrame frame;
                 frame.scene = scene.get();
                 frame.sceneVersion = 1;
                 frame.colorVersion = ++colorVersion;
+                frame.nodeVersion = colorVersion;
                 frame.display.mode = mode;
-                frame.display.color = selectionMode == fem::render::SelectionMode::Elements
-                                          ? fem::render::ColorMode::ByGroup
-                                          : fem::render::ColorMode::ByDimension;
+                frame.display.showNodes = mixed;
+                frame.display.color =
+                    mixed ? fem::render::ColorMode::ByDimension : fem::render::ColorMode::ByGroup;
                 frame.display.dimensionVisible = {true, true,
                                                   mode != fem::render::DisplayMode::Shaded, true};
                 frame.selection = &selection;

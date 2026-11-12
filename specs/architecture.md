@@ -176,7 +176,8 @@ falhas esperadas (arquivo inválido, modelo singular); exceções apenas para bu
   (sem reenviar a malha).
 - **Seleção (picking)**: calculada na CPU pela `MeshPicker` — raio contra os
   triângulos visíveis no clique, projeção dos vértices em janela e cruzamento
-  (ADR 0003, feature 004).
+  (ADR 0003, feature 004). Itens selecionáveis, combináveis: elementos, faces e
+  arestas da casca externa dos sólidos e nós.
 - **Geometria**: curvas e superfícies de `geom` tesseladas para exibição e seleção.
 - **Barras e cascas**: linhas com opção de seção extrudada; cascas com espessura
   opcional; diagramas de esforços como geometria gerada sobre os elementos.

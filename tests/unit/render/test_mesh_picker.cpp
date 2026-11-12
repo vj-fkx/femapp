@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <initializer_list>
 #include <optional>
 #include <vector>
 
@@ -18,9 +19,11 @@ using fem::core::ElementType;
 using fem::render::Camera;
 using fem::render::DisplayOptions;
 using fem::render::MeshPicker;
+using fem::render::PickedItem;
 using fem::render::PickRect;
 using fem::render::Projection;
-using fem::render::SelectionMode;
+using fem::render::SelectionFilter;
+using fem::render::SelectionKind;
 using fem::render::StandardView;
 using fem::render::Vec2;
 
@@ -50,10 +53,32 @@ Vec2 toPixel(const Camera& camera, const Eigen::Vector3d& world)
             (1.0 - clip.y() / clip.w()) * 0.5 * kHeight};
 }
 
-int elementId(const fem::core::Mesh& mesh, std::optional<int> element)
+SelectionFilter only(std::initializer_list<SelectionKind> kinds)
 {
-    REQUIRE(element.has_value());
-    return static_cast<int>(mesh.elementId(element.value_or(0)));
+    SelectionFilter filter;
+    filter.enabled = {false, false, false, false};
+    for (const SelectionKind kind : kinds) {
+        filter.enabled.at(fem::render::toIndex(kind)) = true;
+    }
+    return filter;
+}
+
+const SelectionFilter kElements = only({SelectionKind::Element});
+const SelectionFilter kNodes = only({SelectionKind::Node});
+
+// Index of a picked item of `kind`, or -1.
+int indexOf(std::optional<PickedItem> item, SelectionKind kind)
+{
+    REQUIRE(item.has_value());
+    const PickedItem picked = item.value_or(PickedItem{});
+    CHECK(picked.kind == kind);
+    return picked.kind == kind ? picked.index : -1;
+}
+
+int elementId(const fem::core::Mesh& mesh, std::optional<PickedItem> item)
+{
+    const int element = indexOf(item, SelectionKind::Element);
+    return element < 0 ? -1 : static_cast<int>(mesh.elementId(element));
 }
 
 std::vector<int> ids(const fem::core::Mesh& mesh, const std::vector<int>& elements)
@@ -90,8 +115,8 @@ TEST_CASE("a click picks the front element", "[render][picker]")
     const Projection projection = GENERATE(Projection::Perspective, Projection::Orthographic);
     const Camera camera = cameraFor(*mesh, c.view, projection);
 
-    const auto picked = picker.pick(camera, Vec2(kWidth / 2.0, kHeight / 2.0),
-                                    SelectionMode::Elements, DisplayOptions{}, kTolerance);
+    const auto picked = picker.pick(camera, Vec2(kWidth / 2.0, kHeight / 2.0), kElements,
+                                    DisplayOptions{}, kTolerance);
     CHECK(elementId(*mesh, picked) == 1 + c.cell[0] + 3 * (c.cell[1] + 3 * c.cell[2]));
 }
 
@@ -103,10 +128,9 @@ TEST_CASE("a click ignores hidden dimensions", "[render][picker]")
     const Camera camera = cameraFor(*mesh, StandardView::Front);
     DisplayOptions display;
     display.dimensionVisible[3] = false;
-    CHECK_FALSE(picker
-                    .pick(camera, Vec2(kWidth / 2.0, kHeight / 2.0), SelectionMode::Elements,
-                          display, kTolerance)
-                    .has_value());
+    CHECK_FALSE(
+        picker.pick(camera, Vec2(kWidth / 2.0, kHeight / 2.0), kElements, display, kTolerance)
+            .has_value());
 }
 
 // REQ-004-20: lines and points are picked within the tolerance.
@@ -119,16 +143,14 @@ TEST_CASE("a click picks lines and points within the tolerance", "[render][picke
     const Camera camera = cameraFor(*mesh, StandardView::Top);
 
     const Vec2 onLine = toPixel(camera, {1.0, 0.0, 0.0});
-    CHECK(elementId(*mesh, picker.pick(camera, onLine + Vec2(0, 3), SelectionMode::Elements,
-                                       DisplayOptions{}, kTolerance)) == 1);
-    CHECK_FALSE(picker
-                    .pick(camera, onLine + Vec2(0, 20), SelectionMode::Elements, DisplayOptions{},
-                          kTolerance)
+    CHECK(elementId(*mesh, picker.pick(camera, onLine + Vec2(0, 3), kElements, DisplayOptions{},
+                                       kTolerance)) == 1);
+    CHECK_FALSE(picker.pick(camera, onLine + Vec2(0, 20), kElements, DisplayOptions{}, kTolerance)
                     .has_value());
 
     const Vec2 onPoint = toPixel(camera, {1.0, 1.0, 0.0});
-    CHECK(elementId(*mesh, picker.pick(camera, onPoint + Vec2(2, -2), SelectionMode::Elements,
-                                       DisplayOptions{}, kTolerance)) == 2);
+    CHECK(elementId(*mesh, picker.pick(camera, onPoint + Vec2(2, -2), kElements, DisplayOptions{},
+                                       kTolerance)) == 2);
 }
 
 // REQ-004-20: a node behind a face cannot be clicked; a visible one can.
@@ -142,17 +164,15 @@ TEST_CASE("a click picks visible nodes only", "[render][picker]")
 
     // Node 0 is (0,0,0), in front; node 7 is (0,1,1), at the back.
     const Vec2 front = toPixel(camera, {0, 0, 0});
-    const auto pickedFront =
-        picker.pick(camera, front, SelectionMode::Nodes, DisplayOptions{}, kTolerance);
+    const auto pickedFront = picker.pick(camera, front, kNodes, DisplayOptions{}, kTolerance);
     REQUIRE(pickedFront.has_value());
-    CHECK(mesh->nodeId(pickedFront.value_or(0)) == 0);
+    CHECK(mesh->nodeId(indexOf(pickedFront, SelectionKind::Node)) == 0);
 
     // Node 2 is (1,1,0): bottom, back right; hidden behind the front face.
     const Vec2 hidden = toPixel(camera, {1, 1, 0});
-    const auto pickedHidden =
-        picker.pick(camera, hidden, SelectionMode::Nodes, DisplayOptions{}, kTolerance);
+    const auto pickedHidden = picker.pick(camera, hidden, kNodes, DisplayOptions{}, kTolerance);
     if (pickedHidden.has_value()) {
-        CHECK(mesh->nodeId(pickedHidden.value_or(0)) != 2);
+        CHECK(mesh->nodeId(indexOf(pickedHidden, SelectionKind::Node)) != 2);
     }
 }
 
@@ -172,7 +192,8 @@ TEST_CASE("window and crossing select by inclusion and by touch", "[render][pick
 
     // Window: left to right. Only quad (1, 1) lies entirely inside.
     const PickRect window{.from = Vec2(left.x(), top.y()), .to = Vec2(right.x(), bottom.y())};
-    CHECK(ids(*mesh, picker.pickRect(camera, window, SelectionMode::Elements, DisplayOptions{})) ==
+    CHECK(ids(*mesh, picker.pickRect(camera, window, kElements,
+                                     DisplayOptions{})[SelectionKind::Element]) ==
           std::vector<int>{1 + 1 + 4 * 1});
 
     // Crossing: right to left. The 3 x 3 quads touched by the rectangle.
@@ -184,11 +205,12 @@ TEST_CASE("window and crossing select by inclusion and by touch", "[render][pick
         }
     }
     std::ranges::sort(touched);
-    CHECK(ids(*mesh, picker.pickRect(camera, crossing, SelectionMode::Elements,
-                                     DisplayOptions{})) == touched);
+    CHECK(ids(*mesh, picker.pickRect(camera, crossing, kElements,
+                                     DisplayOptions{})[SelectionKind::Element]) == touched);
 
     // Nodes inside: (1,1), (2,1), (1,2), (2,2).
-    const auto nodes = picker.pickRect(camera, window, SelectionMode::Nodes, DisplayOptions{});
+    const auto nodes =
+        picker.pickRect(camera, window, kNodes, DisplayOptions{})[SelectionKind::Node];
     std::vector<int> nodeIds;
     nodeIds.reserve(nodes.size());
     for (const int n : nodes) {
@@ -207,8 +229,10 @@ TEST_CASE("crossing inside one element selects it", "[render][picker]")
     const Vec2 c = toPixel(camera, {0.5, 0.5, 0.0});
     const PickRect crossing{.from = c + Vec2(3, -3), .to = c + Vec2(-3, 3)};
     const PickRect window{.from = c + Vec2(-3, -3), .to = c + Vec2(3, 3)};
-    CHECK(picker.pickRect(camera, crossing, SelectionMode::Elements, DisplayOptions{}).size() == 1);
-    CHECK(picker.pickRect(camera, window, SelectionMode::Elements, DisplayOptions{}).empty());
+    CHECK(picker.pickRect(camera, crossing, kElements, DisplayOptions{})[SelectionKind::Element]
+              .size() == 1);
+    CHECK(picker.pickRect(camera, window, kElements, DisplayOptions{})[SelectionKind::Element]
+              .empty());
 }
 
 // REQ-004-21: a window around a block selects the hidden inner elements too,
@@ -219,11 +243,12 @@ TEST_CASE("window includes hidden elements of visible dimensions", "[render][pic
     const MeshPicker picker(fem::render::buildMeshScene(mesh));
     const Camera camera = cameraFor(*mesh, StandardView::Front);
     const PickRect window{.from = Vec2(1, 1), .to = Vec2(kWidth - 1, kHeight - 1)};
-    CHECK(picker.pickRect(camera, window, SelectionMode::Elements, DisplayOptions{}).size() == 27);
+    CHECK(picker.pickRect(camera, window, kElements, DisplayOptions{})[SelectionKind::Element]
+              .size() == 27);
 
     DisplayOptions noSolids;
     noSolids.dimensionVisible[3] = false;
-    CHECK(picker.pickRect(camera, window, SelectionMode::Elements, noSolids).empty());
+    CHECK(picker.pickRect(camera, window, kElements, noSolids)[SelectionKind::Element].empty());
 }
 
 // REQ-002-13 (changed in feature 004): the orbit pivot is the visible mesh
@@ -246,4 +271,121 @@ TEST_CASE("surface point under the centre of the screen", "[render][picker]")
     DisplayOptions hidden;
     hidden.dimensionVisible[3] = false;
     CHECK_FALSE(picker.surfacePoint(camera, centre, hidden).has_value());
+}
+
+namespace {
+
+Eigen::Vector3d nodeAt(const fem::core::Mesh& mesh, fem::core::NodeIndex node)
+{
+    return mesh.nodeCoordinates(node);
+}
+
+} // namespace
+
+// REQ-004-20, REQ-004-32: a click picks by priority node, edge, face, element.
+TEST_CASE("a click picks solid faces, edges and nodes by priority", "[render][picker]")
+{
+    const auto mesh = fem::render::test::hexGrid(3);
+    const auto scene = fem::render::buildMeshScene(mesh);
+    const MeshPicker picker(scene);
+    const Projection projection = GENERATE(Projection::Perspective, Projection::Orthographic);
+    const Camera camera = cameraFor(*mesh, StandardView::Front, projection);
+    const Vec2 centre(kWidth / 2.0, kHeight / 2.0);
+    const auto& faces = scene->surface().faces3d;
+    const auto& edges = scene->surface().edges3d;
+
+    SECTION("faces only: the middle face of the front")
+    {
+        const int f = indexOf(
+            picker.pick(camera, centre, only({SelectionKind::Face}), DisplayOptions{}, kTolerance),
+            SelectionKind::Face);
+        REQUIRE(f >= 0);
+        const auto& face = faces[static_cast<std::size_t>(f)];
+        CHECK(mesh->elementId(face.element) == 1 + 1 + 3 * (0 + 3 * 1));
+        for (std::size_t v = 0; v < face.nodeCount; ++v) {
+            CHECK(nodeAt(*mesh, face.nodes.at(v)).y() == 0.0);
+        }
+    }
+    SECTION("faces and elements: the face wins")
+    {
+        const auto picked =
+            picker.pick(camera, centre, only({SelectionKind::Face, SelectionKind::Element}),
+                        DisplayOptions{}, kTolerance);
+        CHECK(indexOf(picked, SelectionKind::Face) >= 0);
+    }
+    SECTION("elements only: the element")
+    {
+        CHECK(elementId(*mesh, picker.pick(camera, centre, kElements, DisplayOptions{},
+                                           kTolerance)) == 1 + 1 + 3 * (0 + 3 * 1));
+    }
+    SECTION("edges: the front edge near the cursor")
+    {
+        const Vec2 near = toPixel(camera, {1.5, 0.0, 1.0}) + Vec2(0.0, 2.0);
+        const auto filter = only({SelectionKind::Edge, SelectionKind::Face});
+        const int e = indexOf(picker.pick(camera, near, filter, DisplayOptions{}, kTolerance),
+                              SelectionKind::Edge);
+        REQUIRE(e >= 0);
+        const auto& edge = edges[static_cast<std::size_t>(e)];
+        const Eigen::Vector3d a = nodeAt(*mesh, edge.a);
+        const Eigen::Vector3d b = nodeAt(*mesh, edge.b);
+        CHECK((0.5 * (a + b) - Eigen::Vector3d(1.5, 0.0, 1.0)).norm() < 1e-9);
+    }
+    SECTION("nodes and edges: the node at a vertex")
+    {
+        const Vec2 vertex = toPixel(camera, {1.0, 0.0, 1.0}) + Vec2(1.0, -1.0);
+        const auto filter = only({SelectionKind::Node, SelectionKind::Edge});
+        const int n = indexOf(picker.pick(camera, vertex, filter, DisplayOptions{}, kTolerance),
+                              SelectionKind::Node);
+        REQUIRE(n >= 0);
+        CHECK((nodeAt(*mesh, n) - Eigen::Vector3d(1.0, 0.0, 1.0)).norm() < 1e-9);
+    }
+    SECTION("an edge of the back is hidden")
+    {
+        const Vec2 back = toPixel(camera, {1.5, 3.0, 1.0});
+        const auto picked =
+            picker.pick(camera, back, only({SelectionKind::Edge}), DisplayOptions{}, kTolerance);
+        if (picked.has_value()) {
+            const auto& edge = edges[static_cast<std::size_t>(picked->index)];
+            CHECK(nodeAt(*mesh, edge.a).y() == 0.0);
+            CHECK(nodeAt(*mesh, edge.b).y() == 0.0);
+        }
+    }
+    SECTION("hidden solids: nothing")
+    {
+        DisplayOptions hidden;
+        hidden.dimensionVisible[3] = false;
+        CHECK_FALSE(picker
+                        .pick(camera, centre, only({SelectionKind::Face, SelectionKind::Edge}),
+                              hidden, kTolerance)
+                        .has_value());
+    }
+}
+
+// REQ-004-21, REQ-004-22, REQ-004-32: window and crossing with faces and edges.
+TEST_CASE("window and crossing select solid faces and edges", "[render][picker]")
+{
+    const auto mesh = fem::render::test::hexGrid(1);
+    const MeshPicker picker(fem::render::buildMeshScene(mesh));
+    const Projection projection = GENERATE(Projection::Perspective, Projection::Orthographic);
+    const Camera camera = cameraFor(*mesh, StandardView::Front, projection);
+    const auto filter = only({SelectionKind::Face, SelectionKind::Edge});
+
+    const PickRect all{.from = Vec2(1, 1), .to = Vec2(kWidth - 1, kHeight - 1)};
+    const auto everything = picker.pickRect(camera, all, filter, DisplayOptions{});
+    CHECK(everything[SelectionKind::Face].size() == 6);
+    CHECK(everything[SelectionKind::Edge].size() == 12);
+    CHECK(everything[SelectionKind::Element].empty());
+    CHECK(everything[SelectionKind::Node].empty());
+
+    // A small crossing in the middle: the front face and, hidden behind it,
+    // the back face; no edge.
+    const Vec2 c(kWidth / 2.0, kHeight / 2.0);
+    const PickRect crossing{.from = c + Vec2(3, -3), .to = c + Vec2(-3, 3)};
+    const auto middle = picker.pickRect(camera, crossing, filter, DisplayOptions{});
+    CHECK(middle[SelectionKind::Face].size() == 2);
+    CHECK(middle[SelectionKind::Edge].empty());
+
+    DisplayOptions hidden;
+    hidden.dimensionVisible[3] = false;
+    CHECK(picker.pickRect(camera, all, filter, hidden).empty());
 }

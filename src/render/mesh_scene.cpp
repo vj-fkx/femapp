@@ -128,12 +128,14 @@ std::shared_ptr<const MeshScene> buildMeshScene(std::shared_ptr<const core::Mesh
     // Triangles: 2D faces, then 3D outer faces.
     const auto addFaces = [&](const std::vector<core::SurfaceFace>& faces) {
         const auto first = static_cast<std::uint32_t>(scene->m_triangleElements.size());
-        for (const core::SurfaceFace& face : faces) {
+        for (std::size_t f = 0; f < faces.size(); ++f) {
+            const core::SurfaceFace& face = faces[f];
             const auto triangle = [&](std::size_t a, std::size_t b, std::size_t c) {
                 scene->m_triangleVertices.push_back(at(face.nodes.at(a)));
                 scene->m_triangleVertices.push_back(at(face.nodes.at(b)));
                 scene->m_triangleVertices.push_back(at(face.nodes.at(c)));
                 scene->m_triangleElements.push_back(face.element);
+                scene->m_triangleFaces.push_back(static_cast<std::uint32_t>(f));
             };
             triangle(0, 1, 2);
             if (face.nodeCount == 4) {
@@ -203,6 +205,7 @@ std::shared_ptr<const MeshScene> buildMeshScene(std::shared_ptr<const core::Mesh
 
     scene->m_triangleVertices.shrink_to_fit();
     scene->m_triangleElements.shrink_to_fit();
+    scene->m_triangleFaces.shrink_to_fit();
     scene->m_lineVertices.shrink_to_fit();
     scene->m_lineElements.shrink_to_fit();
     scene->m_pointElements.shrink_to_fit();

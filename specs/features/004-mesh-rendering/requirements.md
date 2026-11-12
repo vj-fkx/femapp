@@ -1,6 +1,6 @@
 # Requisitos — 004 mesh-rendering
 
-Status: aprovado · Data: 2026-11-12
+Status: aprovado (ampliação: faces, arestas e nós aprovada em 2026-11-12) · Data: 2026-11-12
 
 ## 1. Contexto e objetivo
 
@@ -23,6 +23,10 @@ mostrar resultados.
   e cruzamento, como no AutoCAD, para depois atribuir propriedades a eles.
 - **US-4** Como engenheiro, quero navegar com fluidez em malhas de até 1 milhão
   de elementos, para trabalhar com modelos reais.
+- **US-5** Como engenheiro, quero selecionar faces e arestas da superfície
+  dos sólidos e ver os nós da malha, para depois aplicar cargas e apoios nelas
+  e conferir a discretização. *(Acrescentada em 2026-11-12, a pedido do
+  mantenedor.)*
 
 ## 3. Requisitos funcionais (EARS)
 
@@ -58,16 +62,20 @@ mostrar resultados.
 
 | ID | Requisito | História |
 |----|-----------|----------|
-| REQ-004-19 | O sistema DEVE oferecer dois modos de seleção, elementos (padrão) e nós, escolhidos no menu Editar. | US-3 |
-| REQ-004-20 | QUANDO o usuário clicar com o botão esquerdo sobre um elemento visível (modo elementos) ou perto de um nó visível (modo nós, até alguns pixels de distância), O sistema DEVE acrescentar à seleção o item mais próximo da câmera sob o cursor. | US-3 |
-| REQ-004-21 | QUANDO o usuário arrastar com o botão esquerdo da esquerda para a direita (janela), O sistema DEVE acrescentar à seleção os itens das dimensões visíveis cuja projeção na tela esteja inteiramente dentro do retângulo, mesmo que escondidos por outros. | US-3 |
-| REQ-004-22 | QUANDO o usuário arrastar com o botão esquerdo da direita para a esquerda (cruzamento), O sistema DEVE acrescentar à seleção os itens das dimensões visíveis cuja projeção na tela esteja dentro do retângulo ou o cruze, mesmo que escondidos por outros. | US-3 |
+| REQ-004-19 | O sistema DEVE oferecer, no menu Editar, quatro tipos de seleção que podem ser ligados ao mesmo tempo: elementos (ligado por padrão), faces de sólidos, arestas de sólidos e nós; pelo menos um tipo fica sempre ligado. *(Alterado em 2026-11-12, a pedido do mantenedor: antes eram dois modos exclusivos.)* | US-3, US-5 |
+| REQ-004-20 | QUANDO o usuário clicar com o botão esquerdo, O sistema DEVE acrescentar à seleção um único item, de um tipo ligado: o nó visível até alguns pixels do cursor; senão, a aresta de sólido visível até alguns pixels; senão, sob o cursor, a face de sólido visível mais próxima da câmera, ou o elemento visível mais próximo, se faces não estiver ligado. *(Alterado em 2026-11-12: prioridade entre os tipos.)* | US-3, US-5 |
+| REQ-004-21 | QUANDO o usuário arrastar com o botão esquerdo da esquerda para a direita (janela), O sistema DEVE acrescentar à seleção os itens de todos os tipos ligados, das dimensões visíveis, cuja projeção na tela esteja inteiramente dentro do retângulo, mesmo que escondidos por outros. *(Alterado em 2026-11-12: tipos ligados.)* | US-3, US-5 |
+| REQ-004-22 | QUANDO o usuário arrastar com o botão esquerdo da direita para a esquerda (cruzamento), O sistema DEVE acrescentar à seleção os itens de todos os tipos ligados, das dimensões visíveis, cuja projeção na tela esteja dentro do retângulo ou o cruze, mesmo que escondidos por outros. *(Alterado em 2026-11-12: tipos ligados.)* | US-3, US-5 |
 | REQ-004-23 | ENQUANTO o usuário arrasta, O sistema DEVE desenhar o retângulo: contínuo e azul para janela, tracejado e verde para cruzamento. | US-3 |
 | REQ-004-24 | QUANDO a tecla Shift estiver pressionada durante clique, janela ou cruzamento, O sistema DEVE retirar os itens da seleção em vez de acrescentá-los. | US-3 |
 | REQ-004-25 | QUANDO o usuário pressionar Esc ou escolher Editar ▸ Limpar seleção, O sistema DEVE esvaziar a seleção. | US-3 |
-| REQ-004-26 | O sistema DEVE realçar os itens selecionados com uma cor própria, visível em qualquer modo de exibição: as faces e arestas visíveis dos elementos selecionados e os nós selecionados como pontos. | US-3 |
-| REQ-004-27 | O sistema DEVE mostrar na barra de status quantos elementos ou nós estão selecionados. | US-3 |
-| REQ-004-28 | QUANDO uma dimensão for ocultada, O sistema DEVE retirar da seleção os elementos dessa dimensão. | US-3 |
+| REQ-004-26 | O sistema DEVE realçar os itens selecionados com uma cor própria, visível em qualquer modo de exibição: as faces e arestas visíveis dos elementos selecionados, as faces de sólido selecionadas, as arestas de sólido selecionadas como linhas mais grossas e os nós selecionados como pontos. *(Alterado em 2026-11-12.)* | US-3, US-5 |
+| REQ-004-27 | O sistema DEVE mostrar na barra de status quantos itens de cada tipo estão selecionados, omitindo os tipos sem itens. *(Alterado em 2026-11-12.)* | US-3, US-5 |
+| REQ-004-28 | QUANDO uma dimensão for ocultada, O sistema DEVE retirar da seleção os elementos dessa dimensão e, se for a 3D, as faces e arestas de sólido. *(Alterado em 2026-11-12.)* | US-3, US-5 |
+| REQ-004-32 | O sistema DEVE considerar como faces de sólido as faces da casca externa (REQ-004-09) e como arestas de sólido as arestas dessas faces; cada aresta é um único item, mesmo sendo comum a duas faces. Faces e arestas internas não são selecionáveis. *(Acrescentado em 2026-11-12.)* | US-5 |
+| REQ-004-33 | QUANDO o usuário desligar um tipo de seleção, O sistema DEVE retirar da seleção os itens desse tipo. *(Acrescentado em 2026-11-12.)* | US-5 |
+| REQ-004-34 | O sistema DEVE oferecer, no menu Exibir, a opção "Mostrar nós" (desligada por padrão), que desenha como pontos de tamanho fixo os nós dos elementos das dimensões visíveis (dos sólidos, só os da casca externa), com cor própria, diferente da de seleção. *(Acrescentado em 2026-11-12.)* | US-5 |
+| REQ-004-35 | ENQUANTO "Mostrar nós" estiver ligada, nos modos sólido e sólido com arestas, O sistema NÃO DEVE desenhar os nós escondidos atrás de faces; no aramado, DEVE desenhar todos. *(Acrescentado em 2026-11-12.)* | US-5 |
 
 ### Interface, camadas e testes
 
@@ -83,7 +91,7 @@ mostrar resultados.
 |----|-----------|------------|
 | NFR-004-01 | A navegação DEVE manter ≥ 30 quadros por segundo com a malha de 1 milhão de tetraedros da feature 003, no modo sólido com arestas, em janela 1920×1080 (REQ-G-20). | Contador de quadros em build Release, na máquina do mantenedor; registrar o modelo da GPU |
 | NFR-004-02 | Do fim do diálogo de arquivo até a malha de 1 milhão de tetraedros aparecer na tela DEVE levar menos de 3 s. | Medição em build Release, na máquina do mantenedor |
-| NFR-004-03 | Uma seleção por clique DEVE responder em menos de 100 ms, e uma por janela ou cruzamento em menos de 500 ms, com a malha de 1 milhão de tetraedros. | Medição em build Release, na máquina do mantenedor |
+| NFR-004-03 | Uma seleção por clique DEVE responder em menos de 100 ms, e uma por janela ou cruzamento em menos de 500 ms, com a malha de 1 milhão de tetraedros, com os quatro tipos de seleção ligados. | Medição em build Release, na máquina do mantenedor |
 | NFR-004-04 | Com a câmera parada, o viewport NÃO DEVE consumir CPU nem GPU de forma contínua, também com malha carregada. | Gerenciador de Tarefas em repouso |
 
 ## 5. Critérios de aceite
@@ -120,11 +128,25 @@ mostrar resultados.
 - [ ] **AC-11** (REQ-004-31) O smoke test com malha passa nos quatro jobs do CI.
 - [ ] **AC-12** (NFR-004-01, 03, 04) Medições registradas em `tasks.md`, dentro
   das metas, com o modelo da GPU.
+- [ ] **AC-13** (REQ-004-19, 20, 32, 33) Testes automáticos num bloco de
+  hexaedros: com faces ligadas, o clique no meio de uma face da casca seleciona
+  essa face; com arestas e nós ligados, o clique perto de um vértice pega o nó
+  e perto do meio de uma aresta pega a aresta; uma aresta comum a duas faces
+  conta uma vez; desligar um tipo retira seus itens.
+- [ ] **AC-14** (REQ-004-21, 22, 26, 27, 28) Roteiro manual com faces, arestas
+  e nós ligados juntos: janela e cruzamento pegam os três tipos, o realce de
+  cada tipo aparece nos três modos de exibição e a barra de status mostra a
+  contagem por tipo.
+- [ ] **AC-15** (REQ-004-34, 35) Roteiro manual: "Mostrar nós" desenha os nós
+  das dimensões visíveis, esconde os de trás no modo sólido e mostra todos no
+  aramado; os nós selecionados continuam com a cor de seleção.
 
 ## 6. Fora de escopo
 
-- Seleção de faces e arestas da casca externa (para cargas e apoios) — feature
-  010.
+- Selecionar faces e arestas internas dos sólidos e arestas de elementos 2D
+  como itens próprios (um elemento 2D já é selecionável como elemento).
+- Atribuir cargas e apoios às faces e arestas selecionadas — feature 010.
+- Numeração (IDs) de nós ou elementos na tela.
 - Mostrar e ocultar grupos individualmente e árvore do modelo — feature 010.
 - Cores de resultados, legenda e deformada — feature 012.
 - Curvatura de elementos de ordem alta — feature 029.
@@ -153,6 +175,12 @@ atribuições), REQ-G-20 (≥ 30 FPS com 1 milhão de elementos).
   de comando, com leitura em segundo plano.
 - [x] **Desempenho:** decidido em 2026-11-12 — a meta do produto, ≥ 30 FPS com
   1 milhão de elementos.
+- [x] **Faces, arestas e nós (ampliação):** decidido em 2026-11-12 — ampliar
+  a 004; só faces e arestas da casca externa; tipos de seleção combináveis;
+  "Mostrar nós" liga e desliga os pontos de todos os nós, sem numeração.
+- [x] **Prioridade do clique (REQ-004-20):** decidido em 2026-11-12 — nó →
+  aresta → face → elemento; com faces ligadas, um clique na casca pega a face,
+  e o elemento 3D só por janela ou cruzamento, ou desligando faces.
 - [x] **GPU da medição:** a máquina do mantenedor tem uma NVIDIA GeForce RTX
   2060 (consultado no sistema em 2026-11-12), uma GPU dedicada de gama média,
   que é o caso do REQ-G-20.

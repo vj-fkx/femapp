@@ -55,7 +55,7 @@ private slots:
     void meshImported(const QString& path, std::shared_ptr<const fem::render::MeshScene> scene,
                       const QStringList& warnings);
     void meshFailed(const QString& path, const QString& message);
-    void showSelection(int count, fem::render::SelectionMode mode);
+    void showSelection();
 
 protected:
     void dragEnterEvent(QDragEnterEvent* event) override;

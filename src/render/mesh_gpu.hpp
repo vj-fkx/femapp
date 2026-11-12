@@ -28,12 +28,13 @@ struct MeshFrame
     const MeshScene* scene = nullptr;
     std::uint64_t sceneVersion = 0; // changes when the scene is replaced
     std::uint64_t colorVersion = 0; // changes with the color mode or the selection
+    std::uint64_t nodeVersion = 0;  // changes with showNodes or the visible dimensions
     DisplayOptions display;
     const Selection* selection = nullptr;
 };
 
-// GPU buffers and pipelines that draw a MeshScene: faces, lines, 0D points and
-// selected nodes (design section 5.2).
+// GPU buffers and pipelines that draw a MeshScene: faces, lines, 0D points,
+// shown nodes and the selected edges and nodes (design sections 5.2, 12.5).
 class MeshGpu
 {
 public:
@@ -53,10 +54,10 @@ public:
                                const Camera& camera, QSize pixelSize, double devicePixelRatio,
                                QString* error);
 
-    // Faces, lines and 0D points, depth tested.
+    // Faces, lines, 0D points and shown nodes, depth tested.
     void draw(QRhiCommandBuffer* commandBuffer, const QRhiViewport& viewport,
               const DisplayOptions& display) const;
-    // Selected nodes, on top of everything.
+    // Selected edges and nodes, on top of everything.
     void drawOverlay(QRhiCommandBuffer* commandBuffer, const QRhiViewport& viewport) const;
 
     [[nodiscard]] bool hasScene() const noexcept { return m_hasScene; }

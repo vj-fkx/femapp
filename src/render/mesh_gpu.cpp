@@ -4,6 +4,7 @@
 
 #include <rhi/qrhi.h>
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstddef>
@@ -30,6 +31,9 @@ constexpr Rgba kElementLineFlag = 2U << 24U;
 
 constexpr std::array<float, 4> kEdgeColor = {0.12F, 0.13F, 0.15F, 1.0F};
 constexpr std::array<float, 4> kHighlightColor = {1.0F, 0.55F, 0.0F, 1.0F};
+// REQ-004-34: shown nodes, magenta, away from the highlight and the
+// dimension and group colors.
+constexpr Rgba kNodeColor = 0x00A020C0U;
 
 // Two triangles covering the square [-1, 1]^2, for the point instances.
 constexpr std::array<float, 12> kCorners = {-1, -1, 1, -1, 1, 1, -1, -1, 1, 1, -1, 1};
@@ -37,6 +41,13 @@ constexpr std::array<float, 12> kCorners = {-1, -1, 1, -1, 1, 1, -1, -1, 1, 1, -
 struct PointInstance
 {
     std::array<float, 3> position;
+    Rgba color;
+};
+
+struct SegmentInstance
+{
+    std::array<float, 3> from;
+    std::array<float, 3> to;
     Rgba color;
 };
 
@@ -62,6 +73,7 @@ struct MeshGpu::Impl
     std::unique_ptr<QRhiGraphicsPipeline> linePipeline;
     std::unique_ptr<QRhiGraphicsPipeline> pointPipeline;
     std::unique_ptr<QRhiGraphicsPipeline> overlayPipeline;
+    std::unique_ptr<QRhiGraphicsPipeline> segmentPipeline;
     std::unique_ptr<QRhiBuffer> corners;
 
     std::unique_ptr<QRhiBuffer> trianglePositions;
@@ -70,14 +82,19 @@ struct MeshGpu::Impl
     std::unique_ptr<QRhiBuffer> lineColors;
     std::unique_ptr<QRhiBuffer> points;
     std::unique_ptr<QRhiBuffer> selectedNodes;
+    std::unique_ptr<QRhiBuffer> selectedEdges;
+    std::unique_ptr<QRhiBuffer> shownNodes;
     quint32 pointCount = 0;
     quint32 selectedNodeCount = 0;
+    quint32 selectedEdgeCount = 0;
+    quint32 shownNodeCount = 0;
 
     const MeshScene* scene = nullptr;
     std::array<Range, 2> triangleRanges{};
     std::array<Range, 3> lineRanges{};
     std::uint64_t sceneVersion = 0;
     std::uint64_t colorVersion = 0;
+    std::uint64_t nodeVersion = 0;
     bool uploaded = false;
 
     [[nodiscard]] QRhiGraphicsPipeline* makePipeline(const QShader& vertex, const QShader& fragment,
@@ -139,8 +156,9 @@ bool MeshGpu::create(QRhi* rhi, QRhiRenderPassDescriptor* renderPass, int sample
     const QShader lineFrag = loadShader(QStringLiteral("mesh_line.frag"), error);
     const QShader pointVert = loadShader(QStringLiteral("mesh_point.vert"), error);
     const QShader pointFrag = loadShader(QStringLiteral("mesh_point.frag"), error);
+    const QShader segmentVert = loadShader(QStringLiteral("mesh_segment.vert"), error);
     if (!faceVert.isValid() || !faceFrag.isValid() || !lineVert.isValid() || !lineFrag.isValid() ||
-        !pointVert.isValid() || !pointFrag.isValid()) {
+        !pointVert.isValid() || !pointFrag.isValid() || !segmentVert.isValid()) {
         return false;
     }
 
@@ -191,8 +209,26 @@ bool MeshGpu::create(QRhi* rhi, QRhiRenderPassDescriptor* renderPass, int sample
     d.overlayPipeline->setDepthTest(false);
     d.overlayPipeline->setDepthWrite(false);
 
+    // Selected edges: corner per vertex, both ends and color per instance,
+    // on top of everything like the selected nodes (design §12.5).
+    QRhiVertexInputLayout segments;
+    segments.setBindings(
+        {{2 * sizeof(float)}, {sizeof(SegmentInstance), QRhiVertexInputBinding::PerInstance}});
+    segments.setAttributes({{0, 0, QRhiVertexInputAttribute::Float2, 0},
+                            {1, 1, QRhiVertexInputAttribute::Float3,
+                             static_cast<quint32>(offsetof(SegmentInstance, from))},
+                            {1, 2, QRhiVertexInputAttribute::Float3,
+                             static_cast<quint32>(offsetof(SegmentInstance, to))},
+                            {1, 3, QRhiVertexInputAttribute::UNormByte4,
+                             static_cast<quint32>(offsetof(SegmentInstance, color))}});
+    d.segmentPipeline.reset(d.makePipeline(segmentVert, pointFrag, segments,
+                                           QRhiGraphicsPipeline::Triangles, renderPass,
+                                           sampleCount));
+    d.segmentPipeline->setDepthTest(false);
+    d.segmentPipeline->setDepthWrite(false);
+
     if (!d.facePipeline->create() || !d.linePipeline->create() || !d.pointPipeline->create() ||
-        !d.overlayPipeline->create()) {
+        !d.overlayPipeline->create() || !d.segmentPipeline->create()) {
         *error = QStringLiteral("could not create the mesh pipelines");
         return false;
     }
@@ -249,20 +285,28 @@ bool MeshGpu::prepare(QRhiResourceUpdateBatch* updates, const MeshFrame& frame,
     if (newScene || d.colorVersion != frame.colorVersion) {
         const std::vector<Rgba> elementColors = scene->elementColors(frame.display.color);
         const Selection* selection = frame.selection;
-        const bool elementMode =
-            selection != nullptr && selection->mode() == SelectionMode::Elements;
         const auto colorOf = [&](core::ElementIndex element) {
             Rgba color = elementColors[static_cast<std::size_t>(element)];
-            if (elementMode && selection->contains(element)) {
+            if (selection != nullptr && selection->contains(SelectionKind::Element, element)) {
                 color |= kSelectedFlag;
             }
             return color;
         };
 
+        // REQ-004-26: a solid triangle is highlighted when its element or its
+        // face is selected.
         std::vector<Rgba> triangleColors;
-        triangleColors.reserve(scene->triangleElements().size() * 3);
-        for (const core::ElementIndex element : scene->triangleElements()) {
-            const Rgba color = colorOf(element);
+        const auto triangleElements = scene->triangleElements();
+        const auto triangleFaces = scene->triangleFaces();
+        const Range solids = scene->triangles(3);
+        triangleColors.reserve(triangleElements.size() * 3);
+        for (std::size_t t = 0; t < triangleElements.size(); ++t) {
+            Rgba color = colorOf(triangleElements[t]);
+            const bool solid = t >= solids.first && t < solids.first + solids.count;
+            if (solid && selection != nullptr &&
+                selection->contains(SelectionKind::Face, static_cast<int>(triangleFaces[t]))) {
+                color |= kSelectedFlag;
+            }
             triangleColors.insert(triangleColors.end(), 3, color);
         }
         std::vector<Rgba> lineColors;
@@ -283,10 +327,19 @@ bool MeshGpu::prepare(QRhiResourceUpdateBatch* updates, const MeshFrame& frame,
                               .color = colorOf(element)});
         }
         std::vector<PointInstance> selectedNodes;
-        if (selection != nullptr && selection->mode() == SelectionMode::Nodes) {
-            for (const int node : selection->items()) {
+        std::vector<SegmentInstance> selectedEdges;
+        if (selection != nullptr) {
+            for (const int node : selection->items(SelectionKind::Node)) {
                 selectedNodes.push_back(
                     {.position = toArray(positions[static_cast<std::size_t>(node)]),
+                     .color = kSelectedFlag});
+            }
+            const auto& edges = scene->surface().edges3d;
+            for (const int e : selection->items(SelectionKind::Edge)) {
+                const core::SurfaceEdge& edge = edges[static_cast<std::size_t>(e)];
+                selectedEdges.push_back(
+                    {.from = toArray(positions[static_cast<std::size_t>(edge.a)]),
+                     .to = toArray(positions[static_cast<std::size_t>(edge.b)]),
                      .color = kSelectedFlag});
             }
         }
@@ -297,12 +350,44 @@ bool MeshGpu::prepare(QRhiResourceUpdateBatch* updates, const MeshFrame& frame,
         d.points = d.staticBuffer(bytes(points), points.data(), updates, error);
         d.selectedNodes =
             d.staticBuffer(bytes(selectedNodes), selectedNodes.data(), updates, error);
+        d.selectedEdges =
+            d.staticBuffer(bytes(selectedEdges), selectedEdges.data(), updates, error);
         if (!error->isEmpty()) {
             return false;
         }
         d.pointCount = static_cast<quint32>(points.size());
         d.selectedNodeCount = static_cast<quint32>(selectedNodes.size());
+        d.selectedEdgeCount = static_cast<quint32>(selectedEdges.size());
         d.colorVersion = frame.colorVersion;
+    }
+
+    // REQ-004-34: the nodes of the visible surface, when shown.
+    if (newScene || d.nodeVersion != frame.nodeVersion) {
+        std::vector<core::NodeIndex> nodes;
+        if (frame.display.showNodes) {
+            for (int dimension = 0; dimension < 4; ++dimension) {
+                if (frame.display.isVisible(dimension)) {
+                    const auto surface = scene->surfaceNodes(dimension);
+                    nodes.insert(nodes.end(), surface.begin(), surface.end());
+                }
+            }
+            std::ranges::sort(nodes);
+            const auto duplicates = std::ranges::unique(nodes);
+            nodes.erase(duplicates.begin(), duplicates.end());
+        }
+        const auto positions = scene->nodePositions();
+        std::vector<PointInstance> shown;
+        shown.reserve(nodes.size());
+        for (const core::NodeIndex node : nodes) {
+            shown.push_back({.position = toArray(positions[static_cast<std::size_t>(node)]),
+                             .color = kNodeColor});
+        }
+        d.shownNodes = d.staticBuffer(bytes(shown), shown.data(), updates, error);
+        if (!error->isEmpty()) {
+            return false;
+        }
+        d.shownNodeCount = static_cast<quint32>(shown.size());
+        d.nodeVersion = frame.nodeVersion;
     }
 
     // Uniforms, every frame. Positions are relative to the scene origin; the
@@ -394,12 +479,39 @@ void MeshGpu::draw(QRhiCommandBuffer* commandBuffer, const QRhiViewport& viewpor
         commandBuffer->setVertexInput(0, 2, inputs.data());
         commandBuffer->draw(6, d.pointCount);
     }
+
+    // REQ-004-35: depth tested, so the faces hide the nodes behind them.
+    if (display.showNodes && d.shownNodes && d.shownNodeCount > 0) {
+        commandBuffer->setGraphicsPipeline(d.pointPipeline.get());
+        commandBuffer->setViewport(viewport);
+        commandBuffer->setShaderResources();
+        const std::array<QRhiCommandBuffer::VertexInput, 2> inputs = {{
+            {d.corners.get(), 0},
+            {d.shownNodes.get(), 0},
+        }};
+        commandBuffer->setVertexInput(0, 2, inputs.data());
+        commandBuffer->draw(6, d.shownNodeCount);
+    }
 }
 
 void MeshGpu::drawOverlay(QRhiCommandBuffer* commandBuffer, const QRhiViewport& viewport) const
 {
     const Impl& d = *m_impl;
-    if (d.scene == nullptr || !d.selectedNodes || d.selectedNodeCount == 0) {
+    if (d.scene == nullptr) {
+        return;
+    }
+    if (d.selectedEdges && d.selectedEdgeCount > 0) {
+        commandBuffer->setGraphicsPipeline(d.segmentPipeline.get());
+        commandBuffer->setViewport(viewport);
+        commandBuffer->setShaderResources();
+        const std::array<QRhiCommandBuffer::VertexInput, 2> inputs = {{
+            {d.corners.get(), 0},
+            {d.selectedEdges.get(), 0},
+        }};
+        commandBuffer->setVertexInput(0, 2, inputs.data());
+        commandBuffer->draw(6, d.selectedEdgeCount);
+    }
+    if (!d.selectedNodes || d.selectedNodeCount == 0) {
         return;
     }
     commandBuffer->setGraphicsPipeline(d.overlayPipeline.get());
