@@ -80,6 +80,9 @@ Conceitos principais:
   por `MeshBuilder`. Aceita os 90 tipos de elemento de número fixo de nós do
   Gmsh (ordem 1 a 10), com a ordem local de nós do Gmsh; a tabela de tipos é
   gerada da API do Gmsh por `tools/generate_element_types.py` (feature 003).
+- **`extractSurface`** — faces dos elementos 2D e casca externa dos 3D
+  (faces de um só elemento, orientadas para fora), com as arestas, pelos
+  vértices (feature 004).
 - **`ShapeFunctions` / `Quadrature`** — por topologia (linha, triângulo,
   quadrilátero, tetraedro, hexaedro, cunha) e ordem (linear, quadrática);
   independentes da física.
@@ -162,14 +165,18 @@ falhas esperadas (arquivo inválido, modelo singular); exceções apenas para bu
 
 - **`Viewport`** (`QRhiWidget`) — dono do `QRhi`, do laço de render e dos eventos de entrada.
 - **`Camera`** — órbita/pan/zoom (arcball), projeção perspectiva e ortográfica.
-- **`MeshGpuData`** — converte `core::Mesh` em buffers de vértice/índice
-  (somente a casca externa em 3D), em `float` relativo ao centro do modelo.
+- **`MeshScene`** — montada fora da thread da interface a partir de `core::Mesh`
+  e de `core::extractSurface`: triângulos, segmentos e pontos em `float`
+  relativos ao centro da malha, faixas por dimensão e cores por dimensão ou
+  grupo; `MeshGpu` envia-a à GPU (feature 004).
 - **Passes**: faces sombreadas → arestas (wireframe sem z-fighting) →
   realce de seleção → sobreposições (eixos, legenda).
 - **Resultados**: escalar por vértice + textura 1D de colormap, mapeada no
   fragment shader; deformada = posição + escala × deslocamento no vertex shader
   (sem reenviar a malha).
-- **Seleção (picking)**: passe offscreen com ID codificado em cor.
+- **Seleção (picking)**: calculada na CPU pela `MeshPicker` — raio contra os
+  triângulos visíveis no clique, projeção dos vértices em janela e cruzamento
+  (ADR 0003, feature 004).
 - **Geometria**: curvas e superfícies de `geom` tesseladas para exibição e seleção.
 - **Barras e cascas**: linhas com opção de seção extrudada; cascas com espessura
   opcional; diagramas de esforços como geometria gerada sobre os elementos.

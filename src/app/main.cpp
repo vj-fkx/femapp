@@ -45,7 +45,12 @@ int run(int argc, char** argv)
     }
 
     fem::app::MainWindow window;
+    window.setQuietMessages(options.smokeTest);
     window.show();
+    if (options.meshFile) {
+        // REQ-004-03
+        window.importMesh(QString::fromStdString(*options.meshFile));
+    }
 
     if (options.smokeTest) {
         // REQ-002-29: succeed once the viewport has rendered a frame, or once
@@ -59,8 +64,18 @@ int run(int argc, char** argv)
                 QApplication::exit(EXIT_SUCCESS);
             }
         };
-        QObject::connect(&window, &fem::app::MainWindow::viewportFrameRendered, &window,
-                         [finish] { finish("frame rendered"); });
+        // REQ-004-31: with a mesh, wait until it is on screen.
+        if (options.meshFile) {
+            QObject::connect(&window, &fem::app::MainWindow::meshShown, &window,
+                             [finish] { finish("mesh rendered"); });
+            QObject::connect(&window, &fem::app::MainWindow::meshImportFailed, &window, [] {
+                std::cout << "femapp: smoke test: mesh import failed\n" << std::flush;
+                QApplication::exit(EXIT_FAILURE);
+            });
+        } else {
+            QObject::connect(&window, &fem::app::MainWindow::viewportFrameRendered, &window,
+                             [finish] { finish("frame rendered"); });
+        }
         QObject::connect(&window, &fem::app::MainWindow::viewportUnavailable, &window,
                          [finish] { finish("viewport unavailable"); });
         if (!window.isViewportAvailable()) {

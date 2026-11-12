@@ -90,3 +90,19 @@ add_test(NAME check_rhi_confined
 add_executable(bench_gmsh_read perf/bench_gmsh_read.cpp)
 target_link_libraries(bench_gmsh_read PRIVATE fem::io)
 femapp_set_warnings(bench_gmsh_read)
+
+# REQ-004-03: command line parsing of the application, built on its own.
+add_executable(test_app unit/app/test_cli_options.cpp "${PROJECT_SOURCE_DIR}/src/app/cli_options.cpp")
+target_include_directories(test_app PRIVATE "${PROJECT_SOURCE_DIR}/src/app")
+target_compile_features(test_app PRIVATE cxx_std_20)
+target_link_libraries(test_app PRIVATE Catch2::Catch2WithMain)
+femapp_set_warnings(test_app)
+catch_discover_tests(test_app DISCOVERY_MODE PRE_TEST)
+
+# REQ-004-31: the viewport shows a real mesh, here with the Null backend.
+add_test(NAME femapp_smoke_mesh
+    COMMAND femapp --smoke-test "${PROJECT_SOURCE_DIR}/tests/data/gmsh/box_tet4.msh")
+set_tests_properties(femapp_smoke_mesh PROPERTIES
+    TIMEOUT 30
+    ENVIRONMENT "FEM_RHI_BACKEND=null"
+    PASS_REGULAR_EXPRESSION "smoke test: mesh rendered")

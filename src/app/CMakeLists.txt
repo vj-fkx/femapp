@@ -3,7 +3,9 @@ qt_add_executable(femapp WIN32 MACOSX_BUNDLE
     cli_options.cpp
     cli_options.hpp
     main_window.cpp
-    main_window.hpp)
+    main_window.hpp
+    mesh_import.cpp
+    mesh_import.hpp)
 
 set_target_properties(femapp PROPERTIES AUTOMOC ON)
 target_compile_features(femapp PRIVATE cxx_std_20)

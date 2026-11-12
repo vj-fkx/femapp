@@ -91,6 +91,112 @@
         <source>not available</source>
         <translation>não disponível</translation>
     </message>
+    <message>
+        <source>&amp;Import Mesh...</source>
+        <translation>&amp;Importar malha...</translation>
+    </message>
+    <message>
+        <source>&amp;Display</source>
+        <translation>&amp;Exibição</translation>
+    </message>
+    <message>
+        <source>Shaded with &amp;Edges</source>
+        <translation>Sólido com &amp;arestas</translation>
+    </message>
+    <message>
+        <source>&amp;Shaded</source>
+        <translation>&amp;Sólido</translation>
+    </message>
+    <message>
+        <source>&amp;Wireframe</source>
+        <translation>&amp;Aramado</translation>
+    </message>
+    <message>
+        <source>&amp;Color</source>
+        <translation>&amp;Cor</translation>
+    </message>
+    <message>
+        <source>By &amp;Dimension</source>
+        <translation>Por &amp;dimensão</translation>
+    </message>
+    <message>
+        <source>By &amp;Group</source>
+        <translation>Por &amp;grupo</translation>
+    </message>
+    <message>
+        <source>S&amp;how Elements</source>
+        <translation>&amp;Mostrar elementos</translation>
+    </message>
+    <message>
+        <source>&amp;0D (Points)</source>
+        <translation>&amp;0D (pontos)</translation>
+    </message>
+    <message>
+        <source>&amp;1D (Lines)</source>
+        <translation>&amp;1D (linhas)</translation>
+    </message>
+    <message>
+        <source>&amp;2D (Surfaces)</source>
+        <translation>&amp;2D (superfícies)</translation>
+    </message>
+    <message>
+        <source>&amp;3D (Solids)</source>
+        <translation>&amp;3D (sólidos)</translation>
+    </message>
+    <message>
+        <source>&amp;Edit</source>
+        <translation>E&amp;ditar</translation>
+    </message>
+    <message>
+        <source>Select &amp;Elements</source>
+        <translation>Selecionar &amp;elementos</translation>
+    </message>
+    <message>
+        <source>Select &amp;Nodes</source>
+        <translation>Selecionar &amp;nós</translation>
+    </message>
+    <message>
+        <source>&amp;Clear Selection</source>
+        <translation>&amp;Limpar seleção</translation>
+    </message>
+    <message>
+        <source>Import Mesh</source>
+        <translation>Importar malha</translation>
+    </message>
+    <message>
+        <source>Gmsh meshes (*.msh);;All files (*)</source>
+        <translation>Malhas do Gmsh (*.msh);;Todos os arquivos (*)</translation>
+    </message>
+    <message>
+        <source>Importing %1...</source>
+        <translation>Importando %1...</translation>
+    </message>
+    <message>
+        <source>%1: %2 nodes, %3 elements, %4 groups</source>
+        <translation>%1: %2 nós, %3 elementos, %4 grupos</translation>
+    </message>
+    <message>
+        <source>Mesh imported with warnings</source>
+        <translation>Malha importada com avisos</translation>
+    </message>
+    <message>
+        <source>Could not import the mesh</source>
+        <translation>Não foi possível importar a malha</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n element(s) selected</source>
+        <translation>
+            <numerusform>%n elemento selecionado</numerusform>
+            <numerusform>%n elementos selecionados</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%n node(s) selected</source>
+        <translation>
+            <numerusform>%n nó selecionado</numerusform>
+            <numerusform>%n nós selecionados</numerusform>
+        </translation>
+    </message>
 </context>
 <context>
     <name>fem::render::Viewport</name>

@@ -78,24 +78,24 @@ Regras:
 
 ## Fase 4 — Interface e importação (`app`)
 
-- [ ] **T19** Testes de `parseCliOptions` com arquivo de malha; implementar
+- [x] **T19** Testes de `parseCliOptions` com arquivo de malha; implementar
   `meshFile` — arquivos: `cli_options.hpp/.cpp`,
   `tests/unit/app/test_cli_options.cpp` — cobre: 03
-- [ ] **T20** `MeshImport` (`QThread` com `readGmsh` + `buildMeshScene`, sinais
+- [x] **T20** `MeshImport` (`QThread` com `readGmsh` + `buildMeshScene`, sinais
   de início, fim e falha) — arquivos: `mesh_import.hpp/.cpp` — cobre: 04
-- [ ] **T21** `MainWindow`: Arquivo ▸ Importar malha (diálogo `.msh`), arrastar
+- [x] **T21** `MainWindow`: Arquivo ▸ Importar malha (diálogo `.msh`), arrastar
   arquivo, arquivo da linha de comando, barra de progresso, ação desabilitada
   durante a importação, caixas de aviso e de erro (saída padrão no smoke
   test), barra de status com arquivo, nós, elementos e grupos — cobre: 01 a 08
-- [ ] **T22** Menus: Exibir ▸ modos, cor e dimensões; Editar ▸ modo de seleção e
+- [x] **T22** Menus: Exibir ▸ modos, cor e dimensões; Editar ▸ modo de seleção e
   Limpar seleção; contagem da seleção na barra de status — cobre: 11, 14, 16,
   19, 25, 27
-- [ ] **T23** Smoke test com malha: sair com 0 depois de `sceneShown`;
+- [x] **T23** Smoke test com malha: sair com 0 depois de `sceneShown`;
   `femapp_smoke_mesh` com `box_tet4.msh` e backend `null` no `ctest` — arquivos:
   `main.cpp`, `tests/CMakeLists.txt` — cobre: 31
-- [ ] **T24** Traduções pt_BR dos textos novos — arquivo:
+- [x] **T24** Traduções pt_BR dos textos novos — arquivo:
   `i18n/femapp_pt_BR.ts` — cobre: 29
-- [ ] **T25** Atualizar `specs/architecture.md` §4 (seleção na CPU, ADR 0003;
+- [x] **T25** Atualizar `specs/architecture.md` §4 (seleção na CPU, ADR 0003;
   `MeshScene`) e §3 (`extractSurface`) — cobre: 30
 
 ## Fase 5 — Conferência e medições
@@ -188,3 +188,28 @@ Regras:
   `test_mesh_scene.cpp`, não num arquivo próprio.
 - Nós de ordem alta (meio de aresta etc.) não são clicáveis, porque não são
   desenhados; a janela e o cruzamento os alcançam.
+
+**2026-11-12 — Fases 3 e 4 (T13–T25):**
+
+- 101 testes passando no Windows, incluindo o `SceneRenderer` com backend
+  `Null` desenhando uma malha com faces, linhas, pontos e seleção nos três
+  modos, e o novo `femapp_smoke_mesh` (`box_tet4.msh`, mensagem "mesh
+  rendered").
+- Conferido pela linha de comando: arquivo com tipo não suportado mostra o
+  aviso; arquivo inválido mostra o erro com a linha e o smoke test termina em
+  "mesh import failed".
+- **Não verificado visualmente:** aparência das faces, arestas, pontos, cores,
+  realce e retângulo de seleção; isso é o roteiro manual (T26).
+- Desvios do design:
+  - o arquivo da linha de comando é o primeiro argumento terminado em `.msh`
+    (sem diferenciar maiúsculas), e não "o primeiro que não é opção", porque
+    o Qt aceita opções com valor (`-platform offscreen`);
+  - as funções auxiliares de QRhi saíram do `scene_renderer.cpp` para
+    `rhi_util.hpp/.cpp`, compartilhadas com `mesh_gpu.cpp`;
+  - a malha e a grade usam o intervalo de profundidade acima da fatia do
+    indicador de eixos (0,01 a 1), o que resolve a pendência anotada na
+    feature 002 (indicador escondido por objetos muito próximos da câmera);
+  - os textos de contagem da seleção usam plural do Qt (`%n`); sem tradução
+    para inglês, aparecem como "3 element(s) selected".
+- T25: `specs/architecture.md` atualizado (`extractSurface`, `MeshScene`,
+  seleção na CPU).
