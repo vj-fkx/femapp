@@ -228,12 +228,13 @@ posição = t − d·f
 - **Órbita:** `ψ −= k·Δx`, `θ += k·Δy`, com `k = 0,5°/pixel`; `θ` é limitado a
   `[−90°, 90°]`.
 - **Pivô da órbita** *(alterado em 2026-11-12, feature 004)*: ao começar a
-  órbita, o alvo passa a ser o ponto da cena no centro da tela — o primeiro
-  triângulo visível da malha atingido pelo raio do centro, senão o plano de
-  trabalho Z = 0 (pela regra do ponto de ancoragem), senão o alvo atual. A
-  troca não mexe na imagem: em perspectiva o olho fica onde está e a
-  distância passa a ser a profundidade do pivô; em ortográfica o alvo anda
-  ao longo da visada e a distância (que define a escala) não muda.
+  órbita, o pivô é o centro da caixa envolvente dos nós da malha visível que
+  caem dentro da tela (`MeshPicker::visibleCenter`); sem malha em vista, o
+  ponto do plano Z = 0 no centro da tela; senão, nenhum (gira em torno do
+  alvo). `Camera::orbitAbout(pivô, dx, dy)` aplica a mesma variação de
+  guinada e arfagem de `orbit` e gira o alvo em torno do pivô pela rotação
+  `R = B'·Bᵀ` entre as bases da câmera antes (`B`) e depois (`B'`); o olho
+  acompanha. O pivô fica parado no mesmo pixel e o eixo Z continua vertical.
 - **Ponto de ancoragem** de um pixel: onde o raio do pixel encontra o plano de
   trabalho Z = 0, se o encontro está à frente da câmera e a no máximo `100·d`
   de profundidade (dentro do plano de corte distante); senão, o ponto do raio

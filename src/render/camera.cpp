@@ -76,22 +76,16 @@ void Camera::orbit(double deltaXPx, double deltaYPx)
     m_pitch = std::clamp(m_pitch + kOrbitRadPerPixel * deltaYPx, -kHalfPi, kHalfPi);
 }
 
-void Camera::setPivot(const Vec3& pivot)
+void Camera::orbitAbout(const Vec3& pivot, double deltaXPx, double deltaYPx)
 {
-    const Vec3 f = forward();
-    if (m_projection == Projection::Orthographic) {
-        // The scale depends on the distance only, so it is kept; the target
-        // slides along the viewing direction to the depth of the pivot.
-        m_target += (pivot - m_target).dot(f) * f;
-        return;
-    }
-    const Vec3 eye = position();
-    const double depth = (pivot - eye).dot(f);
-    if (!(depth >= kMinDistance) || depth > kMaxDistance) {
-        return;
-    }
-    m_target = eye + depth * f;
-    m_distance = depth;
+    // Rotation taking the camera basis before the orbit to the basis after it,
+    // applied to the target around the pivot; the eye follows.
+    Eigen::Matrix3d before;
+    before << right(), up(), forward();
+    orbit(deltaXPx, deltaYPx);
+    Eigen::Matrix3d after;
+    after << right(), up(), forward();
+    m_target = pivot + after * before.transpose() * (m_target - pivot);
 }
 
 void Camera::pan(const Vec2& fromPx, const Vec2& toPx)

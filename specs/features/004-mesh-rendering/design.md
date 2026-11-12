@@ -756,3 +756,27 @@ faces; os dois → 6); `buildMeshScene` com filtro (só os incluídos nas faixas
 e em `allNodes`); clique com Shift no modo isolado e o desligamento com a
 seleção vazia ficam no roteiro manual (T26), porque dependem do widget.
 
+## 16. Órbita pelo centro da malha em vista, contorno com profundidade e isolamento sem realce (2026-11-12)
+
+Pedido do mantenedor. Substitui partes da §13 (contorno dos selecionados), da
+§15 (desenho no modo isolado) e o pivô da órbita (design da 002, §5.1).
+
+- **Órbita (REQ-002-13):** `MeshPicker::visibleCenter(camera, display)`
+  projeta os `surfaceNodes` das dimensões visíveis e devolve o centro da caixa
+  envolvente (no mundo) dos que caem dentro da tela e à frente da câmera; o
+  `Viewport` guarda esse pivô ao começar a órbita e chama
+  `Camera::orbitAbout`. Sem malha em vista, o ponto do plano Z = 0 no centro
+  da tela; senão, a órbita de sempre em torno do alvo. `Camera::setPivot`
+  deixa de ser usado e sai.
+- **Contorno do sólido selecionado (REQ-004-26):** os segmentos das arestas
+  dos elementos selecionados vão para um buffer próprio, desenhado com um
+  segundo pipeline de segmentos *com* teste de profundidade (sem escrita), no
+  passe normal: as faces, empurradas para trás pelo viés de profundidade,
+  escondem as arestas de trás. As arestas selecionadas como itens continuam
+  no passe de sobreposição.
+- **Modo isolado (REQ-004-37, 39):** só os elementos selecionados; nada é
+  realçado (sem faces, arestas ou nós selecionados por cima); o `Viewport`
+  força as arestas (sólido vira sólido com arestas) e "Mostrar nós" enquanto
+  isolado. O modo exige elemento selecionado e desliga quando não resta
+  nenhum. O buffer de faces selecionadas da §15 sai.
+

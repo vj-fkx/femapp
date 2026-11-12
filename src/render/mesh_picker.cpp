@@ -404,6 +404,38 @@ std::optional<Eigen::Vector3d> MeshPicker::surfacePoint(const Camera& camera, co
     return Eigen::Vector3d(ray.origin + ((hit.depth - offset) / along) * ray.direction);
 }
 
+std::optional<Eigen::Vector3d> MeshPicker::visibleCenter(const Camera& camera,
+                                                         const DisplayOptions& display) const
+{
+    const MeshScene& scene = *m_scene;
+    const Projector projector(camera, scene.origin());
+    const auto positions = scene.nodePositions();
+    const double width = camera.viewportWidth();
+    const double height = camera.viewportHeight();
+    Vec3f low = Vec3f::Constant(std::numeric_limits<float>::max());
+    Vec3f high = Vec3f::Constant(std::numeric_limits<float>::lowest());
+    bool any = false;
+    for (int dimension = 0; dimension < 4; ++dimension) {
+        if (!display.isVisible(dimension)) {
+            continue;
+        }
+        for (const core::NodeIndex node : scene.surfaceNodes(dimension)) {
+            const Vec3f& p = positions[static_cast<std::size_t>(node)];
+            const ScreenPoint s = projector.project(p);
+            if (s.inFront && s.depth > 0.0 && s.pixel.x() >= 0.0 && s.pixel.x() <= width &&
+                s.pixel.y() >= 0.0 && s.pixel.y() <= height) {
+                low = low.cwiseMin(p);
+                high = high.cwiseMax(p);
+                any = true;
+            }
+        }
+    }
+    if (!any) {
+        return std::nullopt;
+    }
+    return Eigen::Vector3d(scene.origin() + (0.5F * (low + high)).cast<double>());
+}
+
 SelectionItems MeshPicker::pickRect(const Camera& camera, const PickRect& rect,
                                     const SelectionFilter& filter,
                                     const DisplayOptions& display) const

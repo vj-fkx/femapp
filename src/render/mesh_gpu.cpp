@@ -74,6 +74,7 @@ struct MeshGpu::Impl
     std::unique_ptr<QRhiGraphicsPipeline> pointPipeline;
     std::unique_ptr<QRhiGraphicsPipeline> overlayPipeline;
     std::unique_ptr<QRhiGraphicsPipeline> segmentPipeline;
+    std::unique_ptr<QRhiGraphicsPipeline> outlinePipeline;
     std::unique_ptr<QRhiBuffer> corners;
 
     std::unique_ptr<QRhiBuffer> trianglePositions;
@@ -83,9 +84,8 @@ struct MeshGpu::Impl
     std::unique_ptr<QRhiBuffer> points;
     std::unique_ptr<QRhiBuffer> selectedNodes;
     std::unique_ptr<QRhiBuffer> selectedEdges;
-    std::unique_ptr<QRhiBuffer> selectedFacePositions;
-    std::unique_ptr<QRhiBuffer> selectedFaceColors;
-    quint32 selectedFaceTriangles = 0;
+    std::unique_ptr<QRhiBuffer> outlines;
+    quint32 outlineCount = 0;
     std::unique_ptr<QRhiBuffer> shownNodes;
     quint32 pointCount = 0;
     quint32 selectedNodeCount = 0;
@@ -229,9 +229,16 @@ bool MeshGpu::create(QRhi* rhi, QRhiRenderPassDescriptor* renderPass, int sample
                                            sampleCount));
     d.segmentPipeline->setDepthTest(false);
     d.segmentPipeline->setDepthWrite(false);
+    // REQ-004-26: the outlines of the selected elements, depth tested so that
+    // the faces hide the edges behind them.
+    d.outlinePipeline.reset(d.makePipeline(segmentVert, pointFrag, segments,
+                                           QRhiGraphicsPipeline::Triangles, renderPass,
+                                           sampleCount));
+    d.outlinePipeline->setDepthWrite(false);
 
     if (!d.facePipeline->create() || !d.linePipeline->create() || !d.pointPipeline->create() ||
-        !d.overlayPipeline->create() || !d.segmentPipeline->create()) {
+        !d.overlayPipeline->create() || !d.segmentPipeline->create() ||
+        !d.outlinePipeline->create()) {
         *error = QStringLiteral("could not create the mesh pipelines");
         return false;
     }
@@ -334,33 +341,38 @@ bool MeshGpu::prepare(QRhiResourceUpdateBatch* updates, const MeshFrame& frame,
             points.push_back({.position = toArray(positions[static_cast<std::size_t>(node)]),
                               .color = colorOf(element)});
         }
+        // Isolated (REQ-004-37): nothing is highlighted.
         std::vector<PointInstance> selectedNodes;
         std::vector<SegmentInstance> selectedEdges;
-        if (selection != nullptr) {
+        std::vector<SegmentInstance> outlines;
+        if (selection != nullptr && !isolated) {
             for (const int node : selection->items(SelectionKind::Node)) {
                 selectedNodes.push_back(
                     {.position = toArray(positions[static_cast<std::size_t>(node)]),
                      .color = kSelectedFlag});
             }
-            const auto segment = [&](core::NodeIndex a, core::NodeIndex b) {
-                selectedEdges.push_back({.from = toArray(positions[static_cast<std::size_t>(a)]),
-                                         .to = toArray(positions[static_cast<std::size_t>(b)]),
-                                         .color = kSelectedFlag});
+            const auto segment = [&](std::vector<SegmentInstance>& into, core::NodeIndex a,
+                                     core::NodeIndex b) {
+                into.push_back({.from = toArray(positions[static_cast<std::size_t>(a)]),
+                                .to = toArray(positions[static_cast<std::size_t>(b)]),
+                                .color = kSelectedFlag});
             };
             for (const int e : selection->items(SelectionKind::Edge)) {
                 const core::SurfaceEdge& edge = indexScene->edge(e);
-                segment(edge.a, edge.b);
+                segment(selectedEdges, edge.a, edge.b);
             }
-            // REQ-004-26: every visible edge of a selected element, also those
-            // that the line buffer gives to a neighbour.
-            if (!isolated && selection->count(SelectionKind::Element) > 0) {
+            // REQ-004-26: the edges of the selected elements, also those that
+            // the line buffer gives to a neighbour; depth tested when drawn,
+            // so only the visible ones show.
+            if (selection->count(SelectionKind::Element) > 0) {
                 const auto faceEdges = [&](const std::vector<core::SurfaceFace>& faces) {
                     for (const core::SurfaceFace& face : faces) {
                         if (!selection->contains(SelectionKind::Element, face.element)) {
                             continue;
                         }
                         for (std::size_t v = 0; v < face.nodeCount; ++v) {
-                            segment(face.nodes.at(v), face.nodes.at((v + 1) % face.nodeCount));
+                            segment(outlines, face.nodes.at(v),
+                                    face.nodes.at((v + 1) % face.nodeCount));
                         }
                     }
                 };
@@ -368,23 +380,6 @@ bool MeshGpu::prepare(QRhiResourceUpdateBatch* updates, const MeshFrame& frame,
                 faceEdges(scene->surface().faces3d);
             }
         }
-
-        // Isolated: the selected solid faces as triangles of their own.
-        std::vector<Eigen::Vector3f> faceVertices;
-        if (isolated && selection != nullptr) {
-            const auto& faces = indexScene->surface().faces3d;
-            for (const int f : selection->items(SelectionKind::Face)) {
-                const core::SurfaceFace& face = faces[static_cast<std::size_t>(f)];
-                const auto at = [&](std::size_t v) {
-                    return positions[static_cast<std::size_t>(face.nodes.at(v))];
-                };
-                faceVertices.insert(faceVertices.end(), {at(0), at(1), at(2)});
-                if (face.nodeCount == 4) {
-                    faceVertices.insert(faceVertices.end(), {at(0), at(2), at(3)});
-                }
-            }
-        }
-        const std::vector<Rgba> faceColors(faceVertices.size(), kSelectedFlag);
 
         d.triangleColors =
             d.staticBuffer(bytes(triangleColors), triangleColors.data(), updates, error);
@@ -400,13 +395,11 @@ bool MeshGpu::prepare(QRhiResourceUpdateBatch* updates, const MeshFrame& frame,
         d.pointCount = static_cast<quint32>(points.size());
         d.selectedNodeCount = static_cast<quint32>(selectedNodes.size());
         d.selectedEdgeCount = static_cast<quint32>(selectedEdges.size());
-        d.selectedFacePositions =
-            d.staticBuffer(bytes(faceVertices), faceVertices.data(), updates, error);
-        d.selectedFaceColors = d.staticBuffer(bytes(faceColors), faceColors.data(), updates, error);
+        d.outlines = d.staticBuffer(bytes(outlines), outlines.data(), updates, error);
         if (!error->isEmpty()) {
             return false;
         }
-        d.selectedFaceTriangles = static_cast<quint32>(faceVertices.size() / 3);
+        d.outlineCount = static_cast<quint32>(outlines.size());
         d.colorVersion = frame.colorVersion;
     }
 
@@ -495,20 +488,6 @@ void MeshGpu::draw(QRhiCommandBuffer* commandBuffer, const QRhiViewport& viewpor
         }
     }
 
-    // REQ-004-37: selected solid faces shown on their own (isolated mode).
-    if (display.mode != DisplayMode::Wireframe && d.selectedFaceTriangles > 0 &&
-        display.isVisible(3)) {
-        commandBuffer->setGraphicsPipeline(d.facePipeline.get());
-        commandBuffer->setViewport(viewport);
-        commandBuffer->setShaderResources();
-        const std::array<QRhiCommandBuffer::VertexInput, 2> inputs = {{
-            {d.selectedFacePositions.get(), 0},
-            {d.selectedFaceColors.get(), 0},
-        }};
-        commandBuffer->setVertexInput(0, 2, inputs.data());
-        commandBuffer->draw(d.selectedFaceTriangles * 3);
-    }
-
     // 1D elements always; edges except in the shaded mode.
     if (d.linePositions && d.lineColors) {
         commandBuffer->setGraphicsPipeline(d.linePipeline.get());
@@ -541,6 +520,18 @@ void MeshGpu::draw(QRhiCommandBuffer* commandBuffer, const QRhiViewport& viewpor
         }};
         commandBuffer->setVertexInput(0, 2, inputs.data());
         commandBuffer->draw(6, d.pointCount);
+    }
+
+    if (d.outlines && d.outlineCount > 0) {
+        commandBuffer->setGraphicsPipeline(d.outlinePipeline.get());
+        commandBuffer->setViewport(viewport);
+        commandBuffer->setShaderResources();
+        const std::array<QRhiCommandBuffer::VertexInput, 2> inputs = {{
+            {d.corners.get(), 0},
+            {d.outlines.get(), 0},
+        }};
+        commandBuffer->setVertexInput(0, 2, inputs.data());
+        commandBuffer->draw(6, d.outlineCount);
     }
 
     // REQ-004-35: depth tested, so the faces hide the nodes behind them.

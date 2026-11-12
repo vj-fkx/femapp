@@ -500,44 +500,32 @@ TEST_CASE("target-relative matrices survive the conversion to float", "[render][
     }
 }
 
-// REQ-002-13 (changed in feature 004): moving the pivot keeps the image.
-TEST_CASE("setting the orbit pivot does not change the image", "[render][camera]")
+// REQ-002-13 (changed in feature 004): orbiting about a pivot keeps the
+// pivot on its pixel, the distance and Z up, and matches orbit() about the
+// target.
+TEST_CASE("orbiting about a pivot keeps it in place", "[render][camera]")
 {
     const Projection projection = GENERATE(Projection::Perspective, Projection::Orthographic);
     Camera camera = makeCamera(projection);
     camera.orbit(35.0, -20.0);
     camera.pan(Vec2(200, 200), Vec2(450, 260));
 
-    const std::array<Vec3, 3> probes = {Vec3(0.3, -1.2, 2.0), Vec3(4.0, 1.0, -0.5),
-                                        Vec3(-2.0, 3.0, 1.0)};
-    std::array<Vec2, 3> before{};
-    for (std::size_t i = 0; i < probes.size(); ++i) {
-        before.at(i) = toPixel(camera, probes.at(i));
-    }
+    // A point away from the centre of the screen.
+    const Vec3 pivot(2.0, -1.0, 0.5);
+    const Vec2 before = toPixel(camera, pivot);
+    const double distance = camera.distance();
+    camera.orbitAbout(pivot, 60.0, 25.0);
+    const Vec2 after = toPixel(camera, pivot);
+    CHECK_THAT(after.x(), WithinAbs(before.x(), kPixelTolerance));
+    CHECK_THAT(after.y(), WithinAbs(before.y(), kPixelTolerance));
+    CHECK_THAT(camera.distance(), WithinAbs(distance, 1e-12));
+    CHECK_THAT(camera.right().z(), WithinAbs(0.0, 1e-12));
 
-    // A point on the central line of sight, nearer than the current target.
-    const Vec3 pivot = camera.position() + 0.4 * camera.distance() * camera.forward();
-    camera.setPivot(pivot);
-
-    checkVec(camera.target(), pivot, 1e-9);
-    for (std::size_t i = 0; i < probes.size(); ++i) {
-        const Vec2 after = toPixel(camera, probes.at(i));
-        CHECK_THAT(after.x(), WithinAbs(before.at(i).x(), kPixelTolerance));
-        CHECK_THAT(after.y(), WithinAbs(before.at(i).y(), kPixelTolerance));
-    }
-
-    // Orbiting now keeps the pivot at the centre of the screen.
-    camera.orbit(60.0, 25.0);
-    const Vec2 centre = toPixel(camera, pivot);
-    CHECK_THAT(centre.x(), WithinAbs(kWidth / 2.0, kPixelTolerance));
-    CHECK_THAT(centre.y(), WithinAbs(kHeight / 2.0, kPixelTolerance));
-}
-
-// REQ-002-13: a pivot behind the eye is ignored in perspective.
-TEST_CASE("a pivot behind the eye is ignored", "[render][camera]")
-{
-    Camera camera = makeCamera(Projection::Perspective);
-    const Vec3 target = camera.target();
-    camera.setPivot(camera.position() - camera.forward());
-    checkVec(camera.target(), target);
+    // About the target it is the plain orbit.
+    Camera plain = makeCamera(projection);
+    Camera about = makeCamera(projection);
+    plain.orbit(-40.0, 15.0);
+    about.orbitAbout(about.target(), -40.0, 15.0);
+    checkVec(about.target(), plain.target(), 1e-12);
+    checkVec(about.position(), plain.position(), 1e-12);
 }

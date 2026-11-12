@@ -48,6 +48,11 @@ public:
     [[nodiscard]] std::optional<Eigen::Vector3d>
     surfacePoint(const Camera& camera, const Vec2& pixel, const DisplayOptions& display) const;
 
+    // REQ-002-13: centre of the bounding box of the visible surface nodes that
+    // fall inside the screen, in front of the camera; the orbit pivot.
+    [[nodiscard]] std::optional<Eigen::Vector3d> visibleCenter(const Camera& camera,
+                                                               const DisplayOptions& display) const;
+
     // REQ-004-21, 22: window (entirely inside) or crossing (inside or
     // crossing), including items hidden behind others, for every kind turned
     // on in `filter`. Each list sorted.

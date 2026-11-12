@@ -210,6 +210,16 @@ Regras:
 - [x] **T53** Menu Exibir ▸ Mostrar só a seleção e tradução — arquivos:
   `main_window.cpp`, `femapp_pt_BR.ts` — cobre: 29, 37
 
+- [x] **T54** `Camera::orbitAbout` (no lugar de `setPivot`) e
+  `MeshPicker::visibleCenter`, com testes; pivô no `Viewport` — arquivos:
+  `camera.hpp/.cpp`, `mesh_picker.hpp/.cpp`, `viewport.cpp`, testes — cobre:
+  REQ-002-13 (alterado)
+- [x] **T55** Contorno dos elementos selecionados com teste de profundidade —
+  arquivo: `mesh_gpu.cpp` — cobre: 26
+- [x] **T56** Modo isolado sem realce, com arestas e nós forçados, exigindo
+  elemento selecionado — arquivos: `mesh_gpu.cpp`, `viewport.cpp` — cobre: 37,
+  39
+
 ## Fase 5 — Conferência e medições
 
 - [ ] **T26** `[M]` Roteiro manual no Windows: importar pelos três caminhos;

@@ -90,6 +90,7 @@ public:
 
     DragMode dragMode = DragMode::None;
     QPointF lastMousePosition;
+    std::optional<Vec3> orbitPivot; // REQ-002-13
 
     // Mesh and selection.
     std::shared_ptr<const MeshScene> scene;
@@ -359,8 +360,8 @@ void Viewport::selectionEdited()
 {
     ++m_impl->colorVersion;
     if (m_impl->isolated) {
-        // REQ-004-39: an empty selection shows the whole mesh again.
-        if (m_impl->selection.total() == 0) {
+        // REQ-004-39: without selected elements the whole mesh comes back.
+        if (m_impl->selection.count(SelectionKind::Element) == 0) {
             setIsolated(false);
         } else {
             rebuildIsolation();
@@ -377,8 +378,9 @@ bool Viewport::isIsolated() const
 
 void Viewport::setIsolated(bool isolated)
 {
-    // REQ-004-39: not with an empty selection.
-    const bool on = isolated && m_impl->scene && m_impl->selection.total() > 0;
+    // REQ-004-39: only with selected elements.
+    const bool on =
+        isolated && m_impl->scene && m_impl->selection.count(SelectionKind::Element) > 0;
     if (on == m_impl->isolated) {
         if (on != isolated) {
             emit isolationChanged(on);
@@ -565,6 +567,13 @@ void Viewport::render(QRhiCommandBuffer* commandBuffer)
     mesh.colorVersion = m_impl->colorVersion;
     mesh.nodeVersion = m_impl->nodeVersion;
     mesh.display = m_impl->display;
+    if (m_impl->isolated) {
+        // REQ-004-37: the isolated part always shows its edges and nodes.
+        mesh.display.showNodes = true;
+        if (mesh.display.mode == DisplayMode::Shaded) {
+            mesh.display.mode = DisplayMode::ShadedWithEdges;
+        }
+    }
     mesh.selection = &m_impl->selection;
     const FrameParams params{.camera = &m_impl->camera,
                              .pixelSize = renderTarget()->pixelSize(),
@@ -607,19 +616,15 @@ void Viewport::mousePressEvent(QMouseEvent* event)
     m_impl->dragMode =
         event->modifiers().testFlag(Qt::ShiftModifier) ? DragMode::Orbit : DragMode::Pan;
     if (m_impl->dragMode == DragMode::Orbit) {
-        // REQ-002-13: orbit around the point at the centre of the screen: the
-        // mesh there, else the work plane, else the current target.
+        // REQ-002-13: orbit around the centre of the mesh in view, else the
+        // work plane point at the centre of the screen, else the target.
         m_impl->camera.setViewportSize(width(), height());
-        const Vec2 centre(0.5 * width(), 0.5 * height());
-        std::optional<Vec3> pivot;
+        m_impl->orbitPivot.reset();
         if (const MeshPicker* picker = m_impl->shownPicker()) {
-            pivot = picker->surfacePoint(m_impl->camera, centre, m_impl->display);
+            m_impl->orbitPivot = picker->visibleCenter(m_impl->camera, m_impl->display);
         }
-        if (!pivot) {
-            pivot = m_impl->camera.workPlanePoint(centre);
-        }
-        if (pivot) {
-            m_impl->camera.setPivot(*pivot);
+        if (!m_impl->orbitPivot) {
+            m_impl->orbitPivot = m_impl->camera.workPlanePoint(Vec2(0.5 * width(), 0.5 * height()));
         }
     }
     m_impl->lastMousePosition = event->position();
@@ -655,7 +660,11 @@ void Viewport::mouseMoveEvent(QMouseEvent* event)
 
     m_impl->camera.setViewportSize(width(), height());
     if (m_impl->dragMode == DragMode::Orbit) {
-        m_impl->camera.orbit(delta.x(), delta.y());
+        if (m_impl->orbitPivot) {
+            m_impl->camera.orbitAbout(*m_impl->orbitPivot, delta.x(), delta.y());
+        } else {
+            m_impl->camera.orbit(delta.x(), delta.y());
+        }
     } else {
         m_impl->camera.pan(toVec2(m_impl->lastMousePosition), toVec2(position));
     }

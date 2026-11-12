@@ -472,3 +472,29 @@ TEST_CASE("a click on a solid face covered by a 2D triangle picks the solid", "[
     noSolids.dimensionVisible[3] = false;
     CHECK(elementId(*mesh, picker.pick(camera, onFace, kElements, noSolids, kTolerance)) == 1);
 }
+
+// REQ-002-13 (changed in feature 004): the orbit pivot is the centre of the
+// part of the mesh in view.
+TEST_CASE("centre of the mesh in view", "[render][picker]")
+{
+    const auto mesh = fem::render::test::hexGrid(3);
+    const MeshPicker picker(fem::render::buildMeshScene(mesh));
+    Camera camera = cameraFor(*mesh, StandardView::Front, Projection::Orthographic);
+
+    // All of it in view: the centre of the block.
+    const auto whole = picker.visibleCenter(camera, DisplayOptions{});
+    REQUIRE(whole.has_value());
+    CHECK((whole.value_or(Eigen::Vector3d::Zero()) - Eigen::Vector3d(1.5, 1.5, 1.5)).norm() < 1e-5);
+
+    // Moved so that only the column x <= 1 is left on the screen: the centre
+    // of what is seen, off the centre of the screen.
+    const Vec2 from = toPixel(camera, {1.25, 0.0, 1.5});
+    camera.pan(from, Vec2(kWidth - 1.0, from.y()));
+    const auto part = picker.visibleCenter(camera, DisplayOptions{});
+    REQUIRE(part.has_value());
+    CHECK(part.value_or(Eigen::Vector3d::Zero()).x() < 1.0);
+
+    DisplayOptions hidden;
+    hidden.dimensionVisible[3] = false;
+    CHECK_FALSE(picker.visibleCenter(camera, hidden).has_value());
+}
