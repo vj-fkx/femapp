@@ -60,8 +60,7 @@ int main(int argc, char* argv[])
     try {
         return run(argc, argv);
     } catch (...) {
-        std::fputs("bench_gmsh_read: fatal error
-", stderr);
+        std::fputs("bench_gmsh_read: fatal error\n", stderr);
         return EXIT_FAILURE;
     }
 }
