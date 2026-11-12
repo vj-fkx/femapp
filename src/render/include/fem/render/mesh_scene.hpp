@@ -81,8 +81,17 @@ public:
         return m_pointElements;
     }
 
-    // Nodes that can be clicked (drawn on the visible surface) and nodes that
-    // a rectangle can reach (all nodes of the elements), per dimension.
+    // REQ-004-32: selectable edges, those of the 2D faces (surface().edges2d)
+    // then those of the outer solid faces (surface().edges3d), in the order
+    // of the segments of lines(Edges2d) and lines(Edges3d), which follow each
+    // other: edge i is segment lines(Edges2d).first + i.
+    [[nodiscard]] int edgeCount() const noexcept;
+    [[nodiscard]] const core::SurfaceEdge& edge(int index) const;
+    [[nodiscard]] int edgeDimension(int index) const noexcept; // 2 or 3
+
+    // Nodes shown and clickable on the visible surface, higher order ones
+    // included (REQ-004-34), and nodes that a rectangle can reach (all nodes
+    // of the elements), per dimension.
     [[nodiscard]] std::span<const core::NodeIndex> surfaceNodes(int dimension) const noexcept;
     [[nodiscard]] std::span<const core::NodeIndex> allNodes(int dimension) const noexcept;
 

@@ -17,7 +17,7 @@ void Selection::reset(const MeshScene* scene)
     if (scene != nullptr) {
         sizes[toIndex(SelectionKind::Element)] = scene->mesh().elementCount();
         sizes[toIndex(SelectionKind::Face)] = static_cast<int>(scene->surface().faces3d.size());
-        sizes[toIndex(SelectionKind::Edge)] = static_cast<int>(scene->surface().edges3d.size());
+        sizes[toIndex(SelectionKind::Edge)] = scene->edgeCount();
         sizes[toIndex(SelectionKind::Node)] = scene->mesh().nodeCount();
     }
     for (std::size_t k = 0; k < kSelectionKindCount; ++k) {
@@ -96,8 +96,17 @@ void Selection::clear(SelectionKind kind)
     set.count = 0;
 }
 
-void Selection::removeElementsOfDimension(const core::Mesh& mesh, int dimension)
+void Selection::removeElementsOfDimension(const MeshScene& scene, int dimension)
 {
+    const core::Mesh& mesh = scene.mesh();
+    // The edges of the hidden dimension (2D or solid) leave too.
+    Set& edges = m_sets[toIndex(SelectionKind::Edge)];
+    for (int e = 0; e < scene.edgeCount(); ++e) {
+        if (scene.edgeDimension(e) == dimension && contains(SelectionKind::Edge, e)) {
+            edges.selected[static_cast<std::size_t>(e)] = false;
+            --edges.count;
+        }
+    }
     Set& elements = m_sets[toIndex(SelectionKind::Element)];
     for (const core::ElementBlock& block : mesh.blocks()) {
         if (core::elementTypeInfo(block.type).dimension != dimension) {
@@ -113,7 +122,6 @@ void Selection::removeElementsOfDimension(const core::Mesh& mesh, int dimension)
     }
     if (dimension == 3) {
         clear(SelectionKind::Face);
-        clear(SelectionKind::Edge);
     }
 }
 

@@ -289,8 +289,9 @@ std::optional<PickedItem> MeshPicker::pick(const Camera& camera, const Vec2& pix
         }
     }
 
-    // 2. Solid edges, the same way, at the closest point of each segment.
-    if (filter.isEnabled(SelectionKind::Edge) && display.isVisible(3)) {
+    // 2. Edges of 2D faces and of outer solid faces, the same way, at the
+    // closest point of each segment.
+    if (filter.isEnabled(SelectionKind::Edge)) {
         struct Candidate
         {
             double depth = 0.0;
@@ -298,9 +299,14 @@ std::optional<PickedItem> MeshPicker::pick(const Camera& camera, const Vec2& pix
             Vec2 through = Vec2::Zero();
         };
         std::vector<Candidate> candidates;
-        const Range range = scene.lines(LineSet::Edges3d);
+        // Edge i is segment firstEdge + i (MeshScene::edge).
+        const std::uint32_t firstEdge = scene.lines(LineSet::Edges2d).first;
         const auto vertices = scene.lineVertices();
-        for (std::uint32_t s = range.first; s < range.first + range.count; ++s) {
+        for (std::uint32_t s = firstEdge;
+             s < firstEdge + static_cast<std::uint32_t>(scene.edgeCount()); ++s) {
+            if (!display.isVisible(scene.edgeDimension(static_cast<int>(s - firstEdge)))) {
+                continue;
+            }
             const ScreenPoint a = projector.project(vertices[2 * static_cast<std::size_t>(s)]);
             const ScreenPoint b = projector.project(vertices[2 * static_cast<std::size_t>(s) + 1]);
             if (!a.inFront || !b.inFront) {
@@ -309,7 +315,7 @@ std::optional<PickedItem> MeshPicker::pick(const Camera& camera, const Vec2& pix
             const auto [distance, u] = distanceToSegment(pixel, a.pixel, b.pixel);
             if (distance <= tolerancePx) {
                 candidates.push_back({.depth = a.depth + u * (b.depth - a.depth),
-                                      .edge = static_cast<int>(s - range.first),
+                                      .edge = static_cast<int>(s - firstEdge),
                                       .through = a.pixel + u * (b.pixel - a.pixel)});
             }
         }
@@ -466,18 +472,20 @@ SelectionItems MeshPicker::pickRect(const Camera& camera, const PickRect& rect,
         }
     }
 
-    // Solid edges.
-    if (filter.isEnabled(SelectionKind::Edge) && solidsVisible) {
-        const auto& edges = scene.surface().edges3d;
-        for (std::size_t e = 0; e < edges.size(); ++e) {
-            const ScreenPoint& a = onScreen(edges[e].a);
-            const ScreenPoint& b = onScreen(edges[e].b);
+    // Edges of 2D faces and of outer solid faces.
+    if (filter.isEnabled(SelectionKind::Edge)) {
+        for (int e = 0; e < scene.edgeCount(); ++e) {
+            if (!display.isVisible(scene.edgeDimension(e))) {
+                continue;
+            }
+            const ScreenPoint& a = onScreen(scene.edge(e).a);
+            const ScreenPoint& b = onScreen(scene.edge(e).b);
             if (!a.inFront || !b.inFront) {
                 continue;
             }
             const bool inside = box.contains(a.pixel) && box.contains(b.pixel);
             if (inside || (crossing && segmentTouchesBox(a.pixel, b.pixel, box))) {
-                result[SelectionKind::Edge].push_back(static_cast<int>(e));
+                result[SelectionKind::Edge].push_back(e);
             }
         }
     }

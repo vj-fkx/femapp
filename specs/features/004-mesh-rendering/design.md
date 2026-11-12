@@ -590,10 +590,8 @@ Todos exigem os vértices à frente da câmera e incluem itens escondidos.
   os nós de trás; no aramado não há faces e todos aparecem (REQ-004-35). Os
   nós selecionados continuam por cima, no passe de sobreposição. O buffer é
   refeito quando mudam `showNodes` ou a visibilidade das dimensões.
-- **Ordem alta:** como no resto da feature (REQ-004-10), são mostrados e
-  clicáveis só os vértices; os nós intermediários entram por janela e
-  cruzamento (`allNodes`), como hoje. Desenhar os intermediários fica com a
-  feature 029.
+- **Ordem alta:** *(substituído pela §13.)* Os nós intermediários passam a ser
+  mostrados e clicáveis.
 
 Memória extra para 1 milhão de tetraedros (casca de ≈ 50 mil nós e ≈ 150 mil
 arestas): menos de 1 MB para os nós; `triangleFaces` soma 4 bytes por
@@ -662,3 +660,41 @@ triângulo (≈ 0,4 MB); os vetores de seleção de faces e arestas, poucos kB.
 
 Sem mudança em relação à §2: tudo em `render` e `app`, `core` intocado, só
 QRhi; nenhuma dependência nova.
+
+## 13. Arestas 2D, arestas dos elementos selecionados e nós intermediários (2026-11-12)
+
+Pedido do mantenedor, sobre a §12. Atende aos REQ-004-19, 20, 26, 28, 32 e 34
+alterados.
+
+- **Arestas 2D no tipo "Arestas":** o índice de aresta passa a percorrer
+  `edges2d` e depois `edges3d`, na mesma ordem dos segmentos
+  `lines(Edges2d)` e `lines(Edges3d)`, que são contíguos no buffer de linhas.
+  `MeshScene` ganha `edgeCount()`, `edge(i)` (a `SurfaceEdge`) e
+  `edgeDimension(i)` (2 ou 3). Uma aresta comum a uma face 2D e a uma face de
+  sólido aparece nos dois grupos, como dois itens. O clique e o retângulo
+  testam as arestas 2D com a dimensão 2 visível e as de sólido com a 3D.
+  `Selection::removeElementsOfDimension` passa a receber a cena e retira as
+  arestas do grupo da dimensão ocultada. No menu, "Arestas de sólidos" vira
+  "Arestas".
+- **Arestas dos elementos selecionados (REQ-004-26):** ao refazer as cores,
+  cada face de `faces2d` e `faces3d` cujo elemento está selecionado gera os
+  segmentos grossos das suas arestas, desenhados pelo mesmo pipeline das
+  arestas selecionadas, no passe de sobreposição. Assim todas as arestas
+  visíveis do elemento ficam realçadas, também as que no buffer de linhas
+  pertencem ao vizinho.
+- **Nós intermediários (REQ-004-34):** `surfaceNodes(d)` passa a conter, para
+  0D, 1D e 2D, todos os nós dos elementos; para 3D, os vértices das faces da
+  casca e os nós de ordem alta sobre elas. Um nó local fica sobre uma face
+  local quando suas coordenadas no elemento de referência
+  (`core::referenceNodeCoordinates`) estão no plano dos vértices daquela face
+  (tolerância 1e−9) — teste exato, sem depender da geometria (vale também para
+  malhas curvas). A face local de cada face da casca é achada pelos seus
+  vértices; a lista de nós por (tipo, face local) é guardada em cache durante a
+  montagem da cena. Como o clique e "Mostrar nós" usam `surfaceNodes`, os
+  intermediários ficam visíveis e clicáveis sem outra mudança.
+
+Testes: arestas 2D e de sólido no clique e no retângulo (uma malha com um
+hexaedro e um quadrilátero ao lado); ocultar 2D retira só as arestas 2D;
+`surfaceNodes(3)` de um Tet10 isolado tem 10 nós e de um Hex27 isolado tem 26
+(todos menos o central); de dois Hex27 colados (45 nós), 42: ficam de fora os
+dois centrais e o centro da face comum.

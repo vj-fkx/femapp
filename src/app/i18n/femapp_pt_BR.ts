@@ -164,8 +164,8 @@
         <translation>&amp;Faces de sólidos</translation>
     </message>
     <message>
-        <source>Solid E&amp;dges</source>
-        <translation>&amp;Arestas de sólidos</translation>
+        <source>E&amp;dges</source>
+        <translation>&amp;Arestas</translation>
     </message>
     <message>
         <source>&amp;Nodes</source>

@@ -163,6 +163,20 @@ Regras:
 - [x] **T41** Clique sem Shift que não escolhe nenhum item limpa a seleção
   (pedido do mantenedor); retângulo vazio não limpa — arquivo: `viewport.cpp`
   — cobre: 25 (alterado)
+- [x] **T42** `MeshScene`: `edgeCount`, `edge`, `edgeDimension` (arestas 2D e de
+  sólido) e `surfaceNodes` com os nós intermediários (teste no elemento de
+  referência), com testes: Tet10 → 10, Hex27 → 26, dois Hex27 colados → 42 —
+  arquivos: `mesh_scene.hpp/.cpp`, `test_mesh_scene.cpp` — cobre: 32, 34
+  (design §13)
+- [x] **T43** `Selection` e `MeshPicker` com as arestas 2D (clique e
+  retângulo; ocultar 2D retira só as arestas 2D), com testes — arquivos:
+  `selection.hpp/.cpp`, `mesh_picker.cpp`, `viewport.cpp`, testes — cobre: 19,
+  20, 21, 22, 28, 32
+- [x] **T44** GPU: arestas selecionadas pelo índice novo e arestas visíveis dos
+  elementos selecionados como segmentos grossos — arquivo: `mesh_gpu.cpp` —
+  cobre: 26
+- [x] **T45** Menu "Arestas" e tradução — arquivos: `main_window.cpp`,
+  `femapp_pt_BR.ts` — cobre: 19, 29
 
 ## Fase 5 — Conferência e medições
 
@@ -219,15 +233,15 @@ Regras:
 | REQ-004-23 | T18, T26 | Roteiro manual (AC-8) |
 | REQ-004-24 | T09, T17, T31, T36 | `test_selection`; roteiro manual (AC-8) |
 | REQ-004-25 | T09, T17, T22, T31, T41 | `test_selection`; roteiro manual (AC-8) |
-| REQ-004-26 | T17, T26, T37 | `test_scene_renderer`; roteiro manual (AC-9, AC-14) |
+| REQ-004-26 | T17, T26, T37, T44 | `test_scene_renderer`; roteiro manual (AC-9, AC-14) |
 | REQ-004-27 | T17, T22, T38 | Roteiro manual (AC-9, AC-14) |
 | REQ-004-28 | T09, T17, T31, T36 | `test_selection`; roteiro manual (AC-9) |
 | REQ-004-29 | T24, T26, T39 | Roteiro manual (AC-10) |
 | REQ-004-30 | T03–T05, T10–T12, T25 | `test_mesh_surface`, `test_mesh_picker` (AC-4, AC-8) |
 | REQ-004-31 | T23, T90 | `femapp_smoke_mesh` nos quatro jobs (AC-11) |
-| REQ-004-32 | T32–T35 | `test_mesh_scene`, `test_mesh_picker` (AC-13) |
+| REQ-004-32 | T32–T35, T42, T43 | `test_mesh_scene`, `test_mesh_picker` (AC-13) |
 | REQ-004-33 | T31, T36 | `test_mesh_scene` (Selection) (AC-13) |
-| REQ-004-34 | T31, T37, T38, T26 | `test_scene_renderer`; roteiro manual (AC-15) |
+| REQ-004-34 | T31, T37, T38, T42, T26 | `test_scene_renderer`; roteiro manual (AC-15) |
 | REQ-004-35 | T37, T26 | Roteiro manual (AC-15) |
 | NFR-004-01 | T28 | Medição manual (AC-12) |
 | NFR-004-02 | T28 | Medição manual (AC-2, AC-12) |
@@ -321,3 +335,14 @@ tela (`Camera::setPivot`, `MeshPicker::surfacePoint`); 104 testes passando.
     laranja); corrigido no design;
   - o `Viewport` passa ao `MeshGpu` um `nodeVersion`, que muda com "Mostrar
     nós" e com a visibilidade das dimensões.
+
+**2026-11-12 — Pedidos do mantenedor (T41–T45):**
+
+- Clique fora da malha limpa a seleção (T41); os quatro tipos de seleção e
+  "Mostrar nós" (em preto) passaram a vir ligados por padrão.
+- T42–T45: arestas de elementos 2D no tipo "Arestas" (menu renomeado), arestas
+  visíveis dos elementos selecionados realçadas em linha grossa e nós
+  intermediários dos elementos de ordem alta mostrados e clicáveis (no 3D, só
+  os que ficam sobre a casca, achados pelo elemento de referência). 110 testes
+  passando; `clang-tidy` sem apontamentos.
+- **Não verificado visualmente:** fica no roteiro manual (T26).

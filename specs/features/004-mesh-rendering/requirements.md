@@ -62,19 +62,19 @@ mostrar resultados.
 
 | ID | Requisito | História |
 |----|-----------|----------|
-| REQ-004-19 | O sistema DEVE oferecer, no menu Editar, quatro tipos de seleção que podem ser ligados ao mesmo tempo: elementos, faces de sólidos, arestas de sólidos e nós, todos ligados por padrão; pelo menos um tipo fica sempre ligado. *(Alterado em 2026-11-12, a pedido do mantenedor: antes eram dois modos exclusivos; depois, os quatro ligados por padrão.)* | US-3, US-5 |
-| REQ-004-20 | QUANDO o usuário clicar com o botão esquerdo, O sistema DEVE acrescentar à seleção um único item, de um tipo ligado: o nó visível até alguns pixels do cursor; senão, a aresta de sólido visível até alguns pixels; senão, sob o cursor, a face de sólido visível mais próxima da câmera, ou o elemento visível mais próximo, se faces não estiver ligado. *(Alterado em 2026-11-12: prioridade entre os tipos.)* | US-3, US-5 |
+| REQ-004-19 | O sistema DEVE oferecer, no menu Editar, quatro tipos de seleção que podem ser ligados ao mesmo tempo: elementos, faces de sólidos, arestas (de sólidos e de elementos 2D) e nós, todos ligados por padrão; pelo menos um tipo fica sempre ligado. *(Alterado em 2026-11-12, a pedido do mantenedor: antes eram dois modos exclusivos; depois, os quatro ligados por padrão.)* | US-3, US-5 |
+| REQ-004-20 | QUANDO o usuário clicar com o botão esquerdo, O sistema DEVE acrescentar à seleção um único item, de um tipo ligado: o nó visível até alguns pixels do cursor; senão, a aresta visível até alguns pixels; senão, sob o cursor, a face de sólido visível mais próxima da câmera, ou o elemento visível mais próximo, se faces não estiver ligado. *(Alterado em 2026-11-12: prioridade entre os tipos.)* | US-3, US-5 |
 | REQ-004-21 | QUANDO o usuário arrastar com o botão esquerdo da esquerda para a direita (janela), O sistema DEVE acrescentar à seleção os itens de todos os tipos ligados, das dimensões visíveis, cuja projeção na tela esteja inteiramente dentro do retângulo, mesmo que escondidos por outros. *(Alterado em 2026-11-12: tipos ligados.)* | US-3, US-5 |
 | REQ-004-22 | QUANDO o usuário arrastar com o botão esquerdo da direita para a esquerda (cruzamento), O sistema DEVE acrescentar à seleção os itens de todos os tipos ligados, das dimensões visíveis, cuja projeção na tela esteja dentro do retângulo ou o cruze, mesmo que escondidos por outros. *(Alterado em 2026-11-12: tipos ligados.)* | US-3, US-5 |
 | REQ-004-23 | ENQUANTO o usuário arrasta, O sistema DEVE desenhar o retângulo: contínuo e azul para janela, tracejado e verde para cruzamento. | US-3 |
 | REQ-004-24 | QUANDO a tecla Shift estiver pressionada durante clique, janela ou cruzamento, O sistema DEVE retirar os itens da seleção em vez de acrescentá-los. | US-3 |
 | REQ-004-25 | QUANDO o usuário pressionar Esc, escolher Editar ▸ Limpar seleção ou clicar sem Shift num ponto onde nenhum item dos tipos ligados seria escolhido (fora da malha), O sistema DEVE esvaziar a seleção. *(Alterado em 2026-11-12, a pedido do mantenedor: clique fora da malha.)* | US-3 |
-| REQ-004-26 | O sistema DEVE realçar os itens selecionados com uma cor própria, visível em qualquer modo de exibição: as faces e arestas visíveis dos elementos selecionados, as faces de sólido selecionadas, as arestas de sólido selecionadas como linhas mais grossas e os nós selecionados como pontos. *(Alterado em 2026-11-12.)* | US-3, US-5 |
+| REQ-004-26 | O sistema DEVE realçar os itens selecionados com uma cor própria, visível em qualquer modo de exibição: as faces visíveis dos elementos selecionados e todas as suas arestas visíveis (inclusive as compartilhadas com vizinhos) como linhas mais grossas, as faces de sólido selecionadas, as arestas selecionadas como linhas mais grossas e os nós selecionados como pontos. *(Alterado em 2026-11-12; arestas dos elementos selecionados a pedido do mantenedor.)* | US-3, US-5 |
 | REQ-004-27 | O sistema DEVE mostrar na barra de status quantos itens de cada tipo estão selecionados, omitindo os tipos sem itens. *(Alterado em 2026-11-12.)* | US-3, US-5 |
-| REQ-004-28 | QUANDO uma dimensão for ocultada, O sistema DEVE retirar da seleção os elementos dessa dimensão e, se for a 3D, as faces e arestas de sólido. *(Alterado em 2026-11-12.)* | US-3, US-5 |
-| REQ-004-32 | O sistema DEVE considerar como faces de sólido as faces da casca externa (REQ-004-09) e como arestas de sólido as arestas dessas faces; cada aresta é um único item, mesmo sendo comum a duas faces. Faces e arestas internas não são selecionáveis. *(Acrescentado em 2026-11-12.)* | US-5 |
+| REQ-004-28 | QUANDO uma dimensão for ocultada, O sistema DEVE retirar da seleção os elementos dessa dimensão e, se for a 2D, as arestas de elementos 2D; se for a 3D, as faces e arestas de sólido. *(Alterado em 2026-11-12.)* | US-3, US-5 |
+| REQ-004-32 | O sistema DEVE considerar como faces de sólido as faces da casca externa (REQ-004-09) e como arestas de sólido as arestas dessas faces; como arestas de elementos 2D, as arestas das faces dos elementos 2D. Cada aresta é um único item dentro do seu grupo (sólido ou 2D), mesmo sendo comum a duas faces. Faces e arestas internas dos sólidos não são selecionáveis. *(Acrescentado em 2026-11-12; arestas 2D a pedido do mantenedor.)* | US-5 |
 | REQ-004-33 | QUANDO o usuário desligar um tipo de seleção, O sistema DEVE retirar da seleção os itens desse tipo. *(Acrescentado em 2026-11-12.)* | US-5 |
-| REQ-004-34 | O sistema DEVE oferecer, no menu Exibir, a opção "Mostrar nós" (ligada por padrão), que desenha como pontos pretos de tamanho fixo os nós dos elementos das dimensões visíveis (dos sólidos, só os da casca externa). *(Acrescentado em 2026-11-12; ligada por padrão e em preto a pedido do mantenedor.)* | US-5 |
+| REQ-004-34 | O sistema DEVE oferecer, no menu Exibir, a opção "Mostrar nós" (ligada por padrão), que desenha como pontos pretos de tamanho fixo todos os nós dos elementos das dimensões visíveis, inclusive os intermediários dos elementos de ordem alta (dos sólidos, só os que ficam sobre a casca externa); esses nós também podem ser escolhidos por clique. *(Acrescentado em 2026-11-12; ligada por padrão, em preto e com os nós intermediários a pedido do mantenedor.)* | US-5 |
 | REQ-004-35 | ENQUANTO "Mostrar nós" estiver ligada, nos modos sólido e sólido com arestas, O sistema NÃO DEVE desenhar os nós escondidos atrás de faces; no aramado, DEVE desenhar todos. *(Acrescentado em 2026-11-12.)* | US-5 |
 
 ### Interface, camadas e testes
@@ -143,8 +143,8 @@ mostrar resultados.
 
 ## 6. Fora de escopo
 
-- Selecionar faces e arestas internas dos sólidos e arestas de elementos 2D
-  como itens próprios (um elemento 2D já é selecionável como elemento).
+- Selecionar faces e arestas internas dos sólidos (um elemento 2D já é
+  selecionável como elemento; suas arestas, como arestas).
 - Atribuir cargas e apoios às faces e arestas selecionadas — feature 010.
 - Numeração (IDs) de nós ou elementos na tela.
 - Mostrar e ocultar grupos individualmente e árvore do modelo — feature 010.

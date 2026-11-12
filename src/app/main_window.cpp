@@ -273,7 +273,7 @@ void MainWindow::createEditMenu()
     const std::array<std::pair<render::SelectionKind, QString>, render::kSelectionKindCount> kinds =
         {{{render::SelectionKind::Element, tr("&Elements")},
           {render::SelectionKind::Face, tr("Solid &Faces")},
-          {render::SelectionKind::Edge, tr("Solid E&dges")},
+          {render::SelectionKind::Edge, tr("E&dges")},
           {render::SelectionKind::Node, tr("&Nodes")}}};
     for (const auto& [kind, name] : kinds) {
         QAction* action = selectMenu->addAction(name);

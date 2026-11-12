@@ -45,9 +45,9 @@ public:
     // REQ-004-33
     void clear(SelectionKind kind);
 
-    // REQ-004-28: takes out the selected elements of `dimension`; for 3D, the
-    // faces and edges of the solids too.
-    void removeElementsOfDimension(const core::Mesh& mesh, int dimension);
+    // REQ-004-28: takes out the selected elements and edges of `dimension`;
+    // for 3D, the faces of the solids too.
+    void removeElementsOfDimension(const MeshScene& scene, int dimension);
 
 private:
     struct Set

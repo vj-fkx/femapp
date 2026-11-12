@@ -276,7 +276,7 @@ void Viewport::setDimensionVisible(int dimension, bool visible)
     // REQ-004-28: hidden elements leave the selection.
     if (!visible && m_impl->scene) {
         const int before = m_impl->selection.total();
-        m_impl->selection.removeElementsOfDimension(m_impl->scene->mesh(), dimension);
+        m_impl->selection.removeElementsOfDimension(*m_impl->scene, dimension);
         if (m_impl->selection.total() != before) {
             selectionEdited();
         }

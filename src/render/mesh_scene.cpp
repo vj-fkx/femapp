@@ -1,8 +1,11 @@
 #include <fem/render/mesh_scene.hpp>
 
+#include <Eigen/Geometry>
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstddef>
+#include <map>
 #include <utility>
 
 namespace fem::render {
@@ -37,6 +40,74 @@ void sortUnique(std::vector<core::NodeIndex>& nodes)
     nodes.shrink_to_fit();
 }
 
+// Local nodes (vertices and higher order nodes) lying on each local face of a
+// solid type, found in the reference element: a node is on a face when its
+// reference coordinates are in the plane of the face vertices (design §13).
+class FaceNodeTable
+{
+public:
+    const std::vector<int>& nodesOn(core::ElementType type, std::size_t localFace)
+    {
+        const auto key = std::make_pair(static_cast<int>(type), localFace);
+        const auto found = m_cache.find(key);
+        if (found != m_cache.end()) {
+            return found->second;
+        }
+        const core::ElementTypeInfo& info = core::elementTypeInfo(type);
+        const core::LocalFace& face = core::elementFaces(info.family)[localFace];
+        const auto reference = core::referenceNodeCoordinates(type);
+        const auto point = [&](std::size_t node) {
+            const std::array<double, 3>& p = reference[node];
+            return Eigen::Vector3d(p[0], p[1], p[2]);
+        };
+        const Eigen::Vector3d a = point(face.vertices[0]);
+        const Eigen::Vector3d normal =
+            (point(face.vertices[1]) - a).cross(point(face.vertices[2]) - a);
+        constexpr double kTolerance = 1e-9;
+        std::vector<int> nodes;
+        for (std::size_t j = 0; j < reference.size(); ++j) {
+            if (std::abs(normal.dot(point(j) - a)) <= kTolerance * normal.norm()) {
+                nodes.push_back(static_cast<int>(j));
+            }
+        }
+        return m_cache.emplace(key, std::move(nodes)).first->second;
+    }
+
+private:
+    std::map<std::pair<int, std::size_t>, std::vector<int>> m_cache;
+};
+
+// Local index of the face of `element` whose vertices are `face`, or -1.
+int localFaceOf(const core::Mesh& mesh, const core::SurfaceFace& face)
+{
+    const core::ElementTypeInfo& info = core::elementTypeInfo(mesh.elementType(face.element));
+    const auto nodes = mesh.elementNodes(face.element);
+    std::array<int, 4> local{-1, -1, -1, -1};
+    for (std::size_t v = 0; v < face.nodeCount; ++v) {
+        for (int j = 0; j < info.vertexCount; ++j) {
+            if (nodes[static_cast<std::size_t>(j)] == face.nodes.at(v)) {
+                local.at(v) = j;
+            }
+        }
+    }
+    std::sort(local.begin(), local.begin() + face.nodeCount);
+    const auto faces = core::elementFaces(info.family);
+    for (std::size_t f = 0; f < faces.size(); ++f) {
+        if (faces[f].vertexCount != face.nodeCount) {
+            continue;
+        }
+        std::array<int, 4> vertices{-1, -1, -1, -1};
+        for (std::size_t v = 0; v < faces[f].vertexCount; ++v) {
+            vertices.at(v) = faces[f].vertices.at(v);
+        }
+        std::sort(vertices.begin(), vertices.begin() + face.nodeCount);
+        if (vertices == local) {
+            return static_cast<int>(f);
+        }
+    }
+    return -1;
+}
+
 } // namespace
 
 Rgba dimensionColor(int dimension) noexcept
@@ -57,6 +128,23 @@ Range MeshScene::triangles(int dimension) const noexcept
 Range MeshScene::lines(LineSet set) const noexcept
 {
     return m_lineRanges[static_cast<std::size_t>(set)];
+}
+
+int MeshScene::edgeCount() const noexcept
+{
+    return static_cast<int>(m_surface.edges2d.size() + m_surface.edges3d.size());
+}
+
+const core::SurfaceEdge& MeshScene::edge(int index) const
+{
+    const auto i = static_cast<std::size_t>(index);
+    const std::size_t flat = m_surface.edges2d.size();
+    return i < flat ? m_surface.edges2d.at(i) : m_surface.edges3d.at(i - flat);
+}
+
+int MeshScene::edgeDimension(int index) const noexcept
+{
+    return static_cast<std::size_t>(index) < m_surface.edges2d.size() ? 2 : 3;
 }
 
 std::span<const core::NodeIndex> MeshScene::surfaceNodes(int dimension) const noexcept
@@ -168,11 +256,8 @@ std::shared_ptr<const MeshScene> buildMeshScene(std::shared_ptr<const core::Mesh
             all.insert(all.end(), nodes.begin(), nodes.end());
             if (info.dimension == 1) {
                 addSegment(nodes[0], nodes[1], element);
-                scene->m_surfaceNodes[1].push_back(nodes[0]);
-                scene->m_surfaceNodes[1].push_back(nodes[1]);
             } else if (info.dimension == 0) {
                 scene->m_pointElements.push_back(element);
-                scene->m_surfaceNodes[0].push_back(nodes[0]);
             }
         }
     }
@@ -190,18 +275,31 @@ std::shared_ptr<const MeshScene> buildMeshScene(std::shared_ptr<const core::Mesh
     }
     scene->m_lineRanges[2] = {.first = first, .count = segmentCount() - first};
 
-    for (const core::SurfaceFace& face : scene->m_surface.faces2d) {
-        scene->m_surfaceNodes[2].insert(scene->m_surfaceNodes[2].end(), face.nodes.begin(),
-                                        face.nodes.begin() + face.nodeCount);
-    }
+    // REQ-004-34: the nodes on the visible surface, higher order ones
+    // included. Points, lines and 2D elements are drawn whole; of the solids,
+    // the nodes lying on their outer faces.
+    FaceNodeTable faceNodes;
+    auto& solidSurface = scene->m_surfaceNodes[3];
     for (const core::SurfaceFace& face : scene->m_surface.faces3d) {
-        scene->m_surfaceNodes[3].insert(scene->m_surfaceNodes[3].end(), face.nodes.begin(),
-                                        face.nodes.begin() + face.nodeCount);
+        solidSurface.insert(solidSurface.end(), face.nodes.begin(),
+                            face.nodes.begin() + face.nodeCount);
+        const int localFace = localFaceOf(m, face);
+        if (localFace < 0) {
+            continue;
+        }
+        const auto nodes = m.elementNodes(face.element);
+        for (const int j :
+             faceNodes.nodesOn(m.elementType(face.element), static_cast<std::size_t>(localFace))) {
+            solidSurface.push_back(nodes[static_cast<std::size_t>(j)]);
+        }
     }
     for (std::size_t d = 0; d < 4; ++d) {
-        sortUnique(scene->m_surfaceNodes.at(d));
         sortUnique(scene->m_allNodes.at(d));
     }
+    for (std::size_t d = 0; d < 3; ++d) {
+        scene->m_surfaceNodes.at(d) = scene->m_allNodes.at(d);
+    }
+    sortUnique(solidSurface);
 
     scene->m_triangleVertices.shrink_to_fit();
     scene->m_triangleElements.shrink_to_fit();

@@ -334,13 +334,30 @@ bool MeshGpu::prepare(QRhiResourceUpdateBatch* updates, const MeshFrame& frame,
                     {.position = toArray(positions[static_cast<std::size_t>(node)]),
                      .color = kSelectedFlag});
             }
-            const auto& edges = scene->surface().edges3d;
+            const auto segment = [&](core::NodeIndex a, core::NodeIndex b) {
+                selectedEdges.push_back({.from = toArray(positions[static_cast<std::size_t>(a)]),
+                                         .to = toArray(positions[static_cast<std::size_t>(b)]),
+                                         .color = kSelectedFlag});
+            };
             for (const int e : selection->items(SelectionKind::Edge)) {
-                const core::SurfaceEdge& edge = edges[static_cast<std::size_t>(e)];
-                selectedEdges.push_back(
-                    {.from = toArray(positions[static_cast<std::size_t>(edge.a)]),
-                     .to = toArray(positions[static_cast<std::size_t>(edge.b)]),
-                     .color = kSelectedFlag});
+                const core::SurfaceEdge& edge = scene->edge(e);
+                segment(edge.a, edge.b);
+            }
+            // REQ-004-26: every visible edge of a selected element, also those
+            // that the line buffer gives to a neighbour.
+            if (selection->count(SelectionKind::Element) > 0) {
+                const auto faceEdges = [&](const std::vector<core::SurfaceFace>& faces) {
+                    for (const core::SurfaceFace& face : faces) {
+                        if (!selection->contains(SelectionKind::Element, face.element)) {
+                            continue;
+                        }
+                        for (std::size_t v = 0; v < face.nodeCount; ++v) {
+                            segment(face.nodes.at(v), face.nodes.at((v + 1) % face.nodeCount));
+                        }
+                    }
+                };
+                faceEdges(scene->surface().faces2d);
+                faceEdges(scene->surface().faces3d);
             }
         }
 

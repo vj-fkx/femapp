@@ -1,5 +1,6 @@
 #include "mesh_fixtures.hpp"
 
+#include <fem/core/element_type.hpp>
 #include <fem/render/mesh_scene.hpp>
 #include <fem/render/selection.hpp>
 
@@ -179,11 +180,12 @@ TEST_CASE("selection adds, removes, clears and drops a dimension", "[render][sel
     CHECK(selection.count(SelectionKind::Node) == 2);
     CHECK(selection.total() == 11);
 
-    // Out of range indices are ignored: 6 faces and 12 edges.
+    // Out of range indices are ignored: 6 faces and 6 + 12 edges (2D first:
+    // edge 0 is a 2D edge, edge 11 a solid one).
     fem::render::SelectionItems some;
     some[SelectionKind::Element] = {1, 4, 99, -1};
     some[SelectionKind::Face] = {6};
-    some[SelectionKind::Edge] = {12};
+    some[SelectionKind::Edge] = {18};
     selection.remove(some);
     CHECK(selection.count(SelectionKind::Element) == 3);
     CHECK_FALSE(selection.contains(SelectionKind::Element, 1));
@@ -193,18 +195,19 @@ TEST_CASE("selection adds, removes, clears and drops a dimension", "[render][sel
 
     // Internal order follows the element types: point, line, triangle,
     // quadrilateral, hexahedron. Left: point, triangle and quadrilateral.
-    // Hiding 2D takes out the triangle and the quadrilateral, not the solid
-    // faces and edges.
+    // Hiding 2D takes out the triangle, the quadrilateral and the 2D edge,
+    // not the solid faces and edges.
     const int point = mesh->findElement(5).value_or(-1);
     const int triangle = mesh->findElement(3).value_or(-1);
     REQUIRE(selection.contains(SelectionKind::Element, triangle));
-    selection.removeElementsOfDimension(*mesh, 2);
+    selection.removeElementsOfDimension(*scene, 2);
     CHECK_FALSE(selection.contains(SelectionKind::Element, triangle));
     CHECK(selection.items(SelectionKind::Element) == std::vector<int>{point});
     CHECK(selection.count(SelectionKind::Face) == 2);
+    CHECK(selection.items(SelectionKind::Edge) == std::vector<int>{11});
 
     // Hiding 3D takes out the solid faces and edges; nodes stay.
-    selection.removeElementsOfDimension(*mesh, 3);
+    selection.removeElementsOfDimension(*scene, 3);
     CHECK(selection.count(SelectionKind::Face) == 0);
     CHECK(selection.count(SelectionKind::Edge) == 0);
     CHECK(selection.count(SelectionKind::Node) == 2);
@@ -220,4 +223,70 @@ TEST_CASE("selection adds, removes, clears and drops a dimension", "[render][sel
     selection.reset(nullptr);
     selection.add(all);
     CHECK(selection.total() == 0);
+}
+
+// REQ-004-32: edges are numbered 2D first, then solid, like the segments.
+TEST_CASE("scene numbers 2D and solid edges like the segments", "[render][scene]")
+{
+    const auto scene = fem::render::buildMeshScene(mixedMesh());
+    REQUIRE(scene->edgeCount() == 6 + 12);
+    const std::uint32_t first = scene->lines(LineSet::Edges2d).first;
+    const auto positions = scene->nodePositions();
+    for (int e = 0; e < scene->edgeCount(); ++e) {
+        CHECK(scene->edgeDimension(e) == (e < 6 ? 2 : 3));
+        const std::size_t v = 2 * static_cast<std::size_t>(first + static_cast<std::uint32_t>(e));
+        CHECK(scene->lineVertices()[v] == positions[static_cast<std::size_t>(scene->edge(e).a)]);
+        CHECK(scene->lineVertices()[v + 1] ==
+              positions[static_cast<std::size_t>(scene->edge(e).b)]);
+    }
+}
+
+namespace {
+
+// Elements of `type` placed at their reference coordinates, shifted along x
+// by 2 per element; nodes at the same position are shared.
+std::shared_ptr<const fem::core::Mesh> referenceElements(ElementType type, int count)
+{
+    std::vector<Eigen::Vector3d> nodes;
+    fem::render::test::ElementList elements;
+    for (int i = 0; i < count; ++i) {
+        std::vector<fem::core::ExternalId> ids;
+        for (const auto& p : fem::core::referenceNodeCoordinates(type)) {
+            const Eigen::Vector3d x(p[0] + 2.0 * i, p[1], p[2]);
+            const auto same = std::ranges::find_if(
+                nodes, [&](const Eigen::Vector3d& y) { return (x - y).norm() < 1e-12; });
+            if (same == nodes.end()) {
+                ids.push_back(static_cast<fem::core::ExternalId>(nodes.size()));
+                nodes.push_back(x);
+            } else {
+                ids.push_back(static_cast<fem::core::ExternalId>(same - nodes.begin()));
+            }
+        }
+        elements.emplace_back(type, ids);
+    }
+    return fem::render::test::buildMesh(nodes, elements);
+}
+
+} // namespace
+
+// REQ-004-34: the higher order nodes on the outer faces are shown, those
+// inside the solid are not.
+TEST_CASE("surface nodes include the higher order nodes on the outer faces", "[render][scene]")
+{
+    CHECK(fem::render::buildMeshScene(referenceElements(ElementType::Tet10, 1))
+              ->surfaceNodes(3)
+              .size() == 10);
+    // All but the centre node.
+    CHECK(fem::render::buildMeshScene(referenceElements(ElementType::Hex27, 1))
+              ->surfaceNodes(3)
+              .size() == 26);
+    // Two hexahedra sharing a face (Gmsh's reference is [-1, 1]^3): 45 nodes;
+    // the two centres and the centre of the shared face are inside.
+    const auto pair = referenceElements(ElementType::Hex27, 2);
+    REQUIRE(pair->nodeCount() == 45);
+    CHECK(fem::render::buildMeshScene(pair)->surfaceNodes(3).size() == 42);
+
+    // 2D and 1D elements show all their nodes.
+    const auto quad = fem::render::buildMeshScene(referenceElements(ElementType::Quad9, 1));
+    CHECK(quad->surfaceNodes(2).size() == 9);
 }

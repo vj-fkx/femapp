@@ -389,3 +389,33 @@ TEST_CASE("window and crossing select solid faces and edges", "[render][picker]"
     hidden.dimensionVisible[3] = false;
     CHECK(picker.pickRect(camera, all, filter, hidden).empty());
 }
+
+// REQ-004-20 to 22, 32: the edges of 2D elements are selectable too.
+TEST_CASE("edges of 2D elements are picked by click and rectangle", "[render][picker]")
+{
+    const auto mesh = fem::render::test::quadGrid(2);
+    const auto scene = fem::render::buildMeshScene(mesh);
+    const MeshPicker picker(scene);
+    const Camera camera = cameraFor(*mesh, StandardView::Top, Projection::Orthographic);
+    const auto edgesOnly = only({SelectionKind::Edge});
+
+    // Near the middle of the edge from (1, 0) to (1, 1).
+    const Vec2 near = toPixel(camera, {1.0, 0.5, 0.0}) + Vec2(2.0, 0.0);
+    const int e = indexOf(picker.pick(camera, near, edgesOnly, DisplayOptions{}, kTolerance),
+                          SelectionKind::Edge);
+    REQUIRE(e >= 0);
+    CHECK(scene->edgeDimension(e) == 2);
+    const Eigen::Vector3d a = mesh->nodeCoordinates(scene->edge(e).a);
+    const Eigen::Vector3d b = mesh->nodeCoordinates(scene->edge(e).b);
+    CHECK((0.5 * (a + b) - Eigen::Vector3d(1.0, 0.5, 0.0)).norm() < 1e-9);
+
+    // A window around everything: the 12 edges of the 2 x 2 grid.
+    const PickRect all{.from = Vec2(1, 1), .to = Vec2(kWidth - 1, kHeight - 1)};
+    CHECK(picker.pickRect(camera, all, edgesOnly, DisplayOptions{})[SelectionKind::Edge].size() ==
+          12);
+
+    DisplayOptions hidden;
+    hidden.dimensionVisible[2] = false;
+    CHECK_FALSE(picker.pick(camera, near, edgesOnly, hidden, kTolerance).has_value());
+    CHECK(picker.pickRect(camera, all, edgesOnly, hidden).empty());
+}
