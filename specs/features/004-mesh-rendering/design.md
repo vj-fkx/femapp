@@ -1,6 +1,6 @@
 # Design — 004 mesh-rendering
 
-Status: rascunho · Data: 2026-11-12
+Status: aprovado · Data: 2026-11-12
 Requisitos: [requirements.md](requirements.md)
 
 ## 1. Resumo da abordagem

@@ -1,6 +1,6 @@
 # ADR 0003 — Seleção no viewport calculada na CPU
 
-Status: proposta · Data: 2026-11-12
+Status: aceita · Data: 2026-11-12
 
 ## Contexto
 
