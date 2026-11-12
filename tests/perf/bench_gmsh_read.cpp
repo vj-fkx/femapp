@@ -15,7 +15,9 @@
 #include <filesystem>
 #include <span>
 
-int main(int argc, char* argv[])
+namespace {
+
+int run(int argc, char* argv[])
 {
     const std::span<char* const> args(argv, static_cast<std::size_t>(argc));
     if (args.size() < 2) {
@@ -49,4 +51,17 @@ int main(int argc, char* argv[])
                     bytes / raw);
     }
     return status;
+}
+
+} // namespace
+
+int main(int argc, char* argv[])
+{
+    try {
+        return run(argc, argv);
+    } catch (...) {
+        std::fputs("bench_gmsh_read: fatal error
+", stderr);
+        return EXIT_FAILURE;
+    }
 }
