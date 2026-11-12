@@ -2,6 +2,7 @@
 
 #include "axis_gizmo_mesh.hpp"
 #include "axis_labels.hpp"
+#include "rhi_util.hpp"
 
 #include <fem/render/grid_spacing.hpp>
 
@@ -38,8 +39,13 @@ constexpr int kLabelCellBasePx = 32;
 // that it always stays on top of the scene.
 constexpr float kGizmoMaxDepth = 0.01F;
 
-constexpr int kMatrixFloats = 16;
-constexpr int kVectorFloats = 4;
+using detail::alphaBlend;
+using detail::copyMatrix;
+using detail::kMatrixFloats;
+using detail::kVectorFloats;
+using detail::loadShader;
+using detail::toOpenGlDepth;
+using detail::toQt;
 constexpr int kGridUniformFloats = kMatrixFloats + 3 * kVectorFloats;
 constexpr int kGizmoUniformFloats = 2 * kMatrixFloats;
 constexpr int kLabelUniformFloats = 2 * kMatrixFloats + kVectorFloats;
@@ -48,58 +54,6 @@ template <std::size_t N>
 constexpr quint32 byteSize(const std::array<float, N>& /*data*/)
 {
     return static_cast<quint32>(N * sizeof(float));
-}
-
-QMatrix4x4 toQt(const Mat4& matrix)
-{
-    QMatrix4x4 result;
-    for (int row = 0; row < 4; ++row) {
-        for (int column = 0; column < 4; ++column) {
-            result(row, column) = static_cast<float>(matrix(row, column));
-        }
-    }
-    return result;
-}
-
-// Camera projections use a [0, 1] depth range. QRhi expects OpenGL-style clip
-// space (depth in [-1, 1]) as the input of its correction matrix.
-Mat4 toOpenGlDepth(const Mat4& projection)
-{
-    Mat4 remap = Mat4::Identity();
-    remap(2, 2) = 2.0;
-    remap(2, 3) = -1.0;
-    return remap * projection;
-}
-
-void copyMatrix(const QMatrix4x4& matrix, float* destination)
-{
-    std::memcpy(destination, matrix.constData(), kMatrixFloats * sizeof(float));
-}
-
-QShader loadShader(const QString& name, QString* error)
-{
-    QFile file(QStringLiteral(":/fem/render/shaders/") + name + QStringLiteral(".qsb"));
-    if (!file.open(QIODevice::ReadOnly)) {
-        *error = QStringLiteral("shader '%1' is missing from the resources").arg(name);
-        return {};
-    }
-    QShader shader = QShader::fromSerialized(file.readAll());
-    if (!shader.isValid()) {
-        *error = QStringLiteral("shader '%1' is not valid").arg(name);
-    }
-    return shader;
-}
-
-QRhiGraphicsPipeline::TargetBlend alphaBlend()
-{
-    QRhiGraphicsPipeline::TargetBlend blend;
-    blend.enable = true;
-    blend.srcColor = QRhiGraphicsPipeline::SrcAlpha;
-    blend.dstColor = QRhiGraphicsPipeline::OneMinusSrcAlpha;
-    // Keeps the destination alpha at 1, so the widget stays opaque.
-    blend.srcAlpha = QRhiGraphicsPipeline::One;
-    blend.dstAlpha = QRhiGraphicsPipeline::OneMinusSrcAlpha;
-    return blend;
 }
 
 } // namespace
@@ -117,7 +71,8 @@ bool SceneRenderer::initialize(QRhi* rhi, QRhiRenderPassDescriptor* renderPass, 
     QRhiResourceUpdateBatch* updates = rhi->nextResourceUpdateBatch();
     const bool created = createGrid(renderPass, sampleCount, updates) &&
                          createGizmo(renderPass, sampleCount, updates) &&
-                         createLabels(renderPass, sampleCount, updates);
+                         createLabels(renderPass, sampleCount, updates) &&
+                         m_mesh.create(rhi, renderPass, sampleCount, &m_error);
     if (!created) {
         updates->release();
         release();
@@ -401,11 +356,11 @@ void SceneRenderer::updateGizmoUniforms(const FrameParams& params, QRhiResourceU
     updates->updateDynamicBuffer(m_labelUniforms.get(), 0, byteSize(labels), labels.data());
 }
 
-void SceneRenderer::render(QRhiCommandBuffer* commandBuffer, QRhiRenderTarget* target,
+bool SceneRenderer::render(QRhiCommandBuffer* commandBuffer, QRhiRenderTarget* target,
                            const FrameParams& params)
 {
     if (m_rhi == nullptr || params.camera == nullptr) {
-        return;
+        return true;
     }
 
     QRhiResourceUpdateBatch* updates = m_pendingUpdates;
@@ -430,17 +385,30 @@ void SceneRenderer::render(QRhiCommandBuffer* commandBuffer, QRhiRenderTarget* t
     if (drawAxes) {
         updateGizmoUniforms(params, updates);
     }
+    if (!m_mesh.prepare(updates, params.mesh, *params.camera, params.pixelSize,
+                        params.devicePixelRatio, &m_error)) {
+        updates->release();
+        return false;
+    }
+
+    // The scene uses the depth range above the thin slice kept for the axis
+    // indicator, so that the indicator always stays in front.
+    const QRhiViewport sceneViewport(0.0F, 0.0F, width, height, kGizmoMaxDepth, 1.0F);
 
     commandBuffer->beginPass(target, kBackgroundColor, {1.0F, 0}, updates);
 
+    m_mesh.draw(commandBuffer, sceneViewport, params.mesh.display);
+
     if (drawGrid) {
         commandBuffer->setGraphicsPipeline(m_gridPipeline.get());
-        commandBuffer->setViewport({0.0F, 0.0F, width, height});
+        commandBuffer->setViewport(sceneViewport);
         commandBuffer->setShaderResources();
         const QRhiCommandBuffer::VertexInput input(m_gridVertices.get(), 0);
         commandBuffer->setVertexInput(0, 1, &input);
         commandBuffer->draw(4);
     }
+
+    m_mesh.drawOverlay(commandBuffer, sceneViewport);
 
     if (drawAxes) {
         // QRhi viewports have their origin at the bottom-left corner.
@@ -463,10 +431,12 @@ void SceneRenderer::render(QRhiCommandBuffer* commandBuffer, QRhiRenderTarget* t
     }
 
     commandBuffer->endPass();
+    return true;
 }
 
 void SceneRenderer::release()
 {
+    m_mesh.release();
     if (m_pendingUpdates != nullptr) {
         m_pendingUpdates->release();
         m_pendingUpdates = nullptr;

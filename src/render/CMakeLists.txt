@@ -9,9 +9,15 @@ femapp_add_module(render
         backend.cpp
         camera.cpp
         grid_spacing.cpp
+        mesh_gpu.cpp
+        mesh_gpu.hpp
         mesh_picker.cpp
         mesh_scene.cpp
+        rhi_util.cpp
+        rhi_util.hpp
         selection.cpp
+        selection_overlay.cpp
+        selection_overlay.hpp
         scene_renderer.cpp
         scene_renderer.hpp
         viewport.cpp
@@ -43,4 +49,10 @@ qt_add_shaders(fem_render "fem_render_shaders"
         shaders/gizmo.vert
         shaders/gizmo.frag
         shaders/label.vert
-        shaders/label.frag)
+        shaders/label.frag
+        shaders/mesh_face.vert
+        shaders/mesh_face.frag
+        shaders/mesh_line.vert
+        shaders/mesh_line.frag
+        shaders/mesh_point.vert
+        shaders/mesh_point.frag)

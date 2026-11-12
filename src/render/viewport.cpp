@@ -1,6 +1,8 @@
 #include "scene_renderer.hpp"
+#include "selection_overlay.hpp"
 
 #include <fem/render/backend.hpp>
+#include <fem/render/mesh_picker.hpp>
 #include <fem/render/viewport.hpp>
 
 #include <QGuiApplication>
@@ -12,8 +14,11 @@
 
 #include <rhi/qrhi.h>
 
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <utility>
+#include <vector>
 #include <string>
 #include <string_view>
 
@@ -26,6 +31,9 @@ Q_LOGGING_CATEGORY(lcRender, "fem.render")
 constexpr int kSampleCount = 4;
 constexpr double kWheelDegreesPerStep = 15.0;
 constexpr double kWheelUnitsPerDegree = 8.0;
+// A left-button press that moves less than this is a click (design §5.3).
+constexpr double kDragThresholdPx = 4.0;
+constexpr double kPickTolerancePx = 5.0;
 
 QRhiWidget::Api toApi(Backend backend)
 {
@@ -80,6 +88,21 @@ public:
 
     DragMode dragMode = DragMode::None;
     QPointF lastMousePosition;
+
+    // Mesh and selection.
+    std::shared_ptr<const MeshScene> scene;
+    std::unique_ptr<MeshPicker> picker;
+    DisplayOptions display;
+    Selection selection;
+    std::uint64_t sceneVersion = 0;
+    std::uint64_t colorVersion = 0;
+    std::uint64_t shownSceneVersion = 0;
+
+    // Left button: click or rectangle.
+    bool leftPressed = false;
+    bool rectangle = false;
+    QPointF pressPosition;
+    SelectionOverlay* overlay = nullptr;
 };
 
 Viewport::Viewport(QWidget* parent)
@@ -101,6 +124,8 @@ Viewport::Viewport(QWidget* parent)
         setApi(toApi(m_impl->plan.attempts.front()));
     }
     setSampleCount(kSampleCount);
+    // NOLINTNEXTLINE(cppcoreguidelines-owning-memory): owned by its Qt parent.
+    m_impl->overlay = new SelectionOverlay(this);
 
     connect(this, &QRhiWidget::renderFailed, this, &Viewport::handleRenderFailed);
 }
@@ -179,10 +204,137 @@ void Viewport::setProjection(Projection projection)
 
 void Viewport::fitAll()
 {
-    // There is no scene content yet, so the default region is framed.
+    // REQ-004-17: the mesh if there is one, else the default grid region.
     m_impl->camera.setViewportSize(width(), height());
-    m_impl->camera.fit(defaultSceneBounds());
+    if (m_impl->scene && !m_impl->scene->bounds().isEmpty()) {
+        const core::BoundingBox& box = m_impl->scene->bounds();
+        m_impl->camera.fit({.min = box.min, .max = box.max});
+    } else {
+        m_impl->camera.fit(defaultSceneBounds());
+    }
     update();
+}
+
+void Viewport::setScene(std::shared_ptr<const MeshScene> scene)
+{
+    m_impl->scene = std::move(scene);
+    ++m_impl->sceneVersion;
+    ++m_impl->colorVersion;
+    if (m_impl->scene) {
+        m_impl->picker = std::make_unique<MeshPicker>(m_impl->scene);
+        m_impl->selection.reset(m_impl->selection.mode(), m_impl->scene->mesh());
+    } else {
+        m_impl->picker.reset();
+        m_impl->selection = Selection();
+    }
+    m_impl->initialFitDone = true;
+    fitAll();
+    emit selectionChanged(0, m_impl->selection.mode());
+}
+
+const std::shared_ptr<const MeshScene>& Viewport::scene() const
+{
+    return m_impl->scene;
+}
+
+const DisplayOptions& Viewport::displayOptions() const
+{
+    return m_impl->display;
+}
+
+const Selection& Viewport::selection() const
+{
+    return m_impl->selection;
+}
+
+void Viewport::setDisplayMode(DisplayMode mode)
+{
+    if (m_impl->display.mode != mode) {
+        m_impl->display.mode = mode;
+        update();
+    }
+}
+
+void Viewport::setColorMode(ColorMode mode)
+{
+    if (m_impl->display.color != mode) {
+        m_impl->display.color = mode;
+        ++m_impl->colorVersion;
+        update();
+    }
+}
+
+void Viewport::setDimensionVisible(int dimension, bool visible)
+{
+    if (dimension < 0 || dimension > 3 || m_impl->display.isVisible(dimension) == visible) {
+        return;
+    }
+    m_impl->display.dimensionVisible.at(static_cast<std::size_t>(dimension)) = visible;
+    // REQ-004-28: hidden elements leave the selection.
+    if (!visible && m_impl->scene) {
+        const int before = m_impl->selection.count();
+        m_impl->selection.removeElementsOfDimension(m_impl->scene->mesh(), dimension);
+        if (m_impl->selection.count() != before) {
+            selectionEdited();
+        }
+    }
+    update();
+}
+
+void Viewport::setSelectionMode(SelectionMode mode)
+{
+    if (m_impl->selection.mode() == mode) {
+        return;
+    }
+    if (m_impl->scene) {
+        m_impl->selection.reset(mode, m_impl->scene->mesh());
+    } else {
+        m_impl->selection = Selection();
+        m_impl->selection.reset(mode, core::Mesh());
+    }
+    selectionEdited();
+}
+
+void Viewport::clearSelection()
+{
+    if (m_impl->selection.count() > 0) {
+        m_impl->selection.clear();
+        selectionEdited();
+    }
+}
+
+void Viewport::selectionEdited()
+{
+    ++m_impl->colorVersion;
+    update();
+    emit selectionChanged(m_impl->selection.count(), m_impl->selection.mode());
+}
+
+void Viewport::finishPick(const QPointF& releasePosition, bool remove)
+{
+    if (!m_impl->picker) {
+        return;
+    }
+    m_impl->camera.setViewportSize(width(), height());
+    std::vector<int> items;
+    if (m_impl->rectangle) {
+        const PickRect rect{.from = toVec2(m_impl->pressPosition), .to = toVec2(releasePosition)};
+        items = m_impl->picker->pickRect(m_impl->camera, rect, m_impl->selection.mode(),
+                                         m_impl->display);
+    } else if (const auto item = m_impl->picker->pick(m_impl->camera, toVec2(releasePosition),
+                                                      m_impl->selection.mode(),
+                                                      m_impl->display, kPickTolerancePx)) {
+        items.push_back(*item);
+    }
+    if (items.empty()) {
+        return;
+    }
+    if (remove) {
+        m_impl->selection.remove(items);
+    } else {
+        m_impl->selection.add(items);
+    }
+    selectionEdited();
 }
 
 void Viewport::handleRenderFailed()
@@ -264,15 +416,29 @@ void Viewport::render(QRhiCommandBuffer* commandBuffer)
         m_impl->initialFitDone = true;
     }
 
+    MeshFrame mesh;
+    mesh.scene = m_impl->scene.get();
+    mesh.sceneVersion = m_impl->sceneVersion;
+    mesh.colorVersion = m_impl->colorVersion;
+    mesh.display = m_impl->display;
+    mesh.selection = &m_impl->selection;
     const FrameParams params{.camera = &m_impl->camera,
                              .pixelSize = renderTarget()->pixelSize(),
                              .devicePixelRatio = devicePixelRatioF(),
                              .showGrid = m_impl->showGrid,
-                             .showAxes = m_impl->showAxes};
-    m_impl->renderer.render(commandBuffer, renderTarget(), params);
+                             .showAxes = m_impl->showAxes,
+                             .mesh = mesh};
+    if (!m_impl->renderer.render(commandBuffer, renderTarget(), params)) {
+        tryNextBackend(m_impl->renderer.errorString());
+        return;
+    }
 
     ++m_impl->frameCount;
     emit frameRendered();
+    if (m_impl->scene && m_impl->shownSceneVersion != m_impl->sceneVersion) {
+        m_impl->shownSceneVersion = m_impl->sceneVersion;
+        emit sceneShown();
+    }
 }
 
 void Viewport::releaseResources()
@@ -283,6 +449,13 @@ void Viewport::releaseResources()
 
 void Viewport::mousePressEvent(QMouseEvent* event)
 {
+    if (event->button() == Qt::LeftButton) {
+        m_impl->leftPressed = true;
+        m_impl->rectangle = false;
+        m_impl->pressPosition = event->position();
+        event->accept();
+        return;
+    }
     if (event->button() != Qt::MiddleButton) {
         QRhiWidget::mousePressEvent(event);
         return;
@@ -295,6 +468,20 @@ void Viewport::mousePressEvent(QMouseEvent* event)
 
 void Viewport::mouseMoveEvent(QMouseEvent* event)
 {
+    if (m_impl->leftPressed) {
+        const QPointF delta = event->position() - m_impl->pressPosition;
+        if (!m_impl->rectangle && std::hypot(delta.x(), delta.y()) > kDragThresholdPx) {
+            m_impl->rectangle = true;
+        }
+        if (m_impl->rectangle) {
+            // REQ-004-23: right to left is a crossing.
+            const bool crossing = event->position().x() < m_impl->pressPosition.x();
+            m_impl->overlay->showRect(
+                QRect(m_impl->pressPosition.toPoint(), event->position().toPoint()), crossing);
+        }
+        event->accept();
+        return;
+    }
     if (m_impl->dragMode == DragMode::None) {
         QRhiWidget::mouseMoveEvent(event);
         return;
@@ -319,6 +506,15 @@ void Viewport::mouseMoveEvent(QMouseEvent* event)
 
 void Viewport::mouseReleaseEvent(QMouseEvent* event)
 {
+    if (event->button() == Qt::LeftButton && m_impl->leftPressed) {
+        m_impl->leftPressed = false;
+        m_impl->overlay->hideRect();
+        // REQ-004-24: Shift removes instead of adding.
+        finishPick(event->position(), event->modifiers().testFlag(Qt::ShiftModifier));
+        m_impl->rectangle = false;
+        event->accept();
+        return;
+    }
     if (event->button() == Qt::MiddleButton && m_impl->dragMode != DragMode::None) {
         m_impl->dragMode = DragMode::None;
         event->accept();

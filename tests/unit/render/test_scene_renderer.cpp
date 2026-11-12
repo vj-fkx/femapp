@@ -1,7 +1,10 @@
 #include "axis_labels.hpp"
+#include "mesh_fixtures.hpp"
 #include "scene_renderer.hpp"
 
 #include <fem/render/camera.hpp>
+#include <fem/render/mesh_scene.hpp>
+#include <fem/render/selection.hpp>
 
 #include <QGuiApplication>
 #include <QImage>
@@ -107,14 +110,62 @@ TEST_CASE("scene renderer draws frames with the Null backend", "[render][rendere
         for (const Variant& variant : variants) {
             QRhiCommandBuffer* commandBuffer = nullptr;
             REQUIRE(rhi->beginOffscreenFrame(&commandBuffer) == QRhi::FrameOpSuccess);
-            renderer.render(commandBuffer, target.get(),
-                            {.camera = &camera,
-                             .pixelSize = size,
-                             .devicePixelRatio = variant.devicePixelRatio,
-                             .showGrid = variant.showGrid,
-                             .showAxes = variant.showAxes});
+            CHECK(renderer.render(commandBuffer, target.get(),
+                                  {.camera = &camera,
+                                   .pixelSize = size,
+                                   .devicePixelRatio = variant.devicePixelRatio,
+                                   .showGrid = variant.showGrid,
+                                   .showAxes = variant.showAxes,
+                                   .mesh = {}}));
             CHECK(rhi->endOffscreenFrame() == QRhi::FrameOpSuccess);
             camera.orbit(40.0, 15.0);
+        }
+
+        // REQ-004-09, 11, 14, 16, 26: a mesh with faces, lines, points and a
+        // selection, in every display mode and color mode.
+        const auto mesh = fem::render::test::buildMesh(
+            {{0, 0, 0}, {1, 0, 0}, {1, 1, 0}, {0, 1, 0}, {0, 0, 1}, {1, 0, 1}, {1, 1, 1}, {0, 1, 1},
+             {2, 0, 0}, {3, 0, 0}},
+            {{fem::core::ElementType::Hex8, {0, 1, 2, 3, 4, 5, 6, 7}},
+             {fem::core::ElementType::Tri3, {1, 8, 2}},
+             {fem::core::ElementType::Line2, {8, 9}},
+             {fem::core::ElementType::Point1, {9}}},
+            {{"solid", {0}}});
+        const auto scene = fem::render::buildMeshScene(mesh);
+        fem::render::Selection selection;
+        std::uint64_t colorVersion = 0;
+        for (const auto mode : {fem::render::DisplayMode::ShadedWithEdges,
+                                fem::render::DisplayMode::Shaded,
+                                fem::render::DisplayMode::Wireframe}) {
+            for (const auto selectionMode :
+                 {fem::render::SelectionMode::Elements, fem::render::SelectionMode::Nodes}) {
+                selection.reset(selectionMode, *mesh);
+                const std::vector<int> picked = {0, 1, 2};
+                selection.add(picked);
+                fem::render::MeshFrame frame;
+                frame.scene = scene.get();
+                frame.sceneVersion = 1;
+                frame.colorVersion = ++colorVersion;
+                frame.display.mode = mode;
+                frame.display.color = selectionMode == fem::render::SelectionMode::Elements
+                                          ? fem::render::ColorMode::ByGroup
+                                          : fem::render::ColorMode::ByDimension;
+                frame.display.dimensionVisible = {true, true, mode != fem::render::DisplayMode::Shaded, true};
+                frame.selection = &selection;
+
+                QRhiCommandBuffer* commandBuffer = nullptr;
+                REQUIRE(rhi->beginOffscreenFrame(&commandBuffer) == QRhi::FrameOpSuccess);
+                const bool rendered = renderer.render(commandBuffer, target.get(),
+                                                      {.camera = &camera,
+                                                       .pixelSize = size,
+                                                       .devicePixelRatio = 1.0,
+                                                       .showGrid = true,
+                                                       .showAxes = true,
+                                                       .mesh = frame});
+                INFO(renderer.errorString().toStdString());
+                CHECK(rendered);
+                CHECK(rhi->endOffscreenFrame() == QRhi::FrameOpSuccess);
+            }
         }
 
         renderer.release();

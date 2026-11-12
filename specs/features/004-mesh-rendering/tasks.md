@@ -56,23 +56,23 @@ Regras:
 
 ## Fase 3 — Desenho (`render`, GPU)
 
-- [ ] **T13** Shaders `mesh_face`, `mesh_line`, `mesh_point` e `mesh_gpu`:
+- [x] **T13** Shaders `mesh_face`, `mesh_line`, `mesh_point` e `mesh_gpu`:
   buffers e pipelines criados a partir de uma `MeshScene`; o teste do
   `SceneRenderer` com backend `Null` passa a desenhar uma cena com faces,
   linhas e pontos — arquivos: `src/render/shaders/mesh_*`, `mesh_gpu.hpp/.cpp`,
   `scene_renderer.cpp`, `test_scene_renderer.cpp` — cobre: 09, 12
-- [ ] **T14** `Viewport::setScene`, deslocamento centro−alvo em `double` por
+- [x] **T14** `Viewport::setScene`, deslocamento centro−alvo em `double` por
   quadro, "Enquadrar tudo" pela caixa da malha, sinal `sceneShown` — cobre: 05,
   17, 18
-- [ ] **T15** Modos de exibição e visibilidade por dimensão (faixas desenhadas),
+- [x] **T15** Modos de exibição e visibilidade por dimensão (faixas desenhadas),
   viés de profundidade nas faces — cobre: 11, 13, 16
-- [ ] **T16** Cores: buffer de cor reescrito ao trocar o modo de cor; arestas
+- [x] **T16** Cores: buffer de cor reescrito ao trocar o modo de cor; arestas
   escuras no sólido com arestas e coloridas no aramado — cobre: 14, 15
-- [ ] **T17** Seleção no `Viewport`: gesto de clique e de retângulo (limiar de 4
+- [x] **T17** Seleção no `Viewport`: gesto de clique e de retângulo (limiar de 4
   px), Shift, Esc, chamada ao `MeshPicker`, realce pelo canal alfa e nós
   selecionados como pontos, sinal `selectionChanged`; ocultar dimensão limpa a
   seleção dela — cobre: 19 a 22, 24 a 28
-- [ ] **T18** Retângulo de janela/cruzamento: widget filho transparente com
+- [x] **T18** Retângulo de janela/cruzamento: widget filho transparente com
   `QPainter` (azul contínuo, verde tracejado) — arquivos:
   `selection_overlay.hpp/.cpp` — cobre: 23
 

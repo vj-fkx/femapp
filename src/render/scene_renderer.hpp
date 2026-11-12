@@ -1,5 +1,7 @@
 #pragma once
 
+#include "mesh_gpu.hpp"
+
 #include <fem/render/camera.hpp>
 
 #include <QSize>
@@ -27,6 +29,7 @@ struct FrameParams
     double devicePixelRatio = 1.0; // physical pixels per logical pixel
     bool showGrid = true;
     bool showAxes = true;
+    MeshFrame mesh; // REQ-004-09: the mesh, if any
 };
 
 // Owns the GPU resources of the viewport and draws a frame into any render
@@ -49,8 +52,10 @@ public:
     [[nodiscard]] bool isInitialized() const noexcept { return m_rhi != nullptr; }
     [[nodiscard]] const QString& errorString() const noexcept { return m_error; }
 
-    // Records one frame: grid, then the axis indicator.
-    void render(QRhiCommandBuffer* commandBuffer, QRhiRenderTarget* target,
+    // Records one frame: mesh, grid, selected nodes, then the axis indicator.
+    // Returns false, with errorString() set, if the mesh cannot be sent to
+    // the GPU.
+    [[nodiscard]] bool render(QRhiCommandBuffer* commandBuffer, QRhiRenderTarget* target,
                 const FrameParams& params);
 
     void release();
@@ -67,6 +72,7 @@ private:
     void updateGizmoUniforms(const FrameParams& params, QRhiResourceUpdateBatch* updates);
 
     QRhi* m_rhi = nullptr;
+    MeshGpu m_mesh;
     QString m_error;
     // Uploads of static data recorded by initialize(), submitted with the
     // first frame. Owned by the QRhi until then.
