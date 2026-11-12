@@ -63,10 +63,10 @@ app ──► render ──────────► core
 
 | Módulo | Tipo | Pode depender de |
 |--------|------|------------------|
-| `core` | lib estática | STL, Eigen, Spectra, oneTBB, spdlog |
+| `core` | lib estática | STL, Eigen, `tl-expected`, Spectra, oneTBB, spdlog |
 | `geom` | lib estática | STL, Eigen, OpenCASCADE |
 | `mesher` | lib estática | `core` (apenas `Mesh`), `geom`, oneTBB |
-| `io` | lib estática | `core`, `geom`, nlohmann/json |
+| `io` | lib estática | `core`; `geom` e nlohmann/json quando chegarem STEP/IGES/DXF e o arquivo de projeto |
 | `render` | lib estática | `core`, `geom`, Qt Gui (RHI, headers privados), Qt Widgets (`QRhiWidget`); Qt Shader Tools no build — ver ADR 0002 |
 | `app` | executável | todos, Qt Widgets |
 
@@ -75,7 +75,11 @@ app ──► render ──────────► core
 Conceitos principais:
 
 - **`Mesh`** — coordenadas nodais (SoA, `double`), conectividade por bloco de
-  tipo de elemento, grupos físicos (conjuntos nomeados de nós/arestas/faces/elementos).
+  tipo de elemento (índices de 32 bits), ids externos comprimidos em faixas,
+  grupos nomeados de elementos por dimensão. Imutável, construída e validada
+  por `MeshBuilder`. Aceita os 90 tipos de elemento de número fixo de nós do
+  Gmsh (ordem 1 a 10), com a ordem local de nós do Gmsh; a tabela de tipos é
+  gerada da API do Gmsh por `tools/generate_element_types.py` (feature 003).
 - **`ShapeFunctions` / `Quadrature`** — por topologia (linha, triângulo,
   quadrilátero, tetraedro, hexaedro, cunha) e ordem (linear, quadrática);
   independentes da física.
@@ -192,7 +196,8 @@ falhas esperadas (arquivo inválido, modelo singular); exceções apenas para bu
 
 ## 6. Arquivos (`io`)
 
-- `GmshReader` — `.msh` 4.1 ASCII e binário (parser próprio, sem SDK do Gmsh).
+- `readGmsh` — `.msh` 4.1 ASCII e binário (parser próprio, sem SDK do Gmsh): nós,
+  elementos dos tipos suportados e grupos físicos (feature 003).
 - `ProjectFile` — JSON versionado (`"formatVersion"`), malha embutida ou referenciada.
 - `StepIgesIo` — fachada sobre os leitores/escritores do OCCT (via `geom`).
 - `DxfIo` — leitor/escritor DXF próprio (entidades 2D/3D básicas, camadas).

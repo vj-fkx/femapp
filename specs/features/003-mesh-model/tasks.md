@@ -114,13 +114,13 @@ Regras:
 
 ## Fase 5 — Desempenho e documentação
 
-- [ ] **T24** Criar `tests/perf/bench_gmsh_read.cpp` (fora do `ctest`) e a
+- [x] **T24** Criar `tests/perf/bench_gmsh_read.cpp` (fora do `ctest`) e a
   opção do script de exemplos que gera uma caixa com cerca de 1 milhão de Tet4
   em ASCII e binário, fora do repositório — cobre: N02
-- [ ] **T25** `[M]` Rodar o `bench_gmsh_read` em build Release e registrar aqui
+- [x] **T25** `[M]` Rodar o `bench_gmsh_read` em build Release e registrar aqui
   os tempos e a memória (máquina do mantenedor) — cobre: N01, N02
-- [ ] **T26** Conferir o tempo dos testes de `core` e `io` (< 5 s) — cobre: N03
-- [ ] **T27** Atualizar `specs/architecture.md`: dependências de `core`
+- [x] **T26** Conferir o tempo dos testes de `core` e `io` (< 5 s) — cobre: N03
+- [x] **T27** Atualizar `specs/architecture.md`: dependências de `core`
   (`tl-expected`) e de `io`; `Mesh` com blocos por tipo e ordem de nós do Gmsh;
   `GmshReader` como `readGmsh` — cobre: 25
 
@@ -128,7 +128,7 @@ Regras:
 
 - [ ] **T90** Build e testes verdes nos quatro jobs do CI (push com sua
   confirmação) — cobre: 24, 26
-- [ ] **T91** `clang-format` e `clang-tidy` sem pendências
+- [x] **T91** `clang-format` e `clang-tidy` sem pendências
 - [ ] **T92** Conferir os doze critérios de aceite de `requirements.md`
 - [ ] **T93** Atualizar `specs/roadmap.md` para `concluída` e o `README.md` se
   algo do build tiver mudado
@@ -220,3 +220,24 @@ Regras:
 - O teste de números independentes do locale troca o `LC_NUMERIC` para
   pt_BR quando a máquina o tem; no Windows a leitura usa `std::from_chars`,
   no macOS deve usar o caminho alternativo (`strtod_l`), que só o CI exercita.
+- T26: `test_core` 0,8 s e `test_io` 0,5 s em Debug (meta < 5 s).
+- T27: `specs/architecture.md` atualizado (`Mesh`, dependências de `core` e
+  `io`, `readGmsh`). Os grupos ficaram só de elementos, por dimensão; a
+  arquitetura falava em grupos de nós, arestas e faces.
+
+**2026-11-11 — Fase 5 (T24, T25) e T91:**
+
+- `bench_gmsh_read` (fora do `ctest`) e a opção `--large` do script de
+  exemplos. Medição em build Release, na máquina do mantenedor, executada pelo
+  agente (a tarefa previa execução pelo mantenedor), com os arquivos já no
+  cache do sistema operacional:
+
+  | Arquivo | Tamanho | Nós | Elementos (Tet4) | Leitura | Memória da malha | Razão |
+  |---------|---------|-----|------------------|---------|------------------|-------|
+  | ASCII | 46,7 MB | 174 014 | 1 057 916 (1 000 626) | 0,65 s | 25,1 MB | 1,20 |
+  | binário | 47,4 MB | 174 014 | 1 057 916 (1 000 626) | 0,45 s | 25,1 MB | 1,20 |
+
+  Metas: < 30 s (ASCII), < 5 s (binário), razão ≤ 1,5 (NFR-003-01 e 02).
+  A razão conta também o grupo de volume e o de superfície.
+- T91: `clang-format` sem diferenças e `clang-tidy` com zero apontamentos nos
+  arquivos de `core`, `io`, testes e no `bench_gmsh_read`.

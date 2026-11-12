@@ -80,3 +80,9 @@ set_tests_properties(femapp_smoke_no_gpu PROPERTIES
 add_test(NAME check_rhi_confined
     COMMAND "${CMAKE_COMMAND}" "-DFEMAPP_SOURCE_DIR=${PROJECT_SOURCE_DIR}"
             -P "${PROJECT_SOURCE_DIR}/cmake/CheckRhiConfined.cmake")
+
+# NFR-003-01, NFR-003-02: reading benchmark, run by hand on a Release build
+# (not registered with CTest). See tests/data/gmsh/README.md.
+add_executable(bench_gmsh_read perf/bench_gmsh_read.cpp)
+target_link_libraries(bench_gmsh_read PRIVATE fem::io)
+femapp_set_warnings(bench_gmsh_read)

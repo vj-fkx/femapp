@@ -187,7 +187,9 @@ def main():
     try:
         if len(sys.argv) == 3 and sys.argv[1] == "--large":
             # NFR-003-02: about one million Tet4, outside the repository.
-            box_tets("box_1m_tet4", 1, 0.031, pathlib.Path(sys.argv[2]).resolve())
+            folder = pathlib.Path(sys.argv[2]).resolve()
+            folder.mkdir(parents=True, exist_ok=True)
+            box_tets("box_1m_tet4", 1, 0.030, folder)
             return
         all_types()
         segment(1)
