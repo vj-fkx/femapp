@@ -76,6 +76,24 @@ void Camera::orbit(double deltaXPx, double deltaYPx)
     m_pitch = std::clamp(m_pitch + kOrbitRadPerPixel * deltaYPx, -kHalfPi, kHalfPi);
 }
 
+void Camera::setPivot(const Vec3& pivot)
+{
+    const Vec3 f = forward();
+    if (m_projection == Projection::Orthographic) {
+        // The scale depends on the distance only, so it is kept; the target
+        // slides along the viewing direction to the depth of the pivot.
+        m_target += (pivot - m_target).dot(f) * f;
+        return;
+    }
+    const Vec3 eye = position();
+    const double depth = (pivot - eye).dot(f);
+    if (!(depth >= kMinDistance) || depth > kMaxDistance) {
+        return;
+    }
+    m_target = eye + depth * f;
+    m_distance = depth;
+}
+
 void Camera::pan(const Vec2& fromPx, const Vec2& toPx)
 {
     // Both points on the work plane when possible, so that the grabbed grid

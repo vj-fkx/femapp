@@ -10,6 +10,7 @@
 #include <Eigen/Geometry>
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <optional>
 #include <vector>
 
@@ -223,4 +224,26 @@ TEST_CASE("window includes hidden elements of visible dimensions", "[render][pic
     DisplayOptions noSolids;
     noSolids.dimensionVisible[3] = false;
     CHECK(picker.pickRect(camera, window, SelectionMode::Elements, noSolids).empty());
+}
+
+// REQ-002-13 (changed in feature 004): the orbit pivot is the visible mesh
+// point at the centre of the screen.
+TEST_CASE("surface point under the centre of the screen", "[render][picker]")
+{
+    const auto mesh = fem::render::test::hexGrid(3);
+    const MeshPicker picker(fem::render::buildMeshScene(mesh));
+    const Projection projection = GENERATE(Projection::Perspective, Projection::Orthographic);
+    const Camera camera = cameraFor(*mesh, StandardView::Front, projection);
+    const Vec2 centre(kWidth / 2.0, kHeight / 2.0);
+
+    const auto point = picker.surfacePoint(camera, centre, DisplayOptions{});
+    REQUIRE(point.has_value());
+    const Eigen::Vector3d p = point.value_or(Eigen::Vector3d::Zero());
+    CHECK(std::abs(p.y()) < 1e-5);       // the front face, y = 0
+    CHECK(std::abs(p.x() - 1.5) < 1e-5); // in the middle of the block
+    CHECK(std::abs(p.z() - 1.5) < 1e-5);
+
+    DisplayOptions hidden;
+    hidden.dimensionVisible[3] = false;
+    CHECK_FALSE(picker.surfacePoint(camera, centre, hidden).has_value());
 }

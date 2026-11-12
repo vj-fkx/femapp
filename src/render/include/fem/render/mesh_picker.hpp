@@ -32,6 +32,11 @@ public:
                                           SelectionMode mode, const DisplayOptions& display,
                                           double tolerancePx) const;
 
+    // REQ-002-13: world position of the closest visible face under `pixel`,
+    // used as the orbit pivot.
+    [[nodiscard]] std::optional<Eigen::Vector3d>
+    surfacePoint(const Camera& camera, const Vec2& pixel, const DisplayOptions& display) const;
+
     // REQ-004-21, 22: window (entirely inside) or crossing (inside or
     // crossing), including items hidden behind others. Sorted.
     [[nodiscard]] std::vector<int> pickRect(const Camera& camera, const PickRect& rect,

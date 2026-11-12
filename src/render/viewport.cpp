@@ -17,6 +17,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -462,6 +463,22 @@ void Viewport::mousePressEvent(QMouseEvent* event)
     }
     m_impl->dragMode =
         event->modifiers().testFlag(Qt::ShiftModifier) ? DragMode::Orbit : DragMode::Pan;
+    if (m_impl->dragMode == DragMode::Orbit) {
+        // REQ-002-13: orbit around the point at the centre of the screen: the
+        // mesh there, else the work plane, else the current target.
+        m_impl->camera.setViewportSize(width(), height());
+        const Vec2 centre(0.5 * width(), 0.5 * height());
+        std::optional<Vec3> pivot;
+        if (m_impl->picker) {
+            pivot = m_impl->picker->surfacePoint(m_impl->camera, centre, m_impl->display);
+        }
+        if (!pivot) {
+            pivot = m_impl->camera.workPlanePoint(centre);
+        }
+        if (pivot) {
+            m_impl->camera.setPivot(*pivot);
+        }
+    }
     m_impl->lastMousePosition = event->position();
     event->accept();
 }

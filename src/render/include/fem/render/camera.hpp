@@ -49,6 +49,12 @@ public:
 
     // Rotates around the target. Positive deltaX moves the scene to the right.
     void orbit(double deltaXPx, double deltaYPx);
+    // Moves the target to the depth of `pivot` along the viewing direction,
+    // without changing the image, so that a following orbit turns around the
+    // point at the centre of the screen (REQ-002-13). In perspective the eye
+    // stays put; in orthographic the distance (the scale) is kept. Ignored for
+    // a pivot behind or too close to the eye.
+    void setPivot(const Vec3& pivot);
     // Moves the view so that the point under `fromPx` ends up under `toPx`.
     void pan(const Vec2& fromPx, const Vec2& toPx);
     // Zooms keeping the point under the cursor fixed. Positive steps zoom in.

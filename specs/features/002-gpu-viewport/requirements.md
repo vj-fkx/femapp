@@ -48,7 +48,7 @@ resultados (012) serão exibidos.
 |----|-----------|----------|
 | REQ-002-11 | O sistema DEVE adotar o eixo Z como vertical ("para cima") e XY como plano de trabalho. | US-2 |
 | REQ-002-12 | QUANDO o usuário arrastar com o botão do meio do mouse, O sistema DEVE deslocar a vista (pan) de modo que o ponto sob o cursor acompanhe o cursor. | US-2 |
-| REQ-002-13 | QUANDO o usuário arrastar com Shift + botão do meio, O sistema DEVE orbitar a câmera em torno do ponto de foco, mantendo o eixo Z vertical na tela. | US-2 |
+| REQ-002-13 | QUANDO o usuário arrastar com Shift + botão do meio, O sistema DEVE orbitar a câmera em torno do ponto da cena no centro da tela (a malha visível, senão o plano da grade, senão o ponto de foco), mantendo o eixo Z vertical na tela. *(Alterado em 2026-11-12, a pedido do mantenedor, durante a feature 004: antes girava sempre em torno do ponto de foco, que podia estar longe da malha e fazê-la sair da tela.)* | US-2 |
 | REQ-002-14 | QUANDO o usuário girar a roda do mouse, O sistema DEVE aproximar ou afastar a vista mantendo fixo o ponto sob o cursor. | US-2 |
 | REQ-002-15 | O sistema DEVE limitar o zoom a uma faixa que impeça a câmera de atravessar o ponto de foco ou de se afastar a ponto de perder precisão numérica. | US-2 |
 | REQ-002-16 | O sistema DEVE oferecer projeção perspectiva e ortográfica, e alternar entre elas por comando de menu, preservando o ponto de foco e o tamanho aparente da cena nesse ponto. | US-3 |

@@ -227,6 +227,13 @@ posição = t − d·f
 
 - **Órbita:** `ψ −= k·Δx`, `θ += k·Δy`, com `k = 0,5°/pixel`; `θ` é limitado a
   `[−90°, 90°]`.
+- **Pivô da órbita** *(alterado em 2026-11-12, feature 004)*: ao começar a
+  órbita, o alvo passa a ser o ponto da cena no centro da tela — o primeiro
+  triângulo visível da malha atingido pelo raio do centro, senão o plano de
+  trabalho Z = 0 (pela regra do ponto de ancoragem), senão o alvo atual. A
+  troca não mexe na imagem: em perspectiva o olho fica onde está e a
+  distância passa a ser a profundidade do pivô; em ortográfica o alvo anda
+  ao longo da visada e a distância (que define a escala) não muda.
 - **Ponto de ancoragem** de um pixel: onde o raio do pixel encontra o plano de
   trabalho Z = 0, se o encontro está à frente da câmera e a no máximo `100·d`
   de profundidade (dentro do plano de corte distante); senão, o ponto do raio

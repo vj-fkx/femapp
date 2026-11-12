@@ -312,6 +312,24 @@ std::optional<int> MeshPicker::pick(const Camera& camera, const Vec2& pixel, Sel
     return std::nullopt;
 }
 
+std::optional<Eigen::Vector3d> MeshPicker::surfacePoint(const Camera& camera, const Vec2& pixel,
+                                                        const DisplayOptions& display) const
+{
+    const MeshScene& scene = *m_scene;
+    const Vec3f eye = (camera.position() - scene.origin()).cast<float>();
+    const Vec3f forward = camera.forward().cast<float>();
+    const TriangleHit hit =
+        closestTriangle(scene, localRay(camera, pixel, scene.origin()), eye, forward, display);
+    if (hit.element < 0) {
+        return std::nullopt;
+    }
+    // Point of the pixel's ray at the depth of the hit, in world coordinates.
+    const Ray ray = camera.rayThrough(pixel);
+    const double along = ray.direction.dot(camera.forward());
+    const double offset = (ray.origin - camera.position()).dot(camera.forward());
+    return Eigen::Vector3d(ray.origin + ((hit.depth - offset) / along) * ray.direction);
+}
+
 std::vector<int> MeshPicker::pickRect(const Camera& camera, const PickRect& rect,
                                       SelectionMode mode, const DisplayOptions& display) const
 {

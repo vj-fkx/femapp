@@ -98,6 +98,18 @@ Regras:
 - [x] **T25** Atualizar `specs/architecture.md` §4 (seleção na CPU, ADR 0003;
   `MeshScene`) e §3 (`extractSurface`) — cobre: 30
 
+## Fase 4b — Órbita pelo centro da tela (pedido do mantenedor)
+
+- [x] **T29** Testes e implementação de `Camera::setPivot`: troca o alvo para
+  um ponto sobre a linha de visada central sem mudar a imagem (perspectiva e
+  ortográfica) — arquivos: `camera.hpp/.cpp`, `test_camera.cpp` — cobre:
+  REQ-002-13 (alterado)
+- [x] **T30** Testes e implementação de `MeshPicker::surfacePoint` (ponto da
+  malha visível sob um pixel); no `Viewport`, ao começar a órbita, pivô no
+  ponto do centro da tela: malha, senão plano Z = 0, senão alvo atual —
+  arquivos: `mesh_picker.hpp/.cpp`, `viewport.cpp`, `test_mesh_picker.cpp` —
+  cobre: REQ-002-13 (alterado)
+
 ## Fase 5 — Conferência e medições
 
 - [ ] **T26** `[M]` Roteiro manual no Windows: importar pelos três caminhos;
