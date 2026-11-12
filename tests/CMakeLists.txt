@@ -44,6 +44,8 @@ femapp_add_test(render SOURCES
     test_backend.cpp
     test_camera.cpp
     test_grid_spacing.cpp
+    test_mesh_picker.cpp
+    test_mesh_scene.cpp
     test_scene_renderer.cpp)
 # The renderer tests reach into the module's private headers and create a QRhi
 # with the Null backend, which needs no GPU and no window.

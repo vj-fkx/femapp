@@ -31,25 +31,25 @@ Regras:
 
 ## Fase 2 — Cena, cores e seleção (`render`, sem GPU)
 
-- [ ] **T06** `display_options.hpp` e testes de `buildMeshScene`: faixas por
+- [x] **T06** `display_options.hpp` e testes de `buildMeshScene`: faixas por
   dimensão, contagens de triângulos (quadriláteros viram 2) e linhas, posições
   relativas ao centro, cena de malha vazia — arquivos: `mesh_scene.hpp/.cpp`,
   `tests/unit/render/test_mesh_scene.cpp` — cobre: 09, 16, 18
-- [ ] **T07** Implementar `buildMeshScene` até a T06 passar — cobre: 09, 16, 18
-- [ ] **T08** Testes e implementação de `elementColors`: por dimensão; por
+- [x] **T07** Implementar `buildMeshScene` até a T06 passar — cobre: 09, 16, 18
+- [x] **T08** Testes e implementação de `elementColors`: por dimensão; por
   grupo, com elemento em dois grupos (cor do primeiro) e elemento sem grupo
   (cinza) — cobre: 14, 15
-- [ ] **T09** `[P]` Testes e implementação de `Selection`: acrescentar, retirar,
+- [x] **T09** `[P]` Testes e implementação de `Selection`: acrescentar, retirar,
   limpar, trocar de modo, retirar elementos de uma dimensão — arquivos:
   `selection.hpp/.cpp`, `tests/unit/render/test_selection.cpp` — cobre: 24, 25,
   28
-- [ ] **T10** Testes de `MeshPicker::pick`: elemento da frente num cubo de
+- [x] **T10** Testes de `MeshPicker::pick`: elemento da frente num cubo de
   hexaedros em cada vista padrão; linha 1D dentro e fora da tolerância; ponto
   0D; nó escondido atrás de uma face não escolhido; dimensão oculta ignorada —
   arquivo: `tests/unit/render/test_mesh_picker.cpp` — cobre: 20, 30
-- [ ] **T11** Implementar `MeshPicker::pick` até a T10 passar — arquivos:
+- [x] **T11** Implementar `MeshPicker::pick` até a T10 passar — arquivos:
   `mesh_picker.hpp/.cpp` — cobre: 20
-- [ ] **T12** Testes e implementação de `MeshPicker::pickRect`: janela e
+- [x] **T12** Testes e implementação de `MeshPicker::pickRect`: janela e
   cruzamento sobre malha 2D em vista superior; elemento parcialmente dentro só
   no cruzamento; retângulo dentro de um elemento grande; itens escondidos
   incluídos; nós — cobre: 21, 22, 30
@@ -174,3 +174,17 @@ Regras:
   junto dos testes de `io`, porque lê os arquivos `.msh` e o executável de
   testes de `core` não liga com `io`.
 - Testes e implementação compilados juntos, como nas features anteriores.
+
+**2026-11-12 — Fase 2 (T06–T12):**
+
+- 98 testes passando no Windows. Clique acerta o elemento da frente nas seis
+  vistas padrão, em perspectiva e ortográfica; linhas e pontos dentro da
+  tolerância; nó atrás de uma face não é escolhido; janela e cruzamento numa
+  grade 4×4 dão 1 e 9 quadriláteros; janela em volta de um bloco 3×3×3 pega os
+  27 hexaedros, inclusive o interno.
+- Desvios do design §4: `Selection::reset` recebe a malha (e não as
+  contagens); `MeshScene` expõe também `nodePositions()` e `pointElements()`,
+  usados pela seleção e pelos pontos; testes do `Selection` ficaram em
+  `test_mesh_scene.cpp`, não num arquivo próprio.
+- Nós de ordem alta (meio de aresta etc.) não são clicáveis, porque não são
+  desenhados; a janela e o cruzamento os alcançam.

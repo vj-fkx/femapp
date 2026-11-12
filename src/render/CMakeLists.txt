@@ -9,6 +9,9 @@ femapp_add_module(render
         backend.cpp
         camera.cpp
         grid_spacing.cpp
+        mesh_picker.cpp
+        mesh_scene.cpp
+        selection.cpp
         scene_renderer.cpp
         scene_renderer.hpp
         viewport.cpp
