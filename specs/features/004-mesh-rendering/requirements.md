@@ -153,7 +153,6 @@ atribuições), REQ-G-20 (≥ 30 FPS com 1 milhão de elementos).
   de comando, com leitura em segundo plano.
 - [x] **Desempenho:** decidido em 2026-11-12 — a meta do produto, ≥ 30 FPS com
   1 milhão de elementos.
-- [ ] **GPU da medição:** o REQ-G-20 fala em GPU dedicada de gama média. Se a
-  máquina do mantenedor tiver GPU integrada, a meta medida nela é mais exigente
-  que a do produto; se tiver GPU dedicada de topo, a medição não prova a meta
-  para gama média. Qual é a GPU da sua máquina?
+- [x] **GPU da medição:** a máquina do mantenedor tem uma NVIDIA GeForce RTX
+  2060 (consultado no sistema em 2026-11-12), uma GPU dedicada de gama média,
+  que é o caso do REQ-G-20.
