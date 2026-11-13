@@ -291,7 +291,7 @@ void MainWindow::createEditMenu()
 
     // REQ-005-31
     QAction* undo = editMenu->addAction(tr("&Undo"), m_drafting, &DraftingController::undo);
-    undo->setShortcuts({QKeySequence::Undo});
+    undo->setShortcut(QKeySequence::Undo);
     QAction* redo = editMenu->addAction(tr("&Redo"), m_drafting, &DraftingController::redo);
     redo->setShortcuts({QKeySequence(Qt::CTRL | Qt::Key_Y), QKeySequence::Redo});
     const auto refreshUndo = [this, undo, redo] {

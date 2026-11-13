@@ -121,7 +121,8 @@ TEST_CASE("scene renderer draws frames with the Null backend", "[render][rendere
                                    .devicePixelRatio = variant.devicePixelRatio,
                                    .showGrid = variant.showGrid,
                                    .showAxes = variant.showAxes,
-                                   .mesh = {}}));
+                                   .mesh = {},
+                                   .drawing = {}}));
             CHECK(rhi->endOffscreenFrame() == QRhi::FrameOpSuccess);
             camera.orbit(40.0, 15.0);
         }
@@ -184,7 +185,8 @@ TEST_CASE("scene renderer draws frames with the Null backend", "[render][rendere
                                                        .devicePixelRatio = 1.0,
                                                        .showGrid = true,
                                                        .showAxes = true,
-                                                       .mesh = frame});
+                                                       .mesh = frame,
+                                                       .drawing = {}});
                 INFO(renderer.errorString().toStdString());
                 CHECK(rendered);
                 CHECK(rhi->endOffscreenFrame() == QRhi::FrameOpSuccess);
