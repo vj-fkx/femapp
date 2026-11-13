@@ -25,19 +25,23 @@ struct ScreenPoint
     bool inFront = false;
 };
 
+Mat4 translationTo(const Eigen::Vector3d& origin)
+{
+    Mat4 translation = Mat4::Identity();
+    translation.block<3, 1>(0, 3) = origin;
+    return translation;
+}
+
 // Projects scene-relative positions to pixels for one camera.
 class Projector
 {
 public:
     Projector(const Camera& camera, const Eigen::Vector3d& origin)
-        : m_width(camera.viewportWidth())
+        : m_view(camera.viewMatrix() * translationTo(origin))
+        , m_clip(camera.projectionMatrix() * m_view)
+        , m_width(camera.viewportWidth())
         , m_height(camera.viewportHeight())
-    {
-        Mat4 translation = Mat4::Identity();
-        translation.block<3, 1>(0, 3) = origin;
-        m_view = camera.viewMatrix() * translation;
-        m_clip = camera.projectionMatrix() * m_view;
-    }
+    {}
 
     [[nodiscard]] ScreenPoint project(const Vec3f& relative) const
     {
@@ -89,12 +93,16 @@ float intersect(const LocalRay& ray, const Vec3f& a, const Vec3f& b, const Vec3f
     const float inverse = 1.0F / det;
     const Vec3f s = ray.origin - a;
     const float u = s.dot(p) * inverse;
-    if (u < 0.0F || u > 1.0F) {
+    // A small tolerance on the barycentric coordinates closes the cracks that
+    // rounding opens along shared edges, such as the diagonal of a split
+    // quadrilateral (seen with Apple clang on ARM).
+    constexpr float kEdge = 1e-5F;
+    if (u < -kEdge || u > 1.0F + kEdge) {
         return -1.0F;
     }
     const Vec3f q = s.cross(ab);
     const float v = ray.direction.dot(q) * inverse;
-    if (v < 0.0F || u + v > 1.0F) {
+    if (v < -kEdge || u + v > 1.0F + kEdge) {
         return -1.0F;
     }
     return ac.dot(q) * inverse;

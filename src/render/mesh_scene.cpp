@@ -90,7 +90,9 @@ int localFaceOf(const core::Mesh& mesh, const core::SurfaceFace& face)
             }
         }
     }
-    std::sort(local.begin(), local.begin() + face.nodeCount);
+    // Whole arrays are sorted (the unused slot is -1 in both), which also
+    // avoids a false -Warray-bounds of GCC 13 on partial sorts.
+    std::ranges::sort(local);
     const auto faces = core::elementFaces(info.family);
     for (std::size_t f = 0; f < faces.size(); ++f) {
         if (faces[f].vertexCount != face.nodeCount) {
@@ -100,7 +102,7 @@ int localFaceOf(const core::Mesh& mesh, const core::SurfaceFace& face)
         for (std::size_t v = 0; v < faces[f].vertexCount; ++v) {
             vertices.at(v) = faces[f].vertices.at(v);
         }
-        std::sort(vertices.begin(), vertices.begin() + face.nodeCount);
+        std::ranges::sort(vertices);
         if (vertices == local) {
             return static_cast<int>(f);
         }
@@ -273,7 +275,7 @@ std::shared_ptr<const MeshScene> buildMeshScene(std::shared_ptr<const core::Mesh
         const auto keyOf = [](const core::SurfaceFace& face) {
             Key key{-1, -1, -1, -1};
             std::copy_n(face.nodes.begin(), face.nodeCount, key.begin());
-            std::sort(key.begin(), key.begin() + face.nodeCount);
+            std::ranges::sort(key);
             return key;
         };
         std::map<Key, core::ElementIndex> flat;

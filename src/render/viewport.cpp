@@ -660,8 +660,8 @@ void Viewport::mouseMoveEvent(QMouseEvent* event)
 
     m_impl->camera.setViewportSize(width(), height());
     if (m_impl->dragMode == DragMode::Orbit) {
-        if (m_impl->orbitPivot) {
-            m_impl->camera.orbitAbout(*m_impl->orbitPivot, delta.x(), delta.y());
+        if (const std::optional<Vec3> pivot = m_impl->orbitPivot) {
+            m_impl->camera.orbitAbout(*pivot, delta.x(), delta.y());
         } else {
             m_impl->camera.orbit(delta.x(), delta.y());
         }
