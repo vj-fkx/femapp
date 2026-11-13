@@ -121,9 +121,10 @@ Regras:
   ERASE; Delete; desfazer e refazer pelos três caminhos; alvo da seleção;
   desenho junto da malha; "Enquadrar tudo"; desenho a 1e6 da origem; textos em
   português — cobre: 04 a 35
-- [ ] **T23** `[M]` Medir em Release: snap com 100 mil trechos (bench), FPS com
-  100 mil trechos e a malha de 1 milhão de Tet4, consumo em repouso com um
-  comando ativo — cobre: N01, N02, N03
+- [ ] **T23** `[M]` Medir em Release: consumo em repouso com um comando ativo
+  (o snap com 100 mil trechos já foi medido na T21; o FPS com 100 mil trechos
+  e a malha de 1 milhão de Tet4 foi adiado para a 014, que permite abrir um
+  desenho desse tamanho) — cobre: N01, N03
 
 ## Fase 7 — Fechamento
 
@@ -175,7 +176,7 @@ Regras:
 | REQ-005-34 | T13, T22 | Roteiro manual (AC-8) |
 | REQ-005-35 | T19, T22 | Roteiro manual (AC-9) |
 | NFR-005-01 | T21, T23 | `bench_drafting` (AC-10) |
-| NFR-005-02 | T23 | Medição manual (AC-10) |
+| NFR-005-02 | — (adiado para a 014) | Medição na feature 014 |
 | NFR-005-03 | T23 | Medição manual (AC-10) |
 
 ## Notas de implementação

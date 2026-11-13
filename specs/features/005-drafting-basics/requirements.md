@@ -108,7 +108,7 @@ na feature 015.
 | ID | Requisito | Como medir |
 |----|-----------|------------|
 | NFR-005-01 | A busca de snap DEVE responder em menos de 5 ms por movimento do mouse com um desenho de 100 mil trechos. | Benchmark em Release, na máquina do mantenedor |
-| NFR-005-02 | A navegação DEVE manter ≥ 30 quadros por segundo com 100 mil trechos desenhados, junto com a malha de 1 milhão de tetraedros. | Contador de quadros em Release |
+| NFR-005-02 | A navegação DEVE manter ≥ 30 quadros por segundo com 100 mil trechos desenhados, junto com a malha de 1 milhão de tetraedros. | Contador de quadros em Release. *Medição adiada para a feature 014 (decidido em 2026-11-12): só então dá para abrir um desenho desse tamanho.* |
 | NFR-005-03 | Com a câmera parada e nenhum movimento do mouse, o viewport NÃO DEVE consumir CPU nem GPU de forma contínua, também com um comando ativo. | Gerenciador de Tarefas em repouso |
 
 ## 5. Critérios de aceite
@@ -140,7 +140,8 @@ na feature 015.
   tudo" enquadra os dois; um desenho a 1e6 da origem não treme.
 - [ ] **AC-9** (REQ-005-35) Com o sistema em português, menus e pedidos
   aparecem em português e os comandos continuam aceitos em inglês.
-- [ ] **AC-10** (NFR-005-01 a 03) Medições registradas em `tasks.md`.
+- [ ] **AC-10** (NFR-005-01, 03) Medições registradas em `tasks.md`; a do
+  NFR-005-02 fica para a feature 014.
 
 ## 6. Fora de escopo
 

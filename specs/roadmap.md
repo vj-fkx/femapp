@@ -33,7 +33,7 @@ cargas, resolver e ver diagramas de esforços.
 | 011 | analysis-runner | Execução assíncrona, progresso, cancelamento, validação do modelo | 008, 010 | planejada |
 | 012 | results-visualization | Deformada com escala, mapa de cores, legenda, consulta de valores, reações de apoio | 004, 011 | planejada |
 | 013 | frame-postprocessing | Diagramas N/V/M, seção extrudada no viewport | 012 | planejada |
-| 014 | project-files | Salvar/abrir projeto `.femapp`, exportar `.vtu` | 010, 012 | planejada |
+| 014 | project-files | Salvar/abrir projeto `.femapp`, exportar `.vtu`; medir o NFR-005-02 (FPS com 100 mil trechos e a malha de 1 milhão de Tet4) | 010, 012 | planejada |
 
 ## v0.3 — Geometria CAD completa e importação
 
