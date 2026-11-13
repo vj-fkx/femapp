@@ -44,16 +44,16 @@ Regras:
 
 ## Fase 3 — Comandos (`geom`)
 
-- [ ] **T07** Testes da `CommandSession` para desenho: POINT; LINE com U, C
+- [x] **T07** Testes da `CommandSession` para desenho: POINT; LINE com U, C
   (e C com menos de dois trechos), Enter e Esc; PLINE aberta, fechada e com
   um só vértice; pré-visualização em cada passo; um `DrawingEdit` por comando;
   repetição com Enter vazio; comando novo cancela o ativo; mensagens de erro;
   último ponto entre comandos — arquivo: `test_commands.cpp` — cobre: 06, 07,
   08, 15, 16, 17, 18, 31
-- [ ] **T08** Implementar `commands.hpp/.cpp` para POINT, LINE, PLINE, UNDO e
+- [x] **T08** Implementar `commands.hpp/.cpp` para POINT, LINE, PLINE, UNDO e
   REDO (pedidos de desfazer repassados ao chamador) até a T07 passar — cobre:
   06, 07, 15, 16, 17, 18, 31
-- [ ] **T09** Testes e implementação de MOVE, COPY e ERASE: com e sem
+- [x] **T09** Testes e implementação de MOVE, COPY e ERASE: com e sem
   pré-seleção; "Selecione objetos" e Enter; nada selecionado; fantasmas na
   pré-visualização; cópias múltiplas com IDs novos; desfazer de cada um
   restaura os IDs — arquivos: `commands.cpp`, `test_commands.cpp` — cobre: 27,
@@ -197,4 +197,14 @@ Regras:
   plano pode ficar atrás do olho e mesmo assim aparecer na tela, como na 004);
   `closestPoints` ficou público para ser testado à parte; `commandText`
   devolve o nome por extenso, para o histórico.
+
+**2026-11-12 — Fase 3 (T07–T09):**
+
+- 140 testes passando no Windows; `clang-tidy` sem apontamentos.
+- Desvios do design §4 e §5.4: a `CommandSession` guarda o estado do comando
+  ativo num único lugar, sem a interface polimórfica `Command` (mais simples
+  para seis comandos curtos); Esc na PLINE cria a polilinha com os vértices já
+  dados (como no AutoCAD e como a LINE, REQ-005-07); `feedSelection` recebe a
+  seleção inteira do momento (o viewport mantém o realce), e Enter confirma;
+  `activeCommand()` exposto para a barra de título do pedido e os testes.
 

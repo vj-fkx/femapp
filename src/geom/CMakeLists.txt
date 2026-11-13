@@ -17,6 +17,7 @@ endforeach()
 femapp_add_module(geom
     SOURCES
         command_input.cpp
+        commands.cpp
         drawing.cpp
         kernel_check.cpp
         point_resolver.cpp
