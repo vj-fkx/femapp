@@ -29,6 +29,8 @@ public:
 signals:
     void textEntered(const QString& text);
     void escapePressed();
+    // REQ-005-30: Delete with an empty input.
+    void deletePressed();
 
 protected:
     bool eventFilter(QObject* watched, QEvent* event) override;

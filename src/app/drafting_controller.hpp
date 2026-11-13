@@ -47,6 +47,8 @@ public slots:
     void run(fem::geom::CommandName name);
     void enterText(const QString& text);
     void escape();
+    // REQ-005-07: right click on the viewport.
+    void cancelCommand();
     void deleteSelection();
     void undo();
     void redo();

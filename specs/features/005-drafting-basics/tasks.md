@@ -109,6 +109,12 @@ Regras:
   e o desfazer por `DrawingEdit` + `QUndoStack`; §5: `DraftingController` e
   linha de comando) — cobre: 03
 
+- [x] **T24** Delete apaga a seleção também com o foco na linha de comando
+  (entrada vazia) e no viewport; botão direito no viewport cancela o comando
+  ativo (pedidos do mantenedor no roteiro) — arquivos:
+  `command_line_widget.hpp/.cpp`, `drafting_controller.hpp/.cpp`,
+  `main_window.cpp`, `viewport.hpp/.cpp` — cobre: 07, 30
+
 ## Fase 6 — Conferência e medições
 
 - [x] **T21** `bench_drafting` (fora do ctest): 100 mil trechos, tempo de

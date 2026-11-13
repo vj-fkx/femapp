@@ -75,6 +75,9 @@ DraftingController::DraftingController(render::Viewport* viewport, CommandLineWi
             &DraftingController::drawingSelectionChanged);
     connect(m_commandLine, &CommandLineWidget::textEntered, this, &DraftingController::enterText);
     connect(m_commandLine, &CommandLineWidget::escapePressed, this, &DraftingController::escape);
+    connect(m_commandLine, &CommandLineWidget::deletePressed, this,
+            &DraftingController::deleteSelection);
+    connect(m_viewport, &render::Viewport::rightClicked, this, &DraftingController::cancelCommand);
     // Undo and redo change the drawing behind the session's back.
     connect(m_undo, &QUndoStack::indexChanged, this, [this] {
         if (m_viewport) {
@@ -135,6 +138,15 @@ void DraftingController::escape()
     if (m_viewport) {
         m_viewport->clearDrawingSelection();
         m_viewport->clearSelection();
+    }
+}
+
+void DraftingController::cancelCommand()
+{
+    if (m_session.isActive()) {
+        m_session.cancel();
+        m_commandLine->appendHistory(tr("*Cancel*"));
+        sync();
     }
 }
 

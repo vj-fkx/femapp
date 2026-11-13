@@ -467,6 +467,10 @@ bool MainWindow::eventFilter(QObject* watched, QEvent* event)
             m_drafting->enterText(QString());
             return true;
         }
+        if (plain && key->key() == Qt::Key_Delete) {
+            m_drafting->deleteSelection();
+            return true;
+        }
         const QString text = key->text();
         if (plain && !text.isEmpty() && text.at(0).isPrint()) {
             m_commandLine->typeText(text);

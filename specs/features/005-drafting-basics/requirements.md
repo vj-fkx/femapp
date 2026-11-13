@@ -43,7 +43,7 @@ na feature 015.
 | REQ-005-04 | O sistema DEVE oferecer uma linha de comando acoplada à janela, com área de histórico das mensagens e campo de entrada, que mostra o pedido do comando ativo (por exemplo, "Especifique o próximo ponto ou [Desfazer/Fechar]:"). | US-1 |
 | REQ-005-05 | O sistema DEVE aceitar os comandos POINT (PO), LINE (L), PLINE (PL), MOVE (M), COPY (CO), ERASE (E), UNDO (U) e REDO, sem diferenciar maiúsculas, pelo nome ou pelo atalho, e completar o nome a partir das primeiras letras com Tab. | US-1, US-4 |
 | REQ-005-06 | QUANDO o usuário pressionar Enter ou Espaço com a entrada vazia e nenhum comando ativo, O sistema DEVE repetir o último comando. | US-1 |
-| REQ-005-07 | QUANDO o usuário pressionar Esc, O sistema DEVE cancelar o comando ativo, mantendo o que ele já tiver concluído (por exemplo, os segmentos já desenhados de uma LINE). | US-1 |
+| REQ-005-07 | QUANDO o usuário pressionar Esc ou clicar com o botão direito no viewport, O sistema DEVE cancelar o comando ativo, mantendo o que ele já tiver concluído (por exemplo, os segmentos já desenhados de uma LINE). | US-1 |
 | REQ-005-08 | SE o texto digitado não for um comando, uma opção do pedido atual ou uma entrada válida, ENTÃO O sistema DEVE mostrar uma mensagem no histórico e manter o comando ativo no mesmo passo. | US-1, US-2 |
 | REQ-005-09 | O sistema DEVE guardar o histórico das entradas da sessão e percorrê-lo com as setas para cima e para baixo. | US-1 |
 
@@ -86,7 +86,7 @@ na feature 015.
 | REQ-005-27 | QUANDO um comando de edição for iniciado com entidades do desenho já selecionadas, O sistema DEVE usá-las; senão, DEVE pedir "Selecione objetos" e aceitar clique, janela e cruzamento até Enter. | US-4 |
 | REQ-005-28 | O comando MOVE DEVE pedir o ponto base e o segundo ponto e deslocar as entidades pelo vetor entre eles, mostrando a pré-visualização das entidades no cursor. | US-4 |
 | REQ-005-29 | O comando COPY DEVE pedir o ponto base e criar uma cópia deslocada (com novos IDs) para cada segundo ponto informado, até Enter ou Esc, com pré-visualização. | US-4 |
-| REQ-005-30 | O comando ERASE e a tecla Delete com entidades selecionadas DEVEM remover as entidades do documento. | US-4 |
+| REQ-005-30 | O comando ERASE e a tecla Delete com entidades selecionadas DEVEM remover as entidades do documento; a tecla Delete funciona também com o foco na linha de comando, quando a entrada está vazia. *(Alterado em 2026-11-12: o Delete não chegava com o foco na linha de comando; o botão direito cancela, a pedido do mantenedor.)* | US-4 |
 
 ### Desfazer e refazer
 

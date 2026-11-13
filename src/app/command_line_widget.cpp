@@ -90,6 +90,14 @@ bool CommandLineWidget::eventFilter(QObject* watched, QEvent* event)
         m_input->clear();
         emit escapePressed();
         return true;
+    case Qt::Key_Delete:
+        // The input keeps the key for editing its text; empty, it erases the
+        // selection, as the window shortcut cannot fire while it has focus.
+        if (m_input->text().isEmpty()) {
+            emit deletePressed();
+            return true;
+        }
+        return QWidget::eventFilter(watched, event);
     case Qt::Key_Tab: {
         // REQ-005-05: completes a command name.
         const auto name = geom::completeCommand(m_input->text().toStdString());

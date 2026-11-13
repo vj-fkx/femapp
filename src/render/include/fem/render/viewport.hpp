@@ -142,6 +142,8 @@ signals:
     // REQ-005-14: left click in PickPoint mode.
     void pointRequested(fem::render::Vec2 pixel);
     void drawingSelectionChanged();
+    // REQ-005-07: right button released without dragging.
+    void rightClicked(fem::render::Vec2 pixel);
 
 protected:
     void initialize(QRhiCommandBuffer* commandBuffer) override;

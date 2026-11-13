@@ -649,6 +649,10 @@ void Viewport::mousePressEvent(QMouseEvent* event)
         event->accept();
         return;
     }
+    if (event->button() == Qt::RightButton) {
+        event->accept();
+        return;
+    }
     if (event->button() != Qt::MiddleButton) {
         QRhiWidget::mousePressEvent(event);
         return;
@@ -735,6 +739,11 @@ void Viewport::mouseReleaseEvent(QMouseEvent* event)
         // REQ-004-24: Shift removes instead of adding.
         finishPick(event->position(), event->modifiers().testFlag(Qt::ShiftModifier));
         m_impl->rectangle = false;
+        event->accept();
+        return;
+    }
+    if (event->button() == Qt::RightButton) {
+        emit rightClicked(toVec2(event->position()));
         event->accept();
         return;
     }
