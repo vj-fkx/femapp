@@ -16,7 +16,10 @@ endforeach()
 
 femapp_add_module(geom
     SOURCES
+        command_input.cpp
+        drawing.cpp
         kernel_check.cpp
+        point_resolver.cpp
     PUBLIC_DEPS
         Eigen3::Eigen
     PRIVATE_DEPS

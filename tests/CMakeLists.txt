@@ -30,7 +30,11 @@ femapp_add_test(core SOURCES
     test_mesh_surface.cpp)
 target_compile_definitions(test_core PRIVATE FEMAPP_EXPECTED_VERSION="${PROJECT_VERSION}")
 
-femapp_add_test(geom)
+femapp_add_test(geom SOURCES
+    test_geom.cpp
+    test_command_input.cpp
+    test_drawing.cpp
+    test_point_resolver.cpp)
 femapp_add_test(mesher)
 femapp_add_test(io SOURCES
     test_gmsh_cursor.cpp
