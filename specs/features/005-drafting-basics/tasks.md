@@ -137,9 +137,9 @@ Regras:
 
 ## Fase 7 — Fechamento
 
-- [ ] **T90** Build e testes verdes nos quatro jobs do CI (push com sua
+- [x] **T90** Build e testes verdes nos quatro jobs do CI (push com sua
   confirmação)
-- [ ] **T91** `clang-format` e `clang-tidy` sem pendências (também o do Linux,
+- [x] **T91** `clang-format` e `clang-tidy` sem pendências (também o do Linux,
   pelo CI)
 - [ ] **T92** Conferir os dez critérios de aceite de `requirements.md`
 - [ ] **T93** Atualizar `specs/roadmap.md` para `concluída` e o `README.md`
@@ -262,4 +262,10 @@ Regras:
   - depois de guardar a tolerância em cache, projetar cada vértice uma vez e
     calcular meios e interseções só nos trechos sob o cursor: **2,7 ms** por
     movimento (meta: 5 ms); a primeira chamada, que monta o cache, leva 25 ms.
+
+**2026-11-12 — T90 e T91:** CI verde nos cinco jobs no commit `e93fb21`,
+depois de corrigir três apontamentos que só os outros compiladores viram:
+`FrameParams::drawing` sem inicializador num teste (GCC), chaves em volta de
+um único atalho (clang) e um `optional` lido sem cópia conferida
+(`clang-tidy` do Linux).
 
