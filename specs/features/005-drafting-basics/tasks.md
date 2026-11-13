@@ -115,6 +115,9 @@ Regras:
   `command_line_widget.hpp/.cpp`, `drafting_controller.hpp/.cpp`,
   `main_window.cpp`, `viewport.hpp/.cpp` — cobre: 07, 30
 
+- [x] **T25** Marcadores nos vértices das linhas e polilinhas selecionadas,
+  na cor de realce — arquivo: `drawing_gpu.cpp` — cobre: 25
+
 ## Fase 6 — Conferência e medições
 
 - [x] **T21** `bench_drafting` (fora do ctest): 100 mil trechos, tempo de

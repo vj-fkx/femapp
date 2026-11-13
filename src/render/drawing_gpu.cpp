@@ -304,6 +304,14 @@ bool DrawingGpu::prepare(QRhiResourceUpdateBatch* updates, const DrawingFrame& f
                 const bool isSelected = selected != nullptr &&
                                         std::ranges::find(*selected, entity.id) != selected->end();
                 geometry.add(entity, d.origin, kEntityColor | (isSelected ? kSelectedFlag : 0U));
+                // REQ-005-25: the vertices of a selected line or polyline.
+                if (isSelected && !geom::segmentsOf(entity).empty()) {
+                    for (const auto& vertex : geom::verticesOf(entity)) {
+                        geometry.add(
+                            {.id = entity.id, .shape = geom::PointEntity{.position = vertex}},
+                            d.origin, kEntityColor | kSelectedFlag);
+                    }
+                }
             }
         }
         if (!d.upload(d.entities, geometry, updates, error)) {

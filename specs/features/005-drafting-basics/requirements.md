@@ -81,7 +81,7 @@ na feature 015.
 
 | ID | Requisito | História |
 |----|-----------|----------|
-| REQ-005-25 | O sistema DEVE permitir selecionar entidades do desenho com os mesmos gestos da feature 004 (clique, janela, cruzamento, Shift para retirar, Esc para limpar), com a tolerância de clique de alguns pixels sobre linhas e pontos, e realçar as selecionadas. | US-4 |
+| REQ-005-25 | O sistema DEVE permitir selecionar entidades do desenho com os mesmos gestos da feature 004 (clique, janela, cruzamento, Shift para retirar, Esc para limpar), com a tolerância de clique de alguns pixels sobre linhas e pontos, e realçar as selecionadas, com marcadores nos vértices das linhas e polilinhas selecionadas (só exibição; arrastá-los é da feature 017). *(Marcadores acrescentados em 2026-11-12, a pedido do mantenedor.)* | US-4 |
 | REQ-005-26 | O sistema DEVE oferecer, no menu Editar, o alvo da seleção sem comando ativo: Desenho (padrão) ou Malha; com Malha, valem as regras de seleção da feature 004; os comandos de edição sempre selecionam entidades do desenho. | US-5 |
 | REQ-005-27 | QUANDO um comando de edição for iniciado com entidades do desenho já selecionadas, O sistema DEVE usá-las; senão, DEVE pedir "Selecione objetos" e aceitar clique, janela e cruzamento até Enter. | US-4 |
 | REQ-005-28 | O comando MOVE DEVE pedir o ponto base e o segundo ponto e deslocar as entidades pelo vetor entre eles, mostrando a pré-visualização das entidades no cursor. | US-4 |
