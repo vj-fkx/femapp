@@ -87,8 +87,31 @@ Opções de linha de comando:
 
 | Opção | Efeito |
 |-------|--------|
+| `<arquivo.msh>` | Importa a malha do Gmsh (formato 4.1, ASCII ou binário) ao abrir |
 | `--version` | Imprime a versão e sai |
 | `--smoke-test` | Abre a janela principal e fecha sozinho (usado nos testes) |
+
+Malhas também podem ser abertas em Arquivo ▸ Importar malha (Ctrl+I) ou
+arrastando o arquivo `.msh` para a janela.
+
+Mouse no viewport:
+
+| Ação | Efeito |
+|------|--------|
+| Botão do meio + arrastar | Desloca a vista (pan) |
+| Shift + botão do meio + arrastar | Gira em torno da parte da malha em vista |
+| Roda | Zoom em torno do ponto sob o cursor |
+| Clique esquerdo | Seleciona um item (Editar ▸ Selecionar escolhe os tipos: elementos, faces, arestas, nós) |
+| Arrastar da esquerda para a direita | Janela: seleciona o que está inteiro dentro |
+| Arrastar da direita para a esquerda | Cruzamento: seleciona o que está dentro ou toca o retângulo |
+| Shift + clique ou arrasto | Retira da seleção |
+| Esc ou clique fora da malha | Limpa a seleção |
+
+Para malhas grandes (centenas de milhares de elementos ou mais), use o build
+de Release (`cmake --preset release` e `cmake --build --preset release`): o
+build `dev` é de depuração e chega a ser dez vezes mais lento. O
+`bench_mesh_scene` mede a importação e a seleção de um arquivo:
+`build/release/bin/bench_mesh_scene <arquivo.msh>`.
 
 ## Presets
 

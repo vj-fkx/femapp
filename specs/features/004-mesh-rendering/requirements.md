@@ -100,48 +100,48 @@ mostrar resultados.
 
 ## 5. Critérios de aceite
 
-- [ ] **AC-1** (REQ-004-01, 02, 03, 05, 08) Importando pelo menu, arrastando o
+- [x] **AC-1** (REQ-004-01, 02, 03, 05, 08) Importando pelo menu, arrastando o
   arquivo e pela linha de comando, a malha aparece enquadrada e a barra de
   status mostra nome, nós, elementos e grupos.
-- [ ] **AC-2** (REQ-004-04, NFR-004-02) Durante a importação da malha de 1
+- [x] **AC-2** (REQ-004-04, NFR-004-02) Durante a importação da malha de 1
   milhão de tetraedros a janela continua respondendo e o indicador aparece; a
   malha surge em menos de 3 s.
-- [ ] **AC-3** (REQ-004-06, 07) Um arquivo com tipo não suportado mostra o
+- [x] **AC-3** (REQ-004-06, 07) Um arquivo com tipo não suportado mostra o
   aviso; um arquivo inválido mostra o erro com a linha e mantém a malha
   anterior.
-- [ ] **AC-4** (REQ-004-09, 10, 30) Testes sem GPU: a casca externa de malhas
+- [x] **AC-4** (REQ-004-09, 10, 30) Testes sem GPU: a casca externa de malhas
   conhecidas (um cubo de hexaedros, uma caixa de tetraedros, uma malha mista
   com cunhas e pirâmides) tem o número esperado de faces e arestas, e nenhuma
   face interna.
-- [ ] **AC-5** (REQ-004-09 a 13) Roteiro manual com os arquivos de exemplo da
+- [x] **AC-5** (REQ-004-09 a 13) Roteiro manual com os arquivos de exemplo da
   feature 003: pontos, linhas, faces e casca externa aparecem; os três modos
   funcionam; as arestas não cintilam ao orbitar.
-- [ ] **AC-6** (REQ-004-14, 15, 16) Cores por dimensão e por grupo e
+- [x] **AC-6** (REQ-004-14, 15, 16) Cores por dimensão e por grupo e
   visibilidade por dimensão funcionam pelo menu, conferidas no roteiro manual;
   a regra de cor de elemento em vários grupos tem teste automático.
-- [ ] **AC-7** (REQ-004-17, 18) "Enquadrar tudo" mostra a malha inteira; uma
+- [x] **AC-7** (REQ-004-17, 18) "Enquadrar tudo" mostra a malha inteira; uma
   malha deslocada 1e6 unidades da origem não treme ao orbitar e aproximar.
-- [ ] **AC-8** (REQ-004-19 a 25) Roteiro manual: clique, janela, cruzamento,
+- [x] **AC-8** (REQ-004-19 a 25) Roteiro manual: clique, janela, cruzamento,
   Shift e Esc se comportam como descrito, nos dois modos; testes automáticos
   conferem os critérios de janela e cruzamento sobre projeções conhecidas.
-- [ ] **AC-9** (REQ-004-26, 27, 28) A seleção aparece realçada nos três modos
+- [x] **AC-9** (REQ-004-26, 27, 28) A seleção aparece realçada nos três modos
   de exibição, a contagem aparece na barra de status e ocultar uma dimensão
   retira seus elementos da seleção.
-- [ ] **AC-10** (REQ-004-29) Com o sistema em português, os textos novos
+- [x] **AC-10** (REQ-004-29) Com o sistema em português, os textos novos
   aparecem em português.
 - [ ] **AC-11** (REQ-004-31) O smoke test com malha passa nos quatro jobs do CI.
-- [ ] **AC-12** (NFR-004-01, 03, 04) Medições registradas em `tasks.md`, dentro
+- [x] **AC-12** (NFR-004-01, 03, 04) Medições registradas em `tasks.md`, dentro
   das metas, com o modelo da GPU.
-- [ ] **AC-13** (REQ-004-19, 20, 32, 33) Testes automáticos num bloco de
+- [x] **AC-13** (REQ-004-19, 20, 32, 33) Testes automáticos num bloco de
   hexaedros: com faces ligadas, o clique no meio de uma face da casca seleciona
   essa face; com arestas e nós ligados, o clique perto de um vértice pega o nó
   e perto do meio de uma aresta pega a aresta; uma aresta comum a duas faces
   conta uma vez; desligar um tipo retira seus itens.
-- [ ] **AC-14** (REQ-004-21, 22, 26, 27, 28) Roteiro manual com faces, arestas
+- [x] **AC-14** (REQ-004-21, 22, 26, 27, 28) Roteiro manual com faces, arestas
   e nós ligados juntos: janela e cruzamento pegam os três tipos, o realce de
   cada tipo aparece nos três modos de exibição e a barra de status mostra a
   contagem por tipo.
-- [ ] **AC-15** (REQ-004-34, 35) Roteiro manual: "Mostrar nós" desenha os nós
+- [x] **AC-15** (REQ-004-34, 35) Roteiro manual: "Mostrar nós" desenha os nós
   das dimensões visíveis, esconde os de trás no modo sólido e mostra todos no
   aramado; os nós selecionados continuam com a cor de seleção.
 

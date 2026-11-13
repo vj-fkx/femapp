@@ -235,7 +235,7 @@ Regras:
 
 ## Fase 5 — Conferência e medições
 
-- [ ] **T26** `[M]` Roteiro manual no Windows: importar pelos três caminhos;
+- [x] **T26** `[M]` Roteiro manual no Windows: importar pelos três caminhos;
   arquivo com aviso e arquivo inválido; os três modos; cores por dimensão e
   por grupo; ocultar dimensões; seleção por clique, janela, cruzamento, Shift e
   Esc com os quatro tipos de seleção, sozinhos e combinados; realce de
@@ -244,7 +244,7 @@ Regras:
   da tela — cobre: 01 a 29, 32 a 35
 - [x] **T27** Gerar a malha de 1 milhão de Tet4 deslocada 1e6 da origem para o
   roteiro (opção no script de exemplos) — cobre: 18
-- [ ] **T28** `[M]` Medir em Release: FPS navegando com 1 milhão de Tet4 em
+- [x] **T28** `[M]` Medir em Release: FPS navegando com 1 milhão de Tet4 em
   1920×1080, tempo do diálogo até a malha aparecer, tempo de clique e de
   janela/cruzamento (com os quatro tipos ligados), consumo em repouso; registrar com o modelo da GPU — cobre:
   N01, N02, N03, N04
@@ -255,7 +255,7 @@ Regras:
   confirmação) — cobre: 31
 - [x] **T91** `clang-format` e `clang-tidy` sem pendências (também o
   `clang-tidy` do Linux, pelo CI)
-- [ ] **T92** Conferir os quinze critérios de aceite de `requirements.md`
+- [x] **T92** Conferir os quinze critérios de aceite de `requirements.md`
 - [ ] **T93** Atualizar `specs/roadmap.md` para `concluída` e o `README.md` se
   algo do uso tiver mudado
 
@@ -424,4 +424,16 @@ tela (`Camera::setPivot`, `MeshPicker::surfacePoint`); 104 testes passando.
   27,5 s em Debug. As metas do NFR-004-02 e 03 valem para Release; o build
   `dev` (Debug do MSVC, com iteradores verificados) é de 10 a 20 vezes mais
   lento e não serve para medir.
+
+**2026-11-12 — T26, T28 e T92:**
+
+- T26: roteiro manual no Windows aprovado pelo mantenedor ("tudo passou"),
+  com as mudanças pedidas ao longo da conferência (T29–T59).
+- T28: medições em Release aprovadas pelo mantenedor na NVIDIA GeForce RTX
+  2060: navegação com 1 milhão de Tet4 dentro da meta de 30 FPS e sem consumo
+  de CPU e GPU em repouso (os valores exatos não foram anotados); abertura em
+  2,4 s e seleção dentro das metas (tabela acima).
+- T92: critérios AC-1 a AC-10 e AC-12 a AC-15 conferidos (testes automáticos,
+  roteiro e medições). AC-11 (smoke test com malha nos quatro jobs) depende do
+  CI, depois do push (T90).
 
