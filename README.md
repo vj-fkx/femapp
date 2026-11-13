@@ -105,7 +105,31 @@ Mouse no viewport:
 | Arrastar da esquerda para a direita | Janela: seleciona o que está inteiro dentro |
 | Arrastar da direita para a esquerda | Cruzamento: seleciona o que está dentro ou toca o retângulo |
 | Shift + clique ou arrasto | Retira da seleção |
-| Esc ou clique fora da malha | Limpa a seleção |
+| Esc ou clique fora da malha | Limpa a seleção (sem comando ativo) |
+
+Desenho (feature 005), pela linha de comando na parte de baixo da janela ou
+pelos menus Desenho e Modificar. Os comandos ficam em inglês, como no
+AutoCAD:
+
+| Comando | Atalho | Efeito |
+|---------|--------|--------|
+| `POINT` | `PO` | Pontos |
+| `LINE` | `L` | Linhas; opções `U` (desfazer o último trecho) e `C` (fechar) |
+| `PLINE` | `PL` | Uma polilinha; opções `U` e `C` |
+| `MOVE` | `M` | Move os objetos selecionados (ponto base e segundo ponto) |
+| `COPY` | `CO` | Copia, quantas vezes quiser, até Enter |
+| `ERASE` | `E` ou Delete | Apaga os objetos selecionados |
+| `UNDO` / `REDO` | Ctrl+Z / Ctrl+Y | Desfaz e refaz um comando inteiro |
+
+Pontos digitados: `x,y` ou `x,y,z` (absoluto), `@dx,dy[,dz]` (relativo ao
+último ponto), `d<ângulo` e `@d<ângulo` (polar, ângulo em graus a partir de
++X), ou só uma distância, na direção do cursor. Decimal com ponto. Enter ou
+Espaço repetem o último comando; Esc ou o botão direito cancelam; Tab
+completa o nome; as setas percorrem o histórico. F3 liga o snap a objetos
+(extremidade, meio, interseção), F9 o encaixe na grade (passo em Ferramentas
+▸ Configurações de desenho) e F8 o modo ortogonal. O mouse marca pontos no
+plano Z = 0. Editar ▸ Alvo da seleção escolhe se a seleção sem comando pega o
+desenho ou a malha.
 
 Para malhas grandes (centenas de milhares de elementos ou mais), use o build
 de Release (`cmake --preset release` e `cmake --build --preset release`): o

@@ -113,34 +113,34 @@ na feature 015.
 
 ## 5. Critérios de aceite
 
-- [ ] **AC-1** (REQ-005-01, 02, 03) Testes de `geom` sem Qt: criar, mover,
+- [x] **AC-1** (REQ-005-01, 02, 03) Testes de `geom` sem Qt: criar, mover,
   copiar e apagar entidades preservam a geometria e os IDs esperados; IDs
   apagados não voltam a ser usados.
-- [ ] **AC-2** (REQ-005-05, 10 a 13) Testes da interpretação: comandos e
+- [x] **AC-2** (REQ-005-05, 10 a 13) Testes da interpretação: comandos e
   atalhos, coordenadas absolutas, relativas, polares (absolutas e relativas) e
   distância direta, com 2 e 3 componentes; entradas inválidas são recusadas
   com mensagem.
-- [ ] **AC-3** (REQ-005-15 a 17, 28 a 32) Testes das máquinas de estado dos
+- [x] **AC-3** (REQ-005-15 a 17, 28 a 32) Testes das máquinas de estado dos
   comandos sem interface: sequências de entradas produzem as entidades
   esperadas, incluindo Desfazer, Fechar, Enter, Esc, cópias múltiplas e
   desfazer/refazer com IDs restaurados.
-- [ ] **AC-4** (REQ-005-19, 22, 23) Testes de snap: extremidade, meio e
+- [x] **AC-4** (REQ-005-19, 22, 23) Testes de snap: extremidade, meio e
   interseção (também de trechos em 3D), abertura em pixels, prioridade do snap
   a objetos sobre grade e ortogonal.
-- [ ] **AC-5** (REQ-005-04 a 09, 14, 18, 20, 21, 24) Roteiro manual: desenhar
+- [x] **AC-5** (REQ-005-04 a 09, 14, 18, 20, 21, 24) Roteiro manual: desenhar
   um pórtico plano e um espacial pelo mouse e pela linha de comando, com
   snaps, grade e ortogonal; trecho elástico, marcadores, barra de status,
   histórico, Tab, Enter/Espaço e Esc se comportam como descrito.
-- [ ] **AC-6** (REQ-005-25 a 30) Roteiro manual: selecionar antes e depois do
+- [x] **AC-6** (REQ-005-25 a 30) Roteiro manual: selecionar antes e depois do
   comando; mover, copiar e apagar com pré-visualização; Delete; alvo da
   seleção alternando entre Desenho e Malha sem misturar as seleções.
-- [ ] **AC-7** (REQ-005-31, 32) Roteiro manual: desfazer e refazer pelo menu,
+- [x] **AC-7** (REQ-005-31, 32) Roteiro manual: desfazer e refazer pelo menu,
   pelo teclado e pela linha de comando, passo a passo.
-- [ ] **AC-8** (REQ-005-33, 34) Desenho e malha juntos na tela; "Enquadrar
+- [x] **AC-8** (REQ-005-33, 34) Desenho e malha juntos na tela; "Enquadrar
   tudo" enquadra os dois; um desenho a 1e6 da origem não treme.
-- [ ] **AC-9** (REQ-005-35) Com o sistema em português, menus e pedidos
+- [x] **AC-9** (REQ-005-35) Com o sistema em português, menus e pedidos
   aparecem em português e os comandos continuam aceitos em inglês.
-- [ ] **AC-10** (NFR-005-01, 03) Medições registradas em `tasks.md`; a do
+- [x] **AC-10** (NFR-005-01, 03) Medições registradas em `tasks.md`; a do
   NFR-005-02 fica para a feature 014.
 
 ## 6. Fora de escopo

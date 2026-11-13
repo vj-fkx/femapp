@@ -1,6 +1,6 @@
 # Tarefas — 005 drafting-basics
 
-Status: em andamento
+Status: concluída
 Design: [design.md](design.md) · Requisitos: [requirements.md](requirements.md)
 
 Regras:
@@ -123,14 +123,14 @@ Regras:
 - [x] **T21** `bench_drafting` (fora do ctest): 100 mil trechos, tempo de
   `PointResolver::resolve` por movimento — arquivo: `tests/perf/bench_drafting.cpp`
   — cobre: N01
-- [ ] **T22** `[M]` Roteiro manual no Windows: pórtico plano e espacial pelo
+- [x] **T22** `[M]` Roteiro manual no Windows: pórtico plano e espacial pelo
   mouse e pela linha de comando; coordenadas absolutas, relativas, polares e
   distância direta; snaps, grade e ortogonal com marcadores e barra de status;
   histórico, Tab, Enter/Espaço, Esc; selecionar antes e depois de MOVE, COPY e
   ERASE; Delete; desfazer e refazer pelos três caminhos; alvo da seleção;
   desenho junto da malha; "Enquadrar tudo"; desenho a 1e6 da origem; textos em
   português — cobre: 04 a 35
-- [ ] **T23** `[M]` Medir em Release: consumo em repouso com um comando ativo
+- [x] **T23** `[M]` Medir em Release: consumo em repouso com um comando ativo
   (o snap com 100 mil trechos já foi medido na T21; o FPS com 100 mil trechos
   e a malha de 1 milhão de Tet4 foi adiado para a 014, que permite abrir um
   desenho desse tamanho) — cobre: N01, N03
@@ -141,8 +141,8 @@ Regras:
   confirmação)
 - [x] **T91** `clang-format` e `clang-tidy` sem pendências (também o do Linux,
   pelo CI)
-- [ ] **T92** Conferir os dez critérios de aceite de `requirements.md`
-- [ ] **T93** Atualizar `specs/roadmap.md` para `concluída` e o `README.md`
+- [x] **T92** Conferir os dez critérios de aceite de `requirements.md`
+- [x] **T93** Atualizar `specs/roadmap.md` para `concluída` e o `README.md`
   (comandos de desenho, atalhos)
 
 ## Matriz de rastreabilidade
@@ -268,4 +268,17 @@ depois de corrigir três apontamentos que só os outros compiladores viram:
 `FrameParams::drawing` sem inicializador num teste (GCC), chaves em volta de
 um único atalho (clang) e um `optional` lido sem cópia conferida
 (`clang-tidy` do Linux).
+
+**2026-11-12 — T22, T23, T92 e T93:**
+
+- T22: roteiro manual no Windows aprovado pelo mantenedor ("tudo passou"),
+  com os ajustes pedidos durante a conferência (T24: Delete com o foco na
+  linha de comando e botão direito cancelando; T25: marcadores nos vértices
+  selecionados).
+- T23: consumo em repouso com um comando ativo aprovado pelo mantenedor; o
+  snap com 100 mil trechos mede 2,7 ms (T21); o FPS com 100 mil trechos
+  (NFR-005-02) foi adiado para a feature 014.
+- T92: critérios AC-1 a AC-10 conferidos (o AC-10 sem o NFR-005-02, adiado).
+- T93: roadmap com a 005 concluída; README com os comandos de desenho, as
+  entradas de coordenadas e os atalhos.
 
