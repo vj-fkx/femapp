@@ -122,14 +122,20 @@ void PointResolver::refresh(const Drawing& drawing) const
     }
     m_drawing = &drawing;
     m_revision = drawing.revision();
-    m_endpoints.clear();
+    m_points.clear();
     m_segments.clear();
     for (const Entity& entity : drawing.entities()) {
+        const auto base = static_cast<std::uint32_t>(m_points.size());
         const auto vertices = verticesOf(entity);
-        m_endpoints.insert(m_endpoints.end(), vertices.begin(), vertices.end());
-        const auto segments = segmentsOf(entity);
-        m_segments.insert(m_segments.end(), segments.begin(), segments.end());
+        m_points.insert(m_points.end(), vertices.begin(), vertices.end());
+        // Same pieces, in the same order, as segmentsOf.
+        const auto pieces = static_cast<std::uint32_t>(segmentsOf(entity).size());
+        const auto count = static_cast<std::uint32_t>(vertices.size());
+        for (std::uint32_t k = 0; k < pieces; ++k) {
+            m_segments.push_back({base + k, base + (k + 1) % count});
+        }
     }
+    m_tolerance = drawing.tolerance();
 }
 
 std::optional<ResolvedPoint> PointResolver::resolve(const Drawing& drawing, const ScreenView& view,
@@ -139,34 +145,51 @@ std::optional<ResolvedPoint> PointResolver::resolve(const Drawing& drawing, cons
     // 1. Object snap (REQ-005-19).
     if (settings.objectSnap) {
         refresh(drawing);
-        Best best;
         const double aperture = settings.aperturePx;
+
+        // Every vertex projected once.
+        m_screen.resize(m_points.size());
+        m_visible.resize(m_points.size());
+        for (std::size_t k = 0; k < m_points.size(); ++k) {
+            const auto pixel = project(view, m_points[k]);
+            m_visible[k] = pixel ? 1 : 0;
+            m_screen[k] = pixel.value_or(Vec2::Zero());
+        }
+
+        Best best;
         if (settings.isOn(SnapMode::Endpoint)) {
-            for (const Vec3& p : m_endpoints) {
-                best.offer(view, p, SnapMode::Endpoint, aperture);
+            for (std::size_t k = 0; k < m_points.size(); ++k) {
+                if (m_visible[k] != 0 && (m_screen[k] - view.cursor).norm() <= aperture) {
+                    best.offer(view, m_points[k], SnapMode::Endpoint, aperture);
+                }
+            }
+        }
+
+        // Only the pieces passing under the cursor can have their midpoint or
+        // an intersection there.
+        std::vector<const std::array<std::uint32_t, 2>*> near;
+        for (const auto& segment : m_segments) {
+            const auto a = segment[0];
+            const auto b = segment[1];
+            if (m_visible[a] != 0 && m_visible[b] != 0 &&
+                distanceToSegment(view.cursor, m_screen[a], m_screen[b]) <= aperture) {
+                near.push_back(&segment);
             }
         }
         if (settings.isOn(SnapMode::Midpoint)) {
-            for (const Segment& s : m_segments) {
-                best.offer(view, 0.5 * (s.a + s.b), SnapMode::Midpoint, aperture);
+            for (const auto* segment : near) {
+                best.offer(view, 0.5 * (m_points[(*segment)[0]] + m_points[(*segment)[1]]),
+                           SnapMode::Midpoint, aperture);
             }
         }
         if (settings.isOn(SnapMode::Intersection)) {
-            // Only the segments passing under the cursor can cross there.
-            std::vector<const Segment*> near;
-            for (const Segment& s : m_segments) {
-                const auto a = project(view, s.a);
-                const auto b = project(view, s.b);
-                if (a && b && distanceToSegment(view.cursor, *a, *b) <= aperture) {
-                    near.push_back(&s);
-                }
-            }
-            const double tolerance = drawing.tolerance();
             for (std::size_t i = 0; i < near.size(); ++i) {
                 for (std::size_t j = i + 1; j < near.size(); ++j) {
-                    const ClosestPoints closest =
-                        closestPoints(near[i]->a, near[i]->b, near[j]->a, near[j]->b);
-                    if (closest.distance <= tolerance) {
+                    const auto& s = *near[i];
+                    const auto& t = *near[j];
+                    const ClosestPoints closest = closestPoints(m_points[s[0]], m_points[s[1]],
+                                                                m_points[t[0]], m_points[t[1]]);
+                    if (closest.distance <= m_tolerance) {
                         best.offer(view, 0.5 * (closest.onFirst + closest.onSecond),
                                    SnapMode::Intersection, aperture);
                     }

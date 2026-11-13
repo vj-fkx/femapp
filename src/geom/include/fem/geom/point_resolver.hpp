@@ -62,11 +62,16 @@ public:
 private:
     void refresh(const Drawing& drawing) const;
 
-    // Cached per drawing revision.
+    // Cached per drawing revision: the vertices of every entity, the straight
+    // pieces as pairs of vertex indices, and the tolerance. Each vertex is
+    // projected once per call (NFR-005-01).
     mutable const Drawing* m_drawing = nullptr;
     mutable std::uint64_t m_revision = 0;
-    mutable std::vector<Vec3> m_endpoints;
-    mutable std::vector<Segment> m_segments;
+    mutable std::vector<Vec3> m_points;
+    mutable std::vector<std::array<std::uint32_t, 2>> m_segments;
+    mutable double m_tolerance = 0.0;
+    mutable std::vector<Eigen::Vector2d> m_screen; // per call, reused
+    mutable std::vector<std::uint8_t> m_visible;
 };
 
 // Closest points of segments ab and cd; returns the distance between them and

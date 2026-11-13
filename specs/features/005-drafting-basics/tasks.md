@@ -111,7 +111,7 @@ Regras:
 
 ## Fase 6 — Conferência e medições
 
-- [ ] **T21** `bench_drafting` (fora do ctest): 100 mil trechos, tempo de
+- [x] **T21** `bench_drafting` (fora do ctest): 100 mil trechos, tempo de
   `PointResolver::resolve` por movimento — arquivo: `tests/perf/bench_drafting.cpp`
   — cobre: N01
 - [ ] **T22** `[M]` Roteiro manual no Windows: pórtico plano e espacial pelo
@@ -241,4 +241,15 @@ Regras:
   - depois de cada comando a seleção do desenho é limpa, como no AutoCAD;
   - os botões SNAP, GRADE e ORTO da barra de status e as ações do menu
     Ferramentas ficam sincronizados; F3, F9 e F8 como atalhos.
+
+**2026-11-12 — T21 (benchmark do snap, Release, máquina do mantenedor):**
+
+- `bench_drafting` com 100 mil trechos curtos aleatórios num quadrado de 1000
+  unidades, vista superior em 1920×1080, os três modos de snap ligados:
+  - primeira versão (força bruta, cada ponto projetado várias vezes e a
+    tolerância recalculada a cada movimento): **11,3 ms** por movimento, acima
+    da meta;
+  - depois de guardar a tolerância em cache, projetar cada vértice uma vez e
+    calcular meios e interseções só nos trechos sob o cursor: **2,7 ms** por
+    movimento (meta: 5 ms); a primeira chamada, que monta o cache, leva 25 ms.
 
