@@ -91,6 +91,12 @@ add_executable(bench_gmsh_read perf/bench_gmsh_read.cpp)
 target_link_libraries(bench_gmsh_read PRIVATE fem::io)
 femapp_set_warnings(bench_gmsh_read)
 
+# NFR-004-02, NFR-004-03: import and selection benchmark, run by hand on a
+# Release build (not registered with CTest).
+add_executable(bench_mesh_scene perf/bench_mesh_scene.cpp)
+target_link_libraries(bench_mesh_scene PRIVATE fem::io fem::render)
+femapp_set_warnings(bench_mesh_scene)
+
 # REQ-004-03: command line parsing of the application, built on its own.
 add_executable(test_app unit/app/test_cli_options.cpp "${PROJECT_SOURCE_DIR}/src/app/cli_options.cpp")
 target_include_directories(test_app PRIVATE "${PROJECT_SOURCE_DIR}/src/app")

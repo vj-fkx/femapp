@@ -405,3 +405,23 @@ tela (`Camera::setPivot`, `MeshPicker::surfacePoint`); 104 testes passando.
   os que ficam sobre a casca, achados pelo elemento de referência). 110 testes
   passando; `clang-tidy` sem apontamentos.
 - **Não verificado visualmente:** fica no roteiro manual (T26).
+
+**2026-11-12 — Desempenho com 1 milhão de Tet4 (apoio à T28):**
+
+- Novo `tests/perf/bench_mesh_scene` (fora do ctest), que mede cada etapa.
+  Na máquina do mantenedor (`box_1m_tet4_bin.msh`, 1920×1080):
+
+  | Etapa | Release | Debug |
+  |-------|---------|-------|
+  | Leitura | 0,42 s | 5,8 s |
+  | Casca externa | 0,94 s | 16,6 s |
+  | Cena completa (inclui a casca) | 1,26 s | 19,6 s |
+  | Clique (elementos / todos os tipos) | 0,002 / 0,004 s | 0,11 / 0,31 s |
+  | Janela, elementos (516 mil) | 0,04 s | 1,4 s |
+  | Cruzamento, todos os tipos | 0,12 s | 9,0 s |
+
+- `femapp --smoke-test` com a malha, até o primeiro quadro: 2,4 s em Release,
+  27,5 s em Debug. As metas do NFR-004-02 e 03 valem para Release; o build
+  `dev` (Debug do MSVC, com iteradores verificados) é de 10 a 20 vezes mais
+  lento e não serve para medir.
+
