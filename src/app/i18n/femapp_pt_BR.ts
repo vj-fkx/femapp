@@ -235,6 +235,110 @@
         <source>Selected: %1</source>
         <translation>Selecionados: %1</translation>
     </message>
+    <message>
+        <source>Command Line</source>
+        <translation>Linha de comando</translation>
+    </message>
+    <message>
+        <source>&amp;Draw</source>
+        <translation>&amp;Desenho</translation>
+    </message>
+    <message>
+        <source>&amp;Point</source>
+        <translation>&amp;Ponto</translation>
+    </message>
+    <message>
+        <source>&amp;Line</source>
+        <translation>&amp;Linha</translation>
+    </message>
+    <message>
+        <source>P&amp;olyline</source>
+        <translation>P&amp;olilinha</translation>
+    </message>
+    <message>
+        <source>&amp;Modify</source>
+        <translation>&amp;Modificar</translation>
+    </message>
+    <message>
+        <source>&amp;Move</source>
+        <translation>&amp;Mover</translation>
+    </message>
+    <message>
+        <source>&amp;Copy</source>
+        <translation>&amp;Copiar</translation>
+    </message>
+    <message>
+        <source>&amp;Erase</source>
+        <translation>&amp;Apagar</translation>
+    </message>
+    <message>
+        <source>&amp;Tools</source>
+        <translation>&amp;Ferramentas</translation>
+    </message>
+    <message>
+        <source>&amp;Object Snap</source>
+        <translation>&amp;Snap a objetos</translation>
+    </message>
+    <message>
+        <source>SNAP</source>
+        <translation>SNAP</translation>
+    </message>
+    <message>
+        <source>&amp;Grid Snap</source>
+        <translation>Encaixe na &amp;grade</translation>
+    </message>
+    <message>
+        <source>GRID</source>
+        <translation>GRADE</translation>
+    </message>
+    <message>
+        <source>O&amp;rtho</source>
+        <translation>O&amp;rtogonal</translation>
+    </message>
+    <message>
+        <source>ORTHO</source>
+        <translation>ORTO</translation>
+    </message>
+    <message>
+        <source>Object Snap &amp;Modes</source>
+        <translation>&amp;Modos de snap</translation>
+    </message>
+    <message>
+        <source>&amp;Endpoint</source>
+        <translation>&amp;Extremidade</translation>
+    </message>
+    <message>
+        <source>&amp;Midpoint</source>
+        <translation>&amp;Meio</translation>
+    </message>
+    <message>
+        <source>&amp;Intersection</source>
+        <translation>&amp;Interseção</translation>
+    </message>
+    <message>
+        <source>&amp;Drafting Settings...</source>
+        <translation>&amp;Configurações de desenho...</translation>
+    </message>
+    <message>
+        <source>&amp;Undo</source>
+        <translation>&amp;Desfazer</translation>
+    </message>
+    <message>
+        <source>&amp;Redo</source>
+        <translation>&amp;Refazer</translation>
+    </message>
+    <message>
+        <source>Selection &amp;Target</source>
+        <translation>&amp;Alvo da seleção</translation>
+    </message>
+    <message>
+        <source>&amp;Drawing</source>
+        <translation>&amp;Desenho</translation>
+    </message>
+    <message>
+        <source>&amp;Mesh</source>
+        <translation>&amp;Malha</translation>
+    </message>
 </context>
 <context>
     <name>fem::render::Viewport</name>
@@ -245,6 +349,159 @@
     <message>
         <source>The graphics backend could not be initialized.</source>
         <translation>Não foi possível inicializar o backend gráfico.</translation>
+    </message>
+    <message>
+        <source>Endpoint</source>
+        <translation>Extremidade</translation>
+    </message>
+    <message>
+        <source>Midpoint</source>
+        <translation>Meio</translation>
+    </message>
+    <message>
+        <source>Intersection</source>
+        <translation>Interseção</translation>
+    </message>
+</context>
+<context>
+    <name>fem::app::DraftingController</name>
+    <message>
+        <source>*Cancel*</source>
+        <translation>*Cancelado*</translation>
+    </message>
+    <message>
+        <source>Nothing to undo.</source>
+        <translation>Nada para desfazer.</translation>
+    </message>
+    <message>
+        <source>Nothing to redo.</source>
+        <translation>Nada para refazer.</translation>
+    </message>
+    <message>
+        <source>drafting</source>
+        <translation>desenho</translation>
+    </message>
+    <message>
+        <source>Command:</source>
+        <translation>Comando:</translation>
+    </message>
+    <message>
+        <source>Specify a point</source>
+        <translation>Especifique um ponto</translation>
+    </message>
+    <message>
+        <source>Specify the first point</source>
+        <translation>Especifique o primeiro ponto</translation>
+    </message>
+    <message>
+        <source>Specify the next point</source>
+        <translation>Especifique o próximo ponto</translation>
+    </message>
+    <message>
+        <source>Select objects (Enter to finish)</source>
+        <translation>Selecione objetos (Enter para concluir)</translation>
+    </message>
+    <message>
+        <source>Specify the base point</source>
+        <translation>Especifique o ponto base</translation>
+    </message>
+    <message>
+        <source>Specify the second point</source>
+        <translation>Especifique o segundo ponto</translation>
+    </message>
+    <message>
+        <source>Specify the second point or Enter to finish</source>
+        <translation>Especifique o segundo ponto ou Enter para concluir</translation>
+    </message>
+    <message>
+        <source>Undo (U)</source>
+        <translation>Desfazer (U)</translation>
+    </message>
+    <message>
+        <source>Close (C)</source>
+        <translation>Fechar (C)</translation>
+    </message>
+    <message>
+        <source>or [%1]</source>
+        <translation>ou [%1]</translation>
+    </message>
+    <message>
+        <source>Invalid input.</source>
+        <translation>Entrada inválida.</translation>
+    </message>
+    <message>
+        <source>Unknown command.</source>
+        <translation>Comando desconhecido.</translation>
+    </message>
+    <message>
+        <source>There is no previous point.</source>
+        <translation>Não há ponto anterior.</translation>
+    </message>
+    <message>
+        <source>At least two segments are needed.</source>
+        <translation>São necessários pelo menos dois segmentos.</translation>
+    </message>
+    <message>
+        <source>No object selected.</source>
+        <translation>Nenhum objeto selecionado.</translation>
+    </message>
+    <message>
+        <source>Polyline created.</source>
+        <translation>Polilinha criada.</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n point(s) created.</source>
+        <translation>
+            <numerusform>%n ponto criado.</numerusform>
+            <numerusform>%n pontos criados.</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%n line(s) created.</source>
+        <translation>
+            <numerusform>%n linha criada.</numerusform>
+            <numerusform>%n linhas criadas.</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%n object(s) moved.</source>
+        <translation>
+            <numerusform>%n objeto movido.</numerusform>
+            <numerusform>%n objetos movidos.</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%n copy(ies) created.</source>
+        <translation>
+            <numerusform>%n cópia criada.</numerusform>
+            <numerusform>%n cópias criadas.</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%n object(s) erased.</source>
+        <translation>
+            <numerusform>%n objeto apagado.</numerusform>
+            <numerusform>%n objetos apagados.</numerusform>
+        </translation>
+    </message>
+</context>
+<context>
+    <name>fem::app::DraftingSettingsDialog</name>
+    <message>
+        <source>Drafting Settings</source>
+        <translation>Configurações de desenho</translation>
+    </message>
+    <message>
+        <source> px</source>
+        <translation> px</translation>
+    </message>
+    <message>
+        <source>Grid snap &amp;step:</source>
+        <translation>&amp;Passo da grade:</translation>
+    </message>
+    <message>
+        <source>Object snap &amp;aperture:</source>
+        <translation>&amp;Abertura do snap:</translation>
     </message>
 </context>
 </TS>

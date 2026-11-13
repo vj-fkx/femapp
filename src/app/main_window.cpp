@@ -1,5 +1,8 @@
 #include "main_window.hpp"
 
+#include "command_line_widget.hpp"
+#include "drafting_controller.hpp"
+#include "drafting_settings_dialog.hpp"
 #include "mesh_import.hpp"
 
 #include <fem/core/version.hpp>
@@ -11,10 +14,12 @@
 
 #include <QAction>
 #include <QActionGroup>
+#include <QDockWidget>
 #include <QDragEnterEvent>
 #include <QDropEvent>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QKeyEvent>
 #include <QKeySequence>
 #include <QLabel>
 #include <QMenu>
@@ -26,6 +31,8 @@
 #include <QStatusBar>
 #include <QString>
 #include <QStringList>
+#include <QToolButton>
+#include <QUndoStack>
 #include <QUrl>
 
 #include <array>
@@ -84,8 +91,10 @@ MainWindow::MainWindow(QWidget* parent)
     exitAction->setShortcut(QKeySequence::Quit);
     exitAction->setMenuRole(QAction::QuitRole);
 
+    createDraftingUi();
     createEditMenu();
     createViewMenu();
+    createDraftingMenus();
 
     QMenu* helpMenu = menuBar()->addMenu(tr("&Help"));
     QAction* aboutAction = helpMenu->addAction(tr("&About femapp"), this, &MainWindow::showAbout);
@@ -280,6 +289,37 @@ void MainWindow::createEditMenu()
 {
     QMenu* editMenu = menuBar()->addMenu(tr("&Edit"));
 
+    // REQ-005-31
+    QAction* undo = editMenu->addAction(tr("&Undo"), m_drafting, &DraftingController::undo);
+    undo->setShortcuts({QKeySequence::Undo});
+    QAction* redo = editMenu->addAction(tr("&Redo"), m_drafting, &DraftingController::redo);
+    redo->setShortcuts({QKeySequence(Qt::CTRL | Qt::Key_Y), QKeySequence::Redo});
+    const auto refreshUndo = [this, undo, redo] {
+        undo->setEnabled(m_drafting->undoStack()->canUndo());
+        redo->setEnabled(m_drafting->undoStack()->canRedo());
+    };
+    connect(m_drafting->undoStack(), &QUndoStack::indexChanged, this, refreshUndo);
+    refreshUndo();
+    editMenu->addSeparator();
+
+    // REQ-005-26: what the selection picks when no command asks for objects.
+    QMenu* targetMenu = editMenu->addMenu(tr("Selection &Target"));
+    // NOLINTNEXTLINE(cppcoreguidelines-owning-memory): owned by its Qt parent.
+    auto* targetGroup = new QActionGroup(targetMenu);
+    const std::array<std::pair<render::SelectionTarget, QString>, 2> targets = {{
+        {render::SelectionTarget::Drawing, tr("&Drawing")},
+        {render::SelectionTarget::Mesh, tr("&Mesh")},
+    }};
+    for (const auto& [target, text] : targets) {
+        QAction* action = targetMenu->addAction(text);
+        action->setCheckable(true);
+        action->setChecked(m_viewport->selectionTarget() == target);
+        targetGroup->addAction(action);
+        connect(action, &QAction::triggered, m_viewport,
+                [this, target = target] { m_viewport->setSelectionTarget(target); });
+        m_viewActions.append(action);
+    }
+
     // REQ-004-19: kinds that can be combined; the last one on cannot be
     // turned off (the action is checked again).
     QMenu* selectMenu = editMenu->addMenu(tr("&Select"));
@@ -305,9 +345,135 @@ void MainWindow::createEditMenu()
 
     // REQ-004-25
     QAction* clear =
-        editMenu->addAction(tr("&Clear Selection"), m_viewport, &render::Viewport::clearSelection);
+        editMenu->addAction(tr("&Clear Selection"), m_drafting, &DraftingController::escape);
     clear->setShortcut(QKeySequence(Qt::Key_Escape));
     m_viewActions.append(clear);
+}
+
+void MainWindow::createDraftingUi()
+{
+    // REQ-005-04: the command line, docked at the bottom.
+    // NOLINTBEGIN(cppcoreguidelines-owning-memory): owned by their Qt parents.
+    m_commandLine = new CommandLineWidget(this);
+    auto* dock = new QDockWidget(tr("Command Line"), this);
+    m_drafting = new DraftingController(m_viewport, m_commandLine, this);
+    // NOLINTEND(cppcoreguidelines-owning-memory)
+    dock->setObjectName(QStringLiteral("commandLine"));
+    dock->setWidget(m_commandLine);
+    dock->setFeatures(QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable);
+    addDockWidget(Qt::BottomDockWidgetArea, dock);
+
+    // Keys typed on the viewport go to the command line (as in AutoCAD).
+    m_viewport->installEventFilter(this);
+}
+
+void MainWindow::createDraftingMenus()
+{
+    using geom::CommandName;
+    const auto command = [this](QMenu* menu, const QString& text, CommandName name) {
+        QAction* action =
+            menu->addAction(text, m_drafting, [this, name] { m_drafting->run(name); });
+        m_viewActions.append(action);
+        return action;
+    };
+
+    // REQ-005-15 to 17
+    QMenu* drawMenu = menuBar()->addMenu(tr("&Draw"));
+    command(drawMenu, tr("&Point"), CommandName::Point);
+    command(drawMenu, tr("&Line"), CommandName::Line);
+    command(drawMenu, tr("P&olyline"), CommandName::Pline);
+
+    // REQ-005-28 to 30
+    QMenu* modifyMenu = menuBar()->addMenu(tr("&Modify"));
+    command(modifyMenu, tr("&Move"), CommandName::Move);
+    command(modifyMenu, tr("&Copy"), CommandName::Copy);
+    QAction* erase =
+        modifyMenu->addAction(tr("&Erase"), m_drafting, &DraftingController::deleteSelection);
+    erase->setShortcut(QKeySequence::Delete);
+    m_viewActions.append(erase);
+
+    // REQ-005-21 to 24: toggles in the Tools menu and on the status bar.
+    QMenu* toolsMenu = menuBar()->addMenu(tr("&Tools"));
+    const auto toggle = [&](const QString& text, const QString& button, Qt::Key key, bool on,
+                            void (DraftingController::*slot)(bool)) {
+        QAction* action = toolsMenu->addAction(text);
+        action->setCheckable(true);
+        action->setChecked(on);
+        action->setShortcut(QKeySequence(key));
+        connect(action, &QAction::toggled, m_drafting, slot);
+        // NOLINTNEXTLINE(cppcoreguidelines-owning-memory): owned by the status bar.
+        auto* toolButton = new QToolButton(this);
+        toolButton->setText(button);
+        toolButton->setCheckable(true);
+        toolButton->setChecked(on);
+        toolButton->setAutoRaise(true);
+        toolButton->setToolTip(text);
+        connect(toolButton, &QToolButton::toggled, action, &QAction::setChecked);
+        connect(action, &QAction::toggled, toolButton, &QToolButton::setChecked);
+        statusBar()->addPermanentWidget(toolButton);
+        m_viewActions.append(action);
+    };
+    const geom::DraftingSettings& settings = m_drafting->settings();
+    toggle(tr("&Object Snap"), tr("SNAP"), Qt::Key_F3, settings.objectSnap,
+           &DraftingController::setObjectSnap);
+    toggle(tr("&Grid Snap"), tr("GRID"), Qt::Key_F9, settings.gridSnap,
+           &DraftingController::setGridSnap);
+    toggle(tr("O&rtho"), tr("ORTHO"), Qt::Key_F8, settings.ortho, &DraftingController::setOrtho);
+
+    QMenu* modes = toolsMenu->addMenu(tr("Object Snap &Modes"));
+    const std::array<std::pair<geom::SnapMode, QString>, 3> snapModes = {{
+        {geom::SnapMode::Endpoint, tr("&Endpoint")},
+        {geom::SnapMode::Midpoint, tr("&Midpoint")},
+        {geom::SnapMode::Intersection, tr("&Intersection")},
+    }};
+    for (const auto& [mode, text] : snapModes) {
+        QAction* action = modes->addAction(text);
+        action->setCheckable(true);
+        action->setChecked(settings.modes.at(static_cast<std::size_t>(mode)));
+        connect(action, &QAction::toggled, m_drafting,
+                [this, mode = mode](bool on) { m_drafting->setSnapMode(mode, on); });
+        m_viewActions.append(action);
+    }
+
+    toolsMenu->addSeparator();
+    QAction* settingsAction = toolsMenu->addAction(tr("&Drafting Settings..."), this, [this] {
+        DraftingSettingsDialog dialog(m_drafting->settings().gridStep,
+                                      m_drafting->settings().aperturePx, this);
+        if (dialog.exec() == QDialog::Accepted) {
+            m_drafting->setGridStep(dialog.gridStep());
+            m_drafting->setAperture(dialog.aperturePx());
+        }
+    });
+    m_viewActions.append(settingsAction);
+
+    // REQ-005-24: coordinates of the point a click would give.
+    // NOLINTNEXTLINE(cppcoreguidelines-owning-memory): owned by the status bar.
+    m_coordinates = new QLabel(this);
+    m_coordinates->setMinimumWidth(m_coordinates->fontMetrics().horizontalAdvance(
+        QStringLiteral("-000000.0000, -000000.0000, -000000.0000")));
+    statusBar()->insertPermanentWidget(0, m_coordinates);
+    connect(m_drafting, &DraftingController::cursorPointChanged, m_coordinates, &QLabel::setText);
+}
+
+bool MainWindow::eventFilter(QObject* watched, QEvent* event)
+{
+    // Text typed with the viewport focused goes to the command line; Enter
+    // and Space send it (REQ-005-04, 06).
+    if (watched == m_viewport && event->type() == QEvent::KeyPress && m_commandLine) {
+        const auto* key = static_cast<QKeyEvent*>(event);
+        const bool plain = (key->modifiers() & ~(Qt::ShiftModifier | Qt::KeypadModifier)) == 0;
+        if (plain && (key->key() == Qt::Key_Return || key->key() == Qt::Key_Enter ||
+                      key->key() == Qt::Key_Space)) {
+            m_drafting->enterText(QString());
+            return true;
+        }
+        const QString text = key->text();
+        if (plain && !text.isEmpty() && text.at(0).isPrint()) {
+            m_commandLine->typeText(text);
+            return true;
+        }
+    }
+    return QMainWindow::eventFilter(watched, event);
 }
 
 void MainWindow::chooseMeshFile()

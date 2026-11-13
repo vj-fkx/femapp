@@ -2,6 +2,12 @@ qt_add_executable(femapp WIN32 MACOSX_BUNDLE
     main.cpp
     cli_options.cpp
     cli_options.hpp
+    command_line_widget.cpp
+    command_line_widget.hpp
+    drafting_controller.cpp
+    drafting_controller.hpp
+    drafting_settings_dialog.cpp
+    drafting_settings_dialog.hpp
     main_window.cpp
     main_window.hpp
     mesh_import.cpp

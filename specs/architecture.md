@@ -140,6 +140,17 @@ Duas camadas (ADR-0001):
 Os headers públicos de `geom` não incluem headers do OCCT (padrão pimpl), para
 manter os tempos de compilação e permitir trocar o núcleo no futuro.
 
+**Já implementado (feature 005):** `Drawing` com pontos, linhas e polilinhas
+retas em `double` e IDs estáveis; `DrawingEdit` (entidades que saem e que
+entram, com os IDs), base do desfazer; `parseInput` (comandos, opções,
+coordenadas absolutas, relativas, polares e distância direta, com o ponto
+como separador decimal em qualquer locale); `PointResolver` (snaps de
+extremidade, meio e interseção 3D por força bruta, grade e ortogonal, a partir
+de uma projeção de tela passada como matriz); `CommandSession` (POINT, LINE,
+PLINE, MOVE, COPY, ERASE, um `DrawingEdit` por comando). Os pedidos e as
+mensagens saem como IDs e são traduzidos no `app`. O OCCT ainda não é usado
+pelo desenho (feature 015).
+
 ## 3b. Geração de malha (`mesher`)
 
 | Gerador | Algoritmo |
@@ -191,10 +202,14 @@ falhas esperadas (arquivo inválido, modelo singular); exceções apenas para bu
 
 - **`MainWindow`** com docks: árvore do modelo, propriedades, console.
 - **Documento/Comando**: toda edição do `Model` é um `QUndoCommand` (REQ-G-06).
+  Para o desenho (feature 005), cada comando concluído vira um `QUndoCommand`
+  que embrulha o `geom::DrawingEdit`, testado sem Qt em `geom`.
 - **`CommandLineWidget`**: linha de comando estilo CAD com histórico e
   autocompletar; encaminha texto ao `geom::CommandParser`.
 - **`DraftingController`**: liga eventos de mouse do viewport ao comando ativo e
-  ao `SnapEngine`; desenha pré-visualização elástica, marcadores de snap e grips.
+  ao `PointResolver` (o `SnapEngine` desta seção); desenha pré-visualização
+  elástica e marcadores de snap (grips na feature 017). O `Viewport` tem o modo
+  "pedir ponto" e o alvo da seleção (desenho ou malha).
 - **Painel de camadas** e barra de status com alternadores (snap, grade, orto, polar).
 - **`MeshRunner`**: mesma mecânica do `AnalysisRunner`, para os geradores de malha.
 - **`AnalysisRunner`**: executa `core::Analysis` em thread de trabalho; comunica

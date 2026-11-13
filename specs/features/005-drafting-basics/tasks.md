@@ -86,26 +86,26 @@ Regras:
 
 ## Fase 5 — Interface (`app`)
 
-- [ ] **T15** `CommandLineWidget`: histórico, entrada, pedido, Tab
+- [x] **T15** `CommandLineWidget`: histórico, entrada, pedido, Tab
   (`completeCommand`), setas, Espaço como Enter, Esc; teclas imprimíveis do
   viewport repassadas à entrada — arquivos: `command_line_widget.hpp/.cpp` —
   cobre: 04, 05, 06, 07, 09
-- [ ] **T16** `DraftingController`: dono do `Drawing`, da `CommandSession`, do
+- [x] **T16** `DraftingController`: dono do `Drawing`, da `CommandSession`, do
   `PointResolver`, das configurações e do `QUndoStack`; liga a linha de
   comando e o viewport (modo do mouse, pré-visualização, marcador), traduz
   pedidos e mensagens com `tr()`, manda as edições ao `QUndoStack` (primeiro
   `redo` ignorado) — arquivos: `drafting_controller.hpp/.cpp` — cobre: 04, 07,
   08, 14, 18, 27, 31
-- [ ] **T17** `MainWindow`: dock da linha de comando; menus Desenho, Modificar,
+- [x] **T17** `MainWindow`: dock da linha de comando; menus Desenho, Modificar,
   Editar (Desfazer, Refazer, Alvo da seleção, modos de snap) e Ferramentas;
   barra de status com coordenadas e botões SNAP/GRADE/ORTO; atalhos F3, F8, F9,
   Delete, Ctrl+Z, Ctrl+Y/Ctrl+Shift+Z — arquivos: `main_window.hpp/.cpp` —
   cobre: 21, 24, 26, 30, 31
-- [ ] **T18** `DraftingSettingsDialog` (passo da grade e abertura do snap) —
+- [x] **T18** `DraftingSettingsDialog` (passo da grade e abertura do snap) —
   arquivos: `drafting_settings_dialog.hpp/.cpp` — cobre: 19, 22
-- [ ] **T19** Traduções pt_BR dos menus, botões, pedidos e mensagens — arquivo:
+- [x] **T19** Traduções pt_BR dos menus, botões, pedidos e mensagens — arquivo:
   `i18n/femapp_pt_BR.ts` — cobre: 35
-- [ ] **T20** Atualizar `specs/architecture.md` (§3a: o que já existe em `geom`
+- [x] **T20** Atualizar `specs/architecture.md` (§3a: o que já existe em `geom`
   e o desfazer por `DrawingEdit` + `QUndoStack`; §5: `DraftingController` e
   linha de comando) — cobre: 03
 
@@ -224,4 +224,21 @@ Regras:
   girar a roda (fica desatualizado) até o próximo movimento; `SnapMarker` é
   uma estrutura pública do `Viewport`; `clearDrawingSelection` e
   `setCommandSelection` acrescentados.
+
+**2026-11-12 — Fase 5 (T15–T20):**
+
+- 142 testes passando no Windows, inclusive os smoke tests, que abrem a janela
+  com a linha de comando e os menus novos; `clang-tidy` sem apontamentos.
+- **Não verificado visualmente nem por interação:** tudo o que depende do
+  mouse e do teclado na janela; isso é o roteiro manual (T22).
+- Decisões de implementação:
+  - teclas imprimíveis com o viewport em foco vão para a linha de comando, e
+    Enter/Espaço enviam a entrada (repetem o último comando se vazia);
+  - Esc cancela o comando ativo; sem comando, limpa as seleções (desenho e
+    malha);
+  - os snaps a objetos só valem enquanto um ponto é pedido; as coordenadas da
+    barra de status acompanham o cursor sempre;
+  - depois de cada comando a seleção do desenho é limpa, como no AutoCAD;
+  - os botões SNAP, GRADE e ORTO da barra de status e as ações do menu
+    Ferramentas ficam sincronizados; F3, F9 e F8 como atalhos.
 

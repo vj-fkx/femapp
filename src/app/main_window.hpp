@@ -11,6 +11,7 @@
 #include <memory>
 
 class QAction;
+class QEvent;
 class QLabel;
 class QProgressBar;
 
@@ -21,6 +22,8 @@ class Viewport;
 
 namespace fem::app {
 
+class CommandLineWidget;
+class DraftingController;
 class MeshImport;
 
 class MainWindow : public QMainWindow
@@ -58,12 +61,15 @@ private slots:
     void showSelection();
 
 protected:
+    bool eventFilter(QObject* watched, QEvent* event) override;
     void dragEnterEvent(QDragEnterEvent* event) override;
     void dropEvent(QDropEvent* event) override;
 
 private:
     void createViewMenu();
     void createEditMenu();
+    void createDraftingUi();
+    void createDraftingMenus();
     void showMessage(const QString& title, const QString& text, bool error);
 
     QPointer<render::Viewport> m_viewport;
@@ -73,6 +79,9 @@ private:
     QProgressBar* m_progress = nullptr;
     QLabel* m_meshInfo = nullptr;
     QLabel* m_selectionInfo = nullptr;
+    QLabel* m_coordinates = nullptr;
+    QPointer<CommandLineWidget> m_commandLine;
+    DraftingController* m_drafting = nullptr;
     bool m_quietMessages = false;
 };
 
