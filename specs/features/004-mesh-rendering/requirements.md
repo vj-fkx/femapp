@@ -129,7 +129,7 @@ mostrar resultados.
   retira seus elementos da seleção.
 - [x] **AC-10** (REQ-004-29) Com o sistema em português, os textos novos
   aparecem em português.
-- [ ] **AC-11** (REQ-004-31) O smoke test com malha passa nos quatro jobs do CI.
+- [x] **AC-11** (REQ-004-31) O smoke test com malha passa nos quatro jobs do CI.
 - [x] **AC-12** (NFR-004-01, 03, 04) Medições registradas em `tasks.md`, dentro
   das metas, com o modelo da GPU.
 - [x] **AC-13** (REQ-004-19, 20, 32, 33) Testes automáticos num bloco de

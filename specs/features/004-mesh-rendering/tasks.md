@@ -1,6 +1,6 @@
 # Tarefas — 004 mesh-rendering
 
-Status: em andamento
+Status: concluída
 Design: [design.md](design.md) · Requisitos: [requirements.md](requirements.md)
 
 Regras:
@@ -251,12 +251,12 @@ Regras:
 
 ## Fase 6 — Fechamento
 
-- [ ] **T90** Build e testes verdes nos quatro jobs do CI (push com sua
+- [x] **T90** Build e testes verdes nos quatro jobs do CI (push com sua
   confirmação) — cobre: 31
 - [x] **T91** `clang-format` e `clang-tidy` sem pendências (também o
   `clang-tidy` do Linux, pelo CI)
 - [x] **T92** Conferir os quinze critérios de aceite de `requirements.md`
-- [ ] **T93** Atualizar `specs/roadmap.md` para `concluída` e o `README.md` se
+- [x] **T93** Atualizar `specs/roadmap.md` para `concluída` e o `README.md` se
   algo do uso tiver mudado
 
 ## Matriz de rastreabilidade
@@ -436,4 +436,11 @@ tela (`Camera::setPivot`, `MeshPicker::surfacePoint`); 104 testes passando.
 - T92: critérios AC-1 a AC-10 e AC-12 a AC-15 conferidos (testes automáticos,
   roteiro e medições). AC-11 (smoke test com malha nos quatro jobs) depende do
   CI, depois do push (T90).
+
+**2026-11-12 — T90 e T93:** CI verde nos cinco jobs (Windows, macOS,
+linux-gcc, linux-clang com clang-tidy e formatação) no commit `7b13051`,
+depois de corrigir um falso positivo do GCC 13 em `std::sort` parcial, a
+fresta na diagonal dos quadriláteros vista no macOS (ARM) e dois apontamentos
+do clang-tidy do Linux. AC-11 conferido. README atualizado; feature
+concluída no roadmap.
 
