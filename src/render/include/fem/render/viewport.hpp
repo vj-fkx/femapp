@@ -1,5 +1,8 @@
 #pragma once
 
+#include <fem/geom/commands.hpp>
+#include <fem/geom/drawing.hpp>
+#include <fem/geom/point_resolver.hpp>
 #include <fem/render/camera.hpp>
 #include <fem/render/display_options.hpp>
 #include <fem/render/mesh_scene.hpp>
@@ -9,13 +12,29 @@
 #include <QRhiWidget>
 #include <QString>
 
+#include <cstdint>
 #include <memory>
+#include <optional>
+#include <vector>
 
 namespace fem::render {
 
 // Background of the 3D view: the color the frames are cleared to, and the
 // color the widget shows before the first frame is ready.
 inline constexpr QColor kViewportBackground(38, 41, 48);
+
+// REQ-005-26: what the left button selects when no command asks for objects.
+enum class SelectionTarget : std::uint8_t { Drawing, Mesh };
+// REQ-005-14: in PickPoint mode a left click gives a point to the running
+// drafting command instead of selecting.
+enum class MouseMode : std::uint8_t { Select, PickPoint };
+
+// REQ-005-20: object snap shown at a point.
+struct SnapMarker
+{
+    Vec3 point = Vec3::Zero();
+    geom::SnapMode mode = geom::SnapMode::Endpoint;
+};
 
 // 3D viewport rendered on the GPU through Qt RHI.
 //
@@ -68,6 +87,25 @@ public:
     // REQ-004-37: only the selection is shown.
     [[nodiscard]] bool isIsolated() const;
 
+    // REQ-005-33: the drawing shown with the mesh; drawingChanged() after
+    // every edit of it.
+    void setDrawing(std::shared_ptr<const geom::Drawing> drawing);
+    [[nodiscard]] const std::shared_ptr<const geom::Drawing>& drawing() const;
+    void drawingChanged();
+    // REQ-005-18: elastic line and ghosts of the running command.
+    void setDrawingPreview(geom::Preview preview);
+    void setSnapMarker(const std::optional<SnapMarker>& marker);
+    void setMouseMode(MouseMode mode);
+    [[nodiscard]] MouseMode mouseMode() const;
+    // REQ-005-25
+    [[nodiscard]] const std::vector<geom::EntityId>& drawingSelection() const;
+    void setDrawingSelection(std::vector<geom::EntityId> ids);
+    void clearDrawingSelection();
+    [[nodiscard]] SelectionTarget selectionTarget() const;
+    // REQ-005-27: while a command asks for objects, the gestures select
+    // drawing entities whatever the target.
+    void setCommandSelection(bool on);
+
 public slots:
     void setGridVisible(bool visible);
     void setAxesVisible(bool visible);
@@ -85,6 +123,8 @@ public slots:
     // isolationChanged) while the selection is empty.
     void setIsolated(bool isolated);
     void clearSelection();
+    // REQ-005-26
+    void setSelectionTarget(fem::render::SelectionTarget target);
 
 signals:
     void frameRendered();
@@ -97,6 +137,11 @@ signals:
     void sceneShown();
     // REQ-004-39: the selection-only display was turned on or off.
     void isolationChanged(bool isolated);
+    // REQ-005-14, 24: the cursor moved (every move, in logical pixels).
+    void cursorMoved(fem::render::Vec2 pixel);
+    // REQ-005-14: left click in PickPoint mode.
+    void pointRequested(fem::render::Vec2 pixel);
+    void drawingSelectionChanged();
 
 protected:
     void initialize(QRhiCommandBuffer* commandBuffer) override;
@@ -115,6 +160,8 @@ private:
     void selectionEdited();
     void rebuildIsolation();
     void finishIsolatedPick(const QPointF& releasePosition, bool remove);
+    void finishDrawingPick(const QPointF& releasePosition, bool remove);
+    void drawingSelectionEdited();
 
     class Impl;
     std::unique_ptr<Impl> m_impl;

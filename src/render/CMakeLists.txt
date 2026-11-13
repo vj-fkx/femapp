@@ -8,10 +8,14 @@ femapp_add_module(render
         axis_labels.hpp
         backend.cpp
         camera.cpp
+        drawing_gpu.cpp
+        drawing_gpu.hpp
+        drawing_picker.cpp
         grid_spacing.cpp
         mesh_gpu.cpp
         mesh_gpu.hpp
         mesh_picker.cpp
+        pick_util.hpp
         mesh_scene.cpp
         rhi_util.cpp
         rhi_util.hpp

@@ -2,6 +2,8 @@
 #include "mesh_fixtures.hpp"
 #include "scene_renderer.hpp"
 
+#include <fem/geom/commands.hpp>
+#include <fem/geom/drawing.hpp>
 #include <fem/render/camera.hpp>
 #include <fem/render/mesh_scene.hpp>
 #include <fem/render/selection.hpp>
@@ -14,7 +16,10 @@
 #include <rhi/qrhi.h>
 
 #include <array>
+#include <cstdint>
 #include <memory>
+#include <utility>
+#include <vector>
 
 namespace {
 
@@ -184,6 +189,47 @@ TEST_CASE("scene renderer draws frames with the Null backend", "[render][rendere
                 CHECK(rendered);
                 CHECK(rhi->endOffscreenFrame() == QRhi::FrameOpSuccess);
             }
+        }
+
+        // REQ-005-18, REQ-005-33: a drawing with a line, a polyline and a
+        // point, a selected entity and the preview of a running command.
+        fem::geom::Drawing drawing;
+        const auto line = drawing.nextId();
+        const auto polyline = drawing.nextId();
+        const auto point = drawing.nextId();
+        drawing.apply(
+            {.removed = {},
+             .added = {
+                 {.id = line, .shape = fem::geom::LineEntity{.start = {0, 0, 0}, .end = {4, 0, 0}}},
+                 {.id = polyline,
+                  .shape = fem::geom::PolylineEntity{.vertices = {{0, 0, 0}, {0, 3, 0}, {4, 3, 2}},
+                                                     .closed = true}},
+                 {.id = point, .shape = fem::geom::PointEntity{.position = {2, 1, 0}}}}});
+        const std::vector<fem::geom::EntityId> drawingSelection = {polyline};
+        fem::geom::Preview preview;
+        preview.rubberBand = std::make_pair(fem::geom::Vec3(4, 0, 0), fem::geom::Vec3(6, 1, 0));
+        preview.ghosts.push_back(
+            {.id = fem::geom::EntityId{}, .shape = fem::geom::PointEntity{.position = {5, 5, 0}}});
+        for (std::uint64_t version = 1; version <= 2; ++version) {
+            fem::render::DrawingFrame drawingFrame;
+            drawingFrame.drawing = &drawing;
+            drawingFrame.selection = &drawingSelection;
+            drawingFrame.selectionVersion = version;
+            drawingFrame.preview = &preview;
+            drawingFrame.previewVersion = version;
+            QRhiCommandBuffer* commandBuffer = nullptr;
+            REQUIRE(rhi->beginOffscreenFrame(&commandBuffer) == QRhi::FrameOpSuccess);
+            const bool rendered = renderer.render(commandBuffer, target.get(),
+                                                  {.camera = &camera,
+                                                   .pixelSize = size,
+                                                   .devicePixelRatio = 1.0,
+                                                   .showGrid = true,
+                                                   .showAxes = true,
+                                                   .mesh = {},
+                                                   .drawing = drawingFrame});
+            INFO(renderer.errorString().toStdString());
+            CHECK(rendered);
+            CHECK(rhi->endOffscreenFrame() == QRhi::FrameOpSuccess);
         }
 
         renderer.release();

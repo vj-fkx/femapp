@@ -48,6 +48,7 @@ femapp_add_test(render SOURCES
     test_axis_gizmo_mesh.cpp
     test_backend.cpp
     test_camera.cpp
+    test_drawing_picker.cpp
     test_grid_spacing.cpp
     test_mesh_picker.cpp
     test_mesh_scene.cpp

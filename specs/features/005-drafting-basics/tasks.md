@@ -61,26 +61,26 @@ Regras:
 
 ## Fase 4 — Exibição e seleção (`render`)
 
-- [ ] **T10** Extrair `Projector`, `distanceToSegment`, `segmentTouchesBox` e
+- [x] **T10** Extrair `Projector`, `distanceToSegment`, `segmentTouchesBox` e
   `pointInTriangle` de `mesh_picker.cpp` para `pick_util.hpp` (sem mudar
   comportamento; testes da 004 continuam verdes) — cobre: 25
-- [ ] **T11** Testes e implementação do `DrawingPicker`: clique em linha,
+- [x] **T11** Testes e implementação do `DrawingPicker`: clique em linha,
   trecho de polilinha e ponto, dentro e fora da tolerância, o mais próximo da
   câmera; janela e cruzamento sobre um pórtico em vista superior — arquivos:
   `drawing_picker.hpp/.cpp`, `tests/unit/render/test_drawing_picker.cpp` —
   cobre: 25
-- [ ] **T12** `DrawingGpu`: buffers de segmentos e pontos por revisão (posições
+- [x] **T12** `DrawingGpu`: buffers de segmentos e pontos por revisão (posições
   relativas à origem do desenho, deslocamento em `double`), realce das
   selecionadas, pré-visualização em buffer dinâmico; integração no
   `SceneRenderer`; o teste com backend `Null` desenha um desenho com seleção e
   pré-visualização — arquivos: `drawing_gpu.hpp/.cpp`, `scene_renderer.cpp`,
   `test_scene_renderer.cpp` — cobre: 18, 33
-- [ ] **T13** `Viewport`: `setDrawing`, `drawingChanged`, alvo da seleção
+- [x] **T13** `Viewport`: `setDrawing`, `drawingChanged`, alvo da seleção
   (Desenho/Malha), seleção do desenho por clique, janela, cruzamento, Shift,
   Esc e clique fora; modo "pedir ponto" com `cursorMoved` e `pointRequested`;
   "Enquadrar tudo" com desenho e malha — arquivos: `viewport.hpp/.cpp` —
   cobre: 14, 25, 26, 34
-- [ ] **T14** Marcador e nome do snap no `SelectionOverlay` (quadrado,
+- [x] **T14** Marcador e nome do snap no `SelectionOverlay` (quadrado,
   triângulo, X) e `Viewport::setSnapMarker` — arquivos:
   `selection_overlay.hpp/.cpp`, `viewport.cpp` — cobre: 20
 
@@ -207,4 +207,21 @@ Regras:
   dados (como no AutoCAD e como a LINE, REQ-005-07); `feedSelection` recebe a
   seleção inteira do momento (o viewport mantém o realce), e Enter confirma;
   `activeCommand()` exposto para a barra de título do pedido e os testes.
+
+**2026-11-12 — Fase 4 (T10–T14):**
+
+- 142 testes passando no Windows, incluindo o `SceneRenderer` com backend
+  `Null` desenhando linhas, polilinha fechada em 3D, ponto, seleção e
+  pré-visualização; `clang-tidy` sem apontamentos.
+- `DrawingPicker` testado em vista superior (clique em linha, trecho de
+  polilinha e ponto; janela e cruzamento num pórtico).
+- **Não verificado visualmente:** cores, realce, pré-visualização, marcador de
+  snap e as interações do mouse; isso fica para o roteiro manual (T22), depois
+  da interface da Fase 5.
+- Desvios do design: o `Viewport` passa a acompanhar o mouse sempre
+  (`setMouseTracking`) e emite `cursorMoved` em qualquer modo, para as
+  coordenadas da barra de status (REQ-005-24); o marcador de snap some ao
+  girar a roda (fica desatualizado) até o próximo movimento; `SnapMarker` é
+  uma estrutura pública do `Viewport`; `clearDrawingSelection` e
+  `setCommandSelection` acrescentados.
 

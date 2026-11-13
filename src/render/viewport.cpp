@@ -2,6 +2,7 @@
 #include "selection_overlay.hpp"
 
 #include <fem/render/backend.hpp>
+#include <fem/render/drawing_picker.hpp>
 #include <fem/render/mesh_picker.hpp>
 #include <fem/render/viewport.hpp>
 
@@ -15,6 +16,8 @@
 
 #include <rhi/qrhi.h>
 
+#include <Eigen/Geometry>
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -107,6 +110,9 @@ public:
     bool leftPressed = false;
     bool rectangle = false;
     bool isolated = false;
+    bool commandSelection = false; // REQ-005-27: a command asks for objects
+    SelectionTarget selectionTarget = SelectionTarget::Drawing;
+    MouseMode mouseMode = MouseMode::Select;
     QPointF pressPosition;
     SelectionOverlay* overlay = nullptr;
 
@@ -114,6 +120,19 @@ public:
     // `isolated`).
     std::shared_ptr<const MeshScene> isolatedScene;
     std::unique_ptr<MeshPicker> isolatedPicker;
+
+    // REQ-005: the drawing, its selection and the drafting interaction.
+    std::shared_ptr<const geom::Drawing> drawing;
+    std::vector<geom::EntityId> drawingSelection;
+    std::uint64_t drawingSelectionVersion = 0;
+    geom::Preview preview;
+    std::uint64_t previewVersion = 0;
+
+    // Where the left button gestures go.
+    [[nodiscard]] bool selectsDrawing() const
+    {
+        return commandSelection || selectionTarget == SelectionTarget::Drawing;
+    }
 
     // The picker of what is drawn.
     [[nodiscard]] const MeshPicker* shownPicker() const
@@ -150,6 +169,9 @@ Viewport::Viewport(QWidget* parent)
     setAutoFillBackground(true);
     // NOLINTNEXTLINE(cppcoreguidelines-owning-memory): owned by its Qt parent.
     m_impl->overlay = new SelectionOverlay(this);
+    // REQ-005-24: the cursor position is followed for the status bar and the
+    // drafting commands, also without a button pressed.
+    setMouseTracking(true);
 
     connect(this, &QRhiWidget::renderFailed, this, &Viewport::handleRenderFailed);
 }
@@ -228,14 +250,23 @@ void Viewport::setProjection(Projection projection)
 
 void Viewport::fitAll()
 {
-    // REQ-004-17: the mesh if there is one, else the default grid region.
+    // REQ-004-17, REQ-005-34: the mesh and the drawing, else the default
+    // grid region.
     m_impl->camera.setViewportSize(width(), height());
+    std::optional<Aabb> box;
+    const auto add = [&box](const Vec3& low, const Vec3& high) {
+        box = box ? Aabb{.min = box->min.cwiseMin(low), .max = box->max.cwiseMax(high)}
+                  : Aabb{.min = low, .max = high};
+    };
     if (m_impl->scene && !m_impl->scene->bounds().isEmpty()) {
-        const core::BoundingBox& box = m_impl->scene->bounds();
-        m_impl->camera.fit({.min = box.min, .max = box.max});
-    } else {
-        m_impl->camera.fit(defaultSceneBounds());
+        add(m_impl->scene->bounds().min, m_impl->scene->bounds().max);
     }
+    if (m_impl->drawing) {
+        if (const auto drawn = m_impl->drawing->bounds()) {
+            add(drawn->min, drawn->max);
+        }
+    }
+    m_impl->camera.fit(box.value_or(defaultSceneBounds()));
     update();
 }
 
@@ -418,6 +449,10 @@ void Viewport::rebuildIsolation()
 
 void Viewport::finishPick(const QPointF& releasePosition, bool remove)
 {
+    if (m_impl->selectsDrawing()) {
+        finishDrawingPick(releasePosition, remove);
+        return;
+    }
     if (!m_impl->picker) {
         return;
     }
@@ -580,7 +615,12 @@ void Viewport::render(QRhiCommandBuffer* commandBuffer)
                              .devicePixelRatio = devicePixelRatioF(),
                              .showGrid = m_impl->showGrid,
                              .showAxes = m_impl->showAxes,
-                             .mesh = mesh};
+                             .mesh = mesh,
+                             .drawing = {.drawing = m_impl->drawing.get(),
+                                         .selectionVersion = m_impl->drawingSelectionVersion,
+                                         .selection = &m_impl->drawingSelection,
+                                         .preview = &m_impl->preview,
+                                         .previewVersion = m_impl->previewVersion}};
     if (!m_impl->renderer.render(commandBuffer, renderTarget(), params)) {
         tryNextBackend(m_impl->renderer.errorString());
         return;
@@ -633,6 +673,11 @@ void Viewport::mousePressEvent(QMouseEvent* event)
 
 void Viewport::mouseMoveEvent(QMouseEvent* event)
 {
+    emit cursorMoved(toVec2(event->position()));
+    if (m_impl->leftPressed && m_impl->mouseMode == MouseMode::PickPoint) {
+        event->accept();
+        return;
+    }
     if (m_impl->leftPressed) {
         const QPointF delta = event->position() - m_impl->pressPosition;
         if (!m_impl->rectangle && std::hypot(delta.x(), delta.y()) > kDragThresholdPx) {
@@ -675,6 +720,15 @@ void Viewport::mouseMoveEvent(QMouseEvent* event)
 
 void Viewport::mouseReleaseEvent(QMouseEvent* event)
 {
+    if (event->button() == Qt::LeftButton && m_impl->leftPressed &&
+        m_impl->mouseMode == MouseMode::PickPoint) {
+        // REQ-005-14: a click gives a point to the running command.
+        m_impl->leftPressed = false;
+        m_impl->rectangle = false;
+        emit pointRequested(toVec2(event->position()));
+        event->accept();
+        return;
+    }
     if (event->button() == Qt::LeftButton && m_impl->leftPressed) {
         m_impl->leftPressed = false;
         m_impl->overlay->hideRect();
@@ -710,8 +764,166 @@ void Viewport::wheelEvent(QWheelEvent* event)
         anchor = picker->surfacePoint(m_impl->camera, cursor, m_impl->display);
     }
     m_impl->camera.zoomAt(cursor, steps, anchor);
+    m_impl->overlay->hideSnap();
     event->accept();
     update();
+    emit cursorMoved(cursor);
+}
+
+void Viewport::setDrawing(std::shared_ptr<const geom::Drawing> drawing)
+{
+    m_impl->drawing = std::move(drawing);
+    m_impl->drawingSelection.clear();
+    ++m_impl->drawingSelectionVersion;
+    update();
+}
+
+const std::shared_ptr<const geom::Drawing>& Viewport::drawing() const
+{
+    return m_impl->drawing;
+}
+
+void Viewport::drawingChanged()
+{
+    // Entities that are gone leave the selection.
+    if (m_impl->drawing) {
+        const auto gone =
+            std::ranges::remove_if(m_impl->drawingSelection, [this](geom::EntityId id) {
+                return m_impl->drawing->find(id) == nullptr;
+            });
+        if (!gone.empty()) {
+            m_impl->drawingSelection.erase(gone.begin(), gone.end());
+            emit drawingSelectionChanged();
+        }
+    }
+    ++m_impl->drawingSelectionVersion;
+    update();
+}
+
+void Viewport::setDrawingPreview(geom::Preview preview)
+{
+    m_impl->preview = std::move(preview);
+    ++m_impl->previewVersion;
+    update();
+}
+
+void Viewport::setSnapMarker(const std::optional<SnapMarker>& marker)
+{
+    if (!marker) {
+        m_impl->overlay->hideSnap();
+        return;
+    }
+    // REQ-005-20: drawn in pixels over the 3D view.
+    const Eigen::Vector4d clip = m_impl->camera.projectionMatrix() * m_impl->camera.viewMatrix() *
+                                 marker->point.homogeneous();
+    if (!(clip.w() > 0.0)) {
+        m_impl->overlay->hideSnap();
+        return;
+    }
+    const QPointF pixel((clip.x() / clip.w() + 1.0) * 0.5 * width(),
+                        (1.0 - clip.y() / clip.w()) * 0.5 * height());
+    QString label;
+    switch (marker->mode) {
+    case geom::SnapMode::Endpoint:
+        label = tr("Endpoint");
+        break;
+    case geom::SnapMode::Midpoint:
+        label = tr("Midpoint");
+        break;
+    case geom::SnapMode::Intersection:
+        label = tr("Intersection");
+        break;
+    }
+    m_impl->overlay->showSnap(pixel, marker->mode, label);
+}
+
+void Viewport::setMouseMode(MouseMode mode)
+{
+    m_impl->mouseMode = mode;
+    if (mode == MouseMode::Select) {
+        m_impl->overlay->hideSnap();
+    }
+}
+
+MouseMode Viewport::mouseMode() const
+{
+    return m_impl->mouseMode;
+}
+
+const std::vector<geom::EntityId>& Viewport::drawingSelection() const
+{
+    return m_impl->drawingSelection;
+}
+
+void Viewport::setDrawingSelection(std::vector<geom::EntityId> ids)
+{
+    m_impl->drawingSelection = std::move(ids);
+    drawingSelectionEdited();
+}
+
+void Viewport::clearDrawingSelection()
+{
+    if (!m_impl->drawingSelection.empty()) {
+        m_impl->drawingSelection.clear();
+        drawingSelectionEdited();
+    }
+}
+
+void Viewport::setSelectionTarget(SelectionTarget target)
+{
+    m_impl->selectionTarget = target;
+}
+
+SelectionTarget Viewport::selectionTarget() const
+{
+    return m_impl->selectionTarget;
+}
+
+void Viewport::setCommandSelection(bool on)
+{
+    m_impl->commandSelection = on;
+}
+
+void Viewport::drawingSelectionEdited()
+{
+    ++m_impl->drawingSelectionVersion;
+    update();
+    emit drawingSelectionChanged();
+}
+
+void Viewport::finishDrawingPick(const QPointF& releasePosition, bool remove)
+{
+    // REQ-005-25: the gestures of the mesh selection, on the drawing.
+    if (!m_impl->drawing) {
+        return;
+    }
+    m_impl->camera.setViewportSize(width(), height());
+    const DrawingPicker picker;
+    std::vector<geom::EntityId> ids;
+    if (m_impl->rectangle) {
+        const PickRect rect{.from = toVec2(m_impl->pressPosition), .to = toVec2(releasePosition)};
+        ids = picker.pickRect(*m_impl->drawing, m_impl->camera, rect);
+    } else if (const auto id = picker.pick(*m_impl->drawing, m_impl->camera,
+                                           toVec2(releasePosition), kPickTolerancePx)) {
+        ids.push_back(*id);
+    } else if (!remove) {
+        // A plain click off the drawing clears its selection (REQ-004-25).
+        clearDrawingSelection();
+        return;
+    }
+    if (ids.empty()) {
+        return;
+    }
+    auto& selection = m_impl->drawingSelection;
+    for (const geom::EntityId id : ids) {
+        const auto found = std::ranges::find(selection, id);
+        if (remove && found != selection.end()) {
+            selection.erase(found);
+        } else if (!remove && found == selection.end()) {
+            selection.push_back(id);
+        }
+    }
+    drawingSelectionEdited();
 }
 
 } // namespace fem::render

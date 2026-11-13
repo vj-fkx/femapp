@@ -1,5 +1,6 @@
 #pragma once
 
+#include "drawing_gpu.hpp"
 #include "mesh_gpu.hpp"
 
 #include <fem/render/camera.hpp>
@@ -29,7 +30,8 @@ struct FrameParams
     double devicePixelRatio = 1.0; // physical pixels per logical pixel
     bool showGrid = true;
     bool showAxes = true;
-    MeshFrame mesh; // REQ-004-09: the mesh, if any
+    MeshFrame mesh;       // REQ-004-09: the mesh, if any
+    DrawingFrame drawing; // REQ-005-33: the drawing, if any
 };
 
 // Owns the GPU resources of the viewport and draws a frame into any render
@@ -73,6 +75,7 @@ private:
 
     QRhi* m_rhi = nullptr;
     MeshGpu m_mesh;
+    DrawingGpu m_drawing;
     QString m_error;
     // Uploads of static data recorded by initialize(), submitted with the
     // first frame. Owned by the QRhi until then.
