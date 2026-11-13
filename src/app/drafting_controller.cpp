@@ -119,8 +119,9 @@ void DraftingController::enterText(const QString& text)
         }
     }
     geom::Vec3 direction = geom::Vec3::UnitX();
-    if (m_cursor && m_session.referencePoint()) {
-        direction = m_cursor->point - *m_session.referencePoint();
+    if (const std::optional<geom::Vec3> reference = m_session.referencePoint();
+        m_cursor && reference) {
+        direction = m_cursor->point - *reference;
     }
     m_session.feedText(input, direction);
     sync();
