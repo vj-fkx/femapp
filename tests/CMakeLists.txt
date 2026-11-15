@@ -121,6 +121,12 @@ add_executable(bench_drafting perf/bench_drafting.cpp)
 target_link_libraries(bench_drafting PRIVATE fem::geom)
 femapp_set_warnings(bench_drafting)
 
+# NFR-006-01 to 03: kernel benchmark, run by hand on a Release build.
+add_executable(bench_kernel perf/bench_kernel.cpp)
+target_include_directories(bench_kernel PRIVATE unit/core)
+target_link_libraries(bench_kernel PRIVATE fem::core fem::io)
+femapp_set_warnings(bench_kernel)
+
 # REQ-004-03: command line parsing of the application, built on its own.
 add_executable(test_app unit/app/test_cli_options.cpp "${PROJECT_SOURCE_DIR}/src/app/cli_options.cpp")
 target_include_directories(test_app PRIVATE "${PROJECT_SOURCE_DIR}/src/app")

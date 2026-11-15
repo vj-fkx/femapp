@@ -90,7 +90,7 @@ Regras:
 
 ## Fase 6 — Desempenho e cobertura
 
-- [ ] **T18** `bench_kernel` (fora do ctest): montagem de 1 milhão de Tet4 com
+- [x] **T18** `bench_kernel` (fora do ctest): montagem de 1 milhão de Tet4 com
   1 thread e com todas, e solução de Poisson 3D com cerca de 100 mil GDL —
   arquivo: `tests/perf/bench_kernel.cpp` — cobre: N01, N02, N03
 - [ ] **T19** Preset `coverage` e job de cobertura no CI (Linux, GCC,
@@ -182,4 +182,20 @@ Regras:
 - Arquitetura atualizada (§3: o que já existe do núcleo).- O teste de convergência leva cerca de 34 s em Debug (o caso mais pesado,
   8 s); para isso o erro L2 usa quadratura de grau 2p + 3 e as malhas 3D
   lineares começam em n = 3. Em Release (CI) leva poucos segundos.
+
+**2026-11-15 — T18 (`bench_kernel`, Release, máquina do mantenedor, 12 threads):**
+
+| Medida | Resultado | Meta |
+|--------|-----------|------|
+| Montagem de 1 057 916 Tet4 (174 014 GDL), todas as threads | 0,89 s | < 2 s (NFR-006-01) |
+| Mesma montagem, 1 thread | 3,88 s | — |
+| Ganho do paralelismo | 4,35× | ≥ 2,5× (NFR-006-02) |
+| Solução direta, Poisson em 20³ Hex8 (6 859 GDL livres) | 0,34 s | — |
+| Solução direta, 30³ Hex8 (24 389 GDL livres) | 4,9 s | — |
+| Solução direta, 46³ Hex8 (91 125 GDL livres) | 99 s | < 10 s (NFR-006-03) — **não atendida** |
+
+O tempo da solução direta cresce como o quadrado do número de equações: a
+fatoração simplicial (`SimplicialLDLT`) sofre com o preenchimento em
+problemas 3D. A meta do NFR-006-03 precisa de revisão (ver proposta ao
+mantenedor).
 
