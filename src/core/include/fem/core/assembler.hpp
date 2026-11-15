@@ -33,8 +33,7 @@ struct AssembledSystem
 // sequential). Loads on prescribed dofs only count for the reactions.
 [[nodiscard]] Expected<AssembledSystem> assemble(const Mesh& mesh, const DofMap& dofs,
                                                  std::span<const ElementSet> sets,
-                                                 std::span<const NodalLoad> loads,
-                                                 int threads = 0);
+                                                 std::span<const NodalLoad> loads, int threads = 0);
 
 // REQ-006-17: K_e u_e - f_e summed over the elements at the prescribed dofs,
 // minus the loads there: the reactions, per DofIndex (zero at free dofs).

@@ -56,22 +56,22 @@ Regras:
 
 ## Fase 4 — Montagem e solução
 
-- [ ] **T10** Elemento de teste e malhas: `poisson_element.hpp` (rigidez e
+- [x] **T10** Elemento de teste e malhas: `poisson_element.hpp` (rigidez e
   carga, também para linhas e superfícies em 3D) e `unit_meshes.hpp` (malhas
   estruturadas de [0,1]^d lineares e quadráticas) — arquivos em
   `tests/unit/core/` — cobre: 12
-- [ ] **T11** Testes da montagem: matriz de dois elementos calculada à mão;
+- [x] **T11** Testes da montagem: matriz de dois elementos calculada à mão;
   vetor e cargas nodais; lado direito com prescrição não nula; montagem
   paralela igual à sequencial (1e−12) numa malha de 20 mil Tet4; erro de
   jacobiano com o ID do elemento — arquivo: `test_assembler.cpp` — cobre: 12,
   13, 14
-- [ ] **T12** Implementar `assembler.hpp/.cpp` (padrão esparso pela adjacência
+- [x] **T12** Implementar `assembler.hpp/.cpp` (padrão esparso pela adjacência
   de nós, coloração gulosa, `tbb::parallel_for` por cor com buffers por
   thread, controle do número de threads) até a T11 passar — cobre: 12, 13, 14
-- [ ] **T13** Testes e implementação de `linear_solver.hpp/.cpp`
+- [x] **T13** Testes e implementação de `linear_solver.hpp/.cpp`
   (`SparseCholesky`): sistema SPD conhecido; mecanismo recusado; problema bem
   posto e mal escalado aceito — cobre: 15, 16
-- [ ] **T14** Testes e implementação de `linear_static.hpp/.cpp`
+- [x] **T14** Testes e implementação de `linear_static.hpp/.cpp`
   (`solveLinear`): valores livres e prescritos, reações por segunda passada,
   caso sem GDL livre — cobre: 17
 
@@ -154,4 +154,18 @@ Regras:
   muitos apoios não fica quadrático), sem o `finalize()` explícito; a lista de
   tipos tem 16 entradas (a pirâmide de 5 nós é a 16ª), como no REQ-006-01;
   `dofName` e `firstDof` acrescentados.
+
+**2026-11-15 — Fase 4 (T10–T14):**
+
+- 159 testes passando no Windows; `clang-tidy` sem apontamentos.
+- Conferido: matriz de duas barras calculada à mão, lado direito com
+  recalque, carga nodal, valores e reação (u = 2, 5, 11; reação −3); montagem
+  paralela igual à sequencial numa malha de 20 250 Tet4 distorcida (diferença
+  ≤ 1e−12, na prática zero: a ordem das somas é a mesma); erro de jacobiano
+  com o ID do elemento; carga em GDL inexistente; mecanismo recusado pelo
+  solver; sistema mal escalado (1e−6 a 1e6) aceito; problema sem GDL livre com
+  reações.
+- Desvio do design: as reações ficam numa função `reactions` do
+  `assembler.hpp` (a mesma passada por cores da montagem), chamada por
+  `solveLinear`.
 

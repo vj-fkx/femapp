@@ -8,11 +8,14 @@ configure_file(version_config.hpp.in "${CMAKE_CURRENT_BINARY_DIR}/generated/vers
 
 femapp_add_module(core
     SOURCES
+        assembler.cpp
         dof_map.cpp
         element_reference_coordinates.inc
         element_type.cpp
         id_ranges.cpp
         isoparametric.cpp
+        linear_solver.cpp
+        linear_static.cpp
         mesh.cpp
         mesh_builder.cpp
         mesh_measure.cpp

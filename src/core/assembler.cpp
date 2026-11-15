@@ -153,31 +153,30 @@ Expected<void> forEachElement(const Mesh& mesh, std::span<const ElementSet> sets
         for (std::size_t c = 0; c + 1 < coloured->start.size() && !failed; ++c) {
             const std::size_t begin = coloured->start[c];
             const std::size_t end = coloured->start[c + 1];
-            tbb::parallel_for(tbb::blocked_range<std::size_t>(begin, end),
-                              [&](const tbb::blocked_range<std::size_t>& range) {
-                                  Workspace& ws = workspaces.local();
-                                  for (std::size_t i = range.begin(); i != range.end(); ++i) {
-                                      if (failed) {
-                                          return;
-                                      }
-                                      const Item& item = coloured->items[i];
-                                      const ElementSet& set =
-                                          sets[static_cast<std::size_t>(item.set)];
-                                      auto result = work(set, item.element, ws);
-                                      if (!result) {
-                                          const std::scoped_lock lock(errorMutex);
-                                          if (!firstError) {
-                                              firstError = Error{
-                                                  .message =
-                                                      "Element " +
-                                                      std::to_string(mesh.elementId(item.element)) +
-                                                      ": " + result.error().message};
-                                          }
-                                          failed = true;
-                                          return;
-                                      }
-                                  }
-                              });
+            tbb::parallel_for(
+                tbb::blocked_range<std::size_t>(begin, end),
+                [&](const tbb::blocked_range<std::size_t>& range) {
+                    Workspace& ws = workspaces.local();
+                    for (std::size_t i = range.begin(); i != range.end(); ++i) {
+                        if (failed) {
+                            return;
+                        }
+                        const Item& item = coloured->items[i];
+                        const ElementSet& set = sets[static_cast<std::size_t>(item.set)];
+                        auto result = work(set, item.element, ws);
+                        if (!result) {
+                            const std::scoped_lock lock(errorMutex);
+                            if (!firstError) {
+                                firstError =
+                                    Error{.message = "Element " +
+                                                     std::to_string(mesh.elementId(item.element)) +
+                                                     ": " + result.error().message};
+                            }
+                            failed = true;
+                            return;
+                        }
+                    }
+                });
         }
     });
     if (firstError) {
@@ -231,7 +230,8 @@ SparseMatrix pattern(const Mesh& mesh, const DofMap& dofs, std::span<const Eleme
         }
     }
     tbb::parallel_sort(pairs.begin(), pairs.end());
-    pairs.erase(std::unique(pairs.begin(), pairs.end()), pairs.end());
+    const auto duplicates = std::ranges::unique(pairs);
+    pairs.erase(duplicates.begin(), duplicates.end());
 
     const std::int32_t n = dofs.freeCount();
     SparseMatrix matrix(n, n);
@@ -273,35 +273,33 @@ Expected<AssembledSystem> assemble(const Mesh& mesh, const DofMap& dofs,
     system.matrix = pattern(mesh, dofs, sets);
     system.rhs = Eigen::VectorXd::Zero(n);
 
-    auto done = forEachElement(mesh, sets, threads,
-                               [&](const ElementSet& set, ElementIndex element,
-                                   Workspace& ws) -> Expected<void> {
-                                   const auto size = computeLocal(mesh, dofs, set, element, ws);
-                                   if (!size) {
-                                       return tl::unexpected(size.error());
-                                   }
-                                   for (int a = 0; a < *size; ++a) {
-                                       const DofIndex da = ws.dofs.at(static_cast<std::size_t>(a));
-                                       const std::int32_t row = dofs.equation(da);
-                                       if (row < 0) {
-                                           continue;
-                                       }
-                                       system.rhs[row] += ws.vector[a];
-                                       for (int b = 0; b < *size; ++b) {
-                                           const DofIndex db =
-                                               ws.dofs.at(static_cast<std::size_t>(b));
-                                           const std::int32_t column = dofs.equation(db);
-                                           if (column < 0) {
-                                               // REQ-006-10: settlements on the right side.
-                                               system.rhs[row] -=
-                                                   ws.matrix(a, b) * dofs.prescribedValue(db);
-                                           } else if (row >= column) {
-                                               entry(system.matrix, row, column) += ws.matrix(a, b);
-                                           }
-                                       }
-                                   }
-                                   return {};
-                               });
+    auto done = forEachElement(
+        mesh, sets, threads,
+        [&](const ElementSet& set, ElementIndex element, Workspace& ws) -> Expected<void> {
+            const auto size = computeLocal(mesh, dofs, set, element, ws);
+            if (!size) {
+                return tl::unexpected(size.error());
+            }
+            for (int a = 0; a < *size; ++a) {
+                const DofIndex da = ws.dofs.at(static_cast<std::size_t>(a));
+                const std::int32_t row = dofs.equation(da);
+                if (row < 0) {
+                    continue;
+                }
+                system.rhs[row] += ws.vector[a];
+                for (int b = 0; b < *size; ++b) {
+                    const DofIndex db = ws.dofs.at(static_cast<std::size_t>(b));
+                    const std::int32_t column = dofs.equation(db);
+                    if (column < 0) {
+                        // REQ-006-10: settlements on the right side.
+                        system.rhs[row] -= ws.matrix(a, b) * dofs.prescribedValue(db);
+                    } else if (row >= column) {
+                        entry(system.matrix, row, column) += ws.matrix(a, b);
+                    }
+                }
+            }
+            return {};
+        });
     if (!done) {
         return tl::unexpected(done.error());
     }
@@ -323,8 +321,8 @@ Expected<AssembledSystem> assemble(const Mesh& mesh, const DofMap& dofs,
 
 Expected<Eigen::VectorXd> reactions(const Mesh& mesh, const DofMap& dofs,
                                     std::span<const ElementSet> sets,
-                                    std::span<const NodalLoad> loads,
-                                    const Eigen::VectorXd& values, int threads)
+                                    std::span<const NodalLoad> loads, const Eigen::VectorXd& values,
+                                    int threads)
 {
     Eigen::VectorXd result = Eigen::VectorXd::Zero(dofs.size());
     auto done = forEachElement(
