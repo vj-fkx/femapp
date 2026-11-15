@@ -85,7 +85,12 @@ Conceitos principais:
   vértices (feature 004).
 - **`ShapeFunctions` / `Quadrature`** — por topologia (linha, triângulo,
   quadrilátero, tetraedro, hexaedro, cunha) e ordem (linear, quadrática);
-  independentes da física.
+  independentes da física. *Feita na 006:* 16 tipos (mais a pirâmide de 5
+  nós), funções de Lagrange obtidas da Vandermonde inversa nos nós de
+  referência do Gmsh (ordem do Gmsh por construção), avaliadas sem alocação;
+  quadraturas de Gauss (grau ≤ 9) e simétricas positivas nos simplexos
+  (grau ≤ 5); `evaluateGeometry` com jacobiano e medida de linhas e
+  superfícies em 3D.
 - **`Element`** (interface por formulação, sem alocação por elemento) — declara
   os GDL que usa em cada nó e calcula rigidez `K`, massa `M`, capacidade/condutividade
   e forças locais. Formulações: treliça, viga, sólido estrutural, casca MITC,
@@ -96,11 +101,17 @@ Conceitos principais:
   + cargas. É o documento editado pela UI.
 - **`DofMap`** — GDL **variáveis por nó** (u, v, w, θx, θy, θz, T), definidos
   pelos elementos conectados; trata restrições e a compatibilização entre barras,
-  cascas e sólidos (REQ-G-13).
-- **`Assembler`** — monta matrizes esparsas (triplets → CSR) e vetores;
-  paralelo por coloração de elementos (oneTBB).
-- **`LinearSolver`** (interface) — `SparseCholesky` (Eigen `SimplicialLDLT`) e
-  `ConjugateGradient` (pré-condicionador IC/diagonal). A interface permite
+  cascas e sólidos (REQ-G-13). *Feito na 006:* máscara por nó vinda das
+  `ElementFormulation`, numeração determinística, apoios e recalques por
+  eliminação; vínculos multiponto ficam para as features 008 e 036.
+- **`Assembler`** — monta matrizes esparsas e vetores; paralelo por coloração
+  de elementos (oneTBB, ADR 0004). *Feito na 006:* padrão do triângulo
+  inferior montado uma vez a partir dos GDL dos elementos e preenchido direto,
+  cor por cor, sem travas; o resultado não depende do número de threads;
+  reações por uma segunda passada.
+- **`LinearSolver`** (interface) — `SparseCholesky` (Eigen `SimplicialLDLT`,
+  reordenação AMD, pivôs verificados; feito na 006) e `ConjugateGradient`
+  (pré-condicionador IC/diagonal, feature 025). A interface permite
   plugar solvers externos (ex.: PARDISO) sem tocar no restante.
 - **`EigenSolver`** — problema generalizado `K φ = λ M φ` via Spectra (shift-invert).
 - **`TimeIntegrator`** — Newmark (dinâmica) e θ-method (térmica transiente).

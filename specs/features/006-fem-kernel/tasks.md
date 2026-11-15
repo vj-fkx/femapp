@@ -77,15 +77,15 @@ Regras:
 
 ## Fase 5 — Verificação
 
-- [ ] **T15** Patch test de Poisson (u = 1 + 2x − y + 3z) em malhas
+- [x] **T15** Patch test de Poisson (u = 1 + 2x − y + 3z) em malhas
   distorcidas 1D, 2D (Tri3, Tri6, Quad4, Quad8, Quad9) e 3D (Tet4, Tet10, Hex8,
   Hex20, Hex27, Wedge6, Wedge15, Wedge18), lineares e quadráticas; reações
   equilibrando a fonte — arquivo: `test_poisson.cpp` — cobre: 01 a 04, 12 a 17
-- [ ] **T16** Convergência de Poisson contra solução analítica em três
+- [x] **T16** Convergência de Poisson contra solução analítica em três
   refinamentos: taxa do erro L2 ≈ 2 (lineares) e ≈ 3 (quadráticas) em Tri,
   Quad, Tet, Hex e Wedge — arquivo: `test_poisson.cpp` — cobre: 01, 03, 06, 13,
   15, 17
-- [ ] **T17** Atualizar `specs/architecture.md` (§1 e §3: o que já existe do
+- [x] **T17** Atualizar `specs/architecture.md` (§1 e §3: o que já existe do
   núcleo, oneTBB, coloração) — cobre: 18
 
 ## Fase 6 — Desempenho e cobertura
@@ -168,4 +168,18 @@ Regras:
 - Desvio do design: as reações ficam numa função `reactions` do
   `assembler.hpp` (a mesma passada por cores da montagem), chamada por
   `solveLinear`.
+
+**2026-11-15 — Fase 5 (T15–T17):**
+
+- Patch test (u = 1 + 2x − y + 3z) reproduzido até 1e−10 nos 15 tipos, em
+  malhas distorcidas por um mapa suave (elementos quadráticos com lados
+  curvos), com a soma das reações nula; com fonte unitária, as reações somam
+  −1 (o volume do domínio).
+- Convergência do erro L2 em três refinamentos, com a taxa entre os dois
+  últimos dentro de ±0,2 do esperado: ≈ 2 para Line2, Tri3, Quad4, Tet4, Hex8
+  e Wedge6; ≈ 3 para Line3, Tri6, Quad8, Quad9, Tet10, Hex20, Hex27, Wedge15 e
+  Wedge18.
+- Arquitetura atualizada (§3: o que já existe do núcleo).- O teste de convergência leva cerca de 34 s em Debug (o caso mais pesado,
+  8 s); para isso o erro L2 usa quadratura de grau 2p + 3 e as malhas 3D
+  lineares começam em n = 3. Em Release (CI) leva poucos segundos.
 

@@ -31,6 +31,7 @@ femapp_add_test(core SOURCES
     test_mesh.cpp
     test_mesh_measure.cpp
     test_mesh_surface.cpp
+    test_poisson.cpp
     test_quadrature.cpp
     test_shape_functions.cpp)
 target_compile_definitions(test_core PRIVATE FEMAPP_EXPECTED_VERSION="${PROJECT_VERSION}")
