@@ -76,7 +76,7 @@ escalar de Poisson que existe só nos testes.
 |----|-----------|------------|
 | NFR-006-01 | A montagem do elemento de teste (Poisson, Tet4) numa malha de 1 milhão de tetraedros DEVE levar menos de 2 s em Release na máquina do mantenedor. | Benchmark |
 | NFR-006-02 | Com 4 ou mais núcleos, a montagem paralela DEVE ser pelo menos 2,5 vezes mais rápida que a sequencial na mesma malha. | Benchmark com 1 thread e com todas |
-| NFR-006-03 | A solução direta de um problema de Poisson 3D com cerca de 100 mil GDL DEVE levar menos de 10 s em Release. | Benchmark |
+| NFR-006-03 | A solução direta de um problema de Poisson 3D com cerca de 25 mil GDL DEVE levar menos de 10 s em Release. Problemas 3D maiores ficam com o solver iterativo (feature 025) e com o solver externo opcional (feature 038). *(Alterado em 2026-11-15, a pedido do mantenedor: a meta de 100 mil GDL não é atingível com a fatoração simplicial, cujo tempo cresce com o quadrado do tamanho em 3D — 99 s medidos.)* | Benchmark |
 | NFR-006-04 | A cobertura de linhas de `core` DEVE ser de pelo menos 80% (constituição §6.5). | Relatório de cobertura (gcov/llvm-cov no CI ou local) |
 
 ## 5. Critérios de aceite

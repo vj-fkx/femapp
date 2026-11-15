@@ -46,6 +46,12 @@ jobs:
             qt-arch: linux_gcc_64
             vcpkg-cache: linux
             clang-tidy: true
+          - name: coverage
+            os: ubuntu-24.04
+            preset: linux-coverage
+            qt-arch: linux_gcc_64
+            vcpkg-cache: linux
+            coverage: true
 
     env:
       VCPKG_ROOT: ${{ github.workspace }}/vcpkg
@@ -165,6 +171,13 @@ jobs:
             -clang-tidy-binary clang-tidy-${CLANG_TOOLS_VERSION} \
             -p build/${{ matrix.preset }} \
             "${PWD}/src/.*\.cpp$" "${PWD}/tests/.*\.cpp$"
+
+      # NFR-006-04: line coverage of core, at least 80% (constitution §6.5).
+      - name: Coverage of core
+        if: matrix.coverage
+        run: |
+          pipx install gcovr
+          gcovr --root . --filter 'src/core/' --print-summary --fail-under-line 80 build/${{ matrix.preset }}
 
   format:
     name: format

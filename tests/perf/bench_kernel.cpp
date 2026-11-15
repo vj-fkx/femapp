@@ -4,7 +4,7 @@
 // Usage: bench_kernel <tet4 mesh.msh> [cells per side of the solve cube]
 //   - assembles the test Poisson element on the mesh with 1 thread and with
 //     all of them (NFR-006-01, 02);
-//   - solves Poisson on an n^3 hexahedron cube (default n = 46, about 100 000
+//   - solves Poisson on an n^3 hexahedron cube (default n = 30, about 25 000
 //     dofs) with the direct solver (NFR-006-03).
 
 #include "poisson_element.hpp"
@@ -16,6 +16,7 @@
 #include <fem/core/mesh_builder.hpp>
 #include <fem/io/gmsh_reader.hpp>
 
+#include <array>
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
@@ -47,7 +48,8 @@ fem::core::Mesh cube(int n)
 {
     fem::core::MeshBuilder builder;
     const auto id = [n](int i, int j, int k) {
-        return static_cast<fem::core::ExternalId>(1 + i + (n + 1) * (j + (n + 1) * k));
+        const fem::core::ExternalId side = fem::core::ExternalId{n} + 1;
+        return 1 + i + side * (j + side * k);
     };
     for (int k = 0; k <= n; ++k) {
         for (int j = 0; j <= n; ++j) {
@@ -93,7 +95,7 @@ int run(int argc, char** argv)
         std::fputs("usage: bench_kernel <tet4 mesh.msh> [n]\n", stderr);
         return EXIT_FAILURE;
     }
-    const int n = args.size() > 2 ? std::stoi(args[2]) : 46;
+    const int n = args.size() > 2 ? std::stoi(args[2]) : 30;
     const fem::core::test::PoissonElement element(source);
 
     // NFR-006-01, 02: assembly on the large mesh.
@@ -110,18 +112,20 @@ int run(int argc, char** argv)
     const fem::core::DofMap dofs = fem::core::DofMap::build(mesh, sets);
     std::printf("%d elements, %d dofs; DofMap %.3f s\n", mesh.elementCount(), dofs.size(),
                 secondsSince(start));
-    double times[2] = {0.0, 0.0};
-    const int threadCounts[2] = {1, 0};
+    std::array<double, 2> times{};
+    const std::array<int, 2> threadCounts = {1, 0};
     for (int t = 0; t < 2; ++t) {
         start = Clock::now();
-        const auto system = fem::core::assemble(mesh, dofs, sets, {}, threadCounts[t]);
-        times[t] = secondsSince(start);
+        const auto system =
+            fem::core::assemble(mesh, dofs, sets, {}, threadCounts.at(static_cast<std::size_t>(t)));
+        times.at(static_cast<std::size_t>(t)) = secondsSince(start);
         if (!system) {
             std::fprintf(stderr, "%s\n", system.error().message.c_str());
             return EXIT_FAILURE;
         }
         std::printf("assembly, %s: %.3f s (%lld nonzeros)\n", t == 0 ? "1 thread" : "all threads",
-                    times[t], static_cast<long long>(system->matrix.nonZeros()));
+                    times.at(static_cast<std::size_t>(t)),
+                    static_cast<long long>(system->matrix.nonZeros()));
     }
     std::printf("speed-up with %u hardware threads: %.2f\n", std::thread::hardware_concurrency(),
                 times[0] / times[1]);

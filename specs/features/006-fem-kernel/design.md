@@ -416,7 +416,7 @@ mesh + conjuntos (elementos, formulação) + cargas + prescrições
 | Montagem: matriz de 2 elementos conhecida à mão; paralela (todas as threads) = sequencial em 1e−12 numa malha de 20 mil Tet4; cargas nodais; rhs com prescrição não nula | unitário | REQ-006-12 a 14 | 1e−12 |
 | Solver: sistema SPD pequeno conhecido; mecanismo (sem apoio) recusado | unitário | REQ-006-15, 16 | 1e−12 |
 | Poisson: patch test 1D, 2D, 3D, linear e quadrático; convergência linear (≈ 2) e quadrática (≈ 3) em Tri, Quad, Tet, Hex, Wedge; reações equilibram a fonte | verificação | REQ-006-12 a 17 | taxa ± 0,2; equilíbrio 1e−10 |
-| `bench_kernel`: montagem de 1 milhão de Tet4 com 1 thread e todas; solução de ~100 mil GDL | manual, Release | NFR-006-01 a 03 | metas |
+| `bench_kernel`: montagem de 1 milhão de Tet4 com 1 thread e todas; solução de ~25 mil GDL 3D | manual, Release | NFR-006-01 a 03 | metas |
 | Cobertura de `core` | CI (Linux) | NFR-006-04 | ≥ 80% |
 
 ## 9. Alternativas consideradas
@@ -443,6 +443,10 @@ mesh + conjuntos (elementos, formulação) + cargas + prescrições
   colorir.
 - **oneTBB no vcpkg do macOS e Linux** → coberto pelo CI; triplets dinâmicos
   já usados pelo OCCT.
+- **Solução direta lenta em 3D grande** (medido: 99 s com 91 mil GDL) → a
+  fatoração simplicial fica para problemas médios (NFR-006-03 revisto); 3D
+  grande com gradiente conjugado (025) e solver externo (038), atrás da mesma
+  interface `LinearSolver`.
 - **Pivô "pequeno" mal calibrado** (1e−14 relativo) → testes com mecanismo e
   com problema bem posto mas mal escalado (coeficientes de 1e−6 a 1e6).
 

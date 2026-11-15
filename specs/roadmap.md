@@ -59,7 +59,7 @@ cargas, resolver e ver diagramas de esforços.
 
 | Nº | Feature | Entrega | Depende de | Status |
 |----|---------|---------|------------|--------|
-| 025 | elasticity-3d | Tet4, Hex8, Wedge6; solver iterativo (CG) | 024 | planejada |
+| 025 | elasticity-3d | Tet4, Hex8, Wedge6; solver iterativo (CG); solução de problemas 3D grandes (o solver direto da 006 atende até ~25 mil GDL) | 024 | planejada |
 | 026 | mesh-sweep-3d | Malha por varredura (Hex8/Wedge6) | 022 | planejada |
 | 027 | mesh-surface | Malha em superfícies curvas (espaço paramétrico) | 022 | planejada |
 

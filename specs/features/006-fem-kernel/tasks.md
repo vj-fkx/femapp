@@ -91,12 +91,12 @@ Regras:
 ## Fase 6 — Desempenho e cobertura
 
 - [x] **T18** `bench_kernel` (fora do ctest): montagem de 1 milhão de Tet4 com
-  1 thread e com todas, e solução de Poisson 3D com cerca de 100 mil GDL —
+  1 thread e com todas, e solução de Poisson 3D com cerca de 25 mil GDL (NFR-006-03 revisto) —
   arquivo: `tests/perf/bench_kernel.cpp` — cobre: N01, N02, N03
-- [ ] **T19** Preset `coverage` e job de cobertura no CI (Linux, GCC,
+- [x] **T19** Preset `coverage` e job de cobertura no CI (Linux, GCC,
   `gcovr --filter src/core --fail-under-line 80`) — arquivos:
   `CMakePresets.json`, `.github/workflows/ci.yml` — cobre: N04
-- [ ] **T20** `[M]` Rodar o `bench_kernel` em Release na máquina do mantenedor
+- [x] **T20** `[M]` Rodar o `bench_kernel` em Release na máquina do mantenedor
   e registrar as medições — cobre: N01, N02, N03
 
 ## Fase 7 — Fechamento
@@ -191,11 +191,20 @@ Regras:
 | Mesma montagem, 1 thread | 3,88 s | — |
 | Ganho do paralelismo | 4,35× | ≥ 2,5× (NFR-006-02) |
 | Solução direta, Poisson em 20³ Hex8 (6 859 GDL livres) | 0,34 s | — |
-| Solução direta, 30³ Hex8 (24 389 GDL livres) | 4,9 s | — |
-| Solução direta, 46³ Hex8 (91 125 GDL livres) | 99 s | < 10 s (NFR-006-03) — **não atendida** |
+| Solução direta, 30³ Hex8 (24 389 GDL livres) | 4,9 s | < 10 s com ~25 mil GDL (NFR-006-03 revisto) |
+| Solução direta, 46³ Hex8 (91 125 GDL livres) | 99 s | fora da meta revista (só registro) |
 
 O tempo da solução direta cresce como o quadrado do número de equações: a
 fatoração simplicial (`SimplicialLDLT`) sofre com o preenchimento em
-problemas 3D. A meta do NFR-006-03 precisa de revisão (ver proposta ao
-mantenedor).
+problemas 3D. O mantenedor reviu o NFR-006-03 para cerca de 25 mil GDL 3D;
+problemas maiores ficam com as features 025 e 038.
+
+**2026-11-15 — T19 e T20:**
+
+- T19: preset `linux-coverage` (GCC, Debug, `--coverage`) e job `coverage` no
+  CI, que roda os testes e o `gcovr --filter src/core/ --fail-under-line 80`.
+  Os triplets de Linux e macOS passam a ligar o oneTBB dinamicamente, como diz
+  o ADR 0004 (eram estáticos por padrão). A cobertura só é medida no CI (T90).
+- T20: o `bench_kernel` rodou em Release na máquina do mantenedor (tabela da
+  T18); com o NFR-006-03 revisto, as três metas de desempenho estão atendidas.
 

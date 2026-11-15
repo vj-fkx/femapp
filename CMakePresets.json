@@ -65,6 +65,20 @@
       }
     },
     {
+      "name": "linux-coverage",
+      "displayName": "Linux / GCC with coverage (NFR-006-04)",
+      "inherits": "ci-base",
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Linux" },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_CXX_COMPILER": "g++",
+        "VCPKG_TARGET_TRIPLET": "x64-linux-femapp",
+        "CMAKE_CXX_FLAGS": "--coverage",
+        "CMAKE_EXE_LINKER_FLAGS": "--coverage",
+        "CMAKE_SHARED_LINKER_FLAGS": "--coverage"
+      }
+    },
+    {
       "name": "linux-clang",
       "displayName": "Linux / Clang",
       "inherits": "ci-base",
@@ -81,7 +95,8 @@
     { "name": "windows-msvc", "configurePreset": "windows-msvc" },
     { "name": "macos-clang", "configurePreset": "macos-clang" },
     { "name": "linux-gcc", "configurePreset": "linux-gcc" },
-    { "name": "linux-clang", "configurePreset": "linux-clang" }
+    { "name": "linux-clang", "configurePreset": "linux-clang" },
+    { "name": "linux-coverage", "configurePreset": "linux-coverage" }
   ],
   "testPresets": [
     {
@@ -95,6 +110,7 @@
     { "name": "windows-msvc", "inherits": "test-base", "configurePreset": "windows-msvc" },
     { "name": "macos-clang", "inherits": "test-base", "configurePreset": "macos-clang" },
     { "name": "linux-gcc", "inherits": "test-base", "configurePreset": "linux-gcc" },
-    { "name": "linux-clang", "inherits": "test-base", "configurePreset": "linux-clang" }
+    { "name": "linux-clang", "inherits": "test-base", "configurePreset": "linux-clang" },
+    { "name": "linux-coverage", "inherits": "test-base", "configurePreset": "linux-coverage" }
   ]
 }
