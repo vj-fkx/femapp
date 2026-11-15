@@ -22,13 +22,24 @@ endfunction()
 
 femapp_add_test(core SOURCES
     test_core.cpp
+    test_dof_map.cpp
     test_element_type.cpp
     test_expected.cpp
     test_id_ranges.cpp
+    test_isoparametric.cpp
     test_mesh.cpp
     test_mesh_measure.cpp
-    test_mesh_surface.cpp)
+    test_mesh_surface.cpp
+    test_quadrature.cpp
+    test_shape_functions.cpp)
 target_compile_definitions(test_core PRIVATE FEMAPP_EXPECTED_VERSION="${PROJECT_VERSION}")
+
+# REQ-006-05: replaces the global operator new to count allocations, so it is
+# an executable of its own.
+add_executable(test_allocations unit/core/test_allocations.cpp)
+target_link_libraries(test_allocations PRIVATE fem::core Catch2::Catch2WithMain)
+femapp_set_warnings(test_allocations)
+catch_discover_tests(test_allocations DISCOVERY_MODE PRE_TEST)
 
 femapp_add_test(geom SOURCES
     test_geom.cpp

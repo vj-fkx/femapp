@@ -1,0 +1,157 @@
+# Tarefas — 006 fem-kernel
+
+Status: em andamento
+Design: [design.md](design.md) · Requisitos: [requirements.md](requirements.md)
+
+Regras:
+- Uma tarefa = uma mudança pequena, compilável e testável.
+- Testes vêm antes ou junto da implementação que verificam.
+- `[P]` marca tarefas que podem ser feitas em paralelo com a anterior.
+- `[M]` marca tarefas que dependem de ação do mantenedor.
+- Marque `[x]` somente com build e testes passando.
+- Os IDs abaixo omitem o prefixo: `01` significa `REQ-006-01`; `N01` significa
+  `NFR-006-01`.
+
+## Fase 1 — Preparação
+
+- [x] **T01** oneTBB no `vcpkg.json` e como dependência privada de `core`;
+  build e testes atuais verdes no Windows — arquivos: `vcpkg.json`,
+  `src/core/CMakeLists.txt` — cobre: 18
+
+## Fase 2 — Funções de forma, quadratura e mapeamento
+
+- [x] **T02** Testes das funções de forma: delta de Kronecker, partição da
+  unidade, soma nula das derivadas (50 pontos aleatórios) e derivadas por
+  diferenças finitas, para os 17 tipos; `hasShapeFunctions` falso para um tipo
+  de ordem 3 — arquivo: `tests/unit/core/test_shape_functions.cpp` — cobre:
+  01, 02
+- [x] **T03** Implementar `shape_functions.hpp/.cpp` (espaços por tipo,
+  Vandermonde invertida uma vez, avaliação em memória fixa, pirâmide racional)
+  até a T02 passar — cobre: 01, 02, 05
+- [x] **T04** `[P]` Testes das quadraturas: exatidão por monômio até o grau
+  declarado de cada regra, pesos positivos nos simplexos, soma dos pesos igual
+  à medida do elemento de referência — arquivo: `test_quadrature.cpp` — cobre:
+  06, 07
+- [x] **T05** Implementar `quadrature.hpp/.cpp` (Gauss 1–5, produtos, Dunavant,
+  tetraedro de 1, 4 e 14 pontos, cunha, pirâmide colapsada) até a T04 passar —
+  cobre: 06, 07
+- [x] **T06** Testes e implementação do mapeamento: elementos afins (jacobiano
+  constante, volume pela soma dos pesos) e distorcidos; elemento invertido
+  recusado; comprimento de linha e área de triângulo e quadrilátero em 3D;
+  derivadas físicas de um campo linear exatas — arquivos:
+  `isoparametric.hpp/.cpp`, `test_isoparametric.cpp` — cobre: 03, 04
+- [x] **T07** Teste sem alocação: contador global de `new` em torno da
+  avaliação de forma e geometria para todos os tipos (0 alocações depois da
+  primeira chamada) — arquivo: `test_allocations.cpp` (executável próprio) —
+  cobre: 05
+
+## Fase 3 — Graus de liberdade
+
+- [x] **T08** Testes do `DofMap`: máscaras misturadas (U, V numa barra e T
+  noutra, com nó comum), numeração determinística, `find`/`nodeOf`/`typeOf`,
+  prescrições válidas (zero e não nula) e inválidas (nó ou tipo inexistente),
+  equações só dos livres — arquivo: `test_dof_map.cpp` — cobre: 08, 09, 10, 11
+- [x] **T09** Implementar `dof_map.hpp/.cpp` e `element_formulation.hpp` até a
+  T08 passar — cobre: 08 a 12
+
+## Fase 4 — Montagem e solução
+
+- [ ] **T10** Elemento de teste e malhas: `poisson_element.hpp` (rigidez e
+  carga, também para linhas e superfícies em 3D) e `unit_meshes.hpp` (malhas
+  estruturadas de [0,1]^d lineares e quadráticas) — arquivos em
+  `tests/unit/core/` — cobre: 12
+- [ ] **T11** Testes da montagem: matriz de dois elementos calculada à mão;
+  vetor e cargas nodais; lado direito com prescrição não nula; montagem
+  paralela igual à sequencial (1e−12) numa malha de 20 mil Tet4; erro de
+  jacobiano com o ID do elemento — arquivo: `test_assembler.cpp` — cobre: 12,
+  13, 14
+- [ ] **T12** Implementar `assembler.hpp/.cpp` (padrão esparso pela adjacência
+  de nós, coloração gulosa, `tbb::parallel_for` por cor com buffers por
+  thread, controle do número de threads) até a T11 passar — cobre: 12, 13, 14
+- [ ] **T13** Testes e implementação de `linear_solver.hpp/.cpp`
+  (`SparseCholesky`): sistema SPD conhecido; mecanismo recusado; problema bem
+  posto e mal escalado aceito — cobre: 15, 16
+- [ ] **T14** Testes e implementação de `linear_static.hpp/.cpp`
+  (`solveLinear`): valores livres e prescritos, reações por segunda passada,
+  caso sem GDL livre — cobre: 17
+
+## Fase 5 — Verificação
+
+- [ ] **T15** Patch test de Poisson (u = 1 + 2x − y + 3z) em malhas
+  distorcidas 1D, 2D (Tri3, Tri6, Quad4, Quad8, Quad9) e 3D (Tet4, Tet10, Hex8,
+  Hex20, Hex27, Wedge6, Wedge15, Wedge18), lineares e quadráticas; reações
+  equilibrando a fonte — arquivo: `test_poisson.cpp` — cobre: 01 a 04, 12 a 17
+- [ ] **T16** Convergência de Poisson contra solução analítica em três
+  refinamentos: taxa do erro L2 ≈ 2 (lineares) e ≈ 3 (quadráticas) em Tri,
+  Quad, Tet, Hex e Wedge — arquivo: `test_poisson.cpp` — cobre: 01, 03, 06, 13,
+  15, 17
+- [ ] **T17** Atualizar `specs/architecture.md` (§1 e §3: o que já existe do
+  núcleo, oneTBB, coloração) — cobre: 18
+
+## Fase 6 — Desempenho e cobertura
+
+- [ ] **T18** `bench_kernel` (fora do ctest): montagem de 1 milhão de Tet4 com
+  1 thread e com todas, e solução de Poisson 3D com cerca de 100 mil GDL —
+  arquivo: `tests/perf/bench_kernel.cpp` — cobre: N01, N02, N03
+- [ ] **T19** Preset `coverage` e job de cobertura no CI (Linux, GCC,
+  `gcovr --filter src/core --fail-under-line 80`) — arquivos:
+  `CMakePresets.json`, `.github/workflows/ci.yml` — cobre: N04
+- [ ] **T20** `[M]` Rodar o `bench_kernel` em Release na máquina do mantenedor
+  e registrar as medições — cobre: N01, N02, N03
+
+## Fase 7 — Fechamento
+
+- [ ] **T90** Build e testes verdes nos jobs do CI, incluindo o de cobertura
+  (push com sua confirmação) — cobre: AC-8, N04
+- [ ] **T91** `clang-format` e `clang-tidy` sem pendências (também o do Linux,
+  pelo CI)
+- [ ] **T92** Conferir os oito critérios de aceite de `requirements.md`
+- [ ] **T93** Atualizar `specs/roadmap.md` para `concluída`
+
+## Matriz de rastreabilidade
+
+| Requisito | Tarefas | Testes |
+|-----------|---------|--------|
+| REQ-006-01 | T02, T03, T15, T16 | `test_shape_functions`, `test_poisson` (AC-1, AC-5) |
+| REQ-006-02 | T02, T03 | `test_shape_functions` (AC-1) |
+| REQ-006-03 | T06, T15, T16 | `test_isoparametric`, `test_poisson` (AC-2, AC-5) |
+| REQ-006-04 | T06, T11 | `test_isoparametric`, `test_assembler` (AC-2) |
+| REQ-006-05 | T03, T07 | `test_allocations` (AC-6) |
+| REQ-006-06 | T04, T05, T16 | `test_quadrature` (AC-3) |
+| REQ-006-07 | T04, T05 | `test_quadrature` (AC-3) |
+| REQ-006-08 | T08, T09 | `test_dof_map` (AC-4) |
+| REQ-006-09 | T08, T09 | `test_dof_map` (AC-4) |
+| REQ-006-10 | T08, T09, T11 | `test_dof_map`, `test_assembler` (AC-4) |
+| REQ-006-11 | T08, T09 | `test_dof_map` (AC-4) |
+| REQ-006-12 | T09, T10, T11, T12, T15 | `test_assembler`, `test_poisson` (AC-5) |
+| REQ-006-13 | T11, T12, T16 | `test_assembler` (AC-5) |
+| REQ-006-14 | T11, T12 | `test_assembler` (AC-5) |
+| REQ-006-15 | T13, T16 | `test_assembler` (solver), `test_poisson` (AC-5) |
+| REQ-006-16 | T13 | `test_assembler` (solver) (AC-5) |
+| REQ-006-17 | T14, T15, T16 | `test_poisson` (AC-5) |
+| REQ-006-18 | T01, T17 | `check_no_qt_includes` (AC-6) |
+| NFR-006-01 | T18, T20 | `bench_kernel` (AC-7) |
+| NFR-006-02 | T18, T20 | `bench_kernel` (AC-7) |
+| NFR-006-03 | T18, T20 | `bench_kernel` (AC-7) |
+| NFR-006-04 | T19, T90 | Job de cobertura no CI (AC-7) |
+
+## Notas de implementação
+
+**2026-11-15 — Fases 1 a 3 (T01–T09):**
+
+- oneTBB 2023.1.0 instalado pelo vcpkg (com hwloc) e ligado como dependência
+  privada de `core` (ADR 0004).
+- 154 testes passando no Windows (12 novos), todos de primeira: as funções de
+  forma geradas pela Vandermonde nos nós do Gmsh passam no delta de Kronecker,
+  na partição da unidade e nas diferenças finitas para os 16 tipos; todas as
+  regras de quadratura integram os monômios até o grau declarado com erro
+  ≤ 1e−12, o que confere as constantes tabeladas (Dunavant e a regra de 14
+  pontos do tetraedro).
+- O teste de alocação roda num executável próprio (`test_allocations`), que
+  substitui o `operator new` global: zero alocações na avaliação de forma e
+  geometria depois da primeira chamada.
+- Desvios do design: `DofMap` numera as equações sob demanda (prescrever
+  muitos apoios não fica quadrático), sem o `finalize()` explícito; a lista de
+  tipos tem 16 entradas (a pirâmide de 5 nós é a 16ª), como no REQ-006-01;
+  `dofName` e `firstDof` acrescentados.
+
