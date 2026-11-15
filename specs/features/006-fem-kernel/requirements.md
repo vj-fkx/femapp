@@ -81,30 +81,30 @@ escalar de Poisson que existe só nos testes.
 
 ## 5. Critérios de aceite
 
-- [ ] **AC-1** (REQ-006-01, 02) Testes: delta de Kronecker nos nós de
+- [x] **AC-1** (REQ-006-01, 02) Testes: delta de Kronecker nos nós de
   referência, partição da unidade e soma nula das derivadas em pontos
   aleatórios, para todos os tipos; derivadas conferidas por diferenças finitas
   (tolerância 1e−7).
-- [ ] **AC-2** (REQ-006-03, 04) Testes: mapeamento de elementos afins e
+- [x] **AC-2** (REQ-006-03, 04) Testes: mapeamento de elementos afins e
   distorcidos (posição, jacobiano, volume pela soma dos pesos); elemento
   invertido recusado; comprimento de uma linha e área de um triângulo
   imersos em 3D.
-- [ ] **AC-3** (REQ-006-06, 07) Testes: cada regra integra monômios até o grau
+- [x] **AC-3** (REQ-006-06, 07) Testes: cada regra integra monômios até o grau
   declarado com erro relativo ≤ 1e−12; pesos positivos nos simplexos.
-- [ ] **AC-4** (REQ-006-08 a 11) Testes: numeração com elementos que usam
+- [x] **AC-4** (REQ-006-08 a 11) Testes: numeração com elementos que usam
   conjuntos diferentes de GDL; determinismo; prescrições válidas e inválidas.
-- [ ] **AC-5** (REQ-006-12 a 17) Testes com o elemento de Poisson: patch test
+- [x] **AC-5** (REQ-006-12 a 17) Testes com o elemento de Poisson: patch test
   (solução linear reproduzida até o arredondamento) em malhas 1D, 2D e 3D
   lineares e quadráticas; problema com solução analítica conhecida com taxa
   de convergência do erro L2 próxima de p + 1 (linear ≈ 2, quadrático ≈ 3)
   em refinamentos sucessivos; reações equilibrando as cargas; montagem
   paralela igual à sequencial; mecanismo detectado.
-- [ ] **AC-6** (REQ-006-05, 18) Verificação de que `core` segue sem Qt e de que
+- [x] **AC-6** (REQ-006-05, 18) Verificação de que `core` segue sem Qt e de que
   a avaliação por elemento não aloca (teste com contador de alocações ou
   revisão documentada).
-- [ ] **AC-7** (NFR-006-01 a 04) Medições e cobertura registradas em
+- [x] **AC-7** (NFR-006-01 a 04) Medições e cobertura registradas em
   `tasks.md`.
-- [ ] **AC-8** Build e testes verdes nos quatro jobs do CI, com o oneTBB
+- [x] **AC-8** Build e testes verdes nos quatro jobs do CI, com o oneTBB
   instalado pelo vcpkg em todas as plataformas.
 
 ## 6. Fora de escopo

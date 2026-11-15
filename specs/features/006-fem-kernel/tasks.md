@@ -1,6 +1,6 @@
 # Tarefas — 006 fem-kernel
 
-Status: em andamento
+Status: concluído
 Design: [design.md](design.md) · Requisitos: [requirements.md](requirements.md)
 
 Regras:
@@ -101,12 +101,12 @@ Regras:
 
 ## Fase 7 — Fechamento
 
-- [ ] **T90** Build e testes verdes nos jobs do CI, incluindo o de cobertura
+- [x] **T90** Build e testes verdes nos jobs do CI, incluindo o de cobertura
   (push com sua confirmação) — cobre: AC-8, N04
-- [ ] **T91** `clang-format` e `clang-tidy` sem pendências (também o do Linux,
+- [x] **T91** `clang-format` e `clang-tidy` sem pendências (também o do Linux,
   pelo CI)
-- [ ] **T92** Conferir os oito critérios de aceite de `requirements.md`
-- [ ] **T93** Atualizar `specs/roadmap.md` para `concluída`
+- [x] **T92** Conferir os oito critérios de aceite de `requirements.md`
+- [x] **T93** Atualizar `specs/roadmap.md` para `concluída`
 
 ## Matriz de rastreabilidade
 
@@ -207,4 +207,9 @@ problemas maiores ficam com as features 025 e 038.
   o ADR 0004 (eram estáticos por padrão). A cobertura só é medida no CI (T90).
 - T20: o `bench_kernel` rodou em Release na máquina do mantenedor (tabela da
   T18); com o NFR-006-03 revisto, as três metas de desempenho estão atendidas.
+- T90, T91: run 43767469387 (commit 7aa1b8a) verde nos seis jobs, com
+  clang-tidy do Linux limpo. Cobertura de linhas de `src/core`: 952 de 994
+  (~96%), meta de 80%. O gcov 13 não lê algumas saídas de lambdas
+  (`--gcov-ignore-parse-errors=all`) e conta desvios negativos no código
+  paralelo (contadores não atômicos); só a cobertura de desvios é afetada.
 
