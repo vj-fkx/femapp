@@ -95,11 +95,11 @@ TEST_CASE("dofs per node come from the elements", "[core][dofs]")
     CHECK_FALSE(dofs.find(node(m, 40), DofType::U).has_value());
 
     // Node by node, in DofType order within a node.
-    const auto t30 = dofs.find(node(m, 30), DofType::T);
-    REQUIRE(t30.has_value());
-    CHECK(*t30 == 6);
-    CHECK(dofs.nodeOf(*t30) == node(m, 30));
-    CHECK(dofs.typeOf(*t30) == DofType::T);
+    REQUIRE(dofs.find(node(m, 30), DofType::T).has_value());
+    const auto t30 = dofs.find(node(m, 30), DofType::T).value_or(-1);
+    CHECK(t30 == 6);
+    CHECK(dofs.nodeOf(t30) == node(m, 30));
+    CHECK(dofs.typeOf(t30) == DofType::T);
     CHECK(dofs.find(node(m, 30), DofType::U) == std::optional<fem::core::DofIndex>(4));
     CHECK(dofs.firstDof(node(m, 40)) == 7);
 
@@ -128,11 +128,11 @@ TEST_CASE("prescribed dofs are eliminated", "[core][dofs]")
     REQUIRE(dofs.prescribe(node(m, 30), DofType::V, -0.01).has_value());
     CHECK(dofs.freeCount() == 3);
 
-    const auto v30 = dofs.find(node(m, 30), DofType::V);
-    REQUIRE(v30.has_value());
-    CHECK(dofs.isPrescribed(*v30));
-    CHECK(dofs.prescribedValue(*v30) == -0.01);
-    CHECK(dofs.equation(*v30) == -1);
+    REQUIRE(dofs.find(node(m, 30), DofType::V).has_value());
+    const auto v30 = dofs.find(node(m, 30), DofType::V).value_or(-1);
+    CHECK(dofs.isPrescribed(v30));
+    CHECK(dofs.prescribedValue(v30) == -0.01);
+    CHECK(dofs.equation(v30) == -1);
     // Free dofs numbered in order: u20, v20, u30.
     CHECK(dofs.equation(dofs.find(node(m, 20), DofType::U).value_or(0)) == 0);
     CHECK(dofs.equation(dofs.find(node(m, 30), DofType::U).value_or(0)) == 2);
