@@ -1,11 +1,13 @@
 #pragma once
 
+#include <fem/core/beam_result.hpp>
 #include <fem/core/expected.hpp>
 #include <fem/core/mesh.hpp>
 #include <fem/core/model.hpp>
 
 #include <Eigen/Core>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -23,16 +25,21 @@ struct ModelIssue
 // they only define groups of nodes.
 [[nodiscard]] std::vector<ModelIssue> validate(const Model& model);
 
-// REQ-007-12: displacements and reactions per node, forces per bar.
+// REQ-007-12, 008-21: displacements and reactions per node, forces per bar.
 struct StaticResult
 {
     std::shared_ptr<const Mesh> mesh;
     std::vector<Eigen::Vector3d> displacements; // per node: u, v, w (0 without dof)
     std::vector<Eigen::Vector3d> reactions;     // per node: 0 where free
-    // Per element; NaN for elements that are not bars.
+    std::vector<Eigen::Vector3d> rotations;       // per node: rx, ry, rz (0 without dof)
+    std::vector<Eigen::Vector3d> reactionMoments; // per node: 0 where free
+    // Per element; NaN for elements that are not bars. For beams, at the
+    // start of the flexible length.
     std::vector<double> axialForce; // N, tension positive
     std::vector<double> strain;     // mechanical: N / EA
     std::vector<double> stress;     // N / A
+    // Per element: the forces along each beam; empty for the others.
+    std::vector<std::optional<BeamResult>> beams;
 };
 
 struct StaticOptions

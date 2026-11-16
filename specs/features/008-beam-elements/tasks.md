@@ -116,16 +116,16 @@ Regras:
 
 ## Fase 5 — Validação e análise
 
-- [ ] **T16** Mover o `Validator` para `model_validation.cpp`, sem mudar
+- [x] **T16** Mover o `Validator` para `model_validation.cpp`, sem mudar
   comportamento; a suíte da 007 passa sem alteração — arquivos:
   `src/core/model_validation.cpp`, `src/core/detail/model_validation.hpp`,
   `static_analysis.cpp` — cobre: 26
-- [ ] **T17** Testes de validação: cada problema do §5.8 isolado, e vários
+- [x] **T17** Testes de validação: cada problema do §5.8 isolado, e vários
   juntos — arquivo: `tests/unit/core/test_beam_validation.cpp` — cobre: 01,
   04, 06, 10, 13, 14, 17, 24
-- [ ] **T18** Implementar as verificações do §5.8 até a T17 passar — cobre:
+- [x] **T18** Implementar as verificações do §5.8 até a T17 passar — cobre:
   01, 04, 06, 10, 13, 14, 17, 24
-- [ ] **T19** `runLinearStatic` misto:
+- [x] **T19** `runLinearStatic` misto:
   - conjuntos de viga, `BeamData` por elemento e momentos nodais;
   - rotações e momentos de reação no `StaticResult`;
   - N, ε e σ também para vigas;

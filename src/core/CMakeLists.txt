@@ -11,6 +11,7 @@ femapp_add_module(core
         assembler.cpp
         beam_element.cpp
         beam_loads.cpp
+        beam_result.cpp
         dof_map.cpp
         element_reference_coordinates.inc
         element_type.cpp
@@ -23,6 +24,7 @@ femapp_add_module(core
         mesh_measure.cpp
         mesh_surface.cpp
         model.cpp
+        model_validation.cpp
         quadrature.cpp
         section.cpp
         shape_functions.cpp

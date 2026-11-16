@@ -24,6 +24,8 @@ femapp_add_test(core SOURCES
     test_assembler.cpp
     test_beam_element.cpp
     test_beam_loads.cpp
+    test_beam_validation.cpp
+    test_beam_verification.cpp
     test_core.cpp
     test_dof_map.cpp
     test_element_type.cpp
