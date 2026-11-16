@@ -49,13 +49,13 @@ Regras:
   `tests/unit/core/test_section_thin_walled.cpp` — cobre: 03, 04
 - [x] **T07** Implementar `ThinWalled` em `section_thin_walled.cpp` até a
   T06 passar — cobre: 03, 04
-- [ ] **T08** Testes da triangulação da seção (ADR 0005; constituição
+- [x] **T08** Testes da triangulação da seção (ADR 0005; constituição
   §7.4): conformidade (sem buracos nem sobreposições, área igual à do
   polígono), Delaunay restrito, ângulo mínimo preservado pelo refinamento,
   furos, contornos não convexos, casos degenerados (vértices quase
   colineares, furo tocando o contorno) e recusas do REQ-008b-04 — arquivo:
   `tests/unit/core/test_section_mesh.cpp` — cobre: 02, 04
-- [ ] **T09** Implementar `detail/section_mesh.hpp/.cpp` até a T08 passar:
+- [x] **T09** Implementar `detail/section_mesh.hpp/.cpp` até a T08 passar:
   orelhas com pontes, Lawson, Rivara, nós T6 — cobre: 02, 04
 - [ ] **T10** Testes de `SolidPolygon` (§5.1.3): geometria exata (retângulo,
   polígono com furo, regiões disjuntas; 1e−10); J do retângulo contra a

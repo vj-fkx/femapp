@@ -88,6 +88,21 @@ struct ThinWalled
     std::vector<Wall> walls;
 };
 
+// REQ-008b-02: a solid section of one material: regions, each an outline
+// with holes, as polygons of the drawing (any orientation). J, the shear
+// centre, Iw and the shear areas come from a triangulation of its own
+// (design 008b §5.1.3); meshSize is its largest edge (0: the default).
+struct SolidPolygon
+{
+    struct Region
+    {
+        std::vector<Eigen::Vector2d> outline;
+        std::vector<std::vector<Eigen::Vector2d>> holes;
+    };
+    std::vector<Region> regions;
+    double meshSize = 0.0;
+};
+
 using SectionShape = std::variant<Rectangle, Circle, CircularTube, RectangularTube, ISection, Angle,
                                   Channel, Tee, ThinWalled>;
 
