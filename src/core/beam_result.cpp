@@ -69,6 +69,39 @@ void endForces(const BeamData& beam, const BeamVector& forces, BeamForces& start
     end.tsv = end.t;
 }
 
+void exactEndForces(const BeamData& beam, bool planar, const StateBarVector& ends,
+                    const StateBarVector& forces, BeamForces& start, BeamForces& end)
+{
+    const Eigen::Index d = forces.size() / 2;
+    const auto internal = [&](Eigen::Index o, double sign) {
+        // sign: -1 at the start (the node pulls on the face of normal -x).
+        BeamForces f;
+        const auto at = [&](Eigen::Index i) { return sign * forces(o + i); };
+        if (planar) {
+            f.n = at(0);
+            f.vy = at(1);
+            f.mz = at(2);
+        } else {
+            f.n = at(0);
+            f.vy = at(1);
+            f.vz = at(2);
+            f.t = at(3) + beam.shearCentre.y() * f.vy - beam.shearCentre.x() * f.vz;
+            f.my = at(4);
+            f.mz = at(5);
+        }
+        if (d == 7) {
+            f.b = -at(6);
+            f.tsv = beam.torsional * ends(o + 6);
+        } else {
+            f.tsv = f.t;
+        }
+        f.tw = f.t - f.tsv;
+        return f;
+    };
+    start = internal(0, -1.0);
+    end = internal(d, 1.0);
+}
+
 namespace {
 
 // REQ-008b-19: a point of an exact beam from the state engine.

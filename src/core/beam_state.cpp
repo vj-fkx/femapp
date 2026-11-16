@@ -38,6 +38,11 @@ StateMatrix matrixExponential(const StateMatrix& a)
 
 namespace {
 
+// The largest growth e^(rate h) of the homogeneous solutions within one
+// part: the transfer matrix of a part then loses about rate h / ln 10
+// digits when the stiffness is drawn from it (design 008b §5.3).
+constexpr double kGrowthPerPart = 8.0;
+
 // Indices of the full state.
 enum Full : std::uint8_t { U = 0, V, W, RX, RY, RZ, PSI, N, VY, VZ, MX, MY, MZ, Q, kFull };
 
@@ -428,7 +433,7 @@ namespace {
 
 int partCount(const BeamData& beam, double length)
 {
-    return std::max(1, static_cast<int>(std::ceil(growthRate(beam) * length / 2.0)));
+    return std::max(1, static_cast<int>(std::ceil(growthRate(beam) * length / kGrowthPerPart)));
 }
 
 // Integrates the part from `from` up to `until`, segment by segment between

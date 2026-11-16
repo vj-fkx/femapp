@@ -12,6 +12,10 @@
 #include <fem/core/static_analysis.hpp>
 #include <fem/core/truss_element.hpp>
 
+#include <tbb/blocked_range.h>
+#include <tbb/parallel_for.h>
+#include <tbb/task_arena.h>
+
 #include <Eigen/Geometry>
 #include <algorithm>
 #include <array>
@@ -433,35 +437,28 @@ Expected<StaticResult> runLinearStatic(const Model& model, const StaticOptions& 
     result.strain.assign(elementCount, kNotABar);
     result.stress.assign(elementCount, kNotABar);
     result.beams.resize(elementCount);
-    for (std::size_t e = 0; e < elementCount; ++e) {
+    // Each element writes only its own entries: in parallel, as the assembly.
+    const auto resultOf = [&](std::size_t e) {
         const int owner = tables.owner[e];
         if (owner == kNoAssignment) {
-            continue;
+            return;
         }
         const auto nodes = mesh.elementNodes(static_cast<ElementIndex>(e));
         const auto& assignment = model.assignments[static_cast<std::size_t>(owner)];
         if (detail::isBeam(kindOf[e]) && beams.exact[e]) {
-            // The element's nodal values, in the order of its dofs.
-            const ExactBeamElement* formulation = nullptr;
-            for (const auto& f : exactFormulations) {
-                const auto& ends = beams.data[e].warpingEnds;
-                const bool c0 = ends[0] == WarpingCondition::Continuous;
-                const bool c1 = ends[1] == WarpingCondition::Continuous;
-                const DofMask m0 = f->dofsAt(mesh.elementType(static_cast<ElementIndex>(e)), 0);
-                const DofMask m1 = f->dofsAt(mesh.elementType(static_cast<ElementIndex>(e)), 1);
-                if (((m0 & mask(DofType::Warp)) != 0) == c0 &&
-                    ((m1 & mask(DofType::Warp)) != 0) == c1) {
-                    formulation = f.get();
-                }
-            }
+            // The element's nodal values, in the order of its dofs: those of
+            // the beam kind, and the warping at the continuous ends.
             std::vector<double> nodeValues;
-            for (int k = 0; k < 2; ++k) {
-                const DofMask used =
-                    formulation->dofsAt(mesh.elementType(static_cast<ElementIndex>(e)), k);
+            for (std::size_t k = 0; k < 2; ++k) {
+                DofMask used = detail::dofsOf(kindOf[e]);
+                if (beams.data[e].warpingEnds.at(k) == WarpingCondition::Continuous &&
+                    beams.data[e].warpingStiffness > 0.0) {
+                    used = static_cast<DofMask>(used | mask(DofType::Warp));
+                }
                 for (int t = 0; t < kDofTypeCount; ++t) {
                     const auto type = static_cast<DofType>(t);
                     if ((used & mask(type)) != 0) {
-                        const auto dof = dofs.find(nodes[static_cast<std::size_t>(k)], type);
+                        const auto dof = dofs.find(nodes[k], type);
                         nodeValues.push_back(dof ? values[*dof] : 0.0);
                     }
                 }
@@ -475,16 +472,16 @@ Expected<StaticResult> runLinearStatic(const Model& model, const StaticOptions& 
             data.loads = beams.loads[e];
             data.exact = true;
             data.planar = kindOf[e] == ElementKind::Beam2D;
-            data.ends = exactBeamEnds(beams.data[e], kindOf[e], beams.loads[e], x1, x2, nodeValues);
-            const BeamResult probe(data);
-            data.start = probe.at(0.0, Side::Before).forces;
-            data.end = probe.at(data.length, Side::After).forces;
+            StateBarVector endLoads;
+            data.ends = exactBeamEnds(beams.data[e], kindOf[e], beams.loads[e], x1, x2, nodeValues,
+                                      &endLoads);
+            exactEndForces(beams.data[e], data.planar, data.ends, endLoads, data.start, data.end);
             const double n = data.start.n;
             result.beams[e].emplace(std::move(data));
             result.axialForce[e] = n;
             result.strain[e] = n / beams.data[e].axial;
             result.stress[e] = n / detail::sectionArea(*model.findSection(assignment.section));
-            continue;
+            return;
         }
         if (detail::isBeam(kindOf[e])) {
             const auto a = static_cast<std::size_t>(nodes[0]);
@@ -506,7 +503,7 @@ Expected<StaticResult> runLinearStatic(const Model& model, const StaticOptions& 
             result.axialForce[e] = n;
             result.strain[e] = n / beams.data[e].axial;
             result.stress[e] = n / detail::sectionArea(*model.findSection(assignment.section));
-            continue;
+            return;
         }
         const double n =
             axialForce(bars[e], mesh.nodeCoordinates(nodes[0]), mesh.nodeCoordinates(nodes[1]),
@@ -515,7 +512,16 @@ Expected<StaticResult> runLinearStatic(const Model& model, const StaticOptions& 
         result.axialForce[e] = n;
         result.strain[e] = n / bars[e].axialStiffness;
         result.stress[e] = n / detail::sectionArea(*model.findSection(assignment.section));
-    }
+    };
+    tbb::task_arena arena(options.threads > 0 ? options.threads : tbb::task_arena::automatic);
+    arena.execute([&] {
+        tbb::parallel_for(tbb::blocked_range<std::size_t>(0, elementCount),
+                          [&](const tbb::blocked_range<std::size_t>& range) {
+                              for (std::size_t e = range.begin(); e != range.end(); ++e) {
+                                  resultOf(e);
+                              }
+                          });
+    });
     return result;
 }
 

@@ -93,11 +93,19 @@ private:
 
 // REQ-008b-19: the local dofs of both ends of the exact flexible length
 // (those of stateBarMatrices) from the values of the element's nodal dofs,
-// in the element's order (the internal dofs of the connections recovered).
+// in the element's order (the internal dofs of the connections recovered);
+// with `endLoads`, also the forces the nodes apply on the flexible length.
 [[nodiscard]] StateBarVector exactBeamEnds(const BeamData& beam, ElementKind kind,
                                            const SpanLoads& loads, const Eigen::Vector3d& x1,
                                            const Eigen::Vector3d& x2,
-                                           std::span<const double> nodeValues);
+                                           std::span<const double> nodeValues,
+                                           StateBarVector* endLoads = nullptr);
+
+// The forces that the nodes apply on the exact flexible length, K d - f,
+// from the local dofs of its ends.
+[[nodiscard]] StateBarVector exactEndLoads(const BeamData& beam, double length,
+                                           const SpanLoads& loads, bool planar,
+                                           const StateBarVector& ends);
 
 // REQ-008b-13: false when the connections let the exact flexible length
 // move without strain.

@@ -1,11 +1,13 @@
 // Measures the beam analysis (NFR-008-02). Not part of ctest: run it on a
 // Release build.
 //
-// Usage: bench_frame [bays] [storeys]
+// Usage: bench_frame [bays] [storeys] [warping]
 //   A space frame building of (bays + 1)^2 columns and `storeys` storeys
 //   (default 10 x 10 bays and 40 storeys: 4 961 nodes, about 29 000 free
 //   dofs): columns between the levels, beams along x and y at each level,
-//   the base fixed, self-weight and a wind load at the top.
+//   the base fixed, self-weight and a wind load at the top. With a third
+//   argument "warping" (NFR-008b-03), every bar has torsion with warping
+//   (I columns, so that they warp too).
 
 #include <fem/core/mesh_builder.hpp>
 #include <fem/core/model.hpp>
@@ -34,7 +36,7 @@ double secondsSince(Clock::time_point start)
     return std::chrono::duration<double>(Clock::now() - start).count();
 }
 
-fem::core::Model building(int bays, int storeys)
+fem::core::Model building(int bays, int storeys, bool warping)
 {
     const double bay = 6.0;
     const double storey = 3.5;
@@ -85,19 +87,29 @@ fem::core::Model building(int bays, int storeys)
                                .thermalExpansion = 1.2e-5,
                                .conductivity = {},
                                .specificHeat = {}});
-    model.sections.push_back(
-        {.name = "Column", .shape = fem::core::RectangularTube{.b = 0.4, .h = 0.4, .t = 0.02}});
+    if (warping) {
+        // Open columns: Vlasov's warping is for open sections (a closed tube
+        // barely warps, and its k L in the hundreds only costs subdivisions).
+        model.sections.push_back(
+            {.name = "Column",
+             .shape = fem::core::ISection{.h = 0.4, .bf = 0.3, .tf = 0.024, .tw = 0.0135}});
+    } else {
+        model.sections.push_back(
+            {.name = "Column", .shape = fem::core::RectangularTube{.b = 0.4, .h = 0.4, .t = 0.02}});
+    }
     model.sections.push_back(
         {.name = "Beam",
          .shape = fem::core::ISection{.h = 0.5, .bf = 0.2, .tf = 0.016, .tw = 0.01}});
     model.assignments.push_back({.elements = fem::core::ElementIds{columns},
                                  .kind = fem::core::ElementKind::Beam3D,
                                  .material = "Steel",
-                                 .section = "Column"});
+                                 .section = "Column",
+                                 .warping = warping});
     model.assignments.push_back({.elements = fem::core::ElementIds{beams},
                                  .kind = fem::core::ElementKind::Beam3D,
                                  .material = "Steel",
-                                 .section = "Beam"});
+                                 .section = "Beam",
+                                 .warping = warping});
     fem::core::NodeIds base;
     fem::core::NodeIds top;
     for (int j = 0; j < side; ++j) {
@@ -121,12 +133,14 @@ int run(int argc, char** argv)
     const std::span<char* const> args(argv, static_cast<std::size_t>(argc));
     const int bays = args.size() > 1 ? std::stoi(args[1]) : 10;
     const int storeys = args.size() > 2 ? std::stoi(args[2]) : 40;
+    const bool warping = args.size() > 3 && std::string(args[3]) == "warping";
     if (bays < 1 || storeys < 1) {
-        std::fputs("usage: bench_frame [bays, at least 1] [storeys, at least 1]\n", stderr);
+        std::fputs("usage: bench_frame [bays, at least 1] [storeys, at least 1] [warping]\n",
+                   stderr);
         return EXIT_FAILURE;
     }
     auto start = Clock::now();
-    const fem::core::Model model = building(bays, storeys);
+    const fem::core::Model model = building(bays, storeys, warping);
     std::printf("%d nodes, %d bars; model built in %.3f s\n", model.mesh->nodeCount(),
                 model.mesh->elementCount(), secondsSince(start));
 
@@ -146,9 +160,10 @@ int run(int argc, char** argv)
         largest = std::max(largest, u.norm());
     }
     const int side = bays + 1;
-    std::printf("analysis, %d free dofs: %.3f s (validation, assembly, solution, "
+    std::printf("analysis, %s%d free dofs: %.3f s (validation, assembly, solution, "
                 "reactions and end forces); largest displacement %.4g\n",
-                6 * side * side * storeys, total, largest);
+                warping ? "with warping, about " : "", (warping ? 7 : 6) * side * side * storeys,
+                total, largest);
     return EXIT_SUCCESS;
 }
 

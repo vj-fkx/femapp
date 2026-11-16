@@ -293,7 +293,7 @@ Expected<void> ExactBeamElement::compute(const ElementNodes& nodes, ElementIndex
 
 StateBarVector exactBeamEnds(const BeamData& beam, ElementKind kind, const SpanLoads& loads,
                              const Eigen::Vector3d& x1, const Eigen::Vector3d& x2,
-                             std::span<const double> nodeValues)
+                             std::span<const double> nodeValues, StateBarVector* endLoads)
 {
     const double length = exactLength(beam, x1, x2);
     const StateBarMatrices bar = stateBarMatrices(beam, length, loads, planarKind(kind));
@@ -304,7 +304,18 @@ StateBarVector exactBeamEnds(const BeamData& beam, ElementKind kind, const SpanL
     for (Eigen::Index i = 0; i < t.cols(); ++i) {
         values(i) = nodeValues[static_cast<std::size_t>(i)];
     }
-    return connections.flexible(t * values);
+    StateBarVector ends = connections.flexible(t * values);
+    if (endLoads != nullptr) {
+        *endLoads = bar.stiffness * ends - bar.loads;
+    }
+    return ends;
+}
+
+StateBarVector exactEndLoads(const BeamData& beam, double length, const SpanLoads& loads,
+                             bool planar, const StateBarVector& ends)
+{
+    const StateBarMatrices bar = stateBarMatrices(beam, length, loads, planar);
+    return bar.stiffness * ends - bar.loads;
 }
 
 bool hasStableExactConnections(const BeamData& beam, ElementKind kind, double length)
