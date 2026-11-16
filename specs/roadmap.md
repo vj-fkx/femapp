@@ -26,7 +26,7 @@ cargas, resolver e ver diagramas de esforços.
 |----|---------|---------|------------|--------|
 | 005 | drafting-basics | Módulo `geom`: ponto, linha, polilinha (2D e 3D); linha de comando com coordenadas absolutas/relativas/polares; snaps de extremidade, meio e interseção; grade e ortogonal; mover, copiar, apagar | 002 | concluída |
 | 006 | fem-kernel | Funções de forma, quadratura, `DofMap` com GDL por nó, montagem paralela, solver direto | 003 | concluída |
-| 007 | truss-elements | Treliça 2D/3D, verificação analítica | 006 | planejada |
+| 007 | truss-elements | Treliça 2D/3D, verificação analítica; `Material`, seção e `Model` em `core` | 006 | implementando |
 | 008 | beam-elements | Vigas Euler-Bernoulli e Timoshenko 2D/3D, seções, orientação, rótulas | 007 | planejada |
 | 009 | line-meshing | Divisão de linhas em elementos, nós coincidentes fundidos | 005, 003 | planejada |
 | 010 | model-setup-ui | Árvore do modelo, propriedades, materiais, seções, apoios, cargas nodais e distribuídas, undo/redo | 004, 005, 008 | planejada |

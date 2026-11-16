@@ -99,6 +99,17 @@ Conceitos principais:
 - **`Section`** — seção de barra/viga (A, I, J, orientação) e espessura de casca.
 - **`Model`** — malha + materiais + seções + atribuições + condições de contorno
   + cargas. É o documento editado pela UI.
+  *Feito na 007:* agregado de valor (`model.hpp`) com a malha em
+  `shared_ptr<const Mesh>` (cópia barata para o instantâneo da 011);
+  `Material` e `Section` (`material.hpp`) referenciados pelo nome; alvos por
+  grupo da malha ou por ids externos (`ElementIds`, `NodeIds`); um caso de
+  carga com forças nodais, peso próprio, ΔT e pré-deformação.
+- **Análise estática** (`static_analysis.hpp`, feita na 007) — `validate`
+  lista todos os problemas do modelo; `runLinearStatic` monta, verifica a
+  diagonal (nó sem rigidez numa direção), fatora (equação singular →
+  mecanismo com nó e direção, via `SparseCholesky::singularEquation`) e
+  devolve deslocamentos e reações por nó e N, ε e σ por barra
+  (`StaticResult`). Elemento: `TrussElement` 2D/3D (`truss_element.hpp`).
 - **`DofMap`** — GDL **variáveis por nó** (u, v, w, θx, θy, θz, T), definidos
   pelos elementos conectados; trata restrições e a compatibilização entre barras,
   cascas e sólidos (REQ-G-13). *Feito na 006:* máscara por nó vinda das
