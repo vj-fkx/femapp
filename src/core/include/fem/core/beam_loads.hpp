@@ -30,13 +30,26 @@ struct SpanPoint
     Eigen::Vector3d moment = Eigen::Vector3d::Zero();
 };
 
+// REQ-008b-15: a force per length fixed in space (a global load, the weight)
+// on a curved bar, linear from `from` to `to`, by its components in the
+// principal local axes at the start of the bar; along the arc its local
+// components turn with the frame (design 008b §5.3). On the centroid.
+struct SpanFixedPiece
+{
+    double from = 0.0;
+    double to = 0.0;
+    Eigen::Vector3d start = Eigen::Vector3d::Zero();
+    Eigen::Vector3d end = Eigen::Vector3d::Zero();
+};
+
 struct SpanLoads
 {
     std::vector<SpanPiece> pieces;
     std::vector<SpanPoint> points;
-    double imposedStrain = 0.0; // alpha dT + eps0
-    double curvatureY = 0.0;    // imposed: My = EIy (ry' - curvatureY)
-    double curvatureZ = 0.0;    // imposed: Mz = EIz (rz' - curvatureZ)
+    std::vector<SpanFixedPiece> fixedPieces; // curved bars only
+    double imposedStrain = 0.0;              // alpha dT + eps0
+    double curvatureY = 0.0;                 // imposed: My = EIy (ry' - curvatureY)
+    double curvatureZ = 0.0;                 // imposed: Mz = EIz (rz' - curvatureZ)
 };
 
 // Where a load on a bar is: its local axes, as the user sees them (after the

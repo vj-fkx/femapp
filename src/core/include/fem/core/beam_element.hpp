@@ -44,6 +44,11 @@ struct BeamData
     // Loads of the flexible length held at both ends, local dofs at the
     // centroid: the equivalent loads of design 008 §5.5.
     BeamVector fixedEndLoads = BeamVector::Zero();
+    // Feature 008b: E Iw (0: no warping) and, for an arc, the turn rate of
+    // the local frame along it, in the principal local axes (design 008b
+    // §5.2, 5.3).
+    double warpingStiffness = 0.0;
+    Eigen::Vector3d curvature = Eigen::Vector3d::Zero();
 };
 
 // REQ-008-09, 10: local axes of a bar from x1 to x2, as columns (x, y, z).

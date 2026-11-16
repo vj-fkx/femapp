@@ -77,22 +77,22 @@ Regras:
 
 ## Fase 3 — Motor exato
 
-- [ ] **T14** Testes do motor (§5.3) com Ω = 0 e EIw = 0: rigidez igual à
+- [x] **T14** Testes do motor (§5.3) com Ω = 0 e EIw = 0: rigidez igual à
   `flexibleStiffness` da 008 nas duas teorias, com centro de cisalhamento e
   base elástica desligada (1e−12); simetria; modos rígidos — arquivo:
   `test_beam_state.cpp` — cobre: 08, 23
-- [ ] **T15** Implementar `StateBar`, a matriz A, a transferência, a rigidez
+- [x] **T15** Implementar `StateBar`, a matriz A, a transferência, a rigidez
   e as cargas de engaste de trechos polinomiais até a T14 passar — cobre:
   08
-- [ ] **T16** Testes e implementação da torção com empenamento no motor:
+- [x] **T16** Testes e implementação da torção com empenamento no motor:
   rigidez 4×4 de torção contra a fórmula fechada em senh/cosh (kL = 0,1, 1,
   10, 50); limites GJ → 0 e EIw → 0; subdivisão (kL = 50) igual à solução
   fechada; base elástica de torção contra Hetényi — cobre: 07, 08, 11
-- [ ] **T17** Testes e implementação da curvatura Ω: modos rígidos do arco
+- [x] **T17** Testes e implementação da curvatura Ω: modos rígidos do arco
   (6 com energia nula, em qualquer orientação de Ω em relação à seção);
   R → ∞ igual à reta; cargas globais pelos estados aumentados (g' = −Ω×g)
   contra a integração numérica de alta ordem (1e−10) — cobre: 13, 15
-- [ ] **T18** `stateAt`: estado em qualquer s, com saltos de concentradas e
+- [x] **T18** `stateAt`: estado em qualquer s, com saltos de concentradas e
   bimomentos, a partir das junções guardadas; contra a solução do motor
   recalculada num trecho mais curto (1e−12) — cobre: 19
 
@@ -252,3 +252,29 @@ Regras:
   cisalhamento é o módulo do vetor (exato), não a soma dos módulos.
 - T13: `bench_section` (200 + 48 vértices, tamanho padrão) em 0,17 a
   0,19 s em Release (meta: 0,5 s).
+
+**Fase 3 — Motor exato (T14 a T18):**
+
+- T14/T15: sem curvatura, empenamento nem base elástica, o motor reproduz
+  `flexibleStiffness` e `equivalentLoads` da 008 em 1e−12, nas duas teorias
+  e com centro de cisalhamento fora do centroide. Os estados são escalados
+  (comprimentos h, forças S/h², momentos S/h) antes da exponencial.
+- T15/T17: os pontos de quebra das cargas dentro de cada parte são
+  achados um a um, sem vetor de tamanho fixo (um primeiro vetor de 130
+  posições perdia cargas com muitos trechos).
+- T16: a rigidez de torção com empenamento bate com a forma fechada (base
+  estável 1, x, e^−kx, e^−k(L−x)) em 1e−10 para kL = 0,1, 1, 10 e 50 (25
+  partes); GJ → 0 dá a viga de flexão com EIw (1e−9); a base elástica de
+  torção dá a viga de Hetényi em 1e−8.
+- T17: `SpanLoads::fixedPieces` leva as forças fixas no espaço sobre arcos
+  (estados aumentados c e d, 6 a mais: `kMaxStates` passou de 19 para 20;
+  ADR 0006 e design falavam em 19 antes de separar a carga global em dois
+  passes). A conferência "contra integração numérica" foi feita pelo
+  equilíbrio global (força e momento resultantes, 1e−5 com a regra do ponto
+  médio em 400 pontos por trecho) e pela concordância com 600 trechos
+  locais lineares (1e−4), que convergem com h².
+- T18: `stateAt` recupera os deslocamentos das junções internas resolvendo
+  a cadeia de partes (alocação permitida: só nos resultados) e integra a
+  partir do início da parte que contém s; conferido contra as pontas e
+  contra a barra cortada em x, inclusive com carga concentrada numa junção.
+
