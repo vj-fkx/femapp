@@ -1,6 +1,6 @@
 # Tarefas — 008 beam-elements
 
-Status: em andamento
+Status: concluído · 2026-11-16
 Design: [design.md](design.md) · Requisitos: [requirements.md](requirements.md)
 
 Regras:
@@ -205,12 +205,12 @@ Regras:
 
 ## Fase 8 — Fechamento
 
-- [ ] **T90** Build e testes verdes nos jobs do CI, incluindo o de cobertura
+- [x] **T90** Build e testes verdes nos jobs do CI, incluindo o de cobertura
   com `core` ≥ 80% (push com sua confirmação) — cobre: N03
-- [ ] **T91** `clang-format` e `clang-tidy` sem pendências (também o do Linux,
+- [x] **T91** `clang-format` e `clang-tidy` sem pendências (também o do Linux,
   pelo CI); `core` sem headers Qt — cobre: 27
-- [ ] **T92** Conferir os doze critérios de aceite de `requirements.md`
-- [ ] **T93** Atualizar `specs/roadmap.md` para `concluída`
+- [x] **T92** Conferir os doze critérios de aceite de `requirements.md`
+- [x] **T93** Atualizar `specs/roadmap.md` para `concluída`
 
 ## Matriz de rastreabilidade
 
@@ -299,3 +299,35 @@ U: pontas das mesas, dorso da alma e centro da alma; perfil T: pontas da mesa,
 base da alma e linha neutra; cantoneira: calcanhar e pontas das abas, só com a
 normal e a torção (o fluxo da cortante nos eixos principais da cantoneira não
 tem fórmula simples).
+
+**2026-11-16 — Fechamento (T90 a T93):**
+
+- T90: execução `1f2fdf8` verde nos seis jobs (Windows, macOS, linux-gcc,
+  linux-clang, cobertura e formatação):
+  <https://github.com/vj-fkx/femapp/actions/runs/43920681713>. Cobertura de
+  `core`: 96,2% das linhas e 98,5% das funções.
+- T91: `clang-format` e `clang-tidy` limpos no Windows e no Linux;
+  `check_no_qt_includes` verde. A primeira execução (`2c7362d`) falhou só no
+  `clang-tidy` do linux-clang, com 65 avisos que o mesmo clang-tidy 19 não
+  mostra no modo MSVC: inicializadores designados, De Morgan, algoritmos de
+  `std::ranges`, índices `Eigen::Index`, variáveis `const` e acesso verificado
+  a `optional`. Corrigidos em `1f2fdf8`, sem mudança de comportamento.
+- T92, os doze critérios de aceite, conferidos nos testes:
+  - AC-1: `test_section.cpp` (oito formas contra tabelas e fórmulas; J dos
+    perfis abertos com 25%, ver nota da T04).
+  - AC-2: `test_beam_element.cpp` (fórmula fechada nas duas teorias, rotação,
+    modos rígidos, simetria).
+  - AC-3 a AC-6: `test_beam_verification.cpp` (patch test, vigas analíticas,
+    contínua, pórticos em L plano e espacial, grelha, seções assimétricas).
+  - AC-7: `test_beam_connections.cpp` (liberações, molas, excentricidades,
+    Gerber).
+  - AC-8: `test_beam_loads.cpp` ("temperature and weight on beams" e as
+    cargas equivalentes de temperatura).
+  - AC-9: `test_beam_verification.cpp` ("Timoshenko against Euler-Bernoulli")
+    e `test_section.cpp` (tensões na seção).
+  - AC-10: `test_beam_verification.cpp`, taxas 2,00 (quarto de anel) e 3,99
+    (base elástica), nota da T29.
+  - AC-11: `test_beam_validation.cpp` (cada problema com sua mensagem).
+  - AC-12: `check_no_qt_includes` verde; `bench_frame` com 29 040 GDL em
+    3,2 a 3,5 s (Release); cobertura acima de 80% (T90).
+- T93: roadmap com a 008 `concluída`.

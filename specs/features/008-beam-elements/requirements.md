@@ -115,37 +115,37 @@ testes; nada muda na interface.
 
 ## 5. Critérios de aceite
 
-- [ ] **AC-1** (REQ-008-02 a 05) Seções: propriedades das oito formas
+- [x] **AC-1** (REQ-008-02 a 05) Seções: propriedades das oito formas
   (inércias, eixos principais, centro de cisalhamento, J, áreas de
   cisalhamento) iguais às fórmulas fechadas ou a valores tabelados, com
   tolerância documentada para as aproximações; dimensões inválidas
   recusadas.
-- [ ] **AC-2** (REQ-008-06, 07, 09) Elemento: matriz de rigidez de Euler-
+- [x] **AC-2** (REQ-008-06, 07, 09) Elemento: matriz de rigidez de Euler-
   Bernoulli e de Timoshenko iguais às fórmulas fechadas em orientação
   qualquer; invariância sob rotação; seis modos de corpo rígido com energia
   nula em 3D e três em 2D; Timoshenko → Euler-Bernoulli com áreas de
   cisalhamento grandes; eixos locais pelo vetor padrão, por vetor dado e por
   ângulo.
-- [ ] **AC-3** (REQ-008-08, NFR-008-01) Patch test: barra subdividida sob
+- [x] **AC-3** (REQ-008-08, NFR-008-01) Patch test: barra subdividida sob
   momento constante (curvatura uniforme) e sob esforço normal e torção
   constantes reproduz o campo exato em todos os nós e esforços constantes em
   todas as barras.
-- [ ] **AC-4** (REQ-008-08, 16, 21, 22) Vigas, nas duas teorias:
+- [x] **AC-4** (REQ-008-08, 16, 21, 22) Vigas, nas duas teorias:
   - balanço com força e com momento na ponta;
   - biapoiada e biengastada com carga uniforme, trapezoidal, parcial e
     concentrada no vão (flecha, rotações, reações e diagramas M e V ao longo
     da barra, com o salto sob a carga concentrada);
   - viga contínua de dois vãos;
   - recalque e rotação prescrita.
-- [ ] **AC-5** (REQ-008-08, 20, 21) Pórticos e grelhas: pórtico plano com
+- [x] **AC-5** (REQ-008-08, 20, 21) Pórticos e grelhas: pórtico plano com
   carga lateral; pórtico espacial em L com flexão e torção; grelha com carga
   fora do plano; modelo misto de viga com tirante de treliça.
-- [ ] **AC-6** (REQ-008-05, 09) Seções assimétricas: balanço de cantoneira
+- [x] **AC-6** (REQ-008-05, 09) Seções assimétricas: balanço de cantoneira
   com carga na ponta (flexão oblíqua nos eixos principais); balanço de perfil
   U com carga no centroide (torção pela excentricidade do centro de
   cisalhamento); resultados iguais ao mesmo modelo com a seção girada e a
   carga aplicada no centro de cisalhamento.
-- [ ] **AC-7** (REQ-008-11 a 14, 19) Ligações:
+- [x] **AC-7** (REQ-008-11 a 14, 19) Ligações:
   - viga com rótula interna (Gerber);
   - barra com rótulas nas duas pontas igual a uma treliça;
   - liberação de torção;
@@ -154,27 +154,27 @@ testes; nada muda na interface.
   - excentricidade igual ao mesmo modelo com barra rígida explícita;
   - cargas no vão com rótula, com mola e com excentricidade;
   - liberações instáveis e trecho nulo recusados.
-- [ ] **AC-8** (REQ-008-16 a 19, NFR-008-01) Temperatura e peso:
+- [x] **AC-8** (REQ-008-16 a 19, NFR-008-01) Temperatura e peso:
   biengastada com gradiente (M = E·I·α·∂T/∂y, deslocamentos nulos);
   biapoiada com gradiente (rotações e flecha exatas); ΔT uniforme e
   pré-deformação em pórtico; peso próprio de viga inclinada.
-- [ ] **AC-9** (REQ-008-07, 23, NFR-008-01) Timoshenko e tensões:
+- [x] **AC-9** (REQ-008-07, 23, NFR-008-01) Timoshenko e tensões:
   - balanço curto com a flecha de flexão mais a de cortante exata;
   - viga esbelta igual a Euler-Bernoulli (sem travamento) dentro de 1e−6;
   - tensões normal, de cisalhamento e de von Mises nos pontos
     característicos das formas iguais às fórmulas de resistência dos
     materiais.
-- [ ] **AC-10** (REQ-008-08, 15) Convergência:
+- [x] **AC-10** (REQ-008-08, 15) Convergência:
   - quarto de anel em balanço com carga na ponta, discretizado em n barras
     retas: o deslocamento da ponta converge para a solução de viga curva com
     taxa ≈ 2 (± 0,2);
   - viga sobre base elástica (Hetényi) com carga concentrada: o erro do
     deslocamento sob a carga cai com a taxa documentada no design.
-- [ ] **AC-11** (REQ-008-10, 13, 14, 17, 24 a 26) Validação: cada problema do
+- [x] **AC-11** (REQ-008-10, 13, 14, 17, 24 a 26) Validação: cada problema do
   REQ-008-24 gera uma mensagem com o item envolvido, e vários aparecem
   juntos; mecanismo de rotação informa nó e direção; os testes da 007 passam
   sem alteração de resultado.
-- [ ] **AC-12** (REQ-008-27, NFR-008-02, 03) `core` segue sem Qt; benchmark
+- [x] **AC-12** (REQ-008-27, NFR-008-02, 03) `core` segue sem Qt; benchmark
   do pórtico espacial registrado em `tasks.md`; CI verde nas quatro
   plataformas, com a cobertura de `core` ≥ 80%.
 
