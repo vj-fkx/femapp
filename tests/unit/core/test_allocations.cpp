@@ -1,11 +1,12 @@
 // REQ-006-05: evaluating shape functions and element geometry does not
-// allocate. A test executable of its own, because it replaces the global
-// operator new to count the allocations.
+// allocate; REQ-006-12: nor does the truss element of 007. A test executable of its own, because it
+// replaces the global operator new to count the allocations.
 
 #include <fem/core/element_type.hpp>
 #include <fem/core/isoparametric.hpp>
 #include <fem/core/quadrature.hpp>
 #include <fem/core/shape_functions.hpp>
+#include <fem/core/truss_element.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -13,6 +14,7 @@
 #include <cstddef>
 #include <cstdlib>
 #include <new>
+#include <vector>
 
 namespace {
 
@@ -83,4 +85,24 @@ TEST_CASE("shape functions and geometry do not allocate", "[core][allocations]")
     gCounting = false;
     CHECK(gAllocations == 0);
     CHECK(sink != 0.0);
+}
+
+TEST_CASE("the truss element does not allocate", "[core][allocations]")
+{
+    const std::vector<fem::core::BarData> bars(1);
+    const fem::core::TrussElement element(fem::core::ElementKind::Truss3D, bars);
+    fem::core::ElementNodes nodes;
+    nodes.type = fem::core::ElementType::Line2;
+    nodes.count = 2;
+    nodes.x[0] = Eigen::Vector3d(0.0, 0.0, 0.0);
+    nodes.x[1] = Eigen::Vector3d(1.0, 2.0, 3.0);
+    Eigen::MatrixXd matrix = Eigen::MatrixXd::Zero(6, 6);
+    Eigen::VectorXd vector = Eigen::VectorXd::Zero(6);
+
+    gAllocations = 0;
+    gCounting = true;
+    const bool computed = element.compute(nodes, 0, matrix, vector).has_value();
+    gCounting = false;
+    CHECK(computed);
+    CHECK(gAllocations == 0);
 }

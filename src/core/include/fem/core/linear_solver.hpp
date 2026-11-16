@@ -4,7 +4,9 @@
 #include <fem/core/expected.hpp>
 
 #include <Eigen/Core>
+#include <cstdint>
 #include <memory>
+#include <optional>
 
 namespace fem::core {
 
@@ -39,6 +41,10 @@ public:
 
     [[nodiscard]] Expected<void> factorize(const SparseMatrix& lowerTriangle) override;
     [[nodiscard]] Expected<Eigen::VectorXd> solve(const Eigen::VectorXd& rhs) const override;
+
+    // REQ-007-15: after a failed factorize(), the first equation (in the
+    // numbering of the input matrix) whose pivot was not clearly positive.
+    [[nodiscard]] std::optional<std::int32_t> singularEquation() const;
 
 private:
     struct Impl;

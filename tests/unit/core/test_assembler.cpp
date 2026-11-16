@@ -10,6 +10,8 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <cmath>
+#include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -178,4 +180,46 @@ TEST_CASE("a problem without free dofs", "[core][solver]")
     CHECK(std::abs(solution->reactions[0] + 1.0) < 1e-12);
     CHECK(std::abs(solution->reactions[1] - 0.5) < 1e-12);
     CHECK(std::abs(solution->reactions[2] - 0.5) < 1e-12);
+}
+
+// REQ-007-15: the failing equation, in the numbering of the input matrix.
+TEST_CASE("the direct solver points at the singular equation", "[core][solver]")
+{
+    fem::core::SparseCholesky solver;
+
+    // Springs 0-1 and 1-2 tied to ground at 0; equation 3 has no stiffness
+    // (a stored zero) and 4 is a regular grounded spring.
+    fem::core::SparseMatrix lonely(5, 5);
+    lonely.insert(0, 0) = 3.0;
+    lonely.insert(1, 0) = -1.0;
+    lonely.insert(1, 1) = 2.0;
+    lonely.insert(2, 1) = -1.0;
+    lonely.insert(2, 2) = 1.0;
+    lonely.insert(3, 3) = 0.0;
+    lonely.insert(4, 4) = 5.0;
+    lonely.makeCompressed();
+    REQUIRE_FALSE(solver.factorize(lonely).has_value());
+    CHECK(solver.singularEquation() == std::optional<std::int32_t>(3));
+
+    // Equations 3 and 4 joined by a spring and to nothing else: a mechanism
+    // found at one of them.
+    fem::core::SparseMatrix floating(5, 5);
+    floating.insert(0, 0) = 3.0;
+    floating.insert(1, 0) = -1.0;
+    floating.insert(1, 1) = 2.0;
+    floating.insert(2, 1) = -1.0;
+    floating.insert(2, 2) = 1.0;
+    floating.insert(3, 3) = 4.0;
+    floating.insert(4, 3) = -4.0;
+    floating.insert(4, 4) = 4.0;
+    floating.makeCompressed();
+    REQUIRE_FALSE(solver.factorize(floating).has_value());
+    const auto equation = solver.singularEquation();
+    REQUIRE(equation.has_value());
+    CHECK((equation == 3 || equation == 4));
+
+    // A successful factorization clears it.
+    floating.coeffRef(4, 4) = 5.0;
+    REQUIRE(solver.factorize(floating).has_value());
+    CHECK_FALSE(solver.singularEquation().has_value());
 }

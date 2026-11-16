@@ -20,8 +20,11 @@ femapp_add_module(core
         mesh_builder.cpp
         mesh_measure.cpp
         mesh_surface.cpp
+        model.cpp
         quadrature.cpp
         shape_functions.cpp
+        static_analysis.cpp
+        truss_element.cpp
         version.cpp
     PUBLIC_DEPS
         Eigen3::Eigen

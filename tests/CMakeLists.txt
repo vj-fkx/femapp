@@ -31,9 +31,13 @@ femapp_add_test(core SOURCES
     test_mesh.cpp
     test_mesh_measure.cpp
     test_mesh_surface.cpp
+    test_model.cpp
     test_poisson.cpp
     test_quadrature.cpp
-    test_shape_functions.cpp)
+    test_shape_functions.cpp
+    test_static_validation.cpp
+    test_truss_element.cpp
+    test_truss_verification.cpp)
 target_compile_definitions(test_core PRIVATE FEMAPP_EXPECTED_VERSION="${PROJECT_VERSION}")
 
 # REQ-006-05: replaces the global operator new to count allocations, so it is
@@ -126,6 +130,11 @@ add_executable(bench_kernel perf/bench_kernel.cpp)
 target_include_directories(bench_kernel PRIVATE unit/core)
 target_link_libraries(bench_kernel PRIVATE fem::core fem::io)
 femapp_set_warnings(bench_kernel)
+
+# NFR-007-02: truss analysis benchmark, run by hand on a Release build.
+add_executable(bench_truss perf/bench_truss.cpp)
+target_link_libraries(bench_truss PRIVATE fem::core)
+femapp_set_warnings(bench_truss)
 
 # REQ-004-03: command line parsing of the application, built on its own.
 add_executable(test_app unit/app/test_cli_options.cpp "${PROJECT_SOURCE_DIR}/src/app/cli_options.cpp")
