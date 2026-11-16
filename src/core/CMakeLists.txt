@@ -22,6 +22,7 @@ femapp_add_module(core
         mesh_surface.cpp
         model.cpp
         quadrature.cpp
+        section.cpp
         shape_functions.cpp
         static_analysis.cpp
         truss_element.cpp

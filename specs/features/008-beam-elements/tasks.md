@@ -14,28 +14,28 @@ Regras:
 
 ## Fase 1 — Seções
 
-- [ ] **T01** `section.hpp`: `Section` movida de `material.hpp` (que passa a
+- [x] **T01** `section.hpp`: `Section` movida de `material.hpp` (que passa a
   incluí-la) com os campos da seção genérica e `shape`; as oito formas e
   `SectionProperties`; novos fontes no `CMakeLists.txt`. Os testes da 007
   continuam passando sem mudança — arquivos:
   `src/core/include/fem/core/section.hpp`, `material.hpp`,
   `src/core/section.cpp`, `src/core/CMakeLists.txt` — cobre: 02, 26
-- [ ] **T02** Testes de `sectionProperties`:
+- [x] **T02** Testes de `sectionProperties`:
   - A, centroide, Iy, Iz, Iyz, J, centro de cisalhamento e áreas de
     cisalhamento das oito formas contra as fórmulas (1e−12);
   - retângulo, círculo e tubos contra os valores exatos (1e−6), e perfis
-    abertos contra tabelas (≤ 15%);
+    abertos contra tabelas (A e I ≤ 5%, J ≤ 25%);
   - eixos principais da cantoneira, e centros de cisalhamento do U e do T;
   - seção genérica com Iyz ≠ 0 levada aos eixos principais;
   - dimensões inválidas, com a mensagem citando a dimensão.
 
   — arquivo: `tests/unit/core/test_section.cpp` — cobre: 02 a 04
-- [ ] **T03** Implementar `sectionProperties` (§5.1 do design) até a T02
+- [x] **T03** Implementar `sectionProperties` (§5.1 do design) até a T02
   passar, com as referências das fórmulas no código — cobre: 02 a 05
 
 ## Fase 2 — Modelo
 
-- [ ] **T04** `model.hpp`:
+- [x] **T04** `model.hpp`:
   - `ElementKind` com `Beam2D` e `Beam3D`; `BeamTheory`, `Axes`, `BarEnd`
     e `BarPosition`;
   - campos novos de `Assignment` e o momento em `NodalForce`;
@@ -47,7 +47,7 @@ Regras:
 
   — arquivos: `src/core/include/fem/core/model.hpp`,
   `tests/unit/core/bar_meshes.hpp`, testes da 007 — cobre: 09, 11 a 16
-- [ ] **T05** [P] Ampliar `test_model`: incluir, alterar, remover e copiar
+- [x] **T05** [P] Ampliar `test_model`: incluir, alterar, remover e copiar
   os itens novos; a cópia compartilha a malha — arquivo:
   `tests/unit/core/test_model.cpp` — cobre: 11 a 16
 

@@ -1,0 +1,253 @@
+// REQ-008-02 to 05: section properties of the generic section and of the
+// eight shapes.
+
+#include <fem/core/section.hpp>
+
+#include <catch2/catch_test_macros.hpp>
+
+#include <Eigen/Core>
+#include <cmath>
+#include <numbers>
+#include <string>
+
+using fem::core::Section;
+using fem::core::SectionProperties;
+using fem::core::SectionShape;
+
+namespace {
+
+constexpr double kPi = std::numbers::pi;
+
+bool near(double value, double reference, double tolerance)
+{
+    return std::abs(value - reference) <= tolerance * std::max(1.0e-300, std::abs(reference));
+}
+
+SectionProperties of(const SectionShape& shape)
+{
+    Section section{.name = "S"};
+    section.shape = shape;
+    const auto properties = fem::core::sectionProperties(section);
+    REQUIRE(properties.has_value());
+    return properties.value_or(SectionProperties{});
+}
+
+std::string failure(const SectionShape& shape)
+{
+    Section section{.name = "S"};
+    section.shape = shape;
+    const auto properties = fem::core::sectionProperties(section);
+    REQUIRE_FALSE(properties.has_value());
+    return properties.error().message;
+}
+
+} // namespace
+
+// REQ-008-03: the doubly symmetric shapes against closed forms.
+TEST_CASE("properties of the symmetric shapes", "[core][section]")
+{
+    SECTION("rectangle")
+    {
+        const SectionProperties p = of(fem::core::Rectangle{.b = 0.2, .h = 0.5});
+        CHECK(near(p.area, 0.1, 1e-12));
+        CHECK(near(p.inertiaZ, 0.2 * std::pow(0.5, 3) / 12, 1e-12));
+        CHECK(near(p.inertiaY, 0.5 * std::pow(0.2, 3) / 12, 1e-12));
+        CHECK(p.principalAngle == 0.0);
+        CHECK(p.centroid.norm() <= 1e-15);
+        CHECK(p.shearCentre.norm() <= 1e-15);
+        REQUIRE(p.shearAreaY.has_value());
+        CHECK(near(p.shearAreaY.value_or(0.0), 5.0 / 6.0 * 0.1, 1e-12));
+    }
+    SECTION("rectangle torsion against tables")
+    {
+        // Square: J = 0.1406 a^4 (Timoshenko and Goodier, table of k1).
+        CHECK(near(of(fem::core::Rectangle{.b = 1.0, .h = 1.0}).torsionConstant, 0.1406, 2e-4));
+        // Thin strip: J -> a c^3 / 3 (1 - 0.630 c / a).
+        CHECK(near(of(fem::core::Rectangle{.b = 1.0, .h = 100.0}).torsionConstant,
+                   100.0 / 3.0 * (1.0 - 0.630 / 100.0), 1e-5));
+        // The same J whichever side is longer.
+        CHECK(near(of(fem::core::Rectangle{.b = 0.3, .h = 0.1}).torsionConstant,
+                   of(fem::core::Rectangle{.b = 0.1, .h = 0.3}).torsionConstant, 1e-14));
+    }
+    SECTION("circle and circular tube, exact")
+    {
+        const SectionProperties c = of(fem::core::Circle{.d = 0.1});
+        CHECK(near(c.area, kPi * 0.01 / 4, 1e-14));
+        CHECK(near(c.inertiaY, kPi * 1e-4 / 64, 1e-14));
+        CHECK(near(c.inertiaZ, c.inertiaY, 1e-14));
+        CHECK(near(c.torsionConstant, kPi * 1e-4 / 32, 1e-14));
+
+        const SectionProperties t = of(fem::core::CircularTube{.d = 0.2, .t = 0.01});
+        const double inner = 0.18;
+        CHECK(near(t.area, kPi * (0.04 - inner * inner) / 4, 1e-14));
+        CHECK(near(t.inertiaZ, kPi * (std::pow(0.2, 4) - std::pow(inner, 4)) / 64, 1e-14));
+        CHECK(near(t.torsionConstant, kPi * (std::pow(0.2, 4) - std::pow(inner, 4)) / 32, 1e-14));
+        CHECK(near(t.shearAreaZ.value_or(0.0), 0.5 * t.area, 1e-14));
+    }
+    SECTION("rectangular tube")
+    {
+        const double b = 0.2;
+        const double h = 0.3;
+        const double t = 0.01;
+        const SectionProperties p = of(fem::core::RectangularTube{.b = b, .h = h, .t = t});
+        CHECK(near(p.area, b * h - (b - 2 * t) * (h - 2 * t), 1e-12));
+        CHECK(near(p.inertiaZ, (b * h * h * h - (b - 2 * t) * std::pow(h - 2 * t, 3)) / 12, 1e-12));
+        CHECK(near(p.inertiaY, (h * b * b * b - (h - 2 * t) * std::pow(b - 2 * t, 3)) / 12, 1e-12));
+        // Bredt: 4 Am^2 t / pm on the mid-line.
+        const double am = (b - t) * (h - t);
+        CHECK(near(p.torsionConstant, 4 * am * am * t / (2 * ((b - t) + (h - t))), 1e-12));
+        CHECK(near(p.shearAreaY.value_or(0.0), 2 * (h - t) * t, 1e-12));
+    }
+    SECTION("I section against the formula and the IPE 300 table")
+    {
+        const double h = 0.3;
+        const double bf = 0.15;
+        const double tf = 0.0107;
+        const double tw = 0.0071;
+        const SectionProperties p = of(fem::core::ISection{.h = h, .bf = bf, .tf = tf, .tw = tw});
+        CHECK(near(p.area, 2 * bf * tf + (h - 2 * tf) * tw, 1e-12));
+        CHECK(near(p.inertiaZ, (bf * h * h * h - (bf - tw) * std::pow(h - 2 * tf, 3)) / 12, 1e-12));
+        CHECK(near(p.inertiaY, (2 * tf * std::pow(bf, 3) + (h - 2 * tf) * std::pow(tw, 3)) / 12,
+                   1e-12));
+        CHECK(near(p.torsionConstant, (2 * bf * std::pow(tf, 3) + (h - 2 * tf) * std::pow(tw, 3)) / 3,
+                   1e-12));
+        CHECK(p.shearCentre.norm() <= 1e-15);
+        // The rolled IPE 300 has root fillets, which the plates leave out:
+        // A 53.8 cm2, Iz 8356 cm4, Iy 604 cm4, J 20.1 cm4 (design 008 §5.1).
+        CHECK(near(p.area, 53.8e-4, 0.05));
+        CHECK(near(p.inertiaZ, 8356e-8, 0.05));
+        CHECK(near(p.inertiaY, 604e-8, 0.05));
+        CHECK(near(p.torsionConstant, 20.1e-8, 0.25));
+    }
+}
+
+// REQ-008-03, 05: shapes with a shear centre away from the centroid.
+TEST_CASE("properties of the asymmetric shapes", "[core][section]")
+{
+    SECTION("tee")
+    {
+        const double h = 0.2;
+        const double bf = 0.15;
+        const double tf = 0.02;
+        const double tw = 0.01;
+        const SectionProperties p = of(fem::core::Tee{.h = h, .bf = bf, .tf = tf, .tw = tw});
+        const double af = bf * tf;
+        const double aw = (h - tf) * tw;
+        const double yc = (af * (h - tf / 2) + aw * (h - tf) / 2) / (af + aw);
+        CHECK(near(p.area, af + aw, 1e-12));
+        CHECK(near(p.centroid.x(), yc, 1e-12));
+        CHECK(std::abs(p.centroid.y()) <= 1e-15);
+        const double iz = bf * std::pow(tf, 3) / 12 + af * std::pow(h - tf / 2 - yc, 2) +
+                          tw * std::pow(h - tf, 3) / 12 + aw * std::pow((h - tf) / 2 - yc, 2);
+        CHECK(near(p.inertiaZ, iz, 1e-12));
+        CHECK(near(p.inertiaY, tf * std::pow(bf, 3) / 12 + (h - tf) * std::pow(tw, 3) / 12, 1e-12));
+        CHECK(p.principalAngle == 0.0);
+        // At the meeting of the mid-lines.
+        CHECK(near(p.shearCentre.x(), h - tf / 2 - yc, 1e-12));
+        CHECK(std::abs(p.shearCentre.y()) <= 1e-15);
+    }
+    SECTION("channel")
+    {
+        const double h = 0.2;
+        const double bf = 0.075;
+        const double tf = 0.0115;
+        const double tw = 0.0085;
+        const SectionProperties p = of(fem::core::Channel{.h = h, .bf = bf, .tf = tf, .tw = tw});
+        const double aw = h * tw;
+        const double af = (bf - tw) * tf;
+        const double zc = (aw * tw / 2 + 2 * af * (tw + bf) / 2) / (aw + 2 * af);
+        CHECK(near(p.area, aw + 2 * af, 1e-12));
+        CHECK(near(p.centroid.y(), zc, 1e-12));
+        CHECK(std::abs(p.centroid.x()) <= 1e-15);
+        CHECK(p.principalAngle == 0.0);
+        // e = 3 b^2 tf / (6 b tf + h tw) behind the web mid-line.
+        const double b = bf - tw / 2;
+        const double e = 3 * b * b * tf / (6 * b * tf + (h - tf) * tw);
+        CHECK(near(p.shearCentre.y(), tw / 2 - e - zc, 1e-12));
+        CHECK(std::abs(p.shearCentre.x()) <= 1e-15);
+        CHECK(near(p.torsionConstant, (2 * (bf - tw) * std::pow(tf, 3) + h * std::pow(tw, 3)) / 3,
+                   1e-12));
+    }
+    SECTION("equal angle: principal axes at 45 degrees")
+    {
+        const double a = 0.1;
+        const double t = 0.01;
+        const SectionProperties p = of(fem::core::Angle{.b = a, .h = a, .t = t});
+        const double a1 = a * t;       // leg along y
+        const double a2 = (a - t) * t; // leg along z
+        const double c = (a1 * a / 2 + a2 * t / 2) / (a1 + a2);
+        CHECK(near(p.centroid.x(), c, 1e-12));
+        CHECK(near(p.centroid.y(), c, 1e-12));
+        CHECK(near(std::abs(p.principalAngle), kPi / 4, 1e-12));
+        // Invariants of the rotation.
+        const double iz = t * a * a * a / 12 + a1 * std::pow(a / 2 - c, 2) + (a - t) * t * t * t / 12 +
+                          a2 * std::pow(t / 2 - c, 2);
+        const double iyz = a1 * (a / 2 - c) * (t / 2 - c) + a2 * (t / 2 - c) * ((a + t) / 2 - c);
+        CHECK(near(p.inertiaY + p.inertiaZ, 2 * iz, 1e-12));
+        CHECK(near(p.inertiaY * p.inertiaZ, iz * iz - iyz * iyz, 1e-12));
+        // The shear centre at the corner of the mid-lines lies on the
+        // symmetry axis, a principal axis.
+        const Eigen::Vector2d corner(t / 2 - c, t / 2 - c);
+        CHECK(near(p.shearCentre.norm(), corner.norm(), 1e-12));
+        CHECK(std::min(std::abs(p.shearCentre.x()), std::abs(p.shearCentre.y())) <= 1e-14);
+    }
+    SECTION("unequal angle: principal inertias")
+    {
+        const SectionProperties p = of(fem::core::Angle{.b = 0.1, .h = 0.15, .t = 0.012});
+        CHECK(std::abs(p.principalAngle) > 0.1);
+        CHECK(std::abs(p.principalAngle) <= kPi / 4);
+        // The larger inertia stays about z' (y' near the long leg).
+        CHECK(p.inertiaZ > p.inertiaY);
+    }
+}
+
+// REQ-008-02, 05: a generic section is taken to its principal axes.
+TEST_CASE("a generic section is rotated to its principal axes", "[core][section]")
+{
+    Section section{.name = "G", .area = 1.0};
+    section.inertiaY = 2.0;
+    section.inertiaZ = 4.0;
+    section.productOfInertia = 1.0;
+    section.torsionConstant = 0.5;
+    section.shearCentre = Eigen::Vector2d(0.1, 0.0);
+    section.shearAreaY = 0.8;
+    section.shearAreaZ = 0.8;
+    const auto p = fem::core::sectionProperties(section).value_or(SectionProperties{});
+    // tan 2 theta = 2 Iyz / (Iz - Iy) = 1.
+    CHECK(near(p.principalAngle, kPi / 8, 1e-14));
+    CHECK(near(p.inertiaZ, 3.0 + std::sqrt(2.0), 1e-14));
+    CHECK(near(p.inertiaY, 3.0 - std::sqrt(2.0), 1e-14));
+    CHECK(near(p.shearCentre.x(), 0.1 * std::cos(kPi / 8), 1e-14));
+    CHECK(near(p.shearCentre.y(), -0.1 * std::sin(kPi / 8), 1e-14));
+    CHECK(near(p.shearAreaY.value_or(0.0), 0.8, 1e-14));
+    CHECK(p.torsionConstant == 0.5);
+
+    // A truss section: the area alone, nothing else needed.
+    const auto bar = fem::core::sectionProperties(Section{.name = "Rod", .area = 2.0});
+    REQUIRE(bar.has_value());
+    CHECK(bar.value_or(SectionProperties{}).area == 2.0);
+    CHECK_FALSE(bar.value_or(SectionProperties{}).shearAreaY.has_value());
+}
+
+// REQ-008-04
+TEST_CASE("impossible shapes are refused", "[core][section]")
+{
+    CHECK(failure(fem::core::Rectangle{.b = 0.0, .h = 1.0}) ==
+          "Section \"S\": the dimension b must be positive.");
+    CHECK(failure(fem::core::Circle{.d = -1.0}) ==
+          "Section \"S\": the dimension d must be positive.");
+    CHECK(failure(fem::core::CircularTube{.d = 0.1, .t = 0.05}) ==
+          "Section \"S\": the wall t must be less than d / 2.");
+    CHECK(failure(fem::core::RectangularTube{.b = 0.1, .h = 0.3, .t = 0.05}) ==
+          "Section \"S\": the wall t must be less than b / 2 and h / 2.");
+    CHECK(failure(fem::core::ISection{.h = 0.2, .bf = 0.1, .tf = 0.1, .tw = 0.01}) ==
+          "Section \"S\": 2 tf must be less than h.");
+    CHECK(failure(fem::core::ISection{.h = 0.2, .bf = 0.1, .tf = 0.01, .tw = 0.2}) ==
+          "Section \"S\": tw must not exceed bf.");
+    CHECK(failure(fem::core::Channel{.h = 0.2, .bf = 0.1, .tf = 0.01, .tw = 0.0}) ==
+          "Section \"S\": the dimension tw must be positive.");
+    CHECK(failure(fem::core::Tee{.h = 0.2, .bf = 0.1, .tf = 0.2, .tw = 0.01}) ==
+          "Section \"S\": tf must be less than h.");
+    CHECK(failure(fem::core::Angle{.b = 0.1, .h = 0.1, .t = 0.1}) ==
+          "Section \"S\": the thickness t must be less than b and h.");
+}

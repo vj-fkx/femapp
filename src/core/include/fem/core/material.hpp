@@ -1,5 +1,9 @@
 #pragma once
 
+// Section moved to section.hpp in feature 008; included here so that code of
+// feature 007 keeps compiling.
+#include <fem/core/section.hpp>
+
 #include <optional>
 #include <string>
 
@@ -17,13 +21,6 @@ struct Material
     std::optional<double> thermalExpansion; // alpha
     std::optional<double> conductivity;     // k
     std::optional<double> specificHeat;     // c
-};
-
-// REQ-007-02: a bar section. Inertias and shape come with the beams (008).
-struct Section
-{
-    std::string name;
-    std::optional<double> area; // A
 };
 
 } // namespace fem::core

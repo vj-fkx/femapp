@@ -278,7 +278,8 @@ public:
 Coordenadas do desenho (y, z), com h ao longo de y. Todas as formas são
 compostas de retângulos (as circulares, de fórmulas exatas), e A, centroide,
 Iy, Iz e Iyz saem da soma por Steiner, exatos. Os eixos principais ficam em
-θp = ½·atan2(−2Iyz, Iz − Iy). Os eixos principais y' e z' são y e z
+tan 2θp = 2Iyz/(Iz − Iy), com θp em (−π/4, π/4], o ângulo mais próximo dos
+eixos do desenho *(corrigido na T03: o sinal estava trocado)*. Os eixos principais y' e z' são y e z
 girados de θp. I'y e I'z são as inércias em torno deles: I'z resiste à
 flexão no plano x–y' (momento Mz), I'y à flexão no plano x–z' (momento My),
 a mesma convenção da 2D. Numa seção simétrica, θp = 0 e os eixos principais
@@ -298,8 +299,10 @@ são os do desenho.
 As fórmulas de paredes finas são documentadas no código com a referência
 (Young e Budynas, *Roark's Formulas*, cap. 10). Os testes as comparam com a
 própria fórmula (1e−12) e com valores tabelados, numa tolerância por forma:
-retângulo, círculo e tubos ≤ 1e−6 contra os exatos; perfis abertos ≤ 15%
-contra J de tabelas de perfis laminados, que incluem raios de concordância.
+retângulo, círculo e tubos ≤ 1e−6 contra os exatos; perfis abertos ≤ 5% em
+A e I e ≤ 25% em J contra tabelas de perfis laminados, que incluem raios de
+concordância *(ajustado na T02: no IPE 300, as placas sem raios dão J 22%
+menor que a tabela)*.
 As áreas de cisalhamento de seções assimétricas são aproximações de
 engenharia e ficam projetadas nos eixos principais.
 

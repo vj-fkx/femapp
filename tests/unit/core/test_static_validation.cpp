@@ -8,7 +8,7 @@
 #pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
 #endif
 
-#include "truss_meshes.hpp"
+#include "bar_meshes.hpp"
 
 #include <fem/core/static_analysis.hpp>
 

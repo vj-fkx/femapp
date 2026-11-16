@@ -2,7 +2,7 @@
 // 12; NFR-007-01): patch tests, analytical solutions in 2D and 3D, imposed
 // strains and self-weight, and convergence of a hanging bar.
 
-#include "truss_meshes.hpp"
+#include "bar_meshes.hpp"
 #include "unit_meshes.hpp"
 
 #include <fem/core/static_analysis.hpp>

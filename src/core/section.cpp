@@ -1,0 +1,384 @@
+#include <fem/core/section.hpp>
+
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <numbers>
+#include <string>
+#include <string_view>
+#include <vector>
+
+namespace fem::core {
+
+namespace {
+
+constexpr double kPi = std::numbers::pi;
+
+// Terms of the Saint-Venant series of the rectangle: the first neglected
+// term is below 1e-9 of J.
+constexpr int kTorsionSeriesTerms = 50;
+
+// A rectangle of the drawing, added (sign 1) or removed (sign -1).
+struct Part
+{
+    double y0 = 0.0;
+    double y1 = 0.0;
+    double z0 = 0.0;
+    double z1 = 0.0;
+    double sign = 1.0;
+};
+
+// Area, centroid and second moments about the centroid, in the drawing.
+struct Geometric
+{
+    double area = 0.0;
+    Eigen::Vector2d centroid = Eigen::Vector2d::Zero();
+    double iy = 0.0;  // integral of z^2
+    double iz = 0.0;  // integral of y^2
+    double iyz = 0.0; // integral of y z
+};
+
+Geometric combine(const std::vector<Part>& parts)
+{
+    double area = 0.0;
+    double sy = 0.0; // integral of y
+    double sz = 0.0;
+    double yy = 0.0;
+    double zz = 0.0;
+    double yz = 0.0;
+    for (const Part& p : parts) {
+        const double dy = p.y1 - p.y0;
+        const double dz = p.z1 - p.z0;
+        area += p.sign * dy * dz;
+        sy += p.sign * dz * (p.y1 * p.y1 - p.y0 * p.y0) / 2.0;
+        sz += p.sign * dy * (p.z1 * p.z1 - p.z0 * p.z0) / 2.0;
+        yy += p.sign * dz * (std::pow(p.y1, 3) - std::pow(p.y0, 3)) / 3.0;
+        zz += p.sign * dy * (std::pow(p.z1, 3) - std::pow(p.z0, 3)) / 3.0;
+        yz += p.sign * (p.y1 * p.y1 - p.y0 * p.y0) * (p.z1 * p.z1 - p.z0 * p.z0) / 4.0;
+    }
+    Geometric g;
+    g.area = area;
+    g.centroid = Eigen::Vector2d(sy / area, sz / area);
+    g.iz = yy - area * g.centroid.x() * g.centroid.x();
+    g.iy = zz - area * g.centroid.y() * g.centroid.y();
+    g.iyz = yz - area * g.centroid.x() * g.centroid.y();
+    return g;
+}
+
+// Saint-Venant torsion of a solid rectangle of sides `a` and `b`
+// (Timoshenko and Goodier, Theory of Elasticity, §109):
+// J = a c^3 / 3 [1 - 192 c / (pi^5 a) sum over odd n of tanh(n pi a / 2c) / n^5],
+// with a the longer side and c the shorter.
+double rectangleTorsion(double a, double b)
+{
+    const double longer = std::max(a, b);
+    const double shorter = std::min(a, b);
+    double sum = 0.0;
+    for (int k = 0; k < kTorsionSeriesTerms; ++k) {
+        const double n = 2.0 * k + 1.0;
+        sum += std::tanh(n * kPi * longer / (2.0 * shorter)) / std::pow(n, 5);
+    }
+    return longer * std::pow(shorter, 3) / 3.0 *
+           (1.0 - 192.0 * shorter / (std::pow(kPi, 5) * longer) * sum);
+}
+
+// Open thin-walled section: the sum of b t^3 / 3 over its plates
+// (Young and Budynas, Roark's Formulas for Stress and Strain, table 10.7).
+double thinPlate(double length, double thickness)
+{
+    return length * std::pow(thickness, 3) / 3.0;
+}
+
+// What a shape adds to the geometric properties.
+struct ShapeData
+{
+    std::vector<Part> parts;
+    // Exact values for the circular shapes, which are not rectangles.
+    std::optional<Geometric> exact;
+    double torsion = 0.0;
+    Eigen::Vector2d shearCentre = Eigen::Vector2d::Zero(); // drawing, absolute
+    bool shearCentreAtCentroid = true;
+    double shearAreaY = 0.0;
+    double shearAreaZ = 0.0;
+};
+
+class ShapeBuilder
+{
+public:
+    explicit ShapeBuilder(std::string_view section)
+        : m_section(section)
+    {}
+
+    Expected<ShapeData> operator()(const Rectangle& s) const
+    {
+        if (auto bad = positive({{"b", s.b}, {"h", s.h}})) {
+            return makeError(*bad);
+        }
+        ShapeData d;
+        d.parts = {{-s.h / 2, s.h / 2, -s.b / 2, s.b / 2, 1.0}};
+        d.torsion = rectangleTorsion(s.b, s.h);
+        // Timoshenko shear coefficient 5/6 of the rectangle.
+        d.shearAreaY = d.shearAreaZ = 5.0 / 6.0 * s.b * s.h;
+        return d;
+    }
+
+    Expected<ShapeData> operator()(const Circle& s) const
+    {
+        if (auto bad = positive({{"d", s.d}})) {
+            return makeError(*bad);
+        }
+        ShapeData d;
+        const double area = kPi * s.d * s.d / 4.0;
+        const double inertia = kPi * std::pow(s.d, 4) / 64.0;
+        d.exact = Geometric{
+            .area = area, .centroid = Eigen::Vector2d::Zero(), .iy = inertia, .iz = inertia};
+        d.torsion = 2.0 * inertia;
+        // Shear coefficient 0.9 of the solid circle (Cowper gives 0.886 for nu = 0.3).
+        d.shearAreaY = d.shearAreaZ = 0.9 * area;
+        return d;
+    }
+
+    Expected<ShapeData> operator()(const CircularTube& s) const
+    {
+        if (auto bad = positive({{"d", s.d}, {"t", s.t}})) {
+            return makeError(*bad);
+        }
+        if (!(2.0 * s.t < s.d)) {
+            return makeError(prefix() + "the wall t must be less than d / 2.");
+        }
+        ShapeData d;
+        const double inner = s.d - 2.0 * s.t;
+        const double area = kPi * (s.d * s.d - inner * inner) / 4.0;
+        const double inertia = kPi * (std::pow(s.d, 4) - std::pow(inner, 4)) / 64.0;
+        d.exact = Geometric{
+            .area = area, .centroid = Eigen::Vector2d::Zero(), .iy = inertia, .iz = inertia};
+        d.torsion = 2.0 * inertia;
+        // Thin tube: shear coefficient 1/2.
+        d.shearAreaY = d.shearAreaZ = 0.5 * area;
+        return d;
+    }
+
+    Expected<ShapeData> operator()(const RectangularTube& s) const
+    {
+        if (auto bad = positive({{"b", s.b}, {"h", s.h}, {"t", s.t}})) {
+            return makeError(*bad);
+        }
+        if (!(2.0 * s.t < s.b && 2.0 * s.t < s.h)) {
+            return makeError(prefix() + "the wall t must be less than b / 2 and h / 2.");
+        }
+        ShapeData d;
+        const double hb = s.b / 2;
+        const double hh = s.h / 2;
+        d.parts = {{-hh, hh, -hb, hb, 1.0}, {-hh + s.t, hh - s.t, -hb + s.t, hb - s.t, -1.0}};
+        // Bredt, on the mid-line: J = 4 Am^2 t / pm.
+        const double bm = s.b - s.t;
+        const double hm = s.h - s.t;
+        d.torsion = 4.0 * std::pow(bm * hm, 2) * s.t / (2.0 * (bm + hm));
+        d.shearAreaY = 2.0 * hm * s.t; // the two walls along y
+        d.shearAreaZ = 2.0 * bm * s.t;
+        return d;
+    }
+
+    Expected<ShapeData> operator()(const ISection& s) const
+    {
+        if (auto bad = positive({{"h", s.h}, {"bf", s.bf}, {"tf", s.tf}, {"tw", s.tw}})) {
+            return makeError(*bad);
+        }
+        if (auto bad = flanged(s.h, s.bf, s.tf, s.tw, 2.0)) {
+            return makeError(*bad);
+        }
+        ShapeData d;
+        const double hh = s.h / 2;
+        const double hb = s.bf / 2;
+        d.parts = {{hh - s.tf, hh, -hb, hb, 1.0},
+                   {-hh, -hh + s.tf, -hb, hb, 1.0},
+                   {-hh + s.tf, hh - s.tf, -s.tw / 2, s.tw / 2, 1.0}};
+        d.torsion = 2.0 * thinPlate(s.bf, s.tf) + thinPlate(s.h - 2.0 * s.tf, s.tw);
+        d.shearAreaY = (s.h - s.tf) * s.tw;
+        d.shearAreaZ = 5.0 / 6.0 * 2.0 * s.bf * s.tf;
+        return d;
+    }
+
+    Expected<ShapeData> operator()(const Angle& s) const
+    {
+        if (auto bad = positive({{"b", s.b}, {"h", s.h}, {"t", s.t}})) {
+            return makeError(*bad);
+        }
+        if (!(s.t < s.b && s.t < s.h)) {
+            return makeError(prefix() + "the thickness t must be less than b and h.");
+        }
+        ShapeData d;
+        d.parts = {{0.0, s.h, 0.0, s.t, 1.0}, {0.0, s.t, s.t, s.b, 1.0}};
+        d.torsion = thinPlate(s.h, s.t) + thinPlate(s.b - s.t, s.t);
+        // Where the mid-lines of the legs meet.
+        d.shearCentre = Eigen::Vector2d(s.t / 2, s.t / 2);
+        d.shearCentreAtCentroid = false;
+        d.shearAreaY = 5.0 / 6.0 * s.h * s.t;
+        d.shearAreaZ = 5.0 / 6.0 * s.b * s.t;
+        return d;
+    }
+
+    Expected<ShapeData> operator()(const Channel& s) const
+    {
+        if (auto bad = positive({{"h", s.h}, {"bf", s.bf}, {"tf", s.tf}, {"tw", s.tw}})) {
+            return makeError(*bad);
+        }
+        if (auto bad = flanged(s.h, s.bf, s.tf, s.tw, 2.0)) {
+            return makeError(*bad);
+        }
+        ShapeData d;
+        const double hh = s.h / 2;
+        d.parts = {{-hh, hh, 0.0, s.tw, 1.0},
+                   {hh - s.tf, hh, s.tw, s.bf, 1.0},
+                   {-hh, -hh + s.tf, s.tw, s.bf, 1.0}};
+        d.torsion = 2.0 * thinPlate(s.bf - s.tw, s.tf) + thinPlate(s.h, s.tw);
+        // Thin-walled channel on the mid-lines (Roark, table 10.1): the shear
+        // centre is e = 3 b^2 tf / (6 b tf + h tw) behind the web, with b the
+        // flange from the web mid-line and h between the flange mid-lines.
+        const double b = s.bf - s.tw / 2;
+        const double h = s.h - s.tf;
+        const double e = 3.0 * b * b * s.tf / (6.0 * b * s.tf + h * s.tw);
+        d.shearCentre = Eigen::Vector2d(0.0, s.tw / 2 - e);
+        d.shearCentreAtCentroid = false;
+        d.shearAreaY = (s.h - s.tf) * s.tw;
+        d.shearAreaZ = 5.0 / 6.0 * 2.0 * s.bf * s.tf;
+        return d;
+    }
+
+    Expected<ShapeData> operator()(const Tee& s) const
+    {
+        if (auto bad = positive({{"h", s.h}, {"bf", s.bf}, {"tf", s.tf}, {"tw", s.tw}})) {
+            return makeError(*bad);
+        }
+        if (auto bad = flanged(s.h, s.bf, s.tf, s.tw, 1.0)) {
+            return makeError(*bad);
+        }
+        ShapeData d;
+        d.parts = {{s.h - s.tf, s.h, -s.bf / 2, s.bf / 2, 1.0},
+                   {0.0, s.h - s.tf, -s.tw / 2, s.tw / 2, 1.0}};
+        d.torsion = thinPlate(s.bf, s.tf) + thinPlate(s.h - s.tf, s.tw);
+        // Where the mid-lines of the flange and of the stem meet.
+        d.shearCentre = Eigen::Vector2d(s.h - s.tf / 2, 0.0);
+        d.shearCentreAtCentroid = false;
+        d.shearAreaY = (s.h - s.tf) * s.tw;
+        d.shearAreaZ = 5.0 / 6.0 * s.bf * s.tf;
+        return d;
+    }
+
+private:
+    struct Dimension
+    {
+        std::string_view name;
+        double value;
+    };
+
+    [[nodiscard]] std::string prefix() const
+    {
+        return "Section \"" + std::string(m_section) + "\": ";
+    }
+
+    [[nodiscard]] std::optional<std::string> positive(std::initializer_list<Dimension> dims) const
+    {
+        for (const Dimension& dim : dims) {
+            if (!(dim.value > 0.0) || !std::isfinite(dim.value)) {
+                return prefix() + "the dimension " + std::string(dim.name) + " must be positive.";
+            }
+        }
+        return std::nullopt;
+    }
+
+    // `flanges` flanges of thickness tf in the height h; the web tw fits in bf.
+    [[nodiscard]] std::optional<std::string> flanged(double h, double bf, double tf, double tw,
+                                                     double flanges) const
+    {
+        if (!(flanges * tf < h)) {
+            return prefix() + (flanges > 1.0 ? "2 tf must be less than h." : "tf must be less than h.");
+        }
+        if (!(tw <= bf)) {
+            return prefix() + "tw must not exceed bf.";
+        }
+        return std::nullopt;
+    }
+
+    std::string_view m_section;
+};
+
+// The principal angle closest to the drawing axes: tan 2 theta = 2 Iyz / (Iz - Iy).
+double principalAngle(double iy, double iz, double iyz)
+{
+    const double scale = std::max({std::abs(iy), std::abs(iz), 1e-300});
+    if (std::abs(iyz) <= 1e-14 * scale) {
+        return 0.0;
+    }
+    double theta = 0.5 * std::atan2(2.0 * iyz, iz - iy);
+    if (theta > kPi / 4) {
+        theta -= kPi / 2;
+    } else if (theta <= -kPi / 4) {
+        theta += kPi / 2;
+    }
+    return theta;
+}
+
+// Rotates a vector of the drawing to the principal axes.
+Eigen::Vector2d toPrincipal(const Eigen::Vector2d& v, double theta)
+{
+    const double c = std::cos(theta);
+    const double s = std::sin(theta);
+    return {c * v.x() + s * v.y(), -s * v.x() + c * v.y()};
+}
+
+// Inertias, shear centre and shear areas in the principal axes.
+SectionProperties principal(const Geometric& g, double torsion, const Eigen::Vector2d& shearCentre,
+                            std::optional<double> shearAreaY, std::optional<double> shearAreaZ)
+{
+    SectionProperties p;
+    p.area = g.area;
+    p.centroid = g.centroid;
+    p.torsionConstant = torsion;
+    const double theta = principalAngle(g.iy, g.iz, g.iyz);
+    p.principalAngle = theta;
+    const double c = std::cos(theta);
+    const double s = std::sin(theta);
+    // I'z = integral of y'^2 with y' = c y + s z.
+    p.inertiaZ = c * c * g.iz + s * s * g.iy + 2.0 * s * c * g.iyz;
+    p.inertiaY = s * s * g.iz + c * c * g.iy - 2.0 * s * c * g.iyz;
+    p.shearCentre = toPrincipal(shearCentre, theta);
+    if (shearAreaY && shearAreaZ) {
+        // The shear flexibility 1/As turns as a tensor.
+        const double fy = 1.0 / *shearAreaY;
+        const double fz = 1.0 / *shearAreaZ;
+        p.shearAreaY = 1.0 / (c * c * fy + s * s * fz);
+        p.shearAreaZ = 1.0 / (s * s * fy + c * c * fz);
+    } else if (theta == 0.0) {
+        p.shearAreaY = shearAreaY;
+        p.shearAreaZ = shearAreaZ;
+    }
+    return p;
+}
+
+} // namespace
+
+Expected<SectionProperties> sectionProperties(const Section& section)
+{
+    if (!section.shape) {
+        Geometric g;
+        g.area = section.area.value_or(0.0);
+        g.iy = section.inertiaY.value_or(0.0);
+        g.iz = section.inertiaZ.value_or(0.0);
+        g.iyz = section.productOfInertia.value_or(0.0);
+        return principal(g, section.torsionConstant.value_or(0.0),
+                         section.shearCentre.value_or(Eigen::Vector2d::Zero()),
+                         section.shearAreaY, section.shearAreaZ);
+    }
+    const auto data = std::visit(ShapeBuilder(section.name), *section.shape);
+    if (!data) {
+        return tl::unexpected(data.error());
+    }
+    const Geometric g = data->exact ? *data->exact : combine(data->parts);
+    const Eigen::Vector2d shearCentre = data->shearCentreAtCentroid
+                                            ? Eigen::Vector2d::Zero().eval()
+                                            : (data->shearCentre - g.centroid).eval();
+    return principal(g, data->torsion, shearCentre, data->shearAreaY, data->shearAreaZ);
+}
+
+} // namespace fem::core

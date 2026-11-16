@@ -1,6 +1,6 @@
 #pragma once
 
-// Small bar meshes for the truss tests (feature 007). Node i (0-based) gets
+// Small bar meshes for the truss and beam tests (features 007, 008). Node i (0-based) gets
 // external id i + 1 and bar j gets id j + 1; a point group adds one Point1
 // element per node, with ids from kPointIdBase.
 

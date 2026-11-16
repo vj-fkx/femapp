@@ -1,12 +1,22 @@
 // REQ-007-01 to 07: materials, sections and the Model; resolution of the
 // element and node targets on the mesh.
 
-#include "truss_meshes.hpp"
+// GCC 13 at -O2 warns that the std::vector of the inactive NodeIds or
+// ElementIds alternative "may be used uninitialized" when a temporary holding
+// a GroupRef is moved into the model: a false positive of its variant
+// analysis.
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#endif
+
+#include "bar_meshes.hpp"
 
 #include <fem/core/model.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <Eigen/Core>
+#include <variant>
 #include <vector>
 
 using fem::core::ElementIndex;
@@ -145,4 +155,75 @@ TEST_CASE("the model is edited and copied as a value", "[core][model]")
     model.materials.erase(model.materials.begin());
     CHECK(model.findMaterial("Steel") == nullptr);
     CHECK(model.assignments.front().material == "Steel");
+}
+
+// REQ-008-09, 11 to 16: the beam items are edited and copied like the others.
+TEST_CASE("the beam items of the model are edited and copied", "[core][model]")
+{
+    Model model;
+    model.mesh = fem::core::test::trussMesh(rowSpec());
+    model.sections.push_back({.name = "Box", .shape = fem::core::RectangularTube{.b = 0.2, .h = 0.3, .t = 0.01}});
+    model.assignments.push_back({.elements = GroupRef{"left"},
+                                 .kind = fem::core::ElementKind::Beam3D,
+                                 .material = "Steel",
+                                 .section = "Box",
+                                 .theory = fem::core::BeamTheory::Timoshenko,
+                                 .reference = Eigen::Vector3d::UnitY(),
+                                 .rollAngle = 0.25});
+    model.restraints.push_back(
+        {.nodes = fem::core::NodeIds{{1}}, .dof = fem::core::DofType::RZ, .value = 1e-3});
+    model.nodalForces.push_back({.nodes = GroupRef{"middle"}, .moment = Eigen::Vector3d::UnitZ()});
+
+    fem::core::EndConnection hinge{.elements = fem::core::ElementIds{{2}},
+                                   .end = fem::core::BarEnd::End};
+    hinge.stiffness[5] = 0.0;  // Mz released
+    hinge.stiffness[4] = 5e6;  // My spring
+    model.endConnections.push_back(hinge);
+    model.rigidOffsets.push_back({.elements = fem::core::ElementIds{{1}},
+                                  .start = Eigen::Vector3d(0.1, 0.0, 0.0)});
+    model.foundations.push_back(
+        {.elements = GroupRef{"left"}, .translational = Eigen::Vector3d(0.0, 1e6, 0.0)});
+    model.distributedLoads.push_back({.elements = GroupRef{"left"},
+                                      .axes = fem::core::Axes::Local,
+                                      .startValue = Eigen::Vector3d(0.0, -1.0, 0.0),
+                                      .endValue = Eigen::Vector3d(0.0, -2.0, 0.0),
+                                      .from = {.value = 0.25, .fraction = true},
+                                      .to = {.value = 0.5, .fraction = false}});
+    model.concentratedLoads.push_back(
+        {.elements = fem::core::ElementIds{{3}}, .force = Eigen::Vector3d(0.0, 0.0, -5.0)});
+    model.temperatureGradients.push_back({.elements = GroupRef{"left"}, .alongY = 10.0});
+
+    // Defaults of the new fields.
+    const fem::core::Assignment truss{.elements = GroupRef{"left"}};
+    CHECK(truss.theory == fem::core::BeamTheory::EulerBernoulli);
+    CHECK_FALSE(truss.reference.has_value());
+    CHECK(truss.rollAngle == 0.0);
+    CHECK(model.nodalForces.front().force == Eigen::Vector3d::Zero());
+    CHECK(model.concentratedLoads.front().at.value == 0.5);
+    CHECK(model.concentratedLoads.front().at.fraction);
+    CHECK(model.distributedLoads.front().to.value == 0.5);
+    CHECK_FALSE(model.endConnections.front().stiffness[0].has_value());
+    REQUIRE(model.findSection("Box") != nullptr);
+    CHECK(std::holds_alternative<fem::core::RectangularTube>(*model.findSection("Box")->shape));
+
+    Model copy = model;
+    CHECK(copy.mesh == model.mesh);
+    copy.endConnections.front().stiffness[5] = 1e3;
+    copy.rigidOffsets.clear();
+    copy.foundations.front().torsional = 2.0;
+    copy.distributedLoads.front().axes = fem::core::Axes::Global;
+    copy.concentratedLoads.front().at = {.value = 1.0, .fraction = false};
+    copy.temperatureGradients.front().alongZ = 3.0;
+    copy.assignments.front().rollAngle = 0.0;
+    CHECK(model.endConnections.front().stiffness[5] == 0.0);
+    CHECK(model.rigidOffsets.size() == 1);
+    CHECK(model.foundations.front().torsional == 0.0);
+    CHECK(model.distributedLoads.front().axes == fem::core::Axes::Local);
+    CHECK(model.concentratedLoads.front().at.fraction);
+    CHECK(model.temperatureGradients.front().alongZ == 0.0);
+    CHECK(model.assignments.front().rollAngle == 0.25);
+
+    model.endConnections.erase(model.endConnections.begin());
+    CHECK(model.endConnections.empty());
+    CHECK(copy.endConnections.size() == 1);
 }
