@@ -16,17 +16,17 @@ Regras:
 
 ## Fase 1 — Fundações
 
-- [ ] **T01** `DofType::Warp` (8 tipos, `DofMask` de 8 bits) e o nome
+- [x] **T01** `DofType::Warp` (8 tipos, `DofMask` de 8 bits) e o nome
   "warp"; testes de `DofMap` com o novo tipo (máscara cheia, numeração por
   nó, prescrição) — arquivos: `dof_map.hpp`, `dof_map.cpp`,
   `tests/unit/core/test_dof_map.cpp` — cobre: 07, 10
-- [ ] **T02** `model.hpp`: `CurvedFormulation`, `WarpingCondition`,
+- [x] **T02** `model.hpp`: `CurvedFormulation`, `WarpingCondition`,
   `Assignment::warping` e `::curved`, `WarpingEnd` e a lista no `Model`,
   `NodalForce::bimoment`, `DistributedLoad::startTorque/endTorque`,
   `ConcentratedLoad::bimoment`; ampliar `test_model` (incluir, alterar,
   copiar) — arquivos: `model.hpp`, `tests/unit/core/test_model.cpp` — cobre:
   07, 09, 10, 12, 17
-- [ ] **T03** Testes de `matrixExponential` (ADR 0006): matrizes nilpotentes
+- [x] **T03** Testes de `matrixExponential` (ADR 0006): matrizes nilpotentes
   e diagonais contra a fórmula; rotação (e^{Ω×}) contra Rodrigues; norma
   grande com escala; sem alocação em tamanho fixo. Implementar em
   `beam_state.cpp` até passar — arquivos: `beam_state.hpp/.cpp`,

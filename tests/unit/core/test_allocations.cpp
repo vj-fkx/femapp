@@ -4,6 +4,7 @@
 // operator new to count the allocations.
 
 #include <fem/core/beam_element.hpp>
+#include <fem/core/beam_state.hpp>
 #include <fem/core/element_type.hpp>
 #include <fem/core/isoparametric.hpp>
 #include <fem/core/quadrature.hpp>
@@ -14,6 +15,7 @@
 
 #include <array>
 #include <atomic>
+#include <cmath>
 #include <cstddef>
 #include <cstdlib>
 #include <new>
@@ -140,5 +142,22 @@ TEST_CASE("the beam element does not allocate", "[core][allocations]")
     const bool computed = element.compute(nodes, 0, matrix, vector).has_value();
     gCounting = false;
     CHECK(computed);
+    CHECK(gAllocations == 0);
+}
+
+// ADR 0006: the exponential of the exact beam works on the stack.
+TEST_CASE("the matrix exponential does not allocate", "[core][allocations]")
+{
+    const int n = fem::core::kMaxStates;
+    fem::core::StateMatrix m = fem::core::StateMatrix::Zero(n, n);
+    for (int i = 0; i + 1 < n; ++i) {
+        m(i, i + 1) = 3.0;
+        m(i + 1, i) = -1.0;
+    }
+    gAllocations = 0;
+    gCounting = true;
+    const fem::core::StateMatrix e = fem::core::matrixExponential(m);
+    gCounting = false;
+    CHECK(std::isfinite(e.norm()));
     CHECK(gAllocations == 0);
 }

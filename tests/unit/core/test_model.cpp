@@ -229,3 +229,52 @@ TEST_CASE("the beam items of the model are edited and copied", "[core][model]")
     CHECK(model.endConnections.empty());
     CHECK(copy.endConnections.size() == 1);
 }
+
+// REQ-008b-07, 09, 10, 12, 17: the warping and curved-beam items are edited
+// and copied like the others.
+TEST_CASE("the warping and curved beam items of the model", "[core][model]")
+{
+    Model model;
+    model.mesh = fem::core::test::trussMesh(rowSpec());
+    model.assignments.push_back({.elements = GroupRef{"left"},
+                                 .kind = fem::core::ElementKind::Beam3D,
+                                 .material = "Steel",
+                                 .section = "I",
+                                 .warping = true,
+                                 .curved = fem::core::CurvedFormulation::Isoparametric});
+    model.restraints.push_back(
+        {.nodes = fem::core::NodeIds{{1}}, .dof = fem::core::DofType::Warp, .value = 0.0});
+    model.nodalForces.push_back({.nodes = GroupRef{"middle"}, .bimoment = 2.0});
+    model.distributedLoads.push_back(
+        {.elements = GroupRef{"left"}, .startTorque = 1.0, .endTorque = 3.0});
+    model.concentratedLoads.push_back({.elements = fem::core::ElementIds{{3}}, .bimoment = -4.0});
+    model.warpingEnds.push_back({.elements = fem::core::ElementIds{{2}},
+                                 .end = fem::core::BarEnd::Start,
+                                 .condition = fem::core::WarpingCondition::Free});
+
+    // Defaults of the new fields.
+    const fem::core::Assignment plain{.elements = GroupRef{"left"}, .material = "", .section = ""};
+    CHECK_FALSE(plain.warping);
+    CHECK(plain.curved == fem::core::CurvedFormulation::Arc);
+    const fem::core::WarpingEnd end{.elements = GroupRef{"left"}};
+    CHECK(end.end == fem::core::BarEnd::Both);
+    CHECK(end.condition == fem::core::WarpingCondition::Restrained);
+    CHECK(model.nodalForces.front().moment == Eigen::Vector3d::Zero());
+    CHECK(model.distributedLoads.front().startValue == Eigen::Vector3d::Zero());
+    CHECK(model.concentratedLoads.front().force == Eigen::Vector3d::Zero());
+
+    Model copy = model;
+    copy.assignments.front().warping = false;
+    copy.nodalForces.front().bimoment = 0.0;
+    copy.distributedLoads.front().endTorque = 0.0;
+    copy.concentratedLoads.front().bimoment = 1.0;
+    copy.warpingEnds.front().condition = fem::core::WarpingCondition::Continuous;
+    CHECK(model.assignments.front().warping);
+    CHECK(model.nodalForces.front().bimoment == 2.0);
+    CHECK(model.distributedLoads.front().endTorque == 3.0);
+    CHECK(model.concentratedLoads.front().bimoment == -4.0);
+    CHECK(model.warpingEnds.front().condition == fem::core::WarpingCondition::Free);
+
+    model.warpingEnds.clear();
+    CHECK(copy.warpingEnds.size() == 1);
+}
