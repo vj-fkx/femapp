@@ -1,6 +1,18 @@
-// REQ-008-05, 16 to 19: loads of the span and their equivalent nodal loads.
+// REQ-008-05, 15 to 19, 22: loads of the span, their equivalent nodal loads
+// and the forces along the bar.
+
+// GCC 13 at -O2 warns that the std::vector of the inactive NodeIds or
+// ElementIds alternative "may be used uninitialized" when a temporary holding
+// a GroupRef is moved into the model: a false positive of its variant
+// analysis.
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#endif
+
+#include "beam_models.hpp"
 
 #include <fem/core/beam_loads.hpp>
+#include <fem/core/beam_result.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
@@ -257,4 +269,111 @@ TEST_CASE("equivalent loads through connections and offsets", "[core][beam][load
     CHECK(near(g(1), q * kL / 2, s));
     CHECK(near(g(3), -c * q * kL / 2, s));
     CHECK(near(g(5), q * kL * kL / 12, s));
+}
+
+namespace {
+
+// A simply supported 2D beam of `pieces` bars, span kL, along x.
+fem::core::Model simpleBeam(int pieces, fem::core::BeamTheory theory)
+{
+    fem::core::test::TrussSpec spec;
+    for (int i = 0; i <= pieces; ++i) {
+        spec.nodes.emplace_back(kL * i / pieces, 0.0, 0.0);
+    }
+    for (int i = 0; i < pieces; ++i) {
+        spec.bars.push_back({i, i + 1});
+    }
+    fem::core::Model model =
+        fem::core::test::beamModel(spec, fem::core::ElementKind::Beam2D, theory);
+    fem::core::test::restrain(model, {1}, {fem::core::DofType::U, fem::core::DofType::V});
+    fem::core::test::restrain(model, {static_cast<fem::core::ExternalId>(pieces + 1)},
+                              {fem::core::DofType::V});
+    return model;
+}
+
+} // namespace
+
+// REQ-008-22: forces and deflections along the bar, exact for the span loads.
+TEST_CASE("forces and displacements along a simply supported beam", "[core][beam][loads]")
+{
+    using fem::core::test::kE;
+    using fem::core::test::kG;
+    using fem::core::test::kIz;
+    using fem::core::test::kShearArea;
+    const bool timoshenko = GENERATE(false, true);
+    const int pieces = GENERATE(1, 3);
+    const double w = 5.0e3; // downwards
+    fem::core::Model model = simpleBeam(
+        pieces, timoshenko ? fem::core::BeamTheory::Timoshenko : fem::core::BeamTheory::EulerBernoulli);
+    model.distributedLoads.push_back({.elements = fem::core::ElementIds{{1, 2, 3}},
+                                      .startValue = Eigen::Vector3d(0.0, -w, 0.0),
+                                      .endValue = Eigen::Vector3d(0.0, -w, 0.0)});
+    if (pieces == 1) {
+        model.distributedLoads.front().elements = fem::core::ElementIds{{1}};
+    }
+    const auto result = fem::core::test::solve(model);
+    const double ei = kE * kIz;
+    const double gas = timoshenko ? kG * kShearArea : 0.0;
+    const double piece = kL / pieces;
+    for (int e = 0; e < pieces; ++e) {
+        const auto& beam = fem::core::test::beamOf(result, static_cast<std::size_t>(e));
+        for (int k = 0; k <= 10; ++k) {
+            const double s = piece * k / 10.0;
+            const double x = e * piece + s;
+            const fem::core::BeamPoint p = beam.at(s);
+            const double m = w * x * (kL - x) / 2.0;
+            const double v = -w * x * (kL * kL * kL - 2 * kL * x * x + x * x * x) / (24 * ei) -
+                             (timoshenko ? w * x * (kL - x) / (2 * gas) : 0.0);
+            const double rz = -w * (kL * kL * kL - 6 * kL * x * x + 4 * x * x * x) / (24 * ei);
+            CHECK(fem::core::test::near(p.forces.mz, m, 1e-10, w * kL * kL));
+            CHECK(fem::core::test::near(p.forces.vy, -w * kL / 2 + w * x, 1e-10, w * kL));
+            CHECK(fem::core::test::near(p.displacement.y(), v, 1e-10, w * std::pow(kL, 4) / ei));
+            CHECK(fem::core::test::near(p.rotation.z(), rz, 1e-10, w * std::pow(kL, 3) / ei));
+        }
+        // The ends of the evaluation are the end forces.
+        CHECK(fem::core::test::near(beam.at(piece).forces.mz, beam.end().mz, 1e-12, w * kL * kL));
+    }
+}
+
+// REQ-008-22: the jump under a concentrated load, on either side.
+TEST_CASE("the jump under a concentrated load", "[core][beam][loads]")
+{
+    const double p = 8.0e3;
+    const double a = 1.0;
+    fem::core::Model model = simpleBeam(1, fem::core::BeamTheory::EulerBernoulli);
+    model.concentratedLoads.push_back({.elements = fem::core::ElementIds{{1}},
+                                       .force = Eigen::Vector3d(0.0, -p, 0.0),
+                                       .moment = Eigen::Vector3d(0.0, 0.0, 2.0e3),
+                                       .at = {.value = a, .fraction = false}});
+    const auto result = fem::core::test::solve(model);
+    const auto& beam = fem::core::test::beamOf(result, 0);
+    const auto before = beam.at(a, fem::core::Side::Before);
+    const auto after = beam.at(a, fem::core::Side::After);
+    CHECK(fem::core::test::near(after.forces.vy - before.forces.vy, p, 1e-12));
+    CHECK(fem::core::test::near(before.forces.mz - after.forces.mz, 2.0e3, 1e-10));
+    CHECK(fem::core::test::near(after.displacement.y(), before.displacement.y(), 1e-14, 1.0));
+    // Reaction at the left: P b / L + M / L, up; Vy(0) is minus it.
+    const double left = p * (kL - a) / kL + 2.0e3 / kL;
+    CHECK(fem::core::test::near(beam.start().vy, -left, 1e-10, p));
+    CHECK(fem::core::test::near(beam.at(0.0).forces.mz, 0.0, 1e-10, p * kL));
+    CHECK(fem::core::test::near(beam.at(kL).forces.mz, 0.0, 1e-10, p * kL));
+}
+
+// REQ-008-15, 22: with a foundation the evaluation is approximate but
+// consistent at the ends.
+TEST_CASE("forces along a beam on an elastic foundation", "[core][beam][loads]")
+{
+    fem::core::Model model = simpleBeam(4, fem::core::BeamTheory::EulerBernoulli);
+    model.foundations.push_back(
+        {.elements = fem::core::ElementIds{{1, 2, 3, 4}}, .translational = Eigen::Vector3d(0, 1e7, 0)});
+    model.distributedLoads.push_back({.elements = fem::core::ElementIds{{1, 2, 3, 4}},
+                                      .startValue = Eigen::Vector3d(0.0, -1e4, 0.0),
+                                      .endValue = Eigen::Vector3d(0.0, -1e4, 0.0)});
+    const auto result = fem::core::test::solve(model);
+    for (std::size_t e = 0; e < 4; ++e) {
+        const auto& beam = fem::core::test::beamOf(result, e);
+        const auto end = beam.at(beam.length());
+        CHECK(fem::core::test::near(end.forces.vy, beam.end().vy, 1e-6, 1e4 * kL));
+        CHECK(fem::core::test::near(end.forces.mz, beam.end().mz, 1e-6, 1e4 * kL * kL));
+    }
 }

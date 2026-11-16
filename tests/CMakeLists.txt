@@ -141,6 +141,11 @@ add_executable(bench_truss perf/bench_truss.cpp)
 target_link_libraries(bench_truss PRIVATE fem::core)
 femapp_set_warnings(bench_truss)
 
+# NFR-008-02: frame analysis benchmark, run by hand on a Release build.
+add_executable(bench_frame perf/bench_frame.cpp)
+target_link_libraries(bench_frame PRIVATE fem::core)
+femapp_set_warnings(bench_frame)
+
 # REQ-004-03: command line parsing of the application, built on its own.
 add_executable(test_app unit/app/test_cli_options.cpp "${PROJECT_SOURCE_DIR}/src/app/cli_options.cpp")
 target_include_directories(test_app PRIVATE "${PROJECT_SOURCE_DIR}/src/app")

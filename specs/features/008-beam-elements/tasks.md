@@ -137,11 +137,11 @@ Regras:
 
   — arquivos: `static_analysis.hpp/.cpp`, `beam_result.hpp/.cpp`,
   `test_beam_verification.cpp` — cobre: 20, 21, 25, 26
-- [ ] **T20** Benchmark `bench_frame`: edifício de 11 × 11 pilares e 41
+- [x] **T20** Benchmark `bench_frame`: edifício de 11 × 11 pilares e 41
   níveis (cerca de 30 mil GDL); registrar a medição abaixo. Se passar de
   5 s, parar e propor a revisão do NFR-008-02 — arquivos:
   `tests/perf/bench_frame.cpp`, `tests/CMakeLists.txt` — cobre: N02
-- [ ] **T21** Testes e implementação de `BeamResult::at`:
+- [x] **T21** Testes e implementação de `BeamResult::at`:
   - esforços, rotações e deslocamentos ao longo da barra, com os saltos das
     concentradas (`Side`);
   - com base elástica, a reação interpolada.
@@ -246,3 +246,33 @@ Regras:
 | NFR-008-01 | T22 a T30 | `test_beam_verification`, `test_beam_loads`, `test_beam_connections`, `test_section` |
 | NFR-008-02 | T20 | `bench_frame` |
 | NFR-008-03 | T90 | Job de cobertura no CI |
+
+## Notas de implementação
+
+**2026-11-16 — T02/T03:** dois ajustes no design, registrados no §5.1:
+
+- o sinal da fórmula do ângulo principal estava trocado (tan 2θp = 2Iyz/(Iz − Iy));
+- a tolerância do J de perfis abertos contra tabelas foi de 15% para 25%: no
+  IPE 300, as placas sem raios de concordância dão J 22% menor que a tabela.
+
+**2026-11-16 — T04:** o GCC 13 acusa `-Wmissing-field-initializers` em
+inicializadores designados que omitem campos sem inicializador padrão; os
+campos novos de `Section`, `Assignment` e `EndConnection` ganharam `{}`.
+
+**2026-11-16 — T18:** uma viga com problema próprio (vetor paralelo, trecho
+flexível nulo, liberações instáveis) continua dando GDL aos seus nós, para que
+os apoios ali não virem problemas em cascata.
+
+**2026-11-16 — T20 (`bench_frame`, Release, máquina do mantenedor):**
+edifício de pilares em tubo retangular e vigas em I nas duas direções, base
+engastada, peso próprio e vento no topo. Tempo de `runLinearStatic`
+(validação, montagem, fatoração, solução, reações e esforços de extremidade):
+
+| Vãos | Pavimentos | Nós | Barras | GDL livres | Tempo |
+|------|-----------|-----|--------|-----------|-------|
+| 6 × 6 | 20 | 1 029 | 2 660 | 5 880 | 0,12 s |
+| 8 × 8 | 30 | 2 511 | 6 750 | 14 580 | 0,70 s |
+| 10 × 10 | 40 | 4 961 | 13 640 | 29 040 | 3,2 a 3,5 s (meta: < 5 s) |
+| 12 × 12 | 50 | 8 619 | 24 050 | 50 700 | 13 s |
+
+A estimativa do design (2 a 4 s) se confirmou. A validação leva 23 ms.
