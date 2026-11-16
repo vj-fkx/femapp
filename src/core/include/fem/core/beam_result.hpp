@@ -71,7 +71,8 @@ private:
 struct PointStress
 {
     std::string name;
-    double normal = 0.0;   // N/A - Mz y'/Iz + My z'/Iy
+    Eigen::Vector2d position = Eigen::Vector2d::Zero(); // principal (y', z'), from the centroid
+    double normal = 0.0;                                // N/A - Mz y'/Iz + My z'/Iy
     double shear = 0.0;    // |tau_V| + |tau_T|: the sum is on the safe side
     double vonMises = 0.0; // sqrt(sigma^2 + 3 tau^2)
 };
@@ -80,6 +81,20 @@ struct PointStress
 // section or an impossible shape.
 [[nodiscard]] std::vector<PointStress> sectionStresses(const Section& section,
                                                        const BeamForces& forces);
+// The same for a solved section (REQ-008b-06): for a solid polygon, the
+// shear at its vertices comes from the warping and shear functions, and is
+// the size of the shear stress vector.
+[[nodiscard]] std::vector<PointStress> sectionStresses(const SectionSolution& solution,
+                                                       const BeamForces& forces);
+
+// REQ-008b-06, solid polygon only: the stresses at a point (y, z) of the
+// drawing, and the point of largest von Mises over the mesh (its corner and
+// mid-side nodes, in each triangle). Without a solid polygon, only the
+// normal stress.
+[[nodiscard]] PointStress stressAt(const SectionSolution& solution, const BeamForces& forces,
+                                   const Eigen::Vector2d& point);
+[[nodiscard]] PointStress largestVonMises(const SectionSolution& solution,
+                                          const BeamForces& forces);
 
 // The normal stress at a point (y, z) of the local axes of the bar, from the
 // centroid: for any section, the generic one included.

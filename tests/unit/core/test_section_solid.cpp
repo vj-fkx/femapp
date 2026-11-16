@@ -1,5 +1,6 @@
 // REQ-008b-02, NFR-008b-02: solid polygon sections (design 008b §5.1.3).
 
+#include <fem/core/beam_result.hpp>
 #include <fem/core/section.hpp>
 
 #include <catch2/catch_test_macros.hpp>
@@ -202,4 +203,51 @@ TEST_CASE("solved sections", "[core][section][solid]")
     REQUIRE_FALSE(bad.has_value());
     CHECK(bad.error().message ==
           "Section \"B\": the outline of the region 0 has fewer than three vertices.");
+}
+
+// REQ-008b-06: the stresses of a solid polygon from its fields.
+TEST_CASE("stresses of solid polygons", "[core][section][solid]")
+{
+    const double h = 0.5;
+    const double b = 0.2;
+    const auto solved = fem::core::solveSection(
+        {.name = "R", .shape = solid(rectangle(-h / 2, -b / 2, h / 2, b / 2))});
+    REQUIRE(solved.has_value());
+    const fem::core::SectionSolution& solution = **solved;
+    const SectionProperties& p = solution.properties();
+
+    SECTION("torsion: the largest shear at the middle of the long sides")
+    {
+        const fem::core::BeamForces torque{.t = 100.0};
+        const fem::core::PointStress largest = fem::core::largestVonMises(solution, torque);
+        const auto points = fem::core::stressPoints(fem::core::Rectangle{.b = b, .h = h});
+        const auto side = std::ranges::find_if(points, [](const fem::core::StressPoint& point) {
+            return point.name == "middle of the side +z";
+        });
+        REQUIRE(side != points.end());
+        CHECK(near(largest.shear, 100.0 * side->torsionFactor, 0.01));
+        CHECK(std::abs(largest.position.x()) <= 0.01 * h);
+        CHECK(near(std::abs(largest.position.y()), b / 2, 1e-12));
+    }
+    SECTION("shear force: 3V / 2A at the centroid")
+    {
+        const fem::core::BeamForces shear{.vy = 1000.0};
+        CHECK(near(fem::core::stressAt(solution, shear, Vec::Zero()).shear, 1.5 * 1000.0 / p.area,
+                   0.01));
+        CHECK(fem::core::stressAt(solution, shear, Vec(h / 2, 0.0)).shear <=
+              0.01 * 1500.0 / p.area);
+    }
+    SECTION("normal stress at the vertices, exact")
+    {
+        const fem::core::BeamForces forces{.n = 5e3, .my = 2e2, .mz = -3e2};
+        const auto stresses = fem::core::sectionStresses(solution, forces);
+        REQUIRE(stresses.size() == 4);
+        for (const fem::core::PointStress& s : stresses) {
+            const double expected = 5e3 / p.area - (-3e2) * s.position.x() / p.inertiaZ +
+                                    2e2 * s.position.y() / p.inertiaY;
+            CHECK(near(s.normal, expected, 1e-10));
+            CHECK(near(std::abs(s.position.x()), h / 2, 1e-12));
+        }
+        CHECK(stresses.front().name == "vertex 0 of the outline of the region 0");
+    }
 }

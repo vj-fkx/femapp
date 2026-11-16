@@ -134,8 +134,8 @@ double channelWarping(double b, double tf, double h0, double tw, double e)
 }
 
 // Closed box on the mid-lines (b0 x h0, wall t): the normalised sectorial
-// coordinate is zero at mid-sides and +-b0 h0 (b0 - h0) / (4 (b0 + h0)) at
-// the corners.
+// coordinate is zero at mid-sides and b0 h0 (h0 - b0) / (4 (b0 + h0)) at the
+// corners where y z > 0 (the opposite where y z < 0).
 double boxWarping(double b0, double h0, double t)
 {
     return t * b0 * b0 * h0 * h0 * std::pow(b0 - h0, 2) / (24.0 * (b0 + h0));
@@ -143,7 +143,7 @@ double boxWarping(double b0, double h0, double t)
 
 double boxCornerSectorial(double b0, double h0)
 {
-    return b0 * h0 * (b0 - h0) / (4.0 * (b0 + h0));
+    return b0 * h0 * (h0 - b0) / (4.0 * (b0 + h0));
 }
 
 // Shear centre of the channel behind the web mid-line (Roark, table 10.1).
@@ -593,9 +593,61 @@ public:
         return std::move(m_points);
     }
 
-    // The thin-walled points come with the stresses (task T12 of 008b).
-    std::vector<StressPoint> operator()(const ThinWalled& /*s*/) { return {}; }
-    std::vector<StressPoint> operator()(const SolidPolygon& /*s*/) { return {}; }
+    // REQ-008b-06: both faces of each wall at its two ends. tau = V q / t
+    // with the flow q of a unit shear force, written as Q = |q| I; the
+    // torsion: T t / J on the open branches, T q / (J t) in the cells.
+    std::vector<StressPoint> operator()(const ThinWalled& s)
+    {
+        const auto thin = detail::thinWalled(s, "");
+        if (!thin) {
+            return {};
+        }
+        const double j = m_p.torsionConstant;
+        for (std::size_t w = 0; w < s.walls.size(); ++w) {
+            const ThinWalled::Wall& wall = s.walls[w];
+            const std::array<int, 2> ends = {wall.from, wall.to};
+            const Eigen::Vector2d a = s.points[static_cast<std::size_t>(wall.from)];
+            const Eigen::Vector2d b = s.points[static_cast<std::size_t>(wall.to)];
+            const Eigen::Vector2d d = (b - a).normalized();
+            const Eigen::Vector2d normal(-d.y(), d.x());
+            const double torsion =
+                thin->inCell[w] ? std::abs(thin->torsionFlow[w]) / (j * wall.t) : wall.t / j;
+            for (std::size_t e = 0; e < 2; ++e) {
+                const auto point = static_cast<std::size_t>(ends.at(e));
+                const Eigen::Vector2d p = s.points[point];
+                for (const double side : {1.0, -1.0}) {
+                    const Eigen::Vector2d q = p + side * wall.t / 2 * normal;
+                    add("wall " + std::to_string(w) + (e == 0 ? " start" : " end") +
+                            (side > 0 ? ", face +" : ", face -"),
+                        q.x(), q.y(), std::abs(thin->shearFlowY[w].at(e)) * m_p.inertiaZ, wall.t,
+                        std::abs(thin->shearFlowZ[w].at(e)) * m_p.inertiaY, wall.t, torsion,
+                        thin->sectorial[point]);
+                }
+            }
+        }
+        return std::move(m_points);
+    }
+
+    // REQ-008b-06: the vertices; their shear comes from the fields of the
+    // solution (sectionStresses).
+    std::vector<StressPoint> operator()(const SolidPolygon& s)
+    {
+        for (std::size_t r = 0; r < s.regions.size(); ++r) {
+            const auto& region = s.regions[r];
+            const std::string where = " of the region " + std::to_string(r);
+            for (std::size_t k = 0; k < region.outline.size(); ++k) {
+                add("vertex " + std::to_string(k) + " of the outline" + where,
+                    region.outline[k].x(), region.outline[k].y(), 0.0, 0.0, 0.0, 0.0, 0.0);
+            }
+            for (std::size_t h = 0; h < region.holes.size(); ++h) {
+                for (std::size_t k = 0; k < region.holes[h].size(); ++k) {
+                    add("vertex " + std::to_string(k) + " of the hole " + std::to_string(h) + where,
+                        region.holes[h][k].x(), region.holes[h][k].y(), 0.0, 0.0, 0.0, 0.0, 0.0);
+                }
+            }
+        }
+        return std::move(m_points);
+    }
 
     std::vector<StressPoint> operator()(const Tee& s)
     {

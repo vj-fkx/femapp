@@ -166,3 +166,8 @@ set_tests_properties(femapp_smoke_mesh PROPERTIES
     TIMEOUT 30
     ENVIRONMENT "FEM_RHI_BACKEND=null"
     PASS_REGULAR_EXPRESSION "smoke test: mesh rendered")
+
+# NFR-008b-02: solid polygon section benchmark, run by hand on a Release build.
+add_executable(bench_section perf/bench_section.cpp)
+target_link_libraries(bench_section PRIVATE fem::core)
+femapp_set_warnings(bench_section)

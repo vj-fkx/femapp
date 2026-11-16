@@ -75,8 +75,10 @@ public:
         out.warping = m_warping;
         out.sectorial = m_omega;
         const double theta = principalAngle(m_geometry.iy, m_geometry.iz, m_geometry.iyz);
-        out.shearAreaY = shearArea(theta, true);
-        out.shearAreaZ = shearArea(theta, false);
+        out.shearAreaY = shearArea(theta, true, out.shearFlowY);
+        out.shearAreaZ = shearArea(theta, false, out.shearFlowZ);
+        out.torsionFlow = m_wallTorsionFlow;
+        out.inCell = m_inCell;
         return out;
     }
 
@@ -374,8 +376,10 @@ private:
     // The shear flow of a unit shear force along a principal axis (y' or z'),
     // open on the tree with the cell walls cut at their `to` end, closed by
     // circulating flows of no twist; As = V^2 / integral of q^2 / t ds.
-    [[nodiscard]] double shearArea(double theta, bool alongY) const
+    [[nodiscard]] double shearArea(double theta, bool alongY,
+                                   std::vector<std::array<double, 2>>& endFlows) const
     {
+        endFlows.assign(wallCount(), {0.0, 0.0});
         std::vector<double> f(pointCount(), 0.0); // the principal coordinate
         double inertia = 0.0;
         for (std::size_t p = 0; p < pointCount(); ++p) {
@@ -443,6 +447,7 @@ private:
             for (Eigen::Index c = 0; c < n; ++c) {
                 closing += signIn(static_cast<std::size_t>(c), w) * circulation(c);
             }
+            endFlows[w] = {open(w, 0.0) + closing, open(w, 1.0) + closing};
             double integral = 0.0;
             for (std::size_t g = 0; g < kGaussPoints.size(); ++g) {
                 const double q = open(w, kGaussPoints.at(g)) + closing;

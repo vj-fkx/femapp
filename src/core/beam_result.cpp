@@ -1,3 +1,5 @@
+#include "detail/section_detail.hpp"
+
 #include <fem/core/beam_result.hpp>
 
 #include <algorithm>
@@ -205,27 +207,153 @@ double normalStress(const SectionProperties& section, const BeamForces& forces,
                     Eigen::Vector2d(c * point.x() + s * point.y(), -s * point.x() + c * point.y()));
 }
 
+namespace {
+
+Eigen::Vector2d fromPrincipal(const Eigen::Vector2d& v, double theta)
+{
+    const double c = std::cos(theta);
+    const double s = std::sin(theta);
+    return {c * v.x() - s * v.y(), s * v.x() + c * v.y()};
+}
+
+// The stresses in one triangle of a solid section at area coordinates l:
+// tau = (T / J)(grad phi + (-z, y)) + (Vy / I'z) grad chiY + (Vz / I'y) grad chiZ,
+// with the gradients of chi along the principal axes.
+PointStress solidStress(const SectionProperties& p, const detail::SolidField& field,
+                        const detail::SolidElement& element, const std::array<double, 3>& l,
+                        const BeamForces& forces)
+{
+    const detail::SolidShape s = detail::solidShape(element, l);
+    Eigen::Vector2d gradPhi = Eigen::Vector2d::Zero();
+    Eigen::Vector2d gradY = Eigen::Vector2d::Zero();
+    Eigen::Vector2d gradZ = Eigen::Vector2d::Zero();
+    for (Eigen::Index i = 0; i < 6; ++i) {
+        const auto node = static_cast<Eigen::Index>(element.nodes.at(static_cast<std::size_t>(i)));
+        gradPhi += field.phi(node) * s.gradient.col(i);
+        gradY += field.chiY(node) * s.gradient.col(i);
+        gradZ += field.chiZ(node) * s.gradient.col(i);
+    }
+    const Eigen::Vector2d r = s.position - field.centroid;
+    const Eigen::Vector2d tau =
+        forces.t / p.torsionConstant * (gradPhi + Eigen::Vector2d(-r.y(), r.x())) +
+        forces.vy / p.inertiaZ * gradY + forces.vz / p.inertiaY * gradZ;
+    PointStress stress;
+    stress.position = detail::toPrincipal(r, p.principalAngle);
+    stress.normal = normalAt(p, forces, stress.position);
+    stress.shear = tau.norm();
+    stress.vonMises = std::sqrt(stress.normal * stress.normal + 3.0 * stress.shear * stress.shear);
+    return stress;
+}
+
+// The triangle that holds a point of the drawing and its area coordinates;
+// the closest one for a point just outside.
+std::pair<std::size_t, std::array<double, 3>> locate(const detail::SolidField& field,
+                                                     const Eigen::Vector2d& point)
+{
+    std::size_t best = 0;
+    std::array<double, 3> bestL = {1.0, 0.0, 0.0};
+    double bestOutside = 1e300;
+    for (std::size_t t = 0; t < field.mesh.triangles.size(); ++t) {
+        const detail::SolidElement e = detail::solidElement(field.mesh, t);
+        std::array<double, 3> l{};
+        double outside = 0.0;
+        for (std::size_t i = 0; i < 3; ++i) {
+            l.at(i) = 1.0 / 3.0 +
+                      e.gradL.at(i).dot(point - (e.corners[0] + e.corners[1] + e.corners[2]) / 3.0);
+            outside = std::max(outside, -l.at(i));
+        }
+        if (outside < bestOutside) {
+            bestOutside = outside;
+            best = t;
+            bestL = l;
+        }
+        if (outside <= 0.0) {
+            break;
+        }
+    }
+    return {best, bestL};
+}
+
+} // namespace
+
+PointStress stressAt(const SectionSolution& solution, const BeamForces& forces,
+                     const Eigen::Vector2d& point)
+{
+    const SectionProperties& p = solution.properties();
+    const detail::SolidField* field = solution.field();
+    if (field == nullptr) {
+        PointStress stress;
+        stress.position = detail::toPrincipal(point - p.centroid, p.principalAngle);
+        stress.normal = normalAt(p, forces, stress.position);
+        stress.vonMises = std::abs(stress.normal);
+        return stress;
+    }
+    const auto [triangle, l] = locate(*field, point);
+    return solidStress(p, *field, detail::solidElement(field->mesh, triangle), l, forces);
+}
+
+PointStress largestVonMises(const SectionSolution& solution, const BeamForces& forces)
+{
+    const detail::SolidField* field = solution.field();
+    if (field == nullptr) {
+        return {};
+    }
+    constexpr std::array<std::array<double, 3>, 6> kNodes = {{{1.0, 0.0, 0.0},
+                                                              {0.0, 1.0, 0.0},
+                                                              {0.0, 0.0, 1.0},
+                                                              {0.5, 0.5, 0.0},
+                                                              {0.0, 0.5, 0.5},
+                                                              {0.5, 0.0, 0.5}}};
+    PointStress largest;
+    largest.vonMises = -1.0;
+    for (std::size_t t = 0; t < field->mesh.triangles.size(); ++t) {
+        const detail::SolidElement e = detail::solidElement(field->mesh, t);
+        for (const auto& l : kNodes) {
+            PointStress stress = solidStress(solution.properties(), *field, e, l, forces);
+            if (stress.vonMises > largest.vonMises) {
+                largest = std::move(stress);
+            }
+        }
+    }
+    largest.name = "largest von Mises";
+    return largest;
+}
+
 std::vector<PointStress> sectionStresses(const Section& section, const BeamForces& forces)
 {
     if (!section.shape) {
         return {};
     }
-    const auto properties = sectionProperties(section);
-    if (!properties) {
+    const auto solution = solveSection(section);
+    if (!solution) {
         return {};
     }
+    return sectionStresses(**solution, forces);
+}
+
+std::vector<PointStress> sectionStresses(const SectionSolution& solution, const BeamForces& forces)
+{
+    const SectionProperties& p = solution.properties();
     std::vector<PointStress> stresses;
-    for (const StressPoint& point : stressPoints(*section.shape)) {
+    for (const StressPoint& point : solution.points()) {
+        if (solution.field() != nullptr) {
+            PointStress stress = stressAt(
+                solution, forces, p.centroid + fromPrincipal(point.position, p.principalAngle));
+            stress.name = point.name;
+            stresses.push_back(std::move(stress));
+            continue;
+        }
         PointStress stress;
         stress.name = point.name;
-        stress.normal = normalAt(*properties, forces, point.position);
+        stress.position = point.position;
+        stress.normal = normalAt(p, forces, point.position);
         if (point.thicknessY > 0.0) {
-            stress.shear += std::abs(forces.vy) * point.firstMomentY /
-                            (properties->inertiaZ * point.thicknessY);
+            stress.shear +=
+                std::abs(forces.vy) * point.firstMomentY / (p.inertiaZ * point.thicknessY);
         }
         if (point.thicknessZ > 0.0) {
-            stress.shear += std::abs(forces.vz) * point.firstMomentZ /
-                            (properties->inertiaY * point.thicknessZ);
+            stress.shear +=
+                std::abs(forces.vz) * point.firstMomentZ / (p.inertiaY * point.thicknessZ);
         }
         stress.shear += std::abs(forces.t) * point.torsionFactor;
         stress.vonMises =

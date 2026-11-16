@@ -1,6 +1,7 @@
 // REQ-008b-03, 04: thin-walled sections by their mid-line (design 008b
 // §5.1.2), against the classic thin-walled formulas.
 
+#include <fem/core/beam_result.hpp>
 #include <fem/core/section.hpp>
 
 #include <catch2/catch_test_macros.hpp>
@@ -288,4 +289,88 @@ TEST_CASE("invalid thin-walled sections are refused", "[core][section][thin]")
     u.points.emplace_back(1.0, 2.0);
     u.walls.push_back(Wall{.from = 4, .to = 5, .t = 0.01});
     CHECK(failure(u) == "Section \"T\": the walls are not connected (the wall 3 is apart).");
+}
+
+namespace {
+
+fem::core::StressPoint pointNamed(const ThinWalled& shape, const std::string& name)
+{
+    const auto points = fem::core::stressPoints(shape);
+    const auto found = std::ranges::find_if(
+        points, [&name](const fem::core::StressPoint& p) { return p.name == name; });
+    REQUIRE(found != points.end());
+    return *found;
+}
+
+fem::core::PointStress stressNamed(const ThinWalled& shape, const fem::core::BeamForces& forces,
+                                   const std::string& name)
+{
+    const auto stresses = fem::core::sectionStresses({.name = "T", .shape = shape}, forces);
+    const auto found = std::ranges::find_if(
+        stresses, [&name](const fem::core::PointStress& p) { return p.name == name; });
+    REQUIRE(found != stresses.end());
+    return *found;
+}
+
+} // namespace
+
+// REQ-008b-01, 03: the sectorial coordinate of the mid-line agrees with the
+// parametric shapes, signs included.
+TEST_CASE("sectorial coordinates of thin-walled sections", "[core][section][thin]")
+{
+    const auto parametric = [](const fem::core::SectionShape& shape, const std::string& name) {
+        const auto points = fem::core::stressPoints(shape);
+        const auto found = std::ranges::find_if(
+            points, [&name](const fem::core::StressPoint& p) { return p.name == name; });
+        REQUIRE(found != points.end());
+        return found->sectorial;
+    };
+    const double b = 0.07;
+    const double h0 = 0.19;
+    const double tf = 0.0115;
+    const double tw = 0.0085;
+    const fem::core::Channel u{.h = h0 + tf, .bf = b + tw / 2, .tf = tf, .tw = tw};
+    CHECK(near(pointNamed(channel(b, h0, tf, tw), "wall 0 start, face +").sectorial,
+               parametric(u, "flange tip +y"), 1e-12));
+    CHECK(near(pointNamed(channel(b, h0, tf, tw), "wall 0 end, face +").sectorial,
+               parametric(u, "web back +y"), 1e-12));
+
+    const double b0 = 0.29;
+    const double h0box = 0.19;
+    const fem::core::RectangularTube tube{.b = b0 + 0.01, .h = h0box + 0.01, .t = 0.01};
+    // Point 0 is (h0/2, -b0/2).
+    CHECK(near(pointNamed(box(b0, h0box, 0.01), "wall 0 start, face +").sectorial,
+               parametric(tube, "corner +y -z"), 1e-12));
+}
+
+// REQ-008b-06: the stresses at both faces of the walls.
+TEST_CASE("stresses of thin-walled sections", "[core][section][thin]")
+{
+    const double bf = 0.2;
+    const double h0 = 0.4;
+    const double tf = 0.015;
+    const double tw = 0.01;
+    const ThinWalled i{
+        .points = {Vec(h0 / 2, -bf / 2), Vec(h0 / 2, 0.0), Vec(h0 / 2, bf / 2),
+                   Vec(-h0 / 2, -bf / 2), Vec(-h0 / 2, 0.0), Vec(-h0 / 2, bf / 2)},
+        .walls = {Wall{.from = 0, .to = 1, .t = tf}, Wall{.from = 1, .to = 2, .t = tf},
+                  Wall{.from = 3, .to = 4, .t = tf}, Wall{.from = 4, .to = 5, .t = tf},
+                  Wall{.from = 1, .to = 4, .t = tw}}};
+    const SectionProperties p = of(i);
+    const fem::core::BeamForces shear{.vy = 1000.0};
+    // The web takes the flow of both half flanges at the junction.
+    CHECK(near(stressNamed(i, shear, "wall 4 start, face +").shear,
+               1000.0 * bf * tf * h0 / 2 / (p.inertiaZ * tw), 1e-12));
+    CHECK(stressNamed(i, shear, "wall 0 start, face -").shear <= 1e-9);
+    const fem::core::BeamForces torque{.t = 50.0};
+    CHECK(near(stressNamed(i, torque, "wall 1 end, face +").shear, 50.0 * tf / p.torsionConstant,
+               1e-12));
+    const fem::core::BeamForces bending{.n = 1e4, .mz = 2e3};
+    const auto corner = stressNamed(i, bending, "wall 1 end, face +");
+    CHECK(near(corner.normal, 1e4 / p.area - 2e3 * corner.position.x() / p.inertiaZ, 1e-12));
+
+    // Bredt: T / (2 Am t) all around the box.
+    const ThinWalled tube = box(0.29, 0.19, 0.01);
+    CHECK(near(stressNamed(tube, torque, "wall 2 start, face -").shear,
+               50.0 / (2 * 0.29 * 0.19 * 0.01), 1e-12));
 }

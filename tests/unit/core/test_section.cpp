@@ -412,7 +412,7 @@ TEST_CASE("warping constants and sectorial coordinates of the shapes", "[core][s
         const double h0 = 0.19;
         CHECK(near(of(box).warpingConstant,
                    0.01 * b0 * b0 * h0 * h0 * std::pow(b0 - h0, 2) / (24 * (b0 + h0)), 1e-12));
-        const double corner = b0 * h0 * (b0 - h0) / (4 * (b0 + h0));
+        const double corner = b0 * h0 * (h0 - b0) / (4 * (b0 + h0));
         CHECK(near(point(box, "corner +y +z").sectorial, corner, 1e-12));
         CHECK(near(point(box, "corner -y +z").sectorial, -corner, 1e-12));
         // A square tube does not warp.

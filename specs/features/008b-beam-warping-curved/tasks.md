@@ -66,12 +66,12 @@ Regras:
 - [x] **T11** Implementar `section_solid.cpp` (empenamento, Trefftz, Iw,
   funções de cisalhamento de Pilkey) e `SectionSolution`/`solveSection`;
   `sectionProperties` passa a chamar `solveSection` — cobre: 02, 05
-- [ ] **T12** Testes e implementação das tensões das seções novas: na
+- [x] **T12** Testes e implementação das tensões das seções novas: na
   poligonal, `stressAt` e `largestVonMises` (retângulo sob torção: máximo no
   meio do lado maior contra a série); nas paredes finas, as duas faces nos
   pontos e nós da linha média contra as fórmulas — arquivos:
   `section_solid.cpp`, `section_thin_walled.cpp`, testes — cobre: 06
-- [ ] **T13** [P] Benchmark `bench_section`: polígono de 200 vértices com o
+- [x] **T13** [P] Benchmark `bench_section`: polígono de 200 vértices com o
   tamanho padrão, tempo registrado nas notas — arquivos:
   `tests/perf/bench_section.cpp`, `tests/CMakeLists.txt` — cobre: N02
 
@@ -224,4 +224,31 @@ Regras:
 
 ## Notas de implementação
 
-(vazio)
+**Fase 2 — Seções (T04 a T13):**
+
+- T04: o Iw do perfil U é conferido contra a fórmula fechada de Galambos
+  (1e−12), e não contra tabelas: os UPN laminados têm mesas inclinadas e
+  não seguem a idealização de linha média. O IPE 300 bate com a tabela
+  (125,9·10³ cm⁶) em 1%.
+- T05/T12: a comparação entre a seção de paredes finas e o tubo
+  retangular paramétrico mostrou o sinal de ω nos cantos do tubo trocado; o
+  certo é ω = b₀h₀(h₀ − b₀)/(4(b₀ + h₀)) onde y·z > 0, corrigido.
+- T07: numa seção de paredes finas toda numa reta (placa), a inércia
+  transversal é nula; o centro de cisalhamento sai da solução de norma
+  mínima (fica na reta) e a área de cisalhamento transversal é 0 (a viga
+  recusa Iy = 0 de qualquer modo).
+- T10/T11: com o tamanho padrão, J do retângulo fica a 1,5·10⁻⁷ da série,
+  As dá 5/6 e 6/7 (Cowper, ν = 0) a 10⁻⁵, e J converge com h⁴. Tolerâncias
+  contra as paredes finas: Iw do I 1% (observado 0,07%), centro de
+  cisalhamento do U 1% (0,4%), Iw do U 2% (0,5%). Na placa fina, o Iw
+  numérico fica a menos de 5% de b³h³/144; num retângulo compacto (0,2 ×
+  0,5) a fórmula de placa dá o dobro do valor numérico, o que confirma que
+  ela é só uma estimativa pequena para a forma paramétrica.
+- T12: `stressAt`, `largestVonMises` e `sectionStresses(SectionSolution)`
+  ficaram como funções livres em `beam_result.hpp`, e não como métodos da
+  `SectionSolution` (design §4): `BeamForces` e `PointStress` moram em
+  `beam_result.hpp`, que já inclui `section.hpp`. `PointStress` ganhou a
+  posição (eixos principais), para o máximo de von Mises. Na poligonal, o
+  cisalhamento é o módulo do vetor (exato), não a soma dos módulos.
+- T13: `bench_section` (200 + 48 vértices, tamanho padrão) em 0,17 a
+  0,19 s em Release (meta: 0,5 s).

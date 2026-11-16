@@ -45,6 +45,14 @@ struct ThinWalledData
     // Per point: omega about the shear centre, normalised (0 for a point
     // that no wall uses).
     std::vector<double> sectorial;
+    // Per wall, at its `from` and `to` ends, along `from` to `to`: the shear
+    // flow of a unit shear force along y' and along z' (REQ-008b-06).
+    std::vector<std::array<double, 2>> shearFlowY;
+    std::vector<std::array<double, 2>> shearFlowZ;
+    // Per wall: the torsion flow of the cells for a unit twist rate and G = 1
+    // (0 on the open branches), and whether the wall is in a cell.
+    std::vector<double> torsionFlow;
+    std::vector<bool> inCell;
 };
 
 // Fails, naming the section and the point or wall, for an invalid mid-line
