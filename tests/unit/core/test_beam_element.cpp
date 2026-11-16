@@ -103,7 +103,7 @@ BeamMatrix textbook(const BeamData& beam, double l)
 BeamMatrix rotation(const Eigen::Matrix3d& axes)
 {
     BeamMatrix t = BeamMatrix::Zero();
-    for (int i = 0; i < 4; ++i) {
+    for (Eigen::Index i = 0; i < 4; ++i) {
         t.block<3, 3>(3 * i, 3 * i) = axes.transpose();
     }
     return t;
@@ -237,7 +237,7 @@ TEST_CASE("beam stiffness is invariant under rotation", "[core][beam]")
                     .value_or(Eigen::Matrix3d::Identity());
     const Eigen::MatrixXd rotated = compute(ElementKind::Beam3D, beam, r * a, r * b);
     BeamMatrix t = BeamMatrix::Zero();
-    for (int i = 0; i < 4; ++i) {
+    for (Eigen::Index i = 0; i < 4; ++i) {
         t.block<3, 3>(3 * i, 3 * i) = r;
     }
     CHECK(relativeNorm(rotated, t * original * t.transpose()) <= 1e-12);
@@ -269,7 +269,7 @@ TEST_CASE("2D beam stiffness and rigid modes", "[core][beam]")
 // REQ-008-07: Timoshenko tends to Euler-Bernoulli without locking.
 TEST_CASE("a Timoshenko beam with stiff shear is an Euler-Bernoulli beam", "[core][beam]")
 {
-    BeamData euler = sampleBeam();
+    const BeamData euler = sampleBeam();
     BeamData stiff = euler;
     stiff.shearY = stiff.shearZ = 1e12 * euler.axial;
     const Eigen::Vector3d a(0.0, 0.0, 0.0);

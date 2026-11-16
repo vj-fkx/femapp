@@ -604,7 +604,7 @@ TEST_CASE("convergence on an elastic foundation", "[core][beam][verification]")
         return j % 2 == 0 ? value.real() : value.imag();
     };
     Eigen::Matrix4d a;
-    Eigen::Vector4d rhs(0.0, p / 2 / ei, 0.0, 0.0);
+    const Eigen::Vector4d rhs(0.0, p / 2 / ei, 0.0, 0.0);
     for (int j = 0; j < 4; ++j) {
         a(0, j) = basis(j, 1, 0.0);
         a(1, j) = basis(j, 3, 0.0);
@@ -631,7 +631,7 @@ TEST_CASE("convergence on an elastic foundation", "[core][beam][verification]")
             all.ids.push_back(i);
         }
         model.foundations.push_back({.elements = all, .translational = Eigen::Vector3d(0, k, 0)});
-        const auto centre = static_cast<fem::core::ExternalId>(n / 2 + 1);
+        const auto centre = static_cast<fem::core::ExternalId>(n) / 2 + 1;
         fem::core::test::restrain(model, {centre}, {DofType::U});
         model.nodalForces.push_back(
             {.nodes = fem::core::NodeIds{{centre}}, .force = Eigen::Vector3d(0, -p, 0)});

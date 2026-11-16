@@ -6,6 +6,7 @@
 #include <numbers>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace fem::core {
@@ -27,6 +28,11 @@ struct Part
     double z1 = 0.0;
     double sign = 1.0;
 };
+
+Part rect(double y0, double y1, double z0, double z1, double sign)
+{
+    return {.y0 = y0, .y1 = y1, .z0 = z0, .z1 = z1, .sign = sign};
+}
 
 // Area, centroid and second moments about the centroid, in the drawing.
 struct Geometric
@@ -115,7 +121,7 @@ public:
             return makeError(*bad);
         }
         ShapeData d;
-        d.parts = {{-s.h / 2, s.h / 2, -s.b / 2, s.b / 2, 1.0}};
+        d.parts = {rect(-s.h / 2, s.h / 2, -s.b / 2, s.b / 2, 1.0)};
         d.torsion = rectangleTorsion(s.b, s.h);
         // Timoshenko shear coefficient 5/6 of the rectangle.
         d.shearAreaY = d.shearAreaZ = 5.0 / 6.0 * s.b * s.h;
@@ -163,13 +169,14 @@ public:
         if (auto bad = positive({{"b", s.b}, {"h", s.h}, {"t", s.t}})) {
             return makeError(*bad);
         }
-        if (!(2.0 * s.t < s.b && 2.0 * s.t < s.h)) {
+        if (!(2.0 * s.t < s.b) || !(2.0 * s.t < s.h)) {
             return makeError(prefix() + "the wall t must be less than b / 2 and h / 2.");
         }
         ShapeData d;
         const double hb = s.b / 2;
         const double hh = s.h / 2;
-        d.parts = {{-hh, hh, -hb, hb, 1.0}, {-hh + s.t, hh - s.t, -hb + s.t, hb - s.t, -1.0}};
+        d.parts = {rect(-hh, hh, -hb, hb, 1.0),
+                   rect(-hh + s.t, hh - s.t, -hb + s.t, hb - s.t, -1.0)};
         // Bredt, on the mid-line: J = 4 Am^2 t / pm.
         const double bm = s.b - s.t;
         const double hm = s.h - s.t;
@@ -190,9 +197,8 @@ public:
         ShapeData d;
         const double hh = s.h / 2;
         const double hb = s.bf / 2;
-        d.parts = {{hh - s.tf, hh, -hb, hb, 1.0},
-                   {-hh, -hh + s.tf, -hb, hb, 1.0},
-                   {-hh + s.tf, hh - s.tf, -s.tw / 2, s.tw / 2, 1.0}};
+        d.parts = {rect(hh - s.tf, hh, -hb, hb, 1.0), rect(-hh, -hh + s.tf, -hb, hb, 1.0),
+                   rect(-hh + s.tf, hh - s.tf, -s.tw / 2, s.tw / 2, 1.0)};
         d.torsion = 2.0 * thinPlate(s.bf, s.tf) + thinPlate(s.h - 2.0 * s.tf, s.tw);
         d.shearAreaY = (s.h - s.tf) * s.tw;
         d.shearAreaZ = 5.0 / 6.0 * 2.0 * s.bf * s.tf;
@@ -204,11 +210,11 @@ public:
         if (auto bad = positive({{"b", s.b}, {"h", s.h}, {"t", s.t}})) {
             return makeError(*bad);
         }
-        if (!(s.t < s.b && s.t < s.h)) {
+        if (!(s.t < s.b) || !(s.t < s.h)) {
             return makeError(prefix() + "the thickness t must be less than b and h.");
         }
         ShapeData d;
-        d.parts = {{0.0, s.h, 0.0, s.t, 1.0}, {0.0, s.t, s.t, s.b, 1.0}};
+        d.parts = {rect(0.0, s.h, 0.0, s.t, 1.0), rect(0.0, s.t, s.t, s.b, 1.0)};
         d.torsion = thinPlate(s.h, s.t) + thinPlate(s.b - s.t, s.t);
         // Where the mid-lines of the legs meet.
         d.shearCentre = Eigen::Vector2d(s.t / 2, s.t / 2);
@@ -228,9 +234,8 @@ public:
         }
         ShapeData d;
         const double hh = s.h / 2;
-        d.parts = {{-hh, hh, 0.0, s.tw, 1.0},
-                   {hh - s.tf, hh, s.tw, s.bf, 1.0},
-                   {-hh, -hh + s.tf, s.tw, s.bf, 1.0}};
+        d.parts = {rect(-hh, hh, 0.0, s.tw, 1.0), rect(hh - s.tf, hh, s.tw, s.bf, 1.0),
+                   rect(-hh, -hh + s.tf, s.tw, s.bf, 1.0)};
         d.torsion = 2.0 * thinPlate(s.bf - s.tw, s.tf) + thinPlate(s.h, s.tw);
         // Thin-walled channel on the mid-lines (Roark, table 10.1): the shear
         // centre is e = 3 b^2 tf / (6 b tf + h tw) behind the web, with b the
@@ -254,8 +259,8 @@ public:
             return makeError(*bad);
         }
         ShapeData d;
-        d.parts = {{s.h - s.tf, s.h, -s.bf / 2, s.bf / 2, 1.0},
-                   {0.0, s.h - s.tf, -s.tw / 2, s.tw / 2, 1.0}};
+        d.parts = {rect(s.h - s.tf, s.h, -s.bf / 2, s.bf / 2, 1.0),
+                   rect(0.0, s.h - s.tf, -s.tw / 2, s.tw / 2, 1.0)};
         d.torsion = thinPlate(s.bf, s.tf) + thinPlate(s.h - s.tf, s.tw);
         // Where the mid-lines of the flange and of the stem meet.
         d.shearCentre = Eigen::Vector2d(s.h - s.tf / 2, 0.0);
@@ -266,11 +271,8 @@ public:
     }
 
 private:
-    struct Dimension
-    {
-        std::string_view name;
-        double value;
-    };
+    // A name and its value.
+    using Dimension = std::pair<std::string_view, double>;
 
     [[nodiscard]] std::string prefix() const
     {
@@ -280,8 +282,8 @@ private:
     [[nodiscard]] std::optional<std::string> positive(std::initializer_list<Dimension> dims) const
     {
         for (const Dimension& dim : dims) {
-            if (!(dim.value > 0.0) || !std::isfinite(dim.value)) {
-                return prefix() + "the dimension " + std::string(dim.name) + " must be positive.";
+            if (!(dim.second > 0.0) || !std::isfinite(dim.second)) {
+                return prefix() + "the dimension " + std::string(dim.first) + " must be positive.";
             }
         }
         return std::nullopt;
@@ -375,7 +377,8 @@ Expected<SectionProperties> sectionProperties(const Section& section)
     if (!data) {
         return tl::unexpected(data.error());
     }
-    const Geometric g = data->exact ? *data->exact : combine(data->parts);
+    const std::optional<Geometric>& exact = data->exact;
+    const Geometric g = exact ? *exact : combine(data->parts);
     const Eigen::Vector2d shearCentre = data->shearCentreAtCentroid
                                             ? Eigen::Vector2d::Zero().eval()
                                             : (data->shearCentre - g.centroid).eval();
@@ -538,7 +541,7 @@ private:
 
 std::vector<StressPoint> stressPoints(const SectionShape& shape)
 {
-    Section section{.name = "", .shape = shape};
+    const Section section{.name = "", .shape = shape};
     const auto properties = sectionProperties(section);
     if (!properties) {
         return {};

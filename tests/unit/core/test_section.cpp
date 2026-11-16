@@ -263,8 +263,8 @@ namespace {
 fem::core::PointStress at(const std::vector<fem::core::PointStress>& stresses,
                           const std::string& name)
 {
-    const auto found = std::find_if(stresses.begin(), stresses.end(),
-                                    [&name](const auto& stress) { return stress.name == name; });
+    const auto found =
+        std::ranges::find_if(stresses, [&name](const auto& stress) { return stress.name == name; });
     INFO("stress point " << name);
     REQUIRE(found != stresses.end());
     return *found;
@@ -303,7 +303,7 @@ TEST_CASE("stresses in the section", "[core][section]")
     SECTION("I section: shear in the web")
     {
         const fem::core::ISection s{.h = 0.3, .bf = 0.15, .tf = 0.0107, .tw = 0.0071};
-        Section section{.name = "I", .shape = s};
+        const Section section{.name = "I", .shape = s};
         const SectionProperties p = of(s);
         const auto stresses = fem::core::sectionStresses(section, f);
         const double q = s.bf * s.tf * (s.h - s.tf) / 2 + s.tw * std::pow(s.h / 2 - s.tf, 2) / 2;
@@ -321,7 +321,7 @@ TEST_CASE("stresses in the section", "[core][section]")
     SECTION("circular tube: T r / J and about 2V/A")
     {
         const fem::core::CircularTube s{.d = 0.2, .t = 0.005};
-        Section section{.name = "O", .shape = s};
+        const Section section{.name = "O", .shape = s};
         const SectionProperties p = of(s);
         const auto stresses = fem::core::sectionStresses(section, f);
         REQUIRE(stresses.size() == 8);
@@ -334,7 +334,7 @@ TEST_CASE("stresses in the section", "[core][section]")
     SECTION("channel: torsion T t / J at the flange tip")
     {
         const fem::core::Channel s{.h = 0.2, .bf = 0.075, .tf = 0.0115, .tw = 0.0085};
-        Section section{.name = "U", .shape = s};
+        const Section section{.name = "U", .shape = s};
         const SectionProperties p = of(s);
         const auto stresses =
             fem::core::sectionStresses(section, fem::core::BeamForces{.t = 300.0});

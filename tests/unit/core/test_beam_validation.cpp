@@ -41,7 +41,7 @@ std::vector<std::string> messages(const Model& model)
 
 bool has(const std::vector<std::string>& list, const std::string& message)
 {
-    const bool found = std::find(list.begin(), list.end(), message) != list.end();
+    const bool found = std::ranges::find(list, message) != list.end();
     if (!found) {
         for (const auto& m : list) {
             UNSCOPED_INFO(m);
@@ -140,7 +140,7 @@ TEST_CASE("elements that cannot be beams", "[core][validation][beam]")
         TrussSpec spec;
         spec.nodes = {{0.0, 0.0, 0.0}, {1.0, 0.0, 0.3}};
         spec.bars = {{0, 1}};
-        Model model = fem::core::test::beamModel(spec, ElementKind::Beam2D);
+        const Model model = fem::core::test::beamModel(spec, ElementKind::Beam2D);
         CHECK(messages(model) == std::vector<std::string>{"The element 1 is a 2D beam but does "
                                                           "not lie in the XY plane."});
         Model offset = rowModel(ElementKind::Beam2D);

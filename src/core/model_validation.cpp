@@ -126,7 +126,7 @@ private:
         }
         if (needsShearModulus(assignment)) {
             const double nu = material.poissonsRatio.value_or(1.0);
-            if (!(nu > -1.0 && nu < 0.5)) {
+            if (!(nu > -1.0) || !(nu < 0.5)) {
                 addOnce(name +
                         ": the Poisson's ratio must be given and between -1 and 0.5 for beams.");
                 valid = false;
@@ -179,8 +179,8 @@ private:
             }
         }
         if (assignment.theory == BeamTheory::Timoshenko &&
-            !(properties->shearAreaY.value_or(0.0) > 0.0 &&
-              properties->shearAreaZ.value_or(0.0) > 0.0)) {
+            (!(properties->shearAreaY.value_or(0.0) > 0.0) ||
+             !(properties->shearAreaZ.value_or(0.0) > 0.0))) {
             addOnce(name + ": the shear areas Asy and Asz must be given and positive for "
                            "Timoshenko beams.");
             valid = false;
@@ -302,8 +302,9 @@ private:
         for (std::size_t i = 0; i < connections.size(); ++i) {
             const std::string label = itemLabel("End connection", i);
             const EndConnection& connection = connections[i];
-            if (std::any_of(connection.stiffness.begin(), connection.stiffness.end(),
-                            [](const std::optional<double>& k) { return k && !(*k >= 0.0); })) {
+            if (std::ranges::any_of(connection.stiffness, [](const std::optional<double>& k) {
+                    return k && !(*k >= 0.0);
+                })) {
                 add(label + ": the stiffness must not be negative.");
             }
             for (const ElementIndex element : beamsOf(label, connection.elements)) {
@@ -338,7 +339,7 @@ private:
         for (std::size_t i = 0; i < foundations.size(); ++i) {
             const std::string label = itemLabel("Elastic foundation", i);
             const ElasticFoundation& foundation = foundations[i];
-            if (!(foundation.translational.minCoeff() >= 0.0 && foundation.torsional >= 0.0)) {
+            if (!(foundation.translational.minCoeff() >= 0.0) || !(foundation.torsional >= 0.0)) {
                 add(label + ": the stiffness must not be negative.");
             }
             for (const ElementIndex element : beamsOf(label, foundation.elements)) {

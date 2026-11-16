@@ -15,6 +15,8 @@
 #include <algorithm>
 #include <cmath>
 #include <initializer_list>
+#include <optional>
+#include <stdexcept>
 #include <utility>
 #include <vector>
 
@@ -99,8 +101,11 @@ inline StaticResult solve(const Model& model)
 
 inline const BeamResult& beamOf(const StaticResult& result, std::size_t element)
 {
-    REQUIRE(result.beams.at(element).has_value());
-    return *result.beams[element];
+    const std::optional<BeamResult>& beam = result.beams.at(element);
+    if (!beam) {
+        throw std::logic_error("the element has no beam result");
+    }
+    return *beam;
 }
 
 // |value - reference| within `tolerance` of max(|reference|, scale).

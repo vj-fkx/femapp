@@ -204,8 +204,9 @@ TEST_CASE("the beam items of the model are edited and copied", "[core][model]")
     CHECK(model.concentratedLoads.front().at.fraction);
     CHECK(model.distributedLoads.front().to.value == 0.5);
     CHECK_FALSE(model.endConnections.front().stiffness[0].has_value());
-    REQUIRE(model.findSection("Box") != nullptr);
-    CHECK(std::holds_alternative<fem::core::RectangularTube>(*model.findSection("Box")->shape));
+    const auto* box = model.findSection("Box");
+    REQUIRE(box != nullptr);
+    CHECK((box->shape && std::holds_alternative<fem::core::RectangularTube>(*box->shape)));
 
     Model copy = model;
     CHECK(copy.mesh == model.mesh);

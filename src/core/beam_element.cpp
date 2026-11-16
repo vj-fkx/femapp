@@ -99,10 +99,8 @@ public:
                 ++m_count;
             }
         }
-        m_kee = BeamMatrix::Zero();
         m_kei = CouplingMatrix::Zero(kBeamDofs, m_count);
         m_kii = InternalMatrix::Zero(m_count, m_count);
-        m_fe = BeamVector::Zero();
         m_fi = InternalVector::Zero(m_count);
         // The bar on its dofs (external where rigid, internal elsewhere).
         for (int a = 0; a < kBeamDofs; ++a) {
@@ -176,10 +174,10 @@ private:
     std::array<int, kBeamDofs> m_internal{-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
     std::array<int, kMaxInternal> m_external{};
     std::array<double, kMaxInternal> m_spring{};
-    BeamMatrix m_kee;
+    BeamMatrix m_kee = BeamMatrix::Zero();
     CouplingMatrix m_kei;
     InternalMatrix m_kii;
-    BeamVector m_fe;
+    BeamVector m_fe = BeamVector::Zero();
     InternalVector m_fi;
     Eigen::LDLT<InternalMatrix> m_ldlt;
 };
@@ -257,8 +255,8 @@ BeamMatrix flexibleStiffness(const BeamData& beam, double length)
     BeamMatrix kb = BeamMatrix::Zero();
     const double axial = beam.axial / length;
     const double torsion = beam.torsional / length;
-    for (int a = 0; a < 2; ++a) {
-        for (int b = 0; b < 2; ++b) {
+    for (Eigen::Index a = 0; a < 2; ++a) {
+        for (Eigen::Index b = 0; b < 2; ++b) {
             const double sign = a == b ? 1.0 : -1.0;
             kb(6 * a, 6 * b) = sign * axial;
             kb(6 * a + 3, 6 * b + 3) = sign * torsion;
