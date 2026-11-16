@@ -73,8 +73,23 @@ struct Tee
     double tw = 0.0;
 };
 
-using SectionShape =
-    std::variant<Rectangle, Circle, CircularTube, RectangularTube, ISection, Angle, Channel, Tee>;
+// REQ-008b-03: a thin-walled section by its mid-line: straight walls between
+// points of the drawing, each with its thickness, forming open branches and
+// closed cells (design 008b §5.1.2). Points and walls are numbered from 0.
+struct ThinWalled
+{
+    struct Wall
+    {
+        int from = 0;
+        int to = 0;
+        double t = 0.0;
+    };
+    std::vector<Eigen::Vector2d> points;
+    std::vector<Wall> walls;
+};
+
+using SectionShape = std::variant<Rectangle, Circle, CircularTube, RectangularTube, ISection, Angle,
+                                  Channel, Tee, ThinWalled>;
 
 // REQ-007-02, 008-02: a bar or beam section. Either a generic section, by its
 // properties about axes through the centroid parallel to the local y and z
@@ -93,6 +108,8 @@ struct Section
     std::optional<double> shearAreaY = std::nullopt; // Asy, for the shear force along y
     std::optional<double> shearAreaZ = std::nullopt; // Asz
     std::optional<SectionShape> shape = std::nullopt;
+    // REQ-008b-01: Iw about the shear centre, for beams with warping.
+    std::optional<double> warpingConstant = std::nullopt;
 };
 
 // Everything a beam needs from its section, about the principal axes
@@ -109,6 +126,7 @@ struct SectionProperties
     Eigen::Vector2d shearCentre = Eigen::Vector2d::Zero(); // principal (y', z'), from the centroid
     std::optional<double> shearAreaY = std::nullopt;
     std::optional<double> shearAreaZ = std::nullopt;
+    double warpingConstant = 0.0; // REQ-008b-01: Iw, about the shear centre
 };
 
 // REQ-008-03, 04, 05: computed for a shape, rotated to the principal axes
@@ -129,6 +147,10 @@ struct StressPoint
     double firstMomentZ = 0.0; // Q for Vz (about y)
     double thicknessZ = 0.0;
     double torsionFactor = 0.0;
+    // REQ-008b-01, 20: the sectorial coordinate omega about the shear centre,
+    // normalised (integral of omega dA = 0), with d omega = y dz - z dy along
+    // the mid-line; the warping displacement is -omega theta'.
+    double sectorial = 0.0;
 };
 
 // The points of a valid shape: the extreme fibres, the points of largest

@@ -35,19 +35,19 @@ Regras:
 
 ## Fase 2 — Seções
 
-- [ ] **T04** Testes de Iw e ω das oito formas (§5.1.1 do design) contra as
+- [x] **T04** Testes de Iw e ω das oito formas (§5.1.1 do design) contra as
   fórmulas (1e−12) e valores tabelados de I e U; `Section::warpingConstant`
   na seção genérica (≥ 0); `StressPoint::sectorial` nos pontos — arquivo:
   `tests/unit/core/test_section.cpp` — cobre: 01
-- [ ] **T05** Implementar a T04 em `section.cpp`, com as referências das
+- [x] **T05** Implementar a T04 em `section.cpp`, com as referências das
   fórmulas — cobre: 01
-- [ ] **T06** Testes da seção de paredes finas (§5.1.2): I, U, Z e cartola
+- [x] **T06** Testes da seção de paredes finas (§5.1.2): I, U, Z e cartola
   abertos; caixão de 1 e de 2 células contra Bredt generalizado; centro de
   cisalhamento do U; Iw e ω contra as fórmulas setoriais; As pelo fluxo;
   equivalência com as formas paramétricas I e U nas linhas médias (1e−10);
   recusas (parede nula, t ≤ 0, desconexa, ponto repetido) — arquivo:
   `tests/unit/core/test_section_thin_walled.cpp` — cobre: 03, 04
-- [ ] **T07** Implementar `ThinWalled` em `section_thin_walled.cpp` até a
+- [x] **T07** Implementar `ThinWalled` em `section_thin_walled.cpp` até a
   T06 passar — cobre: 03, 04
 - [ ] **T08** Testes da triangulação da seção (ADR 0005; constituição
   §7.4): conformidade (sem buracos nem sobreposições, área igual à do

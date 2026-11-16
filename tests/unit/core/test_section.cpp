@@ -365,3 +365,82 @@ TEST_CASE("stresses in the section", "[core][section]")
         CHECK(fem::core::sectionStresses(section, bending).empty());
     }
 }
+
+// REQ-008b-01: the warping constant and the sectorial coordinate of the
+// shapes (design 008b §5.1.1), on the mid-lines.
+TEST_CASE("warping constants and sectorial coordinates of the shapes", "[core][section]")
+{
+    const auto point = [](const SectionShape& shape, const std::string& name) {
+        const auto points = fem::core::stressPoints(shape);
+        const auto found = std::ranges::find_if(
+            points, [&name](const fem::core::StressPoint& p) { return p.name == name; });
+        REQUIRE(found != points.end());
+        return *found;
+    };
+
+    SECTION("I: tf bf^3 h0^2 / 24, against the tables of the IPE 300")
+    {
+        const fem::core::ISection ipe{.h = 300.0, .bf = 150.0, .tf = 10.7, .tw = 7.1};
+        const double h0 = 300.0 - 10.7;
+        CHECK(near(of(ipe).warpingConstant, 10.7 * std::pow(150.0, 3) * h0 * h0 / 24, 1e-12));
+        // 125.9e3 cm^6 in the tables, in mm^6.
+        CHECK(near(of(ipe).warpingConstant, 125.9e9, 0.01));
+        CHECK(near(point(ipe, "corner +y +z").sectorial, h0 * 150.0 / 4, 1e-12));
+        CHECK(near(point(ipe, "corner +y -z").sectorial, -h0 * 150.0 / 4, 1e-12));
+        CHECK(point(ipe, "web centre").sectorial == 0.0);
+    }
+
+    SECTION("channel: the closed form of Galambos")
+    {
+        const fem::core::Channel u{.h = 0.2, .bf = 0.075, .tf = 0.0115, .tw = 0.0085};
+        const double b = u.bf - u.tw / 2;
+        const double h0 = u.h - u.tf;
+        const double galambos = u.tf * std::pow(b, 3) * h0 * h0 / 12 *
+                                (3 * b * u.tf + 2 * h0 * u.tw) / (6 * b * u.tf + h0 * u.tw);
+        CHECK(near(of(u).warpingConstant, galambos, 1e-12));
+        const double e = 3 * b * b * u.tf / (6 * b * u.tf + h0 * u.tw);
+        CHECK(near(point(u, "flange tip +y").sectorial, (b - e) * h0 / 2, 1e-12));
+        CHECK(near(point(u, "web back +y").sectorial, -e * h0 / 2, 1e-12));
+        CHECK(near(point(u, "flange tip -y").sectorial, -(b - e) * h0 / 2, 1e-12));
+        CHECK(point(u, "web centre").sectorial == 0.0);
+    }
+
+    SECTION("rectangular tube: the closed cell")
+    {
+        const fem::core::RectangularTube box{.b = 0.3, .h = 0.2, .t = 0.01};
+        const double b0 = 0.29;
+        const double h0 = 0.19;
+        CHECK(near(of(box).warpingConstant,
+                   0.01 * b0 * b0 * h0 * h0 * std::pow(b0 - h0, 2) / (24 * (b0 + h0)), 1e-12));
+        const double corner = b0 * h0 * (b0 - h0) / (4 * (b0 + h0));
+        CHECK(near(point(box, "corner +y +z").sectorial, corner, 1e-12));
+        CHECK(near(point(box, "corner -y +z").sectorial, -corner, 1e-12));
+        // A square tube does not warp.
+        CHECK(of(fem::core::RectangularTube{.b = 0.2, .h = 0.2, .t = 0.01}).warpingConstant == 0.0);
+    }
+
+    SECTION("rectangle: Vlasov's plate value")
+    {
+        CHECK(near(of(fem::core::Rectangle{.b = 0.01, .h = 0.3}).warpingConstant,
+                   std::pow(0.01 * 0.3, 3) / 144, 1e-12));
+    }
+
+    SECTION("shapes that do not warp on their mid-lines")
+    {
+        CHECK(of(fem::core::Circle{.d = 0.1}).warpingConstant == 0.0);
+        CHECK(of(fem::core::CircularTube{.d = 0.1, .t = 0.005}).warpingConstant == 0.0);
+        CHECK(of(fem::core::Angle{.b = 0.1, .h = 0.15, .t = 0.01}).warpingConstant == 0.0);
+        CHECK(of(fem::core::Tee{.h = 0.2, .bf = 0.15, .tf = 0.012, .tw = 0.008}).warpingConstant ==
+              0.0);
+    }
+
+    SECTION("generic section: given, or zero")
+    {
+        Section generic{.name = "G", .area = 1.0, .inertiaY = 1.0, .inertiaZ = 1.0};
+        CHECK(fem::core::sectionProperties(generic).value_or(SectionProperties{}).warpingConstant ==
+              0.0);
+        generic.warpingConstant = 2.5e-6;
+        CHECK(fem::core::sectionProperties(generic).value_or(SectionProperties{}).warpingConstant ==
+              2.5e-6);
+    }
+}

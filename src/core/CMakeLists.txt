@@ -28,6 +28,7 @@ femapp_add_module(core
         model_validation.cpp
         quadrature.cpp
         section.cpp
+        section_thin_walled.cpp
         shape_functions.cpp
         static_analysis.cpp
         truss_element.cpp

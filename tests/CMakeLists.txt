@@ -41,6 +41,7 @@ femapp_add_test(core SOURCES
     test_poisson.cpp
     test_quadrature.cpp
     test_section.cpp
+    test_section_thin_walled.cpp
     test_shape_functions.cpp
     test_static_validation.cpp
     test_truss_element.cpp

@@ -1,3 +1,5 @@
+#include "detail/section_detail.hpp"
+
 #include <fem/core/section.hpp>
 
 #include <algorithm>
@@ -106,7 +108,46 @@ struct ShapeData
     bool shearCentreAtCentroid = true;
     double shearAreaY = 0.0;
     double shearAreaZ = 0.0;
+    double warping = 0.0; // Iw (design 008b section 5.1.1)
+    // The shear areas are already about the principal axes (thin-walled).
+    bool principalShearAreas = false;
 };
+
+// REQ-008b-01: warping of the thin-walled shapes on their mid-lines
+// (Pilkey, 2002, table 6; Galambos, 1968). With omega = y z on the flanges,
+// the doubly symmetric I has Iw = tf bf^3 h0^2 / 24.
+double iWarping(double bf, double tf, double h0)
+{
+    return tf * std::pow(bf, 3) * h0 * h0 / 24.0;
+}
+
+// Channel with flanges b (from the web mid-line), web h0 between the flange
+// mid-lines and the shear centre e behind the web: omega is -e h0/2 at the
+// top junction and (b - e) h0/2 at the top tip, antisymmetric below.
+double channelWarping(double b, double tf, double h0, double tw, double e)
+{
+    return 2.0 * (tw * e * e * std::pow(h0, 3) / 24.0 +
+                  tf * h0 * h0 / 4.0 * (std::pow(b - e, 3) + std::pow(e, 3)) / 3.0);
+}
+
+// Closed box on the mid-lines (b0 x h0, wall t): the normalised sectorial
+// coordinate is zero at mid-sides and +-b0 h0 (b0 - h0) / (4 (b0 + h0)) at
+// the corners.
+double boxWarping(double b0, double h0, double t)
+{
+    return t * b0 * b0 * h0 * h0 * std::pow(b0 - h0, 2) / (24.0 * (b0 + h0));
+}
+
+double boxCornerSectorial(double b0, double h0)
+{
+    return b0 * h0 * (b0 - h0) / (4.0 * (b0 + h0));
+}
+
+// Shear centre of the channel behind the web mid-line (Roark, table 10.1).
+double channelShearCentre(double b, double tf, double h0, double tw)
+{
+    return 3.0 * b * b * tf / (6.0 * b * tf + h0 * tw);
+}
 
 class ShapeBuilder
 {
@@ -125,6 +166,8 @@ public:
         d.torsion = rectangleTorsion(s.b, s.h);
         // Timoshenko shear coefficient 5/6 of the rectangle.
         d.shearAreaY = d.shearAreaZ = 5.0 / 6.0 * s.b * s.h;
+        // Vlasov's warping of a plate, small and documented (design 008b 5.1.1).
+        d.warping = std::pow(s.b * s.h, 3) / 144.0;
         return d;
     }
 
@@ -183,6 +226,7 @@ public:
         d.torsion = 4.0 * std::pow(bm * hm, 2) * s.t / (2.0 * (bm + hm));
         d.shearAreaY = 2.0 * hm * s.t; // the two walls along y
         d.shearAreaZ = 2.0 * bm * s.t;
+        d.warping = boxWarping(bm, hm, s.t);
         return d;
     }
 
@@ -202,6 +246,7 @@ public:
         d.torsion = 2.0 * thinPlate(s.bf, s.tf) + thinPlate(s.h - 2.0 * s.tf, s.tw);
         d.shearAreaY = (s.h - s.tf) * s.tw;
         d.shearAreaZ = 5.0 / 6.0 * 2.0 * s.bf * s.tf;
+        d.warping = iWarping(s.bf, s.tf, s.h - s.tf);
         return d;
     }
 
@@ -242,11 +287,12 @@ public:
         // flange from the web mid-line and h between the flange mid-lines.
         const double b = s.bf - s.tw / 2;
         const double h = s.h - s.tf;
-        const double e = 3.0 * b * b * s.tf / (6.0 * b * s.tf + h * s.tw);
+        const double e = channelShearCentre(b, s.tf, h, s.tw);
         d.shearCentre = Eigen::Vector2d(0.0, s.tw / 2 - e);
         d.shearCentreAtCentroid = false;
         d.shearAreaY = (s.h - s.tf) * s.tw;
         d.shearAreaZ = 5.0 / 6.0 * 2.0 * s.bf * s.tf;
+        d.warping = channelWarping(b, s.tf, h, s.tw, e);
         return d;
     }
 
@@ -267,6 +313,26 @@ public:
         d.shearCentreAtCentroid = false;
         d.shearAreaY = (s.h - s.tf) * s.tw;
         d.shearAreaZ = 5.0 / 6.0 * s.bf * s.tf;
+        return d;
+    }
+
+    Expected<ShapeData> operator()(const ThinWalled& s) const
+    {
+        const auto thin = detail::thinWalled(s, m_section);
+        if (!thin) {
+            return tl::unexpected(thin.error());
+        }
+        const detail::SectionGeometry& g = thin->geometry;
+        ShapeData d;
+        d.exact =
+            Geometric{.area = g.area, .centroid = g.centroid, .iy = g.iy, .iz = g.iz, .iyz = g.iyz};
+        d.torsion = thin->torsion;
+        d.shearCentre = thin->shearCentre;
+        d.shearCentreAtCentroid = false;
+        d.shearAreaY = thin->shearAreaY;
+        d.shearAreaZ = thin->shearAreaZ;
+        d.principalShearAreas = true;
+        d.warping = thin->warping;
         return d;
     }
 
@@ -306,8 +372,9 @@ private:
     std::string_view m_section;
 };
 
-// The principal angle closest to the drawing axes: tan 2 theta = 2 Iyz / (Iz - Iy).
-double principalAngle(double iy, double iz, double iyz)
+} // namespace
+
+double detail::principalAngle(double iy, double iz, double iyz)
 {
     const double scale = std::max({std::abs(iy), std::abs(iz), 1e-300});
     if (std::abs(iyz) <= 1e-14 * scale) {
@@ -322,19 +389,25 @@ double principalAngle(double iy, double iz, double iyz)
     return theta;
 }
 
-// Rotates a vector of the drawing to the principal axes.
-Eigen::Vector2d toPrincipal(const Eigen::Vector2d& v, double theta)
+Eigen::Vector2d detail::toPrincipal(const Eigen::Vector2d& v, double theta)
 {
     const double c = std::cos(theta);
     const double s = std::sin(theta);
     return {c * v.x() + s * v.y(), -s * v.x() + c * v.y()};
 }
 
+namespace {
+
+using detail::principalAngle;
+using detail::toPrincipal;
+
 // Inertias, shear centre and shear areas in the principal axes.
 SectionProperties principal(const Geometric& g, double torsion, const Eigen::Vector2d& shearCentre,
-                            std::optional<double> shearAreaY, std::optional<double> shearAreaZ)
+                            std::optional<double> shearAreaY, std::optional<double> shearAreaZ,
+                            double warping)
 {
     SectionProperties p;
+    p.warpingConstant = warping;
     p.area = g.area;
     p.centroid = g.centroid;
     p.torsionConstant = torsion;
@@ -371,7 +444,7 @@ Expected<SectionProperties> sectionProperties(const Section& section)
         g.iyz = section.productOfInertia.value_or(0.0);
         return principal(g, section.torsionConstant.value_or(0.0),
                          section.shearCentre.value_or(Eigen::Vector2d::Zero()), section.shearAreaY,
-                         section.shearAreaZ);
+                         section.shearAreaZ, section.warpingConstant.value_or(0.0));
     }
     const auto data = std::visit(ShapeBuilder(section.name), *section.shape);
     if (!data) {
@@ -382,7 +455,13 @@ Expected<SectionProperties> sectionProperties(const Section& section)
     const Eigen::Vector2d shearCentre = data->shearCentreAtCentroid
                                             ? Eigen::Vector2d::Zero().eval()
                                             : (data->shearCentre - g.centroid).eval();
-    return principal(g, data->torsion, shearCentre, data->shearAreaY, data->shearAreaZ);
+    SectionProperties p =
+        principal(g, data->torsion, shearCentre, data->shearAreaY, data->shearAreaZ, data->warping);
+    if (data->principalShearAreas) {
+        p.shearAreaY = data->shearAreaY;
+        p.shearAreaZ = data->shearAreaZ;
+    }
+    return p;
 }
 
 namespace {
@@ -433,7 +512,7 @@ public:
     {
         // Bredt: tau = T / (2 Am t) all around.
         const double factor = 1.0 / (2.0 * (s.b - s.t) * (s.h - s.t) * s.t);
-        corners(s.h / 2, s.b / 2, factor);
+        corners(s.h / 2, s.b / 2, factor, boxCornerSectorial(s.b - s.t, s.h - s.t));
         const double qy = (s.b * s.h * s.h - (s.b - 2 * s.t) * std::pow(s.h - 2 * s.t, 2)) / 8;
         const double qz = (s.h * s.b * s.b - (s.h - 2 * s.t) * std::pow(s.b - 2 * s.t, 2)) / 8;
         add("middle of the side +z", 0.0, s.b / 2, qy, 2 * s.t, 0.0, 0.0, factor);
@@ -444,7 +523,7 @@ public:
     std::vector<StressPoint> operator()(const ISection& s)
     {
         const double j = m_p.torsionConstant;
-        corners(s.h / 2, s.bf / 2, s.tf / j);
+        corners(s.h / 2, s.bf / 2, s.tf / j, (s.h - s.tf) * s.bf / 4.0);
         const double qy = s.bf * s.tf * (s.h - s.tf) / 2 + s.tw * std::pow(s.h / 2 - s.tf, 2) / 2;
         add("web centre", 0.0, 0.0, qy, s.tw, 0.0, 0.0, s.tw / j);
         add("top flange centre", s.h / 2 - s.tf / 2, 0.0, 0.0, 0.0, s.tf * s.bf * s.bf / 8, s.tf,
@@ -466,15 +545,23 @@ public:
     std::vector<StressPoint> operator()(const Channel& s)
     {
         const double j = m_p.torsionConstant;
+        const double b = s.bf - s.tw / 2;
+        const double h0 = s.h - s.tf;
+        const double e = channelShearCentre(b, s.tf, h0, s.tw);
         for (const double y : {s.h / 2, -s.h / 2}) {
             const std::string side = y > 0 ? "+y" : "-y";
-            add("flange tip " + side, y, s.bf, 0.0, 0.0, 0.0, 0.0, s.tf / j);
-            add("web back " + side, y, 0.0, 0.0, 0.0, 0.0, 0.0, s.tw / j);
+            const double sign = y > 0 ? 1.0 : -1.0;
+            add("flange tip " + side, y, s.bf, 0.0, 0.0, 0.0, 0.0, s.tf / j,
+                sign * (b - e) * h0 / 2);
+            add("web back " + side, y, 0.0, 0.0, 0.0, 0.0, 0.0, s.tw / j, -sign * e * h0 / 2);
         }
         const double qy = s.bf * s.tf * (s.h - s.tf) / 2 + s.tw * std::pow(s.h / 2 - s.tf, 2) / 2;
         add("web centre", 0.0, s.tw / 2, qy, s.tw, 0.0, 0.0, s.tw / j);
         return std::move(m_points);
     }
+
+    // The thin-walled points come with the stresses (task T12 of 008b).
+    std::vector<StressPoint> operator()(const ThinWalled& /*s*/) { return {}; }
 
     std::vector<StressPoint> operator()(const Tee& s)
     {
@@ -496,7 +583,7 @@ public:
 
 private:
     void add(std::string name, double y, double z, double qy, double ty, double qz, double tz,
-             double torsion)
+             double torsion, double sectorial = 0.0)
     {
         m_points.push_back(
             {.name = std::move(name),
@@ -505,16 +592,17 @@ private:
              .thicknessY = ty,
              .firstMomentZ = qz,
              .thicknessZ = tz,
-             .torsionFactor = torsion});
+             .torsionFactor = torsion,
+             .sectorial = sectorial});
     }
 
-    // The four corners of a centred box.
-    void corners(double y, double z, double torsion)
+    // The four corners of a centred box; omega is +sectorial where y z > 0.
+    void corners(double y, double z, double torsion, double sectorial = 0.0)
     {
-        add("corner +y +z", y, z, 0.0, 0.0, 0.0, 0.0, torsion);
-        add("corner +y -z", y, -z, 0.0, 0.0, 0.0, 0.0, torsion);
-        add("corner -y +z", -y, z, 0.0, 0.0, 0.0, 0.0, torsion);
-        add("corner -y -z", -y, -z, 0.0, 0.0, 0.0, 0.0, torsion);
+        add("corner +y +z", y, z, 0.0, 0.0, 0.0, 0.0, torsion, sectorial);
+        add("corner +y -z", y, -z, 0.0, 0.0, 0.0, 0.0, torsion, -sectorial);
+        add("corner -y +z", -y, z, 0.0, 0.0, 0.0, 0.0, torsion, -sectorial);
+        add("corner -y -z", -y, -z, 0.0, 0.0, 0.0, 0.0, torsion, sectorial);
     }
 
     // Eight points on a circle of radius r; Q and t of the half section at
