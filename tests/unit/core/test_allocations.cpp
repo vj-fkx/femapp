@@ -1,7 +1,9 @@
 // REQ-006-05: evaluating shape functions and element geometry does not
-// allocate; REQ-006-12: nor does the truss element of 007. A test executable of its own, because it
-// replaces the global operator new to count the allocations.
+// allocate; REQ-006-12: nor do the truss element of 007 and the beam element
+// of 008. A test executable of its own, because it replaces the global
+// operator new to count the allocations.
 
+#include <fem/core/beam_element.hpp>
 #include <fem/core/element_type.hpp>
 #include <fem/core/isoparametric.hpp>
 #include <fem/core/quadrature.hpp>
@@ -100,6 +102,38 @@ TEST_CASE("the truss element does not allocate", "[core][allocations]")
     nodes.x[1] = Eigen::Vector3d(1.0, 2.0, 3.0);
     Eigen::MatrixXd matrix = Eigen::MatrixXd::Zero(6, 6);
     Eigen::VectorXd vector = Eigen::VectorXd::Zero(6);
+
+    gAllocations = 0;
+    gCounting = true;
+    const bool computed = element.compute(nodes, 0, matrix, vector).has_value();
+    gCounting = false;
+    CHECK(computed);
+    CHECK(gAllocations == 0);
+}
+
+TEST_CASE("the beam element does not allocate", "[core][allocations]")
+{
+    // With connections (internal dofs), offsets, a shear centre and a
+    // foundation: every branch of compute().
+    std::array<fem::core::BeamData, 1> beams{};
+    fem::core::BeamData& beam = beams[0];
+    beam.axial = 1e6;
+    beam.torsional = 1e3;
+    beam.bendingY = beam.bendingZ = 1e4;
+    beam.shearY = beam.shearZ = 1e5;
+    beam.shearCentre = Eigen::Vector2d(0.01, 0.02);
+    beam.offsets[0] = Eigen::Vector3d(0.1, 0.0, 0.0);
+    beam.springs[1][5] = 0.0;
+    beam.springs[1][4] = 1e4;
+    beam.foundation = Eigen::Vector4d(1.0, 2.0, 3.0, 4.0);
+    const fem::core::BeamElement element(fem::core::ElementKind::Beam3D, beams);
+    fem::core::ElementNodes nodes;
+    nodes.type = fem::core::ElementType::Line2;
+    nodes.count = 2;
+    nodes.x[0] = Eigen::Vector3d(0.0, 0.0, 0.0);
+    nodes.x[1] = Eigen::Vector3d(3.0, 0.0, 0.0);
+    Eigen::MatrixXd matrix = Eigen::MatrixXd::Zero(12, 12);
+    Eigen::VectorXd vector = Eigen::VectorXd::Zero(12);
 
     gAllocations = 0;
     gCounting = true;

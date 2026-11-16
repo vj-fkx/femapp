@@ -53,16 +53,16 @@ Regras:
 
 ## Fase 3 — Elemento de viga
 
-- [ ] **T06** Testes de `beamAxes`:
+- [x] **T06** Testes de `beamAxes`:
   - padrão em barra horizontal (y vertical) e em barra vertical (X global);
   - vetor dado e ângulo β;
   - 2D;
   - vetor paralelo recusado.
 
   — arquivo: `tests/unit/core/test_beam_element.cpp` — cobre: 09, 10
-- [ ] **T07** `beam_element.hpp/.cpp`: `BeamData` e `beamAxes` até a T06
+- [x] **T07** `beam_element.hpp/.cpp`: `BeamData` e `beamAxes` até a T06
   passar; novos fontes no `CMakeLists.txt` — cobre: 09, 10
-- [ ] **T08** Testes do trecho flexível:
+- [x] **T08** Testes do trecho flexível:
   - K de Euler-Bernoulli e de Timoshenko igual à fórmula fechada em
     orientação qualquer, em 2D e 3D;
   - invariância sob rotação;
@@ -71,28 +71,28 @@ Regras:
   - `dofsAt` em 2D e 3D.
 
   — arquivo: `test_beam_element.cpp` — cobre: 05 a 07
-- [ ] **T09** `BeamElement` sem ligações, excentricidades nem base elástica
+- [x] **T09** `BeamElement` sem ligações, excentricidades nem base elástica
   (§5.3 e rotação do §5.4), até a T08 passar — cobre: 05 a 07
-- [ ] **T10** Testes e implementação do centro de cisalhamento e das
+- [x] **T10** Testes e implementação do centro de cisalhamento e das
   excentricidades rígidas (T_sc e T_off do §5.4):
   - modos rígidos continuam com energia nula;
   - com excentricidade nula, o resultado é o mesmo da T09.
 
   — arquivos: `beam_element.cpp`, `test_beam_element.cpp` — cobre: 05, 14
-- [ ] **T11** Testes e implementação das ligações por condensação (§5.4):
+- [x] **T11** Testes e implementação das ligações por condensação (§5.4):
   - mola 0 igual à liberação;
   - mola 1e14 igual à ligação rígida (1e−8);
   - barra rotulada nas duas pontas com rigidez transversal nula;
   - detecção de K_ii singular, exposta para a validação.
 
   — arquivos: `beam_element.cpp`, `test_beam_element.cpp` — cobre: 11 a 13
-- [ ] **T12** Testes e implementação da base elástica:
+- [x] **T12** Testes e implementação da base elástica:
   - matriz consistente com 4 pontos de Gauss, simétrica e positiva com
     k > 0;
   - uma barra livre sobre base elástica deixa de ser singular.
 
   — arquivos: `beam_element.cpp`, `test_beam_element.cpp` — cobre: 15
-- [ ] **T13** [P] Ampliar `test_allocations`: `BeamElement::compute` com
+- [x] **T13** [P] Ampliar `test_allocations`: `BeamElement::compute` com
   ligações, excentricidades e base elástica não aloca — arquivo:
   `tests/unit/core/test_allocations.cpp` — cobre: apoio a 05
 

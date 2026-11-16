@@ -9,6 +9,7 @@ configure_file(version_config.hpp.in "${CMAKE_CURRENT_BINARY_DIR}/generated/vers
 femapp_add_module(core
     SOURCES
         assembler.cpp
+        beam_element.cpp
         dof_map.cpp
         element_reference_coordinates.inc
         element_type.cpp
