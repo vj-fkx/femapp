@@ -10,6 +10,7 @@ femapp_add_module(core
     SOURCES
         assembler.cpp
         beam_element.cpp
+        beam_loads.cpp
         dof_map.cpp
         element_reference_coordinates.inc
         element_type.cpp

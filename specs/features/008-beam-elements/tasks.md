@@ -98,7 +98,7 @@ Regras:
 
 ## Fase 4 — Cargas no vão
 
-- [ ] **T14** Testes de `beam_loads`:
+- [x] **T14** Testes de `beam_loads`:
   - polinômios por trechos (avaliar, integrar, saltos);
   - carga global em eixos locais;
   - posições em fração e em comprimento;
@@ -110,7 +110,7 @@ Regras:
     excêntrico.
 
   — arquivo: `tests/unit/core/test_beam_loads.cpp` — cobre: 05, 16, 18, 19
-- [ ] **T15** `beam_loads.hpp/.cpp` até a T14 passar; `fixedEndLoads` no
+- [x] **T15** `beam_loads.hpp/.cpp` até a T14 passar; `fixedEndLoads` no
   `BeamData`, e as ligações e excentricidades atuando sobre ele — cobre: 05,
   16, 18, 19
 
