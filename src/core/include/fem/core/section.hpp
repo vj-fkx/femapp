@@ -6,6 +6,7 @@
 #include <optional>
 #include <string>
 #include <variant>
+#include <vector>
 
 namespace fem::core {
 
@@ -113,5 +114,25 @@ struct SectionProperties
 // for a generic section. Fails, naming the section and the dimension, for an
 // impossible shape.
 [[nodiscard]] Expected<SectionProperties> sectionProperties(const Section& section);
+
+// REQ-008-23: a characteristic point of a shape for the stresses (design 008
+// §5.1). The shear of the shear forces follows Jourawski, tau = V Q / (I t),
+// where firstMoment and thickness are given; the shear of the torque is
+// tau = T * torsionFactor.
+struct StressPoint
+{
+    std::string name;
+    Eigen::Vector2d position = Eigen::Vector2d::Zero(); // principal (y', z'), from the centroid
+    double firstMomentY = 0.0; // Q for Vy (about z), 0 where not computed
+    double thicknessY = 0.0;
+    double firstMomentZ = 0.0; // Q for Vz (about y)
+    double thicknessZ = 0.0;
+    double torsionFactor = 0.0;
+};
+
+// The points of a valid shape: the extreme fibres, the points of largest
+// shear and of largest torsional shear. The angle only has its corners and
+// the torsional shear (no simple shear flow in its principal axes).
+[[nodiscard]] std::vector<StressPoint> stressPoints(const SectionShape& shape);
 
 } // namespace fem::core

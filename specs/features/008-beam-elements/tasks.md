@@ -150,10 +150,10 @@ Regras:
 
 ## Fase 6 — Verificação
 
-- [ ] **T22** Patch tests: barra em 4 trechos desiguais sob momento, normal
+- [x] **T22** Patch tests: barra em 4 trechos desiguais sob momento, normal
   e torção constantes — arquivo: `test_beam_verification.cpp` — cobre: 08,
   N01
-- [ ] **T23** Vigas analíticas, nas duas teorias:
+- [x] **T23** Vigas analíticas, nas duas teorias:
   - balanço com força e com momento;
   - biapoiada e biengastada com carga uniforme, trapezoidal, parcial e
     concentrada (flechas, reações e diagramas M e V em 11 pontos);
@@ -162,13 +162,13 @@ Regras:
 
   — arquivos: `test_beam_verification.cpp`, `test_beam_loads.cpp` — cobre:
   08, 16, 21, 22, N01
-- [ ] **T24** [P] Pórticos e grelhas: pórtico plano com carga lateral;
+- [x] **T24** [P] Pórticos e grelhas: pórtico plano com carga lateral;
   pórtico espacial em L com flexão e torção; grelha; viga com tirante de
   treliça — arquivo: `test_beam_verification.cpp` — cobre: 08, 20, 21, N01
-- [ ] **T25** [P] Temperatura e peso: biengastada e biapoiada com gradiente;
+- [x] **T25** [P] Temperatura e peso: biengastada e biapoiada com gradiente;
   ΔT e ε₀ em pórtico; peso de viga inclinada — arquivo:
   `test_beam_loads.cpp` — cobre: 16, 18, 19, N01
-- [ ] **T26** [P] Ligações:
+- [x] **T26** [P] Ligações:
   - rótula interna (Gerber);
   - barra rotulada igual à treliça;
   - liberação de torção;
@@ -179,20 +179,20 @@ Regras:
 
   — arquivo: `tests/unit/core/test_beam_connections.cpp` — cobre: 11, 12,
   14, 19, N01
-- [ ] **T27** [P] Timoshenko: balanço curto, com flecha PL³/3EI + PL/(G·As);
+- [x] **T27** [P] Timoshenko: balanço curto, com flecha PL³/3EI + PL/(G·As);
   viga esbelta (L/h = 1000) igual a Euler-Bernoulli (1e−6) — arquivo:
   `test_beam_verification.cpp` — cobre: 07, N01
-- [ ] **T28** [P] Seções assimétricas: balanço de cantoneira em flexão
+- [x] **T28** [P] Seções assimétricas: balanço de cantoneira em flexão
   oblíqua; perfil U com carga no centroide (torção); ambos iguais ao modelo
   girado com a carga no centro de cisalhamento — arquivo:
   `test_beam_verification.cpp` — cobre: 05, 09, N01
-- [ ] **T29** Convergência:
+- [x] **T29** Convergência:
   - quarto de anel com n = 8, 16 e 32 contra Castigliano (taxa 2 ± 0,2);
   - viga sobre base elástica (Hetényi) com n = 4, 8 e 16 (taxa 4 ± 0,3).
 
   Se uma taxa não aparecer, parar e propor o ajuste da spec — arquivo:
   `test_beam_verification.cpp` — cobre: 08, 15
-- [ ] **T30** Testes e implementação de `stressPoints`, `sectionStresses` e
+- [x] **T30** Testes e implementação de `stressPoints`, `sectionStresses` e
   `normalStress`: retângulo, perfil I, tubo e perfil U sob N, M, V e T
   contra a resistência dos materiais; seção genérica em pontos dados —
   arquivos: `section.cpp`, `beam_result.cpp`, `test_section.cpp` — cobre:
@@ -276,3 +276,24 @@ engastada, peso próprio e vento no topo. Tempo de `runLinearStatic`
 | 12 × 12 | 50 | 8 619 | 24 050 | 50 700 | 13 s |
 
 A estimativa do design (2 a 4 s) se confirmou. A validação leva 23 ms.
+
+**2026-11-16 — T26:** a comparação da excentricidade com a barra rígida
+explícita usa extrapolação de Richardson em 1/razão de rigidez (barras 1e4 e
+1e5 vezes mais rígidas), em vez de uma barra 1e8 vezes mais rígida: com 1e8 o
+condicionamento estraga a referência (as reações dela já saíam do equilíbrio
+em 1e−4), enquanto o modelo com excentricidade fica em equilíbrio exato. Com a
+extrapolação, a tolerância de 1e−6 do design é atendida.
+
+**2026-11-16 — T29 (taxas medidas):** quarto de anel, n = 8, 16 e 32: erros
+3,1e−5, 7,9e−6 e 2,0e−6, taxa 2,00. Viga livre sobre base elástica com carga
+central (βL = 4), n = 4, 8 e 16: erros 2,8e−5, 1,8e−6 e 1,1e−7, taxa 3,99.
+
+**2026-11-16 — T30 (pontos de tensão por forma):** retângulo: quinas, centro
+(cisalhamento da cortante) e meio do lado maior (torção de Roark); círculo e
+tubo circular: oito pontos no perímetro, com o cisalhamento da cortante na
+linha neutra de cada direção; tubo retangular: quinas e meios dos lados
+(Bredt); perfil I: pontas das mesas, centro da alma e centro da mesa; perfil
+U: pontas das mesas, dorso da alma e centro da alma; perfil T: pontas da mesa,
+base da alma e linha neutra; cantoneira: calcanhar e pontas das abas, só com a
+normal e a torção (o fluxo da cortante nos eixos principais da cantoneira não
+tem fórmula simples).

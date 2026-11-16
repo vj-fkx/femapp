@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstddef>
 #include <utility>
 
@@ -182,6 +183,55 @@ BeamPoint BeamResult::at(double x, Side side) const
     r.displacement = Eigen::Vector3d(u, v + ez * rx, w - ey * rx);
     r.rotation = Eigen::Vector3d(rx, ry, rz);
     return r;
+}
+
+namespace {
+
+double normalAt(const SectionProperties& section, const BeamForces& forces,
+                const Eigen::Vector2d& principal)
+{
+    return forces.n / section.area - forces.mz * principal.x() / section.inertiaZ +
+           forces.my * principal.y() / section.inertiaY;
+}
+
+} // namespace
+
+double normalStress(const SectionProperties& section, const BeamForces& forces,
+                    const Eigen::Vector2d& point)
+{
+    const double c = std::cos(section.principalAngle);
+    const double s = std::sin(section.principalAngle);
+    return normalAt(section, forces,
+                    Eigen::Vector2d(c * point.x() + s * point.y(), -s * point.x() + c * point.y()));
+}
+
+std::vector<PointStress> sectionStresses(const Section& section, const BeamForces& forces)
+{
+    if (!section.shape) {
+        return {};
+    }
+    const auto properties = sectionProperties(section);
+    if (!properties) {
+        return {};
+    }
+    std::vector<PointStress> stresses;
+    for (const StressPoint& point : stressPoints(*section.shape)) {
+        PointStress stress;
+        stress.name = point.name;
+        stress.normal = normalAt(*properties, forces, point.position);
+        if (point.thicknessY > 0.0) {
+            stress.shear += std::abs(forces.vy) * point.firstMomentY /
+                            (properties->inertiaZ * point.thicknessY);
+        }
+        if (point.thicknessZ > 0.0) {
+            stress.shear += std::abs(forces.vz) * point.firstMomentZ /
+                            (properties->inertiaY * point.thicknessZ);
+        }
+        stress.shear += std::abs(forces.t) * point.torsionFactor;
+        stress.vonMises = std::sqrt(stress.normal * stress.normal + 3.0 * stress.shear * stress.shear);
+        stresses.push_back(std::move(stress));
+    }
+    return stresses;
 }
 
 } // namespace fem::core

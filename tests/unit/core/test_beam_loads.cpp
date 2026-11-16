@@ -377,3 +377,104 @@ TEST_CASE("forces along a beam on an elastic foundation", "[core][beam][loads]")
         CHECK(fem::core::test::near(end.forces.mz, beam.end().mz, 1e-6, 1e4 * kL * kL));
     }
 }
+
+// REQ-008-16, 18, 19, NFR-008-01: temperature, initial strain and weight in
+// analyses.
+TEST_CASE("temperature and weight on beams", "[core][beam][loads]")
+{
+    using fem::core::test::kArea;
+    using fem::core::test::kE;
+    using fem::core::test::kIz;
+    using fem::core::test::near;
+    const double alpha = fem::core::test::steel().thermalExpansion.value_or(0.0);
+    const double gy = 30.0; // dT/dy
+    const auto row = [](int pieces) {
+        fem::core::test::TrussSpec spec;
+        for (int i = 0; i <= pieces; ++i) {
+            spec.nodes.emplace_back(kL * i / pieces, 0.0, 0.0);
+        }
+        for (int i = 0; i < pieces; ++i) {
+            spec.bars.push_back({i, i + 1});
+        }
+        return spec;
+    };
+    const fem::core::ElementIds all{{1, 2, 3}};
+
+    SECTION("fixed-fixed with a gradient: M = EI alpha dT/dy, no displacement")
+    {
+        const bool timoshenko = GENERATE(false, true);
+        fem::core::Model model = fem::core::test::beamModel(
+            row(3), fem::core::ElementKind::Beam2D,
+            timoshenko ? fem::core::BeamTheory::Timoshenko : fem::core::BeamTheory::EulerBernoulli);
+        fem::core::test::fixAll(model, {1, 4}, fem::core::ElementKind::Beam2D);
+        model.temperatureGradients.push_back({.elements = all, .alongY = gy});
+        const auto result = fem::core::test::solve(model);
+        for (std::size_t n = 0; n < 4; ++n) {
+            CHECK(result.displacements[n].norm() <= 1e-14);
+            CHECK(std::abs(result.rotations[n].z()) <= 1e-14);
+        }
+        for (std::size_t e = 0; e < 3; ++e) {
+            const auto& beam = fem::core::test::beamOf(result, e);
+            CHECK(near(beam.at(0.4 * beam.length()).forces.mz, kE * kIz * alpha * gy, 1e-10));
+            CHECK(near(beam.start().vy, 0.0, 1e-10, kE * kIz * alpha * gy));
+        }
+    }
+    SECTION("simply supported with a gradient: free curvature")
+    {
+        fem::core::Model model = simpleBeam(3, fem::core::BeamTheory::EulerBernoulli);
+        model.temperatureGradients.push_back({.elements = all, .alongY = gy});
+        const auto result = fem::core::test::solve(model);
+        // rz' = -alpha gy: v = -alpha gy x (x - L) / 2, rz(0) = alpha gy L / 2.
+        const double k = -alpha * gy;
+        CHECK(near(result.rotations[0].z(), -k * kL / 2, 1e-10));
+        const auto& middle = fem::core::test::beamOf(result, 1);
+        const double x = kL / 2;
+        CHECK(near(middle.at(middle.length() / 2).displacement.y(), k * x * (x - kL) / 2, 1e-10));
+        CHECK(near(middle.at(0.3).forces.mz, 0.0, 1e-10, kE * kIz * alpha * gy));
+    }
+    SECTION("uniform temperature and initial strain held at both ends")
+    {
+        fem::core::Model model = fem::core::test::beamModel(row(3), fem::core::ElementKind::Beam3D);
+        fem::core::test::fixAll(model, {1, 4}, fem::core::ElementKind::Beam3D);
+        model.temperatureChanges.push_back({.elements = all, .deltaT = 25.0});
+        model.initialStrains.push_back({.elements = fem::core::ElementIds{{2}}, .strain = 1e-4});
+        const auto result = fem::core::test::solve(model);
+        // In series: N = -EA (sum of the imposed elongations) / L.
+        const double n = -kE * kArea * (alpha * 25.0 + 1e-4 / 3.0);
+        for (std::size_t e = 0; e < 3; ++e) {
+            CHECK(near(result.axialForce[e], n, 1e-10));
+            CHECK(near(fem::core::test::beamOf(result, e).start().mz, 0.0, 1e-10, -n));
+        }
+    }
+    SECTION("an L frame free at its tip only moves")
+    {
+        fem::core::test::TrussSpec spec;
+        spec.nodes = {{0.0, 0.0, 0.0}, {0.0, 3.0, 0.0}, {kL, 3.0, 0.0}};
+        spec.bars = {{0, 1}, {1, 2}};
+        fem::core::Model model = fem::core::test::beamModel(spec, fem::core::ElementKind::Beam2D);
+        fem::core::test::fixAll(model, {1}, fem::core::ElementKind::Beam2D);
+        model.temperatureChanges.push_back({.elements = fem::core::ElementIds{{2}}, .deltaT = 40.0});
+        const auto result = fem::core::test::solve(model);
+        CHECK(near(result.displacements[2].x(), alpha * 40.0 * kL, 1e-10));
+        CHECK(result.reactions[0].norm() <= 1e-6);
+        CHECK(near(result.axialForce[1], 0.0, 1e-10, kE * kArea * alpha * 40.0));
+    }
+    SECTION("self-weight of an inclined cantilever")
+    {
+        const double angle = 0.6;
+        fem::core::test::TrussSpec spec;
+        spec.nodes = {{0.0, 0.0, 0.0}, {kL * std::cos(angle), kL * std::sin(angle), 0.0}};
+        spec.bars = {{0, 1}};
+        fem::core::Model model = fem::core::test::beamModel(spec, fem::core::ElementKind::Beam2D);
+        fem::core::test::fixAll(model, {1}, fem::core::ElementKind::Beam2D);
+        model.gravity = Eigen::Vector3d(0.0, -9.81, 0.0);
+        const auto result = fem::core::test::solve(model);
+        const double weight = 7850.0 * kArea * 9.81 * kL;
+        CHECK(near(result.reactions[0].y(), weight, 1e-10));
+        CHECK(near(result.reactions[0].x(), 0.0, 1e-10, weight));
+        CHECK(near(result.reactionMoments[0].z(), weight * kL * std::cos(angle) / 2, 1e-10));
+        // Along the bar: the axial part of the weight, compression at the root.
+        const auto& beam = fem::core::test::beamOf(result, 0);
+        CHECK(near(beam.start().n, -weight * std::sin(angle), 1e-10));
+    }
+}

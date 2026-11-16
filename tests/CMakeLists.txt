@@ -22,6 +22,7 @@ endfunction()
 
 femapp_add_test(core SOURCES
     test_assembler.cpp
+    test_beam_connections.cpp
     test_beam_element.cpp
     test_beam_loads.cpp
     test_beam_validation.cpp

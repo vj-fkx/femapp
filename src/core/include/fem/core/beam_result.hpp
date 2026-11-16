@@ -1,9 +1,12 @@
 #pragma once
 
 #include <fem/core/beam_loads.hpp>
+#include <fem/core/section.hpp>
 
 #include <Eigen/Core>
 #include <cstdint>
+#include <string>
+#include <vector>
 
 namespace fem::core {
 
@@ -63,6 +66,25 @@ public:
 private:
     Data m_data;
 };
+
+// REQ-008-23: the stresses at a point of the section.
+struct PointStress
+{
+    std::string name;
+    double normal = 0.0;   // N/A - Mz y'/Iz + My z'/Iy
+    double shear = 0.0;    // |tau_V| + |tau_T|: the sum is on the safe side
+    double vonMises = 0.0; // sqrt(sigma^2 + 3 tau^2)
+};
+
+// At the stress points of the shape of `section`; empty for a generic
+// section or an impossible shape.
+[[nodiscard]] std::vector<PointStress> sectionStresses(const Section& section,
+                                                       const BeamForces& forces);
+
+// The normal stress at a point (y, z) of the local axes of the bar, from the
+// centroid: for any section, the generic one included.
+[[nodiscard]] double normalStress(const SectionProperties& section, const BeamForces& forces,
+                                  const Eigen::Vector2d& point);
 
 // Internal forces at both ends from the end forces of beamEnds() (forces
 // that the nodes apply on the bar, on the centroid dofs).

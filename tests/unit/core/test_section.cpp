@@ -1,14 +1,18 @@
 // REQ-008-02 to 05: section properties of the generic section and of the
 // eight shapes.
 
+#include <fem/core/beam_result.hpp>
 #include <fem/core/section.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
 #include <Eigen/Core>
+#include <Eigen/LU>
+#include <algorithm>
 #include <cmath>
 #include <numbers>
 #include <string>
+#include <vector>
 
 using fem::core::Section;
 using fem::core::SectionProperties;
@@ -250,4 +254,110 @@ TEST_CASE("impossible shapes are refused", "[core][section]")
           "Section \"S\": tf must be less than h.");
     CHECK(failure(fem::core::Angle{.b = 0.1, .h = 0.1, .t = 0.1}) ==
           "Section \"S\": the thickness t must be less than b and h.");
+}
+
+namespace {
+
+// By value: a reference would trip GCC 13 -Wdangling-reference (the name is a
+// temporary).
+fem::core::PointStress at(const std::vector<fem::core::PointStress>& stresses,
+                          const std::string& name)
+{
+    const auto found = std::find_if(stresses.begin(), stresses.end(),
+                                    [&name](const auto& stress) { return stress.name == name; });
+    INFO("stress point " << name);
+    REQUIRE(found != stresses.end());
+    return *found;
+}
+
+} // namespace
+
+// REQ-008-23: stresses at the points of the shapes.
+TEST_CASE("stresses in the section", "[core][section]")
+{
+    const fem::core::BeamForces f{.n = 1e5, .vy = 3e4, .vz = -1e4, .t = 2e3, .my = -5e3, .mz = 2e4};
+    SECTION("rectangle: bending, 3V/2A and torsion")
+    {
+        const double b = 0.2;
+        const double h = 0.4;
+        Section section{.name = "R"};
+        section.shape = fem::core::Rectangle{.b = b, .h = h};
+        const SectionProperties p = of(*section.shape);
+        const auto stresses = fem::core::sectionStresses(section, f);
+        const auto& corner = at(stresses, "corner +y +z");
+        const double sigma = f.n / p.area - f.mz * (h / 2) / p.inertiaZ + f.my * (b / 2) / p.inertiaY;
+        CHECK(near(corner.normal, sigma, 1e-12));
+        CHECK(corner.shear == 0.0);
+        CHECK(near(corner.vonMises, std::abs(sigma), 1e-12));
+        const auto& centre = at(stresses, "centre");
+        CHECK(near(centre.shear, 1.5 * (std::abs(f.vy) + std::abs(f.vz)) / p.area, 1e-12));
+        CHECK(near(centre.normal, f.n / p.area, 1e-12));
+        // h/b = 2: tau = T / (0.246 h b^2) (Timoshenko and Goodier, table of k2).
+        const auto& side = at(stresses, "middle of the side +z");
+        const double torsion = side.shear - 1.5 * std::abs(f.vy) / p.area;
+        CHECK(near(torsion, f.t / (0.246 * h * b * b), 5e-3));
+        CHECK(near(side.vonMises,
+                   std::sqrt(side.normal * side.normal + 3 * side.shear * side.shear), 1e-12));
+    }
+    SECTION("I section: shear in the web")
+    {
+        const fem::core::ISection s{.h = 0.3, .bf = 0.15, .tf = 0.0107, .tw = 0.0071};
+        Section section{.name = "I", .shape = s};
+        const SectionProperties p = of(s);
+        const auto stresses = fem::core::sectionStresses(section, f);
+        const double q = s.bf * s.tf * (s.h - s.tf) / 2 + s.tw * std::pow(s.h / 2 - s.tf, 2) / 2;
+        CHECK(near(at(stresses, "web centre").shear,
+                   std::abs(f.vy) * q / (p.inertiaZ * s.tw) + std::abs(f.t) * s.tw / p.torsionConstant,
+                   1e-12));
+        // Close to V over the web area.
+        CHECK(near(std::abs(f.vy) * q / (p.inertiaZ * s.tw), std::abs(f.vy) / ((s.h - 2 * s.tf) * s.tw),
+                   0.15));
+        CHECK(near(at(stresses, "corner -y -z").normal,
+                   f.n / p.area + f.mz * (s.h / 2) / p.inertiaZ - f.my * (s.bf / 2) / p.inertiaY,
+                   1e-12));
+    }
+    SECTION("circular tube: T r / J and about 2V/A")
+    {
+        const fem::core::CircularTube s{.d = 0.2, .t = 0.005};
+        Section section{.name = "O", .shape = s};
+        const SectionProperties p = of(s);
+        const auto stresses = fem::core::sectionStresses(section, f);
+        REQUIRE(stresses.size() == 8);
+        const auto& side = at(stresses, "perimeter at 90 degrees"); // y = 0
+        CHECK(near(side.shear - std::abs(f.t) * 0.1 / p.torsionConstant, 2 * std::abs(f.vy) / p.area,
+                   0.02));
+        CHECK(near(at(stresses, "perimeter at 0 degrees").normal,
+                   f.n / p.area - f.mz * 0.1 / p.inertiaZ, 1e-12));
+    }
+    SECTION("channel: torsion T t / J at the flange tip")
+    {
+        const fem::core::Channel s{.h = 0.2, .bf = 0.075, .tf = 0.0115, .tw = 0.0085};
+        Section section{.name = "U", .shape = s};
+        const SectionProperties p = of(s);
+        const auto stresses = fem::core::sectionStresses(section, fem::core::BeamForces{.t = 300.0});
+        CHECK(near(at(stresses, "flange tip +y").shear, 300.0 * s.tf / p.torsionConstant, 1e-12));
+        CHECK(at(stresses, "web centre").normal == 0.0);
+    }
+    SECTION("generic section: unsymmetric bending in the drawing axes")
+    {
+        Section section{.name = "G", .area = 2e-2};
+        section.inertiaY = 3e-5;
+        section.inertiaZ = 9e-5;
+        section.productOfInertia = 2e-5;
+        const SectionProperties p = fem::core::sectionProperties(section).value_or(SectionProperties{});
+        const fem::core::BeamForces bending{.n = 4e4, .my = 3e3, .mz = -6e3}; // principal axes
+        // The moment vector in the drawing axes.
+        const double c = std::cos(p.principalAngle);
+        const double s = std::sin(p.principalAngle);
+        const double myd = c * bending.my - s * bending.mz;
+        const double mzd = s * bending.my + c * bending.mz;
+        // sigma = a + b y + c z with int sigma y = -Mz and int sigma z = My.
+        Eigen::Matrix2d inertia;
+        inertia << 9e-5, 2e-5, 2e-5, 3e-5;
+        const Eigen::Vector2d slope = inertia.inverse() * Eigen::Vector2d(-mzd, myd);
+        const Eigen::Vector2d point(0.07, -0.04);
+        CHECK(near(fem::core::normalStress(p, bending, point),
+                   bending.n / 2e-2 + slope.dot(point), 1e-12));
+        CHECK(fem::core::sectionStresses(section, bending).empty());
+    }
 }

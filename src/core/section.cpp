@@ -381,4 +381,169 @@ Expected<SectionProperties> sectionProperties(const Section& section)
     return principal(g, data->torsion, shearCentre, data->shearAreaY, data->shearAreaZ);
 }
 
+namespace {
+
+// Points in the drawing; turned to the principal axes by stressPoints().
+class PointBuilder
+{
+public:
+    explicit PointBuilder(const SectionProperties& p)
+        : m_p(p)
+    {}
+
+    std::vector<StressPoint> operator()(const Rectangle& s)
+    {
+        corners(s.h / 2, s.b / 2, 0.0);
+        add("centre", 0.0, 0.0, s.b * s.h * s.h / 8, s.b, s.h * s.b * s.b / 8, s.h, 0.0);
+        // Saint-Venant torsion of a rectangle 2a x 2b, a >= b: the largest
+        // shear at the middle of the long sides (Roark, table 10.7, case 4):
+        // tau = 3T / (8ab^2) [1 + 0.6095 r + 0.8865 r^2 - 1.8023 r^3 + 0.9100 r^4].
+        const double a = std::max(s.b, s.h) / 2;
+        const double b = std::min(s.b, s.h) / 2;
+        const double r = b / a;
+        const double factor = 3.0 / (8.0 * a * b * b) *
+                              (1.0 + 0.6095 * r + 0.8865 * r * r - 1.8023 * r * r * r +
+                               0.9100 * r * r * r * r);
+        if (s.h >= s.b) {
+            add("middle of the side +z", 0.0, s.b / 2, s.b * s.h * s.h / 8, s.b, 0.0, 0.0, factor);
+        } else {
+            add("middle of the side +y", s.h / 2, 0.0, 0.0, 0.0, s.h * s.b * s.b / 8, s.h, factor);
+        }
+        return std::move(m_points);
+    }
+
+    std::vector<StressPoint> operator()(const Circle& s)
+    {
+        perimeter(s.d / 2, std::pow(s.d, 3) / 12, s.d);
+        return std::move(m_points);
+    }
+
+    std::vector<StressPoint> operator()(const CircularTube& s)
+    {
+        const double inner = s.d - 2 * s.t;
+        perimeter(s.d / 2, (std::pow(s.d, 3) - std::pow(inner, 3)) / 12, 2 * s.t);
+        return std::move(m_points);
+    }
+
+    std::vector<StressPoint> operator()(const RectangularTube& s)
+    {
+        // Bredt: tau = T / (2 Am t) all around.
+        const double factor = 1.0 / (2.0 * (s.b - s.t) * (s.h - s.t) * s.t);
+        corners(s.h / 2, s.b / 2, factor);
+        const double qy = (s.b * s.h * s.h - (s.b - 2 * s.t) * std::pow(s.h - 2 * s.t, 2)) / 8;
+        const double qz = (s.h * s.b * s.b - (s.h - 2 * s.t) * std::pow(s.b - 2 * s.t, 2)) / 8;
+        add("middle of the side +z", 0.0, s.b / 2, qy, 2 * s.t, 0.0, 0.0, factor);
+        add("middle of the side +y", s.h / 2, 0.0, 0.0, 0.0, qz, 2 * s.t, factor);
+        return std::move(m_points);
+    }
+
+    std::vector<StressPoint> operator()(const ISection& s)
+    {
+        const double j = m_p.torsionConstant;
+        corners(s.h / 2, s.bf / 2, s.tf / j);
+        const double qy = s.bf * s.tf * (s.h - s.tf) / 2 + s.tw * std::pow(s.h / 2 - s.tf, 2) / 2;
+        add("web centre", 0.0, 0.0, qy, s.tw, 0.0, 0.0, s.tw / j);
+        add("top flange centre", s.h / 2 - s.tf / 2, 0.0, 0.0, 0.0, s.tf * s.bf * s.bf / 8, s.tf,
+            s.tf / j);
+        return std::move(m_points);
+    }
+
+    std::vector<StressPoint> operator()(const Angle& s)
+    {
+        const double factor = s.t / m_p.torsionConstant;
+        add("heel", 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, factor);
+        add("tip of the leg along y, outer", s.h, 0.0, 0.0, 0.0, 0.0, 0.0, factor);
+        add("tip of the leg along y, inner", s.h, s.t, 0.0, 0.0, 0.0, 0.0, factor);
+        add("tip of the leg along z, outer", 0.0, s.b, 0.0, 0.0, 0.0, 0.0, factor);
+        add("tip of the leg along z, inner", s.t, s.b, 0.0, 0.0, 0.0, 0.0, factor);
+        return std::move(m_points);
+    }
+
+    std::vector<StressPoint> operator()(const Channel& s)
+    {
+        const double j = m_p.torsionConstant;
+        for (const double y : {s.h / 2, -s.h / 2}) {
+            const std::string side = y > 0 ? "+y" : "-y";
+            add("flange tip " + side, y, s.bf, 0.0, 0.0, 0.0, 0.0, s.tf / j);
+            add("web back " + side, y, 0.0, 0.0, 0.0, 0.0, 0.0, s.tw / j);
+        }
+        const double qy = s.bf * s.tf * (s.h - s.tf) / 2 + s.tw * std::pow(s.h / 2 - s.tf, 2) / 2;
+        add("web centre", 0.0, s.tw / 2, qy, s.tw, 0.0, 0.0, s.tw / j);
+        return std::move(m_points);
+    }
+
+    std::vector<StressPoint> operator()(const Tee& s)
+    {
+        const double j = m_p.torsionConstant;
+        add("flange tip +z", s.h, s.bf / 2, 0.0, 0.0, 0.0, 0.0, s.tf / j);
+        add("flange tip -z", s.h, -s.bf / 2, 0.0, 0.0, 0.0, 0.0, s.tf / j);
+        add("stem bottom", 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, s.tw / j);
+        const double yc = m_p.centroid.x();
+        if (yc < s.h - s.tf) {
+            const double qy = s.bf * s.tf * (s.h - s.tf / 2 - yc) + s.tw * std::pow(s.h - s.tf - yc, 2) / 2;
+            add("stem at the neutral axis", yc, 0.0, qy, s.tw, 0.0, 0.0, s.tw / j);
+        } else {
+            add("flange at the neutral axis", yc, 0.0, s.bf * std::pow(s.h - yc, 2) / 2, s.bf, 0.0,
+                0.0, s.tf / j);
+        }
+        return std::move(m_points);
+    }
+
+private:
+    void add(std::string name, double y, double z, double qy, double ty, double qz, double tz,
+             double torsion)
+    {
+        m_points.push_back({.name = std::move(name),
+                            .position = toPrincipal(Eigen::Vector2d(y, z) - m_p.centroid,
+                                                    m_p.principalAngle),
+                            .firstMomentY = qy,
+                            .thicknessY = ty,
+                            .firstMomentZ = qz,
+                            .thicknessZ = tz,
+                            .torsionFactor = torsion});
+    }
+
+    // The four corners of a centred box.
+    void corners(double y, double z, double torsion)
+    {
+        add("corner +y +z", y, z, 0.0, 0.0, 0.0, 0.0, torsion);
+        add("corner +y -z", y, -z, 0.0, 0.0, 0.0, 0.0, torsion);
+        add("corner -y +z", -y, z, 0.0, 0.0, 0.0, 0.0, torsion);
+        add("corner -y -z", -y, -z, 0.0, 0.0, 0.0, 0.0, torsion);
+    }
+
+    // Eight points on a circle of radius r; Q and t of the half section at
+    // the neutral axis of each shear force.
+    void perimeter(double r, double q, double t)
+    {
+        const double torsion = r / m_p.torsionConstant;
+        for (int k = 0; k < 8; ++k) {
+            const double angle = kPi / 4 * k;
+            const double y = r * std::cos(angle);
+            const double z = r * std::sin(angle);
+            const bool onZ = k == 2 || k == 6; // y = 0: shear of Vy
+            const bool onY = k == 0 || k == 4; // z = 0: shear of Vz
+            add("perimeter at " + std::to_string(45 * k) + " degrees", onZ ? 0.0 : y,
+                onY ? 0.0 : z, onZ ? q : 0.0, onZ ? t : 0.0, onY ? q : 0.0, onY ? t : 0.0,
+                torsion);
+        }
+    }
+
+    const SectionProperties& m_p;
+    std::vector<StressPoint> m_points;
+};
+
+} // namespace
+
+std::vector<StressPoint> stressPoints(const SectionShape& shape)
+{
+    Section section{.name = "", .shape = shape};
+    const auto properties = sectionProperties(section);
+    if (!properties) {
+        return {};
+    }
+    PointBuilder builder(*properties);
+    return std::visit(builder, shape);
+}
+
 } // namespace fem::core
