@@ -3,10 +3,14 @@
 // Pieces of the section computations shared between section.cpp and the
 // sources of the thin-walled and solid sections (design 008b §5.1).
 
+#include <fem/core/detail/section_mesh.hpp>
 #include <fem/core/expected.hpp>
 #include <fem/core/section.hpp>
 
 #include <Eigen/Core>
+#include <array>
+#include <cstddef>
+#include <memory>
 #include <string_view>
 #include <vector>
 
@@ -47,5 +51,58 @@ struct ThinWalledData
 // (REQ-008b-04).
 [[nodiscard]] Expected<ThinWalledData> thinWalled(const ThinWalled& shape,
                                                   std::string_view section);
+
+// I'z (aboutZ) or I'y of the principal axes turned by theta.
+[[nodiscard]] double toPrincipalInertia(const SectionGeometry& g, double theta, bool aboutZ);
+
+// REQ-008b-02, 06: the fields of a solid polygon section on its mesh, kept
+// for the stresses (design 008b §5.1.3). Nodal values.
+struct SolidField
+{
+    SectionMesh mesh;
+    Eigen::Vector2d centroid = Eigen::Vector2d::Zero(); // drawing
+    double principalAngle = 0.0;
+    Eigen::VectorXd phi;   // Saint-Venant warping, pole at the centroid
+    Eigen::VectorXd omega; // sectorial coordinate about the shear centre, normalised
+    Eigen::VectorXd chiY;  // shear function of a shear force along y'
+    Eigen::VectorXd chiZ;  // along z'
+};
+
+struct SolidData
+{
+    SectionGeometry geometry;
+    double torsion = 0.0;
+    Eigen::Vector2d shearCentre = Eigen::Vector2d::Zero(); // drawing, absolute
+    double warping = 0.0;
+    double shearAreaY = 0.0; // principal y'
+    double shearAreaZ = 0.0;
+    std::shared_ptr<const SolidField> field;
+};
+
+// Fails as meshSection does (REQ-008b-04).
+[[nodiscard]] Expected<SolidData> solidSection(const SolidPolygon& shape, std::string_view section);
+
+// One six-node triangle of the section mesh (straight sides).
+struct SolidElement
+{
+    std::array<int, 6> nodes{};
+    double area = 0.0;
+    std::array<Eigen::Vector2d, 3> corners{Eigen::Vector2d::Zero(), Eigen::Vector2d::Zero(),
+                                           Eigen::Vector2d::Zero()};
+    std::array<Eigen::Vector2d, 3> gradL{Eigen::Vector2d::Zero(), Eigen::Vector2d::Zero(),
+                                         Eigen::Vector2d::Zero()};
+};
+
+// The quadratic shape functions at area coordinates l, their gradients in
+// the drawing and the point.
+struct SolidShape
+{
+    Eigen::Matrix<double, 6, 1> n = Eigen::Matrix<double, 6, 1>::Zero();
+    Eigen::Matrix<double, 2, 6> gradient = Eigen::Matrix<double, 2, 6>::Zero();
+    Eigen::Vector2d position = Eigen::Vector2d::Zero();
+};
+
+[[nodiscard]] SolidElement solidElement(const SectionMesh& mesh, std::size_t triangle);
+[[nodiscard]] SolidShape solidShape(const SolidElement& element, const std::array<double, 3>& l);
 
 } // namespace fem::core::detail

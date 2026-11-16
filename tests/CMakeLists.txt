@@ -42,6 +42,7 @@ femapp_add_test(core SOURCES
     test_quadrature.cpp
     test_section.cpp
     test_section_mesh.cpp
+    test_section_solid.cpp
     test_section_thin_walled.cpp
     test_shape_functions.cpp
     test_static_validation.cpp

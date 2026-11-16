@@ -3,7 +3,9 @@
 #include <fem/core/expected.hpp>
 
 #include <Eigen/Core>
+#include <memory>
 #include <optional>
+#include <span>
 #include <string>
 #include <variant>
 #include <vector>
@@ -104,7 +106,7 @@ struct SolidPolygon
 };
 
 using SectionShape = std::variant<Rectangle, Circle, CircularTube, RectangularTube, ISection, Angle,
-                                  Channel, Tee, ThinWalled>;
+                                  Channel, Tee, ThinWalled, SolidPolygon>;
 
 // REQ-007-02, 008-02: a bar or beam section. Either a generic section, by its
 // properties about axes through the centroid parallel to the local y and z
@@ -167,6 +169,32 @@ struct StressPoint
     // the mid-line; the warping displacement is -omega theta'.
     double sectorial = 0.0;
 };
+
+namespace detail {
+struct SolidField;
+} // namespace detail
+
+// REQ-008b-02, 06: a section solved once (design 008b §5.1): its properties,
+// its stress points and, for a solid polygon, the fields on its mesh.
+class SectionSolution
+{
+public:
+    SectionSolution(SectionProperties properties, std::vector<StressPoint> points,
+                    std::shared_ptr<const detail::SolidField> field = nullptr);
+
+    [[nodiscard]] const SectionProperties& properties() const { return m_properties; }
+    [[nodiscard]] std::span<const StressPoint> points() const { return m_points; }
+    // Null except for a solid polygon.
+    [[nodiscard]] const detail::SolidField* field() const { return m_field.get(); }
+
+private:
+    SectionProperties m_properties;
+    std::vector<StressPoint> m_points;
+    std::shared_ptr<const detail::SolidField> m_field;
+};
+
+// Solves the section; fails as sectionProperties does.
+[[nodiscard]] Expected<std::shared_ptr<const SectionSolution>> solveSection(const Section& section);
 
 // The points of a valid shape: the extreme fibres, the points of largest
 // shear and of largest torsional shear. The angle only has its corners and

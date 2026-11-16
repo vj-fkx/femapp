@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <memory>
 #include <numbers>
 #include <string>
 #include <string_view>
@@ -109,8 +110,10 @@ struct ShapeData
     double shearAreaY = 0.0;
     double shearAreaZ = 0.0;
     double warping = 0.0; // Iw (design 008b section 5.1.1)
-    // The shear areas are already about the principal axes (thin-walled).
+    // The shear areas are already about the principal axes (thin-walled,
+    // solid polygon).
     bool principalShearAreas = false;
+    std::shared_ptr<const detail::SolidField> field; // solid polygon
 };
 
 // REQ-008b-01: warping of the thin-walled shapes on their mid-lines
@@ -336,6 +339,27 @@ public:
         return d;
     }
 
+    Expected<ShapeData> operator()(const SolidPolygon& s) const
+    {
+        auto solid = detail::solidSection(s, m_section);
+        if (!solid) {
+            return tl::unexpected(solid.error());
+        }
+        const detail::SectionGeometry& g = solid->geometry;
+        ShapeData d;
+        d.exact =
+            Geometric{.area = g.area, .centroid = g.centroid, .iy = g.iy, .iz = g.iz, .iyz = g.iyz};
+        d.torsion = solid->torsion;
+        d.shearCentre = solid->shearCentre;
+        d.shearCentreAtCentroid = false;
+        d.shearAreaY = solid->shearAreaY;
+        d.shearAreaZ = solid->shearAreaZ;
+        d.principalShearAreas = true;
+        d.warping = solid->warping;
+        d.field = std::move(solid->field);
+        return d;
+    }
+
 private:
     // A name and its value.
     using Dimension = std::pair<std::string_view, double>;
@@ -434,7 +458,16 @@ SectionProperties principal(const Geometric& g, double torsion, const Eigen::Vec
 
 } // namespace
 
-Expected<SectionProperties> sectionProperties(const Section& section)
+namespace {
+
+// The properties of a section and, for a solid polygon, its fields.
+struct Solved
+{
+    SectionProperties properties;
+    std::shared_ptr<const detail::SolidField> field;
+};
+
+Expected<Solved> solve(const Section& section)
 {
     if (!section.shape) {
         Geometric g;
@@ -442,9 +475,11 @@ Expected<SectionProperties> sectionProperties(const Section& section)
         g.iy = section.inertiaY.value_or(0.0);
         g.iz = section.inertiaZ.value_or(0.0);
         g.iyz = section.productOfInertia.value_or(0.0);
-        return principal(g, section.torsionConstant.value_or(0.0),
-                         section.shearCentre.value_or(Eigen::Vector2d::Zero()), section.shearAreaY,
-                         section.shearAreaZ, section.warpingConstant.value_or(0.0));
+        return Solved{.properties = principal(g, section.torsionConstant.value_or(0.0),
+                                              section.shearCentre.value_or(Eigen::Vector2d::Zero()),
+                                              section.shearAreaY, section.shearAreaZ,
+                                              section.warpingConstant.value_or(0.0)),
+                      .field = nullptr};
     }
     const auto data = std::visit(ShapeBuilder(section.name), *section.shape);
     if (!data) {
@@ -461,10 +496,8 @@ Expected<SectionProperties> sectionProperties(const Section& section)
         p.shearAreaY = data->shearAreaY;
         p.shearAreaZ = data->shearAreaZ;
     }
-    return p;
+    return Solved{.properties = p, .field = data->field};
 }
-
-namespace {
 
 // Points in the drawing; turned to the principal axes by stressPoints().
 class PointBuilder
@@ -562,6 +595,7 @@ public:
 
     // The thin-walled points come with the stresses (task T12 of 008b).
     std::vector<StressPoint> operator()(const ThinWalled& /*s*/) { return {}; }
+    std::vector<StressPoint> operator()(const SolidPolygon& /*s*/) { return {}; }
 
     std::vector<StressPoint> operator()(const Tee& s)
     {
@@ -627,15 +661,45 @@ private:
 
 } // namespace
 
+SectionSolution::SectionSolution(SectionProperties properties, std::vector<StressPoint> points,
+                                 std::shared_ptr<const detail::SolidField> field)
+    : m_properties(std::move(properties))
+    , m_points(std::move(points))
+    , m_field(std::move(field))
+{}
+
+Expected<std::shared_ptr<const SectionSolution>> solveSection(const Section& section)
+{
+    auto solved = solve(section);
+    if (!solved) {
+        return tl::unexpected(solved.error());
+    }
+    std::vector<StressPoint> points;
+    if (section.shape) {
+        PointBuilder builder(solved->properties);
+        points = std::visit(builder, *section.shape);
+    }
+    return std::make_shared<const SectionSolution>(solved->properties, std::move(points),
+                                                   std::move(solved->field));
+}
+
+Expected<SectionProperties> sectionProperties(const Section& section)
+{
+    const auto solved = solve(section);
+    if (!solved) {
+        return tl::unexpected(solved.error());
+    }
+    return solved->properties;
+}
+
 std::vector<StressPoint> stressPoints(const SectionShape& shape)
 {
-    const Section section{.name = "", .shape = shape};
-    const auto properties = sectionProperties(section);
-    if (!properties) {
+    const auto solution = solveSection({.name = "", .shape = shape});
+    if (!solution) {
         return {};
     }
-    PointBuilder builder(*properties);
-    return std::visit(builder, shape);
+    const auto points = (*solution)->points();
+    return {points.begin(), points.end()};
 }
 
 } // namespace fem::core

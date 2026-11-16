@@ -29,6 +29,7 @@ femapp_add_module(core
         quadrature.cpp
         section.cpp
         section_mesh.cpp
+        section_solid.cpp
         section_thin_walled.cpp
         shape_functions.cpp
         static_analysis.cpp

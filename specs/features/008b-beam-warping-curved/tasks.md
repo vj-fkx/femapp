@@ -57,13 +57,13 @@ Regras:
   `tests/unit/core/test_section_mesh.cpp` — cobre: 02, 04
 - [x] **T09** Implementar `detail/section_mesh.hpp/.cpp` até a T08 passar:
   orelhas com pontes, Lawson, Rivara, nós T6 — cobre: 02, 04
-- [ ] **T10** Testes de `SolidPolygon` (§5.1.3): geometria exata (retângulo,
+- [x] **T10** Testes de `SolidPolygon` (§5.1.3): geometria exata (retângulo,
   polígono com furo, regiões disjuntas; 1e−10); J do retângulo contra a
   série e do tubo contra o exato; centro de cisalhamento e Iw de I e U
   poligonais contra paredes finas (tolerância documentada); As 5/6 e 6/7;
   erro ≤ 0,5% com o tamanho padrão; taxa de J (4 ± 0,5) — arquivo:
   `tests/unit/core/test_section_solid.cpp` — cobre: 02, N02
-- [ ] **T11** Implementar `section_solid.cpp` (empenamento, Trefftz, Iw,
+- [x] **T11** Implementar `section_solid.cpp` (empenamento, Trefftz, Iw,
   funções de cisalhamento de Pilkey) e `SectionSolution`/`solveSection`;
   `sectionProperties` passa a chamar `solveSection` — cobre: 02, 05
 - [ ] **T12** Testes e implementação das tensões das seções novas: na
