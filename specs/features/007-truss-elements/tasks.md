@@ -1,6 +1,6 @@
 # Tarefas — 007 truss-elements
 
-Status: em andamento
+Status: concluído · 2026-11-16
 Design: [design.md](design.md) · Requisitos: [requirements.md](requirements.md)
 
 Regras:
@@ -103,12 +103,12 @@ Regras:
 
 ## Fase 7 — Fechamento
 
-- [ ] **T90** Build e testes verdes nos jobs do CI, incluindo o de cobertura
+- [x] **T90** Build e testes verdes nos jobs do CI, incluindo o de cobertura
   com `core` ≥ 80% (push com sua confirmação) — cobre: AC-8, N03
-- [ ] **T91** `clang-format` e `clang-tidy` sem pendências (também o do Linux,
+- [x] **T91** `clang-format` e `clang-tidy` sem pendências (também o do Linux,
   pelo CI); `core` sem headers Qt
-- [ ] **T92** Conferir os oito critérios de aceite de `requirements.md`
-- [ ] **T93** Atualizar `specs/roadmap.md` para `concluída`
+- [x] **T92** Conferir os oito critérios de aceite de `requirements.md`
+- [x] **T93** Atualizar `specs/roadmap.md` para `concluída`
 
 ## Matriz de rastreabilidade
 
@@ -164,3 +164,28 @@ Com a meta revista (~16 mil GDL em < 5 s), n = 18 atende: 3,7 s.
 
 A validação leva 3 ms. O tempo cresce com o quadrado do número de GDL, como
 na 006: a fatoração simplicial de um grafo 3D com 3 GDL por nó domina.
+
+**2026-11-16 — Fechamento (T90 a T93):**
+
+- T90: execução `5e770ee` verde nos seis jobs (Windows, macOS, linux-gcc,
+  linux-clang, cobertura e formatação):
+  <https://github.com/vj-fkx/femapp/actions/runs/43856149069>. Cobertura de
+  `core`: 96,5% das linhas (`static_analysis.cpp` 97%, `model.cpp` 100%,
+  `truss_element.cpp` 97%).
+- T91: `clang-format` e `clang-tidy` limpos no Windows e no Linux;
+  `check_no_qt_includes` verde. Duas correções só apareceram no CI: o
+  `-Wmaybe-uninitialized` do GCC 13 em `test_static_validation.cpp` (pragma
+  com comentário) e o `-Wmismatched-new-delete` em `test_allocations.cpp`
+  (vetor trocado por `std::array`).
+- T92, os oito critérios de aceite:
+  - AC-1: `test_model.cpp` (alvos por grupo e por lista, edição e cópia por
+    valor; a análise recebe o `Model` como `const`).
+  - AC-2: `test_truss_element.cpp` (fórmula fechada, rotação, modos rígidos,
+    cargas equivalentes).
+  - AC-3 a AC-6: `test_truss_verification.cpp` (patch tests, casos
+    analíticos, ΔT e ε₀, barra pendurada e convergência com taxa ≈ 1).
+  - AC-7: `test_static_validation.cpp` e o teste do pivô singular em
+    `test_assembler.cpp`.
+  - AC-8: `core` sem Qt, benchmark registrado acima (meta revista), CI verde
+    com cobertura ≥ 80%.
+- T93: roadmap atualizado.

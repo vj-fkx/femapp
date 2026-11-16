@@ -74,36 +74,36 @@ exercitado por testes; nada muda na interface.
 
 ## 5. Critérios de aceite
 
-- [ ] **AC-1** (REQ-007-01 a 07, 13) Testes do `Model`: incluir, alterar,
+- [x] **AC-1** (REQ-007-01 a 07, 13) Testes do `Model`: incluir, alterar,
   remover e copiar materiais, seções, atribuições, apoios e ações; atribuição
   por grupo da malha e por lista; a análise não altera o `Model`.
-- [ ] **AC-2** (REQ-007-08, 11) Testes do elemento: matriz de rigidez de uma
+- [x] **AC-2** (REQ-007-08, 11) Testes do elemento: matriz de rigidez de uma
   barra em orientação qualquer igual à fórmula fechada; invariância sob
   rotação; modos de corpo rígido com energia nula (3 em 2D, 5 de 6 na barra
   isolada em 3D, mais a rotação em torno do próprio eixo); cargas
   equivalentes de peso próprio, ΔT e ε₀.
-- [ ] **AC-3** (REQ-007-12, NFR-007-01) Patch test: uma treliça triangulada
+- [x] **AC-3** (REQ-007-12, NFR-007-01) Patch test: uma treliça triangulada
   com deslocamentos prescritos de um campo de deformação uniforme nos nós do
   contorno reproduz o campo nos nós internos e esforços coerentes em todas as
   barras.
-- [ ] **AC-4** (REQ-007-12, NFR-007-01) Soluções analíticas, em 2D e em 3D:
+- [x] **AC-4** (REQ-007-12, NFR-007-01) Soluções analíticas, em 2D e em 3D:
   barra simples sob força axial; treliça em V simétrica (deslocamento do nó
   carregado); treliça plana isostática (esforços pelo método dos nós);
   tripé espacial; treliça hiperestática de três barras concorrentes;
   recalque de apoio.
-- [ ] **AC-5** (REQ-007-11, 12, NFR-007-01) Ações distribuídas: barra presa
+- [x] **AC-5** (REQ-007-11, 12, NFR-007-01) Ações distribuídas: barra presa
   nas duas pontas com ΔT (N = −E·A·α·ΔT e deslocamentos nulos); a mesma barra
   com ε₀ (N = −E·A·ε₀); barra livre numa ponta com ΔT (alongamento α·ΔT·L e
   N = 0); barra pendurada sob peso próprio (reação ρ·g·A·L).
-- [ ] **AC-6** (REQ-007-12, NFR-007-01) Convergência: barra pendurada
+- [x] **AC-6** (REQ-007-12, NFR-007-01) Convergência: barra pendurada
   subdividida em n elementos sob peso próprio; deslocamentos nodais exatos
   para qualquer n e erro L2 do esforço normal caindo com taxa ≈ 1 (± 0,1).
-- [ ] **AC-7** (REQ-007-09, 10, 14, 15) Testes de validação: cada problema
+- [x] **AC-7** (REQ-007-09, 10, 14, 15) Testes de validação: cada problema
   do REQ-007-14 gera uma mensagem com o item envolvido, e vários problemas
   aparecem juntos; z ≠ 0 em treliça 2D e elemento que não é `Line2` são
   recusados; um mecanismo (nó sem apoio numa direção, ou treliça plana com
   nó solto) informa nó e direção.
-- [ ] **AC-8** (REQ-007-16, NFR-007-02, 03) `core` segue sem Qt; benchmark
+- [x] **AC-8** (REQ-007-16, NFR-007-02, 03) `core` segue sem Qt; benchmark
   da treliça espacial registrado em `tasks.md`; CI verde nas quatro
   plataformas, com a cobertura de `core` ≥ 80%.
 
