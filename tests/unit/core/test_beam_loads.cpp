@@ -303,8 +303,8 @@ TEST_CASE("forces and displacements along a simply supported beam", "[core][beam
     const bool timoshenko = GENERATE(false, true);
     const int pieces = GENERATE(1, 3);
     const double w = 5.0e3; // downwards
-    fem::core::Model model = simpleBeam(
-        pieces, timoshenko ? fem::core::BeamTheory::Timoshenko : fem::core::BeamTheory::EulerBernoulli);
+    fem::core::Model model = simpleBeam(pieces, timoshenko ? fem::core::BeamTheory::Timoshenko
+                                                           : fem::core::BeamTheory::EulerBernoulli);
     model.distributedLoads.push_back({.elements = fem::core::ElementIds{{1, 2, 3}},
                                       .startValue = Eigen::Vector3d(0.0, -w, 0.0),
                                       .endValue = Eigen::Vector3d(0.0, -w, 0.0)});
@@ -364,8 +364,8 @@ TEST_CASE("the jump under a concentrated load", "[core][beam][loads]")
 TEST_CASE("forces along a beam on an elastic foundation", "[core][beam][loads]")
 {
     fem::core::Model model = simpleBeam(4, fem::core::BeamTheory::EulerBernoulli);
-    model.foundations.push_back(
-        {.elements = fem::core::ElementIds{{1, 2, 3, 4}}, .translational = Eigen::Vector3d(0, 1e7, 0)});
+    model.foundations.push_back({.elements = fem::core::ElementIds{{1, 2, 3, 4}},
+                                 .translational = Eigen::Vector3d(0, 1e7, 0)});
     model.distributedLoads.push_back({.elements = fem::core::ElementIds{{1, 2, 3, 4}},
                                       .startValue = Eigen::Vector3d(0.0, -1e4, 0.0),
                                       .endValue = Eigen::Vector3d(0.0, -1e4, 0.0)});
@@ -453,7 +453,8 @@ TEST_CASE("temperature and weight on beams", "[core][beam][loads]")
         spec.bars = {{0, 1}, {1, 2}};
         fem::core::Model model = fem::core::test::beamModel(spec, fem::core::ElementKind::Beam2D);
         fem::core::test::fixAll(model, {1}, fem::core::ElementKind::Beam2D);
-        model.temperatureChanges.push_back({.elements = fem::core::ElementIds{{2}}, .deltaT = 40.0});
+        model.temperatureChanges.push_back(
+            {.elements = fem::core::ElementIds{{2}}, .deltaT = 40.0});
         const auto result = fem::core::test::solve(model);
         CHECK(near(result.displacements[2].x(), alpha * 40.0 * kL, 1e-10));
         CHECK(result.reactions[0].norm() <= 1e-6);

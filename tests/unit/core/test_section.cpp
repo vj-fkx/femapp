@@ -113,8 +113,8 @@ TEST_CASE("properties of the symmetric shapes", "[core][section]")
         CHECK(near(p.inertiaZ, (bf * h * h * h - (bf - tw) * std::pow(h - 2 * tf, 3)) / 12, 1e-12));
         CHECK(near(p.inertiaY, (2 * tf * std::pow(bf, 3) + (h - 2 * tf) * std::pow(tw, 3)) / 12,
                    1e-12));
-        CHECK(near(p.torsionConstant, (2 * bf * std::pow(tf, 3) + (h - 2 * tf) * std::pow(tw, 3)) / 3,
-                   1e-12));
+        CHECK(near(p.torsionConstant,
+                   (2 * bf * std::pow(tf, 3) + (h - 2 * tf) * std::pow(tw, 3)) / 3, 1e-12));
         CHECK(p.shearCentre.norm() <= 1e-15);
         // The rolled IPE 300 has root fillets, which the plates leave out:
         // A 53.8 cm2, Iz 8356 cm4, Iy 604 cm4, J 20.1 cm4 (design 008 §5.1).
@@ -184,8 +184,8 @@ TEST_CASE("properties of the asymmetric shapes", "[core][section]")
         CHECK(near(p.centroid.y(), c, 1e-12));
         CHECK(near(std::abs(p.principalAngle), kPi / 4, 1e-12));
         // Invariants of the rotation.
-        const double iz = t * a * a * a / 12 + a1 * std::pow(a / 2 - c, 2) + (a - t) * t * t * t / 12 +
-                          a2 * std::pow(t / 2 - c, 2);
+        const double iz = t * a * a * a / 12 + a1 * std::pow(a / 2 - c, 2) +
+                          (a - t) * t * t * t / 12 + a2 * std::pow(t / 2 - c, 2);
         const double iyz = a1 * (a / 2 - c) * (t / 2 - c) + a2 * (t / 2 - c) * ((a + t) / 2 - c);
         CHECK(near(p.inertiaY + p.inertiaZ, 2 * iz, 1e-12));
         CHECK(near(p.inertiaY * p.inertiaZ, iz * iz - iyz * iyz, 1e-12));
@@ -285,7 +285,8 @@ TEST_CASE("stresses in the section", "[core][section]")
         const SectionProperties p = of(*section.shape);
         const auto stresses = fem::core::sectionStresses(section, f);
         const auto& corner = at(stresses, "corner +y +z");
-        const double sigma = f.n / p.area - f.mz * (h / 2) / p.inertiaZ + f.my * (b / 2) / p.inertiaY;
+        const double sigma =
+            f.n / p.area - f.mz * (h / 2) / p.inertiaZ + f.my * (b / 2) / p.inertiaY;
         CHECK(near(corner.normal, sigma, 1e-12));
         CHECK(corner.shear == 0.0);
         CHECK(near(corner.vonMises, std::abs(sigma), 1e-12));
@@ -307,11 +308,12 @@ TEST_CASE("stresses in the section", "[core][section]")
         const auto stresses = fem::core::sectionStresses(section, f);
         const double q = s.bf * s.tf * (s.h - s.tf) / 2 + s.tw * std::pow(s.h / 2 - s.tf, 2) / 2;
         CHECK(near(at(stresses, "web centre").shear,
-                   std::abs(f.vy) * q / (p.inertiaZ * s.tw) + std::abs(f.t) * s.tw / p.torsionConstant,
+                   std::abs(f.vy) * q / (p.inertiaZ * s.tw) +
+                       std::abs(f.t) * s.tw / p.torsionConstant,
                    1e-12));
         // Close to V over the web area.
-        CHECK(near(std::abs(f.vy) * q / (p.inertiaZ * s.tw), std::abs(f.vy) / ((s.h - 2 * s.tf) * s.tw),
-                   0.15));
+        CHECK(near(std::abs(f.vy) * q / (p.inertiaZ * s.tw),
+                   std::abs(f.vy) / ((s.h - 2 * s.tf) * s.tw), 0.15));
         CHECK(near(at(stresses, "corner -y -z").normal,
                    f.n / p.area + f.mz * (s.h / 2) / p.inertiaZ - f.my * (s.bf / 2) / p.inertiaY,
                    1e-12));
@@ -324,8 +326,8 @@ TEST_CASE("stresses in the section", "[core][section]")
         const auto stresses = fem::core::sectionStresses(section, f);
         REQUIRE(stresses.size() == 8);
         const auto& side = at(stresses, "perimeter at 90 degrees"); // y = 0
-        CHECK(near(side.shear - std::abs(f.t) * 0.1 / p.torsionConstant, 2 * std::abs(f.vy) / p.area,
-                   0.02));
+        CHECK(near(side.shear - std::abs(f.t) * 0.1 / p.torsionConstant,
+                   2 * std::abs(f.vy) / p.area, 0.02));
         CHECK(near(at(stresses, "perimeter at 0 degrees").normal,
                    f.n / p.area - f.mz * 0.1 / p.inertiaZ, 1e-12));
     }
@@ -334,7 +336,8 @@ TEST_CASE("stresses in the section", "[core][section]")
         const fem::core::Channel s{.h = 0.2, .bf = 0.075, .tf = 0.0115, .tw = 0.0085};
         Section section{.name = "U", .shape = s};
         const SectionProperties p = of(s);
-        const auto stresses = fem::core::sectionStresses(section, fem::core::BeamForces{.t = 300.0});
+        const auto stresses =
+            fem::core::sectionStresses(section, fem::core::BeamForces{.t = 300.0});
         CHECK(near(at(stresses, "flange tip +y").shear, 300.0 * s.tf / p.torsionConstant, 1e-12));
         CHECK(at(stresses, "web centre").normal == 0.0);
     }
@@ -344,7 +347,8 @@ TEST_CASE("stresses in the section", "[core][section]")
         section.inertiaY = 3e-5;
         section.inertiaZ = 9e-5;
         section.productOfInertia = 2e-5;
-        const SectionProperties p = fem::core::sectionProperties(section).value_or(SectionProperties{});
+        const SectionProperties p =
+            fem::core::sectionProperties(section).value_or(SectionProperties{});
         const fem::core::BeamForces bending{.n = 4e4, .my = 3e3, .mz = -6e3}; // principal axes
         // The moment vector in the drawing axes.
         const double c = std::cos(p.principalAngle);
@@ -356,8 +360,8 @@ TEST_CASE("stresses in the section", "[core][section]")
         inertia << 9e-5, 2e-5, 2e-5, 3e-5;
         const Eigen::Vector2d slope = inertia.inverse() * Eigen::Vector2d(-mzd, myd);
         const Eigen::Vector2d point(0.07, -0.04);
-        CHECK(near(fem::core::normalStress(p, bending, point),
-                   bending.n / 2e-2 + slope.dot(point), 1e-12));
+        CHECK(near(fem::core::normalStress(p, bending, point), bending.n / 2e-2 + slope.dot(point),
+                   1e-12));
         CHECK(fem::core::sectionStresses(section, bending).empty());
     }
 }

@@ -1,3 +1,5 @@
+#include "detail/model_validation.hpp"
+
 #include <fem/core/assembler.hpp>
 #include <fem/core/beam_element.hpp>
 #include <fem/core/beam_loads.hpp>
@@ -8,8 +10,6 @@
 #include <fem/core/linear_solver.hpp>
 #include <fem/core/static_analysis.hpp>
 #include <fem/core/truss_element.hpp>
-
-#include "detail/model_validation.hpp"
 
 #include <algorithm>
 #include <array>
@@ -244,8 +244,8 @@ Expected<StaticResult> runLinearStatic(const Model& model, const StaticOptions& 
     const TrussElement spatialTruss(ElementKind::Truss3D, bars);
     const BeamElement planarBeam(ElementKind::Beam2D, beams.data);
     const BeamElement spatialBeam(ElementKind::Beam3D, beams.data);
-    const std::array<const ElementFormulation*, kKinds> formulations = {
-        &planarTruss, &spatialTruss, &planarBeam, &spatialBeam};
+    const std::array<const ElementFormulation*, kKinds> formulations = {&planarTruss, &spatialTruss,
+                                                                        &planarBeam, &spatialBeam};
     std::vector<ElementSet> sets;
     for (std::size_t k = 0; k < kKinds; ++k) {
         if (!members.at(k).empty()) {

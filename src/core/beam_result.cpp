@@ -177,8 +177,8 @@ BeamPoint BeamResult::at(double x, Side side) const
     if (beam.torsional > 0.0) {
         rx += (s.t * x - in.q(3, 1) - in.p(3, 1)) / beam.torsional;
     }
-    const double u = u0.x() + (s.n * x - in.q(0, 1) - in.p(0, 1)) / beam.axial +
-                     loads.imposedStrain * x;
+    const double u =
+        u0.x() + (s.n * x - in.q(0, 1) - in.p(0, 1)) / beam.axial + loads.imposedStrain * x;
     // Back to the centroid: v_C = v_S + ez rx, w_C = w_S - ey rx.
     r.displacement = Eigen::Vector3d(u, v + ez * rx, w - ey * rx);
     r.rotation = Eigen::Vector3d(rx, ry, rz);
@@ -228,7 +228,8 @@ std::vector<PointStress> sectionStresses(const Section& section, const BeamForce
                             (properties->inertiaY * point.thicknessZ);
         }
         stress.shear += std::abs(forces.t) * point.torsionFactor;
-        stress.vonMises = std::sqrt(stress.normal * stress.normal + 3.0 * stress.shear * stress.shear);
+        stress.vonMises =
+            std::sqrt(stress.normal * stress.normal + 3.0 * stress.shear * stress.shear);
         stresses.push_back(std::move(stress));
     }
     return stresses;

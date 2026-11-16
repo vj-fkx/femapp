@@ -97,6 +97,11 @@ Conceitos principais:
   condução de calor.
 - **`Material`** — propriedades (E, ν, ρ, k, c) e matriz constitutiva `D`.
 - **`Section`** — seção de barra/viga (A, I, J, orientação) e espessura de casca.
+  *Feito na 008:* `section.hpp` com a seção genérica (A, Iy, Iz, Iyz, J,
+  centro de cisalhamento, áreas de cisalhamento) ou oito formas paramétricas
+  (retângulo, círculo, tubos circular e retangular, perfis I, U, T e
+  cantoneira); `sectionProperties` devolve tudo nos eixos principais, e
+  `stressPoints` dá os pontos característicos para as tensões.
 - **`Model`** — malha + materiais + seções + atribuições + condições de contorno
   + cargas. É o documento editado pela UI.
   *Feito na 007:* agregado de valor (`model.hpp`) com a malha em
@@ -104,12 +109,28 @@ Conceitos principais:
   `Material` e `Section` (`material.hpp`) referenciados pelo nome; alvos por
   grupo da malha ou por ids externos (`ElementIds`, `NodeIds`); um caso de
   carga com forças nodais, peso próprio, ΔT e pré-deformação.
+  *Ampliado na 008:* vigas (`ElementKind::Beam2D/Beam3D`, teoria e
+  orientação na atribuição), momentos nodais e rotações prescritas, e os
+  itens só de viga: ligações de extremidade (liberação ou mola por esforço),
+  excentricidades rígidas, base elástica, cargas distribuídas (inteiras ou
+  parciais, uniformes ou trapezoidais), cargas concentradas no vão e
+  gradiente de temperatura.
 - **Análise estática** (`static_analysis.hpp`, feita na 007) — `validate`
   lista todos os problemas do modelo; `runLinearStatic` monta, verifica a
   diagonal (nó sem rigidez numa direção), fatora (equação singular →
   mecanismo com nó e direção, via `SparseCholesky::singularEquation`) e
   devolve deslocamentos e reações por nó e N, ε e σ por barra
   (`StaticResult`). Elemento: `TrussElement` 2D/3D (`truss_element.hpp`).
+  *Ampliada na 008:* a validação mora em `model_validation.cpp` (privado,
+  `detail/`), que também resolve cada viga (`beamSetup`); treliças e vigas
+  são montadas juntas, e só nós de viga têm rotações. `BeamElement` 2D/3D
+  (`beam_element.hpp`): fórmula fechada de Timoshenko com o parâmetro φ (φ = 0
+  é Euler-Bernoulli), centro de cisalhamento, excentricidades, ligações
+  condensadas no elemento e base elástica consistente, sem alocação.
+  `beam_loads.hpp` leva as cargas do vão aos eixos principais e às cargas
+  nodais equivalentes. O `StaticResult` traz rotações, momentos de reação e
+  um `BeamResult` por viga (`beam_result.hpp`), com os esforços nas pontas,
+  `at(x)` exato ao longo da barra e `sectionStresses`.
 - **`DofMap`** — GDL **variáveis por nó** (u, v, w, θx, θy, θz, T), definidos
   pelos elementos conectados; trata restrições e a compatibilização entre barras,
   cascas e sólidos (REQ-G-13). *Feito na 006:* máscara por nó vinda das

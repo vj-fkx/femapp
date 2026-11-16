@@ -29,8 +29,8 @@ struct ModelIssue
 struct StaticResult
 {
     std::shared_ptr<const Mesh> mesh;
-    std::vector<Eigen::Vector3d> displacements; // per node: u, v, w (0 without dof)
-    std::vector<Eigen::Vector3d> reactions;     // per node: 0 where free
+    std::vector<Eigen::Vector3d> displacements;   // per node: u, v, w (0 without dof)
+    std::vector<Eigen::Vector3d> reactions;       // per node: 0 where free
     std::vector<Eigen::Vector3d> rotations;       // per node: rx, ry, rz (0 without dof)
     std::vector<Eigen::Vector3d> reactionMoments; // per node: 0 where free
     // Per element; NaN for elements that are not bars. For beams, at the

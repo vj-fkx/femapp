@@ -110,8 +110,8 @@ BeamMatrix rotation(const Eigen::Matrix3d& axes)
 }
 
 // u_i = t + w x x_i, rotations w, at both nodes.
-BeamVector rigidMotion(const Eigen::Vector3d& t, const Eigen::Vector3d& w,
-                       const Eigen::Vector3d& a, const Eigen::Vector3d& b)
+BeamVector rigidMotion(const Eigen::Vector3d& t, const Eigen::Vector3d& w, const Eigen::Vector3d& a,
+                       const Eigen::Vector3d& b)
 {
     BeamVector u;
     u << t + w.cross(a), w, t + w.cross(b), w;
@@ -150,8 +150,8 @@ TEST_CASE("beam local axes", "[core][beam]")
 
     // A given reference, not normal to the bar, and a roll.
     const Eigen::Vector3d x2(1, 1, 0);
-    const Eigen::Matrix3d r = axesOf(
-        beamAxes(o, x2, Eigen::Vector3d(1, 0, 1), 0.0, ElementKind::Beam3D));
+    const Eigen::Matrix3d r =
+        axesOf(beamAxes(o, x2, Eigen::Vector3d(1, 0, 1), 0.0, ElementKind::Beam3D));
     CHECK(std::abs(r.col(1).dot(x2)) <= 1e-15);
     CHECK(r.col(1).dot(Eigen::Vector3d(1, 0, 1)) > 0.0);
     CHECK((r.transpose() * r - Eigen::Matrix3d::Identity()).norm() <= 1e-14);
@@ -196,8 +196,8 @@ TEST_CASE("beam stiffness", "[core][beam]")
     }
     const Eigen::Vector3d a(0.3, -1.2, 0.5);
     const Eigen::Vector3d b(2.1, 0.4, 1.7);
-    const auto axes = fem::core::beamAxes(a, b, Eigen::Vector3d(0.2, 1.0, -0.4), 0.3,
-                                          ElementKind::Beam3D);
+    const auto axes =
+        fem::core::beamAxes(a, b, Eigen::Vector3d(0.2, 1.0, -0.4), 0.3, ElementKind::Beam3D);
     REQUIRE(axes.has_value());
     beam.axes = axes.value_or(Eigen::Matrix3d::Identity());
     const double l = (b - a).norm();
@@ -257,8 +257,8 @@ TEST_CASE("2D beam stiffness and rigid modes", "[core][beam]")
     const std::array<int, 6> planar = {0, 1, 5, 6, 7, 11};
     for (int i = 0; i < 6; ++i) {
         for (int j = 0; j < 6; ++j) {
-            CHECK(k2(i, j) == k3(planar[static_cast<std::size_t>(i)],
-                                 planar[static_cast<std::size_t>(j)]));
+            CHECK(k2(i, j) ==
+                  k3(planar[static_cast<std::size_t>(i)], planar[static_cast<std::size_t>(j)]));
         }
     }
     const Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eigen(k2);
@@ -325,8 +325,8 @@ TEST_CASE("beam with shear centre and rigid offsets", "[core][beam]")
     shorter.axes = Eigen::Matrix3d::Identity();
     const Eigen::MatrixXd ka =
         compute(ElementKind::Beam3D, along, Eigen::Vector3d::Zero(), Eigen::Vector3d(3, 0, 0));
-    const Eigen::MatrixXd ks = compute(ElementKind::Beam3D, shorter, Eigen::Vector3d(0.5, 0, 0),
-                                       Eigen::Vector3d(3, 0, 0));
+    const Eigen::MatrixXd ks =
+        compute(ElementKind::Beam3D, shorter, Eigen::Vector3d(0.5, 0, 0), Eigen::Vector3d(3, 0, 0));
     // Same axial and torsional terms; bending moments carried by the link.
     CHECK(std::abs(ka(0, 0) - ks(0, 0)) <= 1e-12 * ks(0, 0));
     CHECK(std::abs(ka(3, 3) - ks(3, 3)) <= 1e-12 * ks(3, 3));
@@ -354,9 +354,9 @@ TEST_CASE("beam end connections", "[core][beam]")
         expected *= 3 * ei / (l * l * l);
         for (int i = 0; i < 3; ++i) {
             for (int j = 0; j < 3; ++j) {
-                CHECK(std::abs(k(dofs[static_cast<std::size_t>(i)],
-                                 dofs[static_cast<std::size_t>(j)]) -
-                               expected(i, j)) <= 1e-10 * expected.norm());
+                CHECK(std::abs(
+                          k(dofs[static_cast<std::size_t>(i)], dofs[static_cast<std::size_t>(j)]) -
+                          expected(i, j)) <= 1e-10 * expected.norm());
             }
         }
         CHECK(k.row(11).norm() <= 1e-10 * expected.norm());

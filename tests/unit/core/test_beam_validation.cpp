@@ -264,8 +264,8 @@ TEST_CASE("loads of the span", "[core][validation][beam]")
         model.distributedLoads.push_back({.elements = ElementIds{{1}},
                                           .from = {.value = 0.8, .fraction = true},
                                           .to = {.value = 0.5, .fraction = false}});
-        model.distributedLoads.push_back({.elements = ElementIds{{2}},
-                                          .to = {.value = 2.5, .fraction = false}});
+        model.distributedLoads.push_back(
+            {.elements = ElementIds{{2}}, .to = {.value = 2.5, .fraction = false}});
         model.concentratedLoads.push_back(
             {.elements = ElementIds{{1}}, .at = {.value = 1.2, .fraction = true}});
         // Within the flexible length left by an offset: 2 - 0.5.

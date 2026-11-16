@@ -73,8 +73,8 @@ struct Tee
     double tw = 0.0;
 };
 
-using SectionShape = std::variant<Rectangle, Circle, CircularTube, RectangularTube, ISection,
-                                  Angle, Channel, Tee>;
+using SectionShape =
+    std::variant<Rectangle, Circle, CircularTube, RectangularTube, ISection, Angle, Channel, Tee>;
 
 // REQ-007-02, 008-02: a bar or beam section. Either a generic section, by its
 // properties about axes through the centroid parallel to the local y and z
@@ -83,15 +83,16 @@ using SectionShape = std::variant<Rectangle, Circle, CircularTube, RectangularTu
 struct Section
 {
     std::string name;
-    std::optional<double> area{};             // A
-    std::optional<double> inertiaY{};         // Iy = integral of z^2
-    std::optional<double> inertiaZ{};         // Iz = integral of y^2
-    std::optional<double> productOfInertia{}; // Iyz = integral of y z (default 0)
-    std::optional<double> torsionConstant{};  // J
-    std::optional<Eigen::Vector2d> shearCentre{}; // (y, z) from the centroid (default 0)
-    std::optional<double> shearAreaY{};           // Asy, for the shear force along y
-    std::optional<double> shearAreaZ{};           // Asz
-    std::optional<SectionShape> shape{};
+    std::optional<double> area = std::nullopt;             // A
+    std::optional<double> inertiaY = std::nullopt;         // Iy = integral of z^2
+    std::optional<double> inertiaZ = std::nullopt;         // Iz = integral of y^2
+    std::optional<double> productOfInertia = std::nullopt; // Iyz = integral of y z (default 0)
+    std::optional<double> torsionConstant = std::nullopt;  // J
+    std::optional<Eigen::Vector2d> shearCentre =
+        std::nullopt;                                // (y, z) from the centroid (default 0)
+    std::optional<double> shearAreaY = std::nullopt; // Asy, for the shear force along y
+    std::optional<double> shearAreaZ = std::nullopt; // Asz
+    std::optional<SectionShape> shape = std::nullopt;
 };
 
 // Everything a beam needs from its section, about the principal axes
@@ -106,8 +107,8 @@ struct SectionProperties
     double inertiaZ = 0.0;       // integral of y'^2: bending by Mz, in the x-y' plane
     double torsionConstant = 0.0;
     Eigen::Vector2d shearCentre = Eigen::Vector2d::Zero(); // principal (y', z'), from the centroid
-    std::optional<double> shearAreaY{};
-    std::optional<double> shearAreaZ{};
+    std::optional<double> shearAreaY = std::nullopt;
+    std::optional<double> shearAreaZ = std::nullopt;
 };
 
 // REQ-008-03, 04, 05: computed for a shape, rotated to the principal axes
@@ -123,7 +124,7 @@ struct StressPoint
 {
     std::string name;
     Eigen::Vector2d position = Eigen::Vector2d::Zero(); // principal (y', z'), from the centroid
-    double firstMomentY = 0.0; // Q for Vy (about z), 0 where not computed
+    double firstMomentY = 0.0;                          // Q for Vy (about z), 0 where not computed
     double thicknessY = 0.0;
     double firstMomentZ = 0.0; // Q for Vz (about y)
     double thicknessZ = 0.0;

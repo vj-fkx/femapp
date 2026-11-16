@@ -12,8 +12,8 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <Eigen/Core>
-#include <cmath>
 #include <algorithm>
+#include <cmath>
 #include <initializer_list>
 #include <utility>
 #include <vector>
@@ -63,11 +63,8 @@ inline Model beamModel(const TrussSpec& spec, ElementKind kind,
     for (std::size_t j = 0; j < spec.bars.size(); ++j) {
         all.ids.push_back(static_cast<ExternalId>(j) + 1);
     }
-    model.assignments.push_back({.elements = all,
-                                 .kind = kind,
-                                 .material = "Steel",
-                                 .section = "S",
-                                 .theory = theory});
+    model.assignments.push_back(
+        {.elements = all, .kind = kind, .material = "Steel", .section = "S", .theory = theory});
     return model;
 }
 

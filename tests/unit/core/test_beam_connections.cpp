@@ -73,9 +73,9 @@ TEST_CASE("Gerber beam with an internal hinge", "[core][beam][connections]")
     const double a = 3.0;
     const double b = 4.0;
     const double w = 5e3;
-    Model model = fem::core::test::beamModel(
-        rowSpec({0.0, a, a + b}), ElementKind::Beam2D,
-        timoshenko ? BeamTheory::Timoshenko : BeamTheory::EulerBernoulli);
+    Model model = fem::core::test::beamModel(rowSpec({0.0, a, a + b}), ElementKind::Beam2D,
+                                             timoshenko ? BeamTheory::Timoshenko
+                                                        : BeamTheory::EulerBernoulli);
     fem::core::test::fixAll(model, {1}, ElementKind::Beam2D);
     fem::core::test::restrain(model, {3}, {DofType::V});
     model.endConnections.push_back(onLoadedBar ? release(ElementIds{{2}}, BarEnd::Start, kMz)
@@ -156,7 +156,8 @@ TEST_CASE("propped beam with a rotational spring at the root", "[core][beam][con
         fem::core::test::fixAll(model, {1}, ElementKind::Beam2D);
         fem::core::test::restrain(model, {2}, {DofType::V});
         if (stiffness) {
-            model.endConnections.push_back(release(ElementIds{{1}}, BarEnd::Start, kMz, *stiffness));
+            model.endConnections.push_back(
+                release(ElementIds{{1}}, BarEnd::Start, kMz, *stiffness));
         }
         model.distributedLoads.push_back({.elements = ElementIds{{1}},
                                           .startValue = Eigen::Vector3d(0, -w, 0),
@@ -226,7 +227,8 @@ TEST_CASE("rigid offsets against explicit rigid bars", "[core][beam][connections
     const auto b4 = explicitModel(1e4);
     const auto b5 = explicitModel(1e5);
     const auto rigid = [](double coarse, double fine) { return fine + (fine - coarse) / 9.0; };
-    const Eigen::Vector3d tip = b5.displacements[3] + (b5.displacements[3] - b4.displacements[3]) / 9.0;
+    const Eigen::Vector3d tip =
+        b5.displacements[3] + (b5.displacements[3] - b4.displacements[3]) / 9.0;
     CHECK((a.displacements[1] - tip).norm() <= 1e-6 * tip.norm());
     CHECK(near(a.rotations[1].z(), rigid(b4.rotations[3].z(), b5.rotations[3].z()), 1e-6));
     // Equilibrium: the reactions hold the loads exactly.
@@ -236,10 +238,10 @@ TEST_CASE("rigid offsets against explicit rigid bars", "[core][beam][connections
                rigid(b4.reactionMoments[0].z(), b5.reactionMoments[0].z()), 1e-6));
     const auto& flexible = fem::core::test::beamOf(a, 0);
     CHECK(near(flexible.length(), flexibleLength, 1e-14));
-    CHECK(near(flexible.start().mz,
-               rigid(fem::core::test::beamOf(b4, 1).start().mz,
-                     fem::core::test::beamOf(b5, 1).start().mz),
-               1e-6));
+    CHECK(near(
+        flexible.start().mz,
+        rigid(fem::core::test::beamOf(b4, 1).start().mz, fem::core::test::beamOf(b5, 1).start().mz),
+        1e-6));
     CHECK(near(flexible.at(1.0).forces.vy,
                rigid(fem::core::test::beamOf(b4, 1).at(1.0).forces.vy,
                      fem::core::test::beamOf(b5, 1).at(1.0).forces.vy),

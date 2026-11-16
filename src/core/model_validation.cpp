@@ -16,9 +16,9 @@ namespace fem::core::detail {
 
 namespace {
 
-constexpr double kPlaneTolerance = 1e-9;    // of the bounding box diagonal
-constexpr double kFlexibleTolerance = 1e-9; // of the length between the nodes
-constexpr double kPositionTolerance = 1e-9; // of the flexible length
+constexpr double kPlaneTolerance = 1e-9;     // of the bounding box diagonal
+constexpr double kFlexibleTolerance = 1e-9;  // of the length between the nodes
+constexpr double kPositionTolerance = 1e-9;  // of the flexible length
 constexpr double kSymmetryTolerance = 1e-12; // shear centre off y, of sqrt(A)
 constexpr std::size_t kListedElements = 10;
 
@@ -167,8 +167,7 @@ private:
                 valid = false;
             }
             if (space && !(section.torsionConstant.value_or(0.0) > 0.0)) {
-                addOnce(name +
-                        ": the torsion constant J must be given and positive for 3D beams.");
+                addOnce(name + ": the torsion constant J must be given and positive for 3D beams.");
                 valid = false;
             }
             const double iy = section.inertiaY.value_or(0.0);
@@ -499,7 +498,8 @@ private:
                 const double to = positionOn(loads[i].to, *length);
                 const double slack = kPositionTolerance * *length;
                 if (from > to + slack) {
-                    add(label + ": on the " + elementName(element) + ", the start is after the end.");
+                    add(label + ": on the " + elementName(element) +
+                        ", the start is after the end.");
                 } else if (from < -slack || to > *length + slack) {
                     add(label + ": on the " + elementName(element) +
                         ", the load goes beyond the flexible length.");
@@ -677,8 +677,8 @@ Expected<BeamSetup> beamSetup(const Model& model, ElementIndex element,
     }
     // The principal axes: the local ones turned by the principal angle.
     const double angle = assignment.kind == ElementKind::Beam2D ? 0.0 : section.principalAngle;
-    const auto axes = beamAxes(p, q, assignment.reference, assignment.rollAngle + angle,
-                               assignment.kind);
+    const auto axes =
+        beamAxes(p, q, assignment.reference, assignment.rollAngle + angle, assignment.kind);
     if (!axes) {
         return makeError("the reference vector is parallel to the bar.");
     }

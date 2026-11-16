@@ -162,7 +162,8 @@ TEST_CASE("the beam items of the model are edited and copied", "[core][model]")
 {
     Model model;
     model.mesh = fem::core::test::trussMesh(rowSpec());
-    model.sections.push_back({.name = "Box", .shape = fem::core::RectangularTube{.b = 0.2, .h = 0.3, .t = 0.01}});
+    model.sections.push_back(
+        {.name = "Box", .shape = fem::core::RectangularTube{.b = 0.2, .h = 0.3, .t = 0.01}});
     model.assignments.push_back({.elements = GroupRef{"left"},
                                  .kind = fem::core::ElementKind::Beam3D,
                                  .material = "Steel",
@@ -176,11 +177,11 @@ TEST_CASE("the beam items of the model are edited and copied", "[core][model]")
 
     fem::core::EndConnection hinge{.elements = fem::core::ElementIds{{2}},
                                    .end = fem::core::BarEnd::End};
-    hinge.stiffness[5] = 0.0;  // Mz released
-    hinge.stiffness[4] = 5e6;  // My spring
+    hinge.stiffness[5] = 0.0; // Mz released
+    hinge.stiffness[4] = 5e6; // My spring
     model.endConnections.push_back(hinge);
-    model.rigidOffsets.push_back({.elements = fem::core::ElementIds{{1}},
-                                  .start = Eigen::Vector3d(0.1, 0.0, 0.0)});
+    model.rigidOffsets.push_back(
+        {.elements = fem::core::ElementIds{{1}}, .start = Eigen::Vector3d(0.1, 0.0, 0.0)});
     model.foundations.push_back(
         {.elements = GroupRef{"left"}, .translational = Eigen::Vector3d(0.0, 1e6, 0.0)});
     model.distributedLoads.push_back({.elements = GroupRef{"left"},
@@ -194,7 +195,7 @@ TEST_CASE("the beam items of the model are edited and copied", "[core][model]")
     model.temperatureGradients.push_back({.elements = GroupRef{"left"}, .alongY = 10.0});
 
     // Defaults of the new fields.
-    const fem::core::Assignment truss{.elements = GroupRef{"left"}};
+    const fem::core::Assignment truss{.elements = GroupRef{"left"}, .material = "", .section = ""};
     CHECK(truss.theory == fem::core::BeamTheory::EulerBernoulli);
     CHECK_FALSE(truss.reference.has_value());
     CHECK(truss.rollAngle == 0.0);

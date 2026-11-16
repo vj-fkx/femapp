@@ -10,8 +10,8 @@ namespace fem::core {
 
 namespace {
 
-constexpr double kParallel = 1e-6;   // |x × r| below this: parallel (design 008 §5.2)
-constexpr double kSingular = 1e-12;  // pivot of the internal dofs, of the largest
+constexpr double kParallel = 1e-6;  // |x × r| below this: parallel (design 008 §5.2)
+constexpr double kSingular = 1e-12; // pivot of the internal dofs, of the largest
 constexpr int kMaxInternal = kBeamDofs;
 
 // Local dofs of the two planes of bending, in BeamDof order per end.
@@ -26,8 +26,8 @@ constexpr std::array<double, 4> kGaussPoints = {0.0694318442029737, 0.3300094782
 constexpr std::array<double, 4> kGaussWeights = {0.1739274225687269, 0.3260725774312731,
                                                  0.3260725774312731, 0.1739274225687269};
 
-using InternalMatrix = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, kMaxInternal,
-                                     kMaxInternal>;
+using InternalMatrix =
+    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, kMaxInternal, kMaxInternal>;
 using InternalVector = Eigen::Matrix<double, Eigen::Dynamic, 1, 0, kMaxInternal, 1>;
 using CouplingMatrix = Eigen::Matrix<double, kBeamDofs, Eigen::Dynamic, 0, kBeamDofs, kMaxInternal>;
 
@@ -38,9 +38,9 @@ Eigen::Matrix4d planeStiffness(double ei, double length, double phi)
     const double l = length;
     const double c = ei / ((1.0 + phi) * l * l * l);
     Eigen::Matrix4d k;
-    k << 12.0, 6.0 * l, -12.0, 6.0 * l,                                   //
-        6.0 * l, (4.0 + phi) * l * l, -6.0 * l, (2.0 - phi) * l * l,      //
-        -12.0, -6.0 * l, 12.0, -6.0 * l,                                  //
+    k << 12.0, 6.0 * l, -12.0, 6.0 * l,                              //
+        6.0 * l, (4.0 + phi) * l * l, -6.0 * l, (2.0 - phi) * l * l, //
+        -12.0, -6.0 * l, 12.0, -6.0 * l,                             //
         6.0 * l, (2.0 - phi) * l * l, -6.0 * l, (4.0 + phi) * l * l;
     return c * k;
 }
@@ -89,11 +89,9 @@ public:
     {
         for (int j = 0; j < kBeamDofs; ++j) {
             const int component = j % kBeamEndDofs;
-            const double spring =
-                beam.springs[static_cast<std::size_t>(j / kBeamEndDofs)]
-                            [static_cast<std::size_t>(component)];
-            const bool used = !isPlanar(kind) || component == 0 || component == 1 ||
-                              component == 5;
+            const double spring = beam.springs[static_cast<std::size_t>(j / kBeamEndDofs)]
+                                              [static_cast<std::size_t>(component)];
+            const bool used = !isPlanar(kind) || component == 0 || component == 1 || component == 5;
             if (used && spring != kRigid) {
                 m_internal[static_cast<std::size_t>(j)] = m_count;
                 m_spring[static_cast<std::size_t>(m_count)] = spring;
@@ -141,7 +139,8 @@ public:
             return true;
         }
         const auto d = m_ldlt.vectorD();
-        const double largest = std::max(d.cwiseAbs().maxCoeff(), m_kii.diagonal().cwiseAbs().maxCoeff());
+        const double largest =
+            std::max(d.cwiseAbs().maxCoeff(), m_kii.diagonal().cwiseAbs().maxCoeff());
         return m_ldlt.info() == Eigen::Success && d.minCoeff() > kSingular * largest;
     }
 
@@ -165,8 +164,7 @@ public:
         if (m_count == 0) {
             return d;
         }
-        const InternalVector internal =
-            m_ldlt.solve(m_fi - m_kei.transpose() * external);
+        const InternalVector internal = m_ldlt.solve(m_fi - m_kei.transpose() * external);
         for (int i = 0; i < m_count; ++i) {
             d(m_external[static_cast<std::size_t>(i)]) = internal(i);
         }
@@ -196,8 +194,7 @@ PlaneShape planeShape(double xi, double length, double phi)
     PlaneShape s;
     s.displacement << (1.0 - 3.0 * x2 + 2.0 * x3 + phi * (1.0 - xi)) / d,
         length * (xi - 2.0 * x2 + x3 + 0.5 * phi * (xi - x2)) / d,
-        (3.0 * x2 - 2.0 * x3 + phi * xi) / d,
-        length * (-x2 + x3 + 0.5 * phi * (x2 - xi)) / d;
+        (3.0 * x2 - 2.0 * x3 + phi * xi) / d, length * (-x2 + x3 + 0.5 * phi * (x2 - xi)) / d;
     const double r = 6.0 * (x2 - xi) / (length * d);
     s.rotation << r, (1.0 - 4.0 * xi + 3.0 * x2 + phi * (1.0 - xi)) / d, -r,
         (-2.0 * xi + 3.0 * x2 + phi * xi) / d;
@@ -269,10 +266,10 @@ BeamMatrix flexibleStiffness(const BeamData& beam, double length)
     }
     const Eigen::Matrix4d kxy =
         planeStiffness(beam.bendingZ, length, shearParameter(beam, length, true));
-    const Eigen::Matrix4d kxz = kFlipXZ.asDiagonal() *
-                                planeStiffness(beam.bendingY, length,
-                                               shearParameter(beam, length, false)) *
-                                kFlipXZ.asDiagonal();
+    const Eigen::Matrix4d kxz =
+        kFlipXZ.asDiagonal() *
+        planeStiffness(beam.bendingY, length, shearParameter(beam, length, false)) *
+        kFlipXZ.asDiagonal();
     for (std::size_t a = 0; a < 4; ++a) {
         for (std::size_t b = 0; b < 4; ++b) {
             kb(kPlaneXY[a], kPlaneXY[b]) = kxy(static_cast<int>(a), static_cast<int>(b));
@@ -319,8 +316,7 @@ BeamMatrix flexibleStiffness(const BeamData& beam, double length)
 
 bool hasStableConnections(const BeamData& beam, double length, ElementKind kind)
 {
-    const Connections connections(beam, kind, flexibleStiffness(beam, length),
-                                  BeamVector::Zero());
+    const Connections connections(beam, kind, flexibleStiffness(beam, length), BeamVector::Zero());
     return connections.stable();
 }
 

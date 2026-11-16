@@ -42,13 +42,13 @@ public:
     // What the evaluation needs; filled by the analysis.
     struct Data
     {
-        double length = 0.0; // flexible
+        double length = 0.0;                                // flexible
         Eigen::Matrix3d axes = Eigen::Matrix3d::Identity(); // principal, columns, global
-        BeamData beam;       // stiffnesses, shear centre, foundation
-        SpanLoads loads;     // span loads and imposed strains
-        BeamVector displacements = BeamVector::Zero(); // ends, local, centroid
-        BeamForces start;    // internal forces at x = 0
-        BeamForces end;      // internal forces at x = length
+        BeamData beam;                                      // stiffnesses, shear centre, foundation
+        SpanLoads loads;                                    // span loads and imposed strains
+        BeamVector displacements = BeamVector::Zero();      // ends, local, centroid
+        BeamForces start;                                   // internal forces at x = 0
+        BeamForces end;                                     // internal forces at x = length
     };
 
     explicit BeamResult(Data data);

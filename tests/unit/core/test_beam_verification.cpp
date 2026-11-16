@@ -17,9 +17,9 @@
 #include <Eigen/Core>
 #include <Eigen/LU>
 #include <array>
+#include <cmath>
 #include <complex>
 #include <numbers>
-#include <cmath>
 
 using fem::core::BeamTheory;
 using fem::core::DofType;
@@ -59,12 +59,12 @@ TEST_CASE("2D cantilever with a tip force", "[core][beam][verification]")
     const bool timoshenko = GENERATE(false, true);
     const double length = 3.0;
     const double p = 1.0e4;
-    Model model = fem::core::test::beamModel(cantileverSpec(1, length, Eigen::Vector3d::UnitX()),
-                                             ElementKind::Beam2D,
-                                             timoshenko ? BeamTheory::Timoshenko
-                                                        : BeamTheory::EulerBernoulli);
+    Model model = fem::core::test::beamModel(
+        cantileverSpec(1, length, Eigen::Vector3d::UnitX()), ElementKind::Beam2D,
+        timoshenko ? BeamTheory::Timoshenko : BeamTheory::EulerBernoulli);
     fem::core::test::fixAll(model, {1}, ElementKind::Beam2D);
-    model.nodalForces.push_back({.nodes = fem::core::NodeIds{{2}}, .force = Eigen::Vector3d(0, p, 0)});
+    model.nodalForces.push_back(
+        {.nodes = fem::core::NodeIds{{2}}, .force = Eigen::Vector3d(0, p, 0)});
     const auto result = fem::core::test::solve(model);
 
     const double shear = timoshenko ? p * length / (kG * kShearArea) : 0.0;
@@ -135,7 +135,8 @@ TEST_CASE("a beam held by a truss tie", "[core][beam][verification]")
                                  .section = "Rod"});
     fem::core::test::fixAll(model, {1}, ElementKind::Beam2D);
     fem::core::test::restrain(model, {3}, {DofType::U, DofType::V});
-    model.nodalForces.push_back({.nodes = fem::core::NodeIds{{2}}, .force = Eigen::Vector3d(0, -p, 0)});
+    model.nodalForces.push_back(
+        {.nodes = fem::core::NodeIds{{2}}, .force = Eigen::Vector3d(0, -p, 0)});
     const auto result = fem::core::test::solve(model);
 
     const double beam = 3 * kE * kIz / (length * length * length);
@@ -250,8 +251,7 @@ TEST_CASE("analytical beams", "[core][beam][verification]")
                                           .startValue = Eigen::Vector3d(0, -w, 0),
                                           .endValue = Eigen::Vector3d(0, -w, 0)});
         const auto result = fem::core::test::solve(model);
-        const double mid =
-            -w * std::pow(length, 4) / (384 * ei) - w * length * length / 8 * shear;
+        const double mid = -w * std::pow(length, 4) / (384 * ei) - w * length * length / 8 * shear;
         CHECK(near(result.displacements[1].y(), mid, kTolerance));
         CHECK(near(result.reactionMoments[0].z(), w * length * length / 12, kTolerance));
         CHECK(near(result.reactions[2].y(), w * length / 2, kTolerance));
@@ -351,8 +351,7 @@ TEST_CASE("analytical beams", "[core][beam][verification]")
                    -12 * c * delta / std::pow(length, 3) - 6 * c * theta / (length * length),
                    kTolerance));
         CHECK(near(result.reactionMoments[0].z(),
-                   6 * c * delta / (length * length) + (2 - phi) * c * theta / length,
-                   kTolerance));
+                   6 * c * delta / (length * length) + (2 - phi) * c * theta / length, kTolerance));
     }
 }
 
@@ -361,8 +360,8 @@ TEST_CASE("continuous beam of two spans", "[core][beam][verification]")
 {
     const double span = 5.0;
     const double w = 6e3;
-    Model model = fem::core::test::beamModel(
-        cantileverSpec(2, 2 * span, Eigen::Vector3d::UnitX()), ElementKind::Beam2D);
+    Model model = fem::core::test::beamModel(cantileverSpec(2, 2 * span, Eigen::Vector3d::UnitX()),
+                                             ElementKind::Beam2D);
     fem::core::test::restrain(model, {1}, {DofType::U});
     fem::core::test::restrain(model, {1, 2, 3}, {DofType::V});
     model.distributedLoads.push_back({.elements = allBars(2),
@@ -437,8 +436,8 @@ TEST_CASE("space L frame with bending and torsion", "[core][beam][verification]"
     }
     CHECK(near(result.displacements[2].z(), expected, kTolerance));
     // The arm along y twists the one along x by p b.
-    CHECK(near(std::abs(fem::core::test::beamOf(result, 0).start().t), std::abs(p * b),
-               kTolerance));
+    CHECK(
+        near(std::abs(fem::core::test::beamOf(result, 0).start().t), std::abs(p * b), kTolerance));
     CHECK(near(result.reactionMoments[0].x(), -p * b, kTolerance));
 }
 
@@ -496,15 +495,17 @@ TEST_CASE("cantilevers of asymmetric sections", "[core][beam][verification]")
     } else {
         section.shape = fem::core::Channel{.h = 0.2, .bf = 0.075, .tf = 0.0115, .tw = 0.0085};
     }
-    const auto properties = fem::core::sectionProperties(section).value_or(fem::core::SectionProperties{});
+    const auto properties =
+        fem::core::sectionProperties(section).value_or(fem::core::SectionProperties{});
     const Eigen::Vector3d force(0.0, 4e3, -3e3); // at the tip, on the centroid
     const auto solveWith = [&](const Eigen::Vector3d& moment) {
-        Model model = fem::core::test::beamModel(cantileverSpec(3, length, Eigen::Vector3d::UnitX()),
-                                                 ElementKind::Beam3D);
+        Model model = fem::core::test::beamModel(
+            cantileverSpec(3, length, Eigen::Vector3d::UnitX()), ElementKind::Beam3D);
         model.sections.front() = section;
         model.assignments.front().reference = Eigen::Vector3d::UnitY(); // local = global
         fem::core::test::fixAll(model, {1}, ElementKind::Beam3D);
-        model.nodalForces.push_back({.nodes = fem::core::NodeIds{{4}}, .force = force, .moment = moment});
+        model.nodalForces.push_back(
+            {.nodes = fem::core::NodeIds{{4}}, .force = force, .moment = moment});
         return fem::core::test::solve(model);
     };
     const auto result = solveWith(Eigen::Vector3d::Zero());
@@ -572,8 +573,9 @@ TEST_CASE("convergence on a quarter ring", "[core][beam][verification]")
         }
         Model model = fem::core::test::beamModel(spec, ElementKind::Beam2D);
         fem::core::test::fixAll(model, {1}, ElementKind::Beam2D);
-        model.nodalForces.push_back({.nodes = fem::core::NodeIds{{static_cast<fem::core::ExternalId>(n + 1)}},
-                                     .force = Eigen::Vector3d(0, p, 0)});
+        model.nodalForces.push_back(
+            {.nodes = fem::core::NodeIds{{static_cast<fem::core::ExternalId>(n + 1)}},
+             .force = Eigen::Vector3d(0, p, 0)});
         const auto result = fem::core::test::solve(model);
         errors.at(k) = std::abs(result.displacements[static_cast<std::size_t>(n)].y() - exact);
     }
@@ -631,7 +633,8 @@ TEST_CASE("convergence on an elastic foundation", "[core][beam][verification]")
         model.foundations.push_back({.elements = all, .translational = Eigen::Vector3d(0, k, 0)});
         const auto centre = static_cast<fem::core::ExternalId>(n / 2 + 1);
         fem::core::test::restrain(model, {centre}, {DofType::U});
-        model.nodalForces.push_back({.nodes = fem::core::NodeIds{{centre}}, .force = Eigen::Vector3d(0, -p, 0)});
+        model.nodalForces.push_back(
+            {.nodes = fem::core::NodeIds{{centre}}, .force = Eigen::Vector3d(0, -p, 0)});
         const auto result = fem::core::test::solve(model);
         errors.at(m) = std::abs(-result.displacements[static_cast<std::size_t>(n / 2)].y() - exact);
     }

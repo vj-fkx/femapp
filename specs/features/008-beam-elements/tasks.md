@@ -200,7 +200,7 @@ Regras:
 
 ## Fase 7 — Documentação
 
-- [ ] **T31** Atualizar `specs/architecture.md` §3 com seções, viga,
+- [x] **T31** Atualizar `specs/architecture.md` §3 com seções, viga,
   resultados de viga e validação — cobre: 27
 
 ## Fase 8 — Fechamento
@@ -257,7 +257,9 @@ Regras:
 
 **2026-11-16 — T04:** o GCC 13 acusa `-Wmissing-field-initializers` em
 inicializadores designados que omitem campos sem inicializador padrão; os
-campos novos de `Section`, `Assignment` e `EndConnection` ganharam `{}`.
+campos opcionais novos de `Section` e `Assignment` ganharam `= std::nullopt`
+(o `clang-tidy` recusa `{}` como redundante, e o `= std::nullopt` satisfaz os
+dois).
 
 **2026-11-16 — T18:** uma viga com problema próprio (vetor paralelo, trecho
 flexível nulo, liberações instáveis) continua dando GDL aos seus nós, para que

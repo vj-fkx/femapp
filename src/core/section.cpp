@@ -292,7 +292,8 @@ private:
                                                      double flanges) const
     {
         if (!(flanges * tf < h)) {
-            return prefix() + (flanges > 1.0 ? "2 tf must be less than h." : "tf must be less than h.");
+            return prefix() +
+                   (flanges > 1.0 ? "2 tf must be less than h." : "tf must be less than h.");
         }
         if (!(tw <= bf)) {
             return prefix() + "tw must not exceed bf.";
@@ -367,8 +368,8 @@ Expected<SectionProperties> sectionProperties(const Section& section)
         g.iz = section.inertiaZ.value_or(0.0);
         g.iyz = section.productOfInertia.value_or(0.0);
         return principal(g, section.torsionConstant.value_or(0.0),
-                         section.shearCentre.value_or(Eigen::Vector2d::Zero()),
-                         section.shearAreaY, section.shearAreaZ);
+                         section.shearCentre.value_or(Eigen::Vector2d::Zero()), section.shearAreaY,
+                         section.shearAreaZ);
     }
     const auto data = std::visit(ShapeBuilder(section.name), *section.shape);
     if (!data) {
@@ -401,9 +402,9 @@ public:
         const double a = std::max(s.b, s.h) / 2;
         const double b = std::min(s.b, s.h) / 2;
         const double r = b / a;
-        const double factor = 3.0 / (8.0 * a * b * b) *
-                              (1.0 + 0.6095 * r + 0.8865 * r * r - 1.8023 * r * r * r +
-                               0.9100 * r * r * r * r);
+        const double factor =
+            3.0 / (8.0 * a * b * b) *
+            (1.0 + 0.6095 * r + 0.8865 * r * r - 1.8023 * r * r * r + 0.9100 * r * r * r * r);
         if (s.h >= s.b) {
             add("middle of the side +z", 0.0, s.b / 2, s.b * s.h * s.h / 8, s.b, 0.0, 0.0, factor);
         } else {
@@ -480,7 +481,8 @@ public:
         add("stem bottom", 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, s.tw / j);
         const double yc = m_p.centroid.x();
         if (yc < s.h - s.tf) {
-            const double qy = s.bf * s.tf * (s.h - s.tf / 2 - yc) + s.tw * std::pow(s.h - s.tf - yc, 2) / 2;
+            const double qy =
+                s.bf * s.tf * (s.h - s.tf / 2 - yc) + s.tw * std::pow(s.h - s.tf - yc, 2) / 2;
             add("stem at the neutral axis", yc, 0.0, qy, s.tw, 0.0, 0.0, s.tw / j);
         } else {
             add("flange at the neutral axis", yc, 0.0, s.bf * std::pow(s.h - yc, 2) / 2, s.bf, 0.0,
@@ -493,14 +495,14 @@ private:
     void add(std::string name, double y, double z, double qy, double ty, double qz, double tz,
              double torsion)
     {
-        m_points.push_back({.name = std::move(name),
-                            .position = toPrincipal(Eigen::Vector2d(y, z) - m_p.centroid,
-                                                    m_p.principalAngle),
-                            .firstMomentY = qy,
-                            .thicknessY = ty,
-                            .firstMomentZ = qz,
-                            .thicknessZ = tz,
-                            .torsionFactor = torsion});
+        m_points.push_back(
+            {.name = std::move(name),
+             .position = toPrincipal(Eigen::Vector2d(y, z) - m_p.centroid, m_p.principalAngle),
+             .firstMomentY = qy,
+             .thicknessY = ty,
+             .firstMomentZ = qz,
+             .thicknessZ = tz,
+             .torsionFactor = torsion});
     }
 
     // The four corners of a centred box.
@@ -523,9 +525,8 @@ private:
             const double z = r * std::sin(angle);
             const bool onZ = k == 2 || k == 6; // y = 0: shear of Vy
             const bool onY = k == 0 || k == 4; // z = 0: shear of Vz
-            add("perimeter at " + std::to_string(45 * k) + " degrees", onZ ? 0.0 : y,
-                onY ? 0.0 : z, onZ ? q : 0.0, onZ ? t : 0.0, onY ? q : 0.0, onY ? t : 0.0,
-                torsion);
+            add("perimeter at " + std::to_string(45 * k) + " degrees", onZ ? 0.0 : y, onY ? 0.0 : z,
+                onZ ? q : 0.0, onZ ? t : 0.0, onY ? q : 0.0, onY ? t : 0.0, torsion);
         }
     }
 

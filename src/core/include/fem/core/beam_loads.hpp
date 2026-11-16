@@ -44,7 +44,7 @@ struct SpanLoads
 struct SpanFrame
 {
     Eigen::Matrix3d principalAxes = Eigen::Matrix3d::Identity(); // columns, global
-    double principalAngle = 0.0; // from the local y to the principal y'
+    double principalAngle = 0.0;                           // from the local y to the principal y'
     Eigen::Vector2d shearCentre = Eigen::Vector2d::Zero(); // principal, from the centroid
 };
 

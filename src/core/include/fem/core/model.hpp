@@ -54,12 +54,12 @@ struct Assignment
 {
     ElementTarget elements;
     ElementKind kind = ElementKind::Truss3D;
-    std::string material{};
-    std::string section{};
+    std::string material;
+    std::string section;
     BeamTheory theory = BeamTheory::EulerBernoulli;
     // 3D beams: the local y is the part of this vector normal to the bar
     // (default: global Z, or global X for a bar along Z; design 008 §5.2).
-    std::optional<Eigen::Vector3d> reference{};
+    std::optional<Eigen::Vector3d> reference = std::nullopt;
     double rollAngle = 0.0; // about the bar axis, radians
 };
 
@@ -118,7 +118,7 @@ struct ElasticFoundation
 {
     ElementTarget elements;
     Eigen::Vector3d translational = Eigen::Vector3d::Zero(); // kx, ky, kz
-    double torsional = 0.0;                                   // about x
+    double torsional = 0.0;                                  // about x
 };
 
 // REQ-008-17: a position along the flexible length, as a fraction of it or

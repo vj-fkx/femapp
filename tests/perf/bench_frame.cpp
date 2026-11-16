@@ -88,7 +88,8 @@ fem::core::Model building(int bays, int storeys)
     model.sections.push_back(
         {.name = "Column", .shape = fem::core::RectangularTube{.b = 0.4, .h = 0.4, .t = 0.02}});
     model.sections.push_back(
-        {.name = "Beam", .shape = fem::core::ISection{.h = 0.5, .bf = 0.2, .tf = 0.016, .tw = 0.01}});
+        {.name = "Beam",
+         .shape = fem::core::ISection{.h = 0.5, .bf = 0.2, .tf = 0.016, .tw = 0.01}});
     model.assignments.push_back({.elements = fem::core::ElementIds{columns},
                                  .kind = fem::core::ElementKind::Beam3D,
                                  .material = "Steel",
@@ -105,9 +106,9 @@ fem::core::Model building(int bays, int storeys)
             top.ids.push_back(id(i, j, storeys));
         }
     }
-    for (const auto dof : {fem::core::DofType::U, fem::core::DofType::V, fem::core::DofType::W,
-                           fem::core::DofType::RX, fem::core::DofType::RY,
-                           fem::core::DofType::RZ}) {
+    for (const auto dof :
+         {fem::core::DofType::U, fem::core::DofType::V, fem::core::DofType::W,
+          fem::core::DofType::RX, fem::core::DofType::RY, fem::core::DofType::RZ}) {
         model.restraints.push_back({.nodes = base, .dof = dof, .value = 0.0});
     }
     model.nodalForces.push_back({.nodes = top, .force = Eigen::Vector3d(2.0e4, 1.0e4, 0.0)});
