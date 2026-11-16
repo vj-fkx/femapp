@@ -1,5 +1,13 @@
 // REQ-007-09, 10, 14: validation of the model before the analysis.
 
+// GCC 13 at -O2 warns that the std::vector of the inactive NodeIds or
+// ElementIds alternative "may be used uninitialized" when a temporary holding
+// a GroupRef is moved into the model: a false positive of its variant
+// analysis.
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#endif
+
 #include "truss_meshes.hpp"
 
 #include <fem/core/static_analysis.hpp>

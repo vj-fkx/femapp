@@ -62,10 +62,12 @@ inline std::shared_ptr<const Mesh> trussMesh(const TrussSpec& spec)
         for (const int j : indices) {
             handles.push_back(bars.at(static_cast<std::size_t>(j)));
         }
-        REQUIRE(builder.addGroup(name, 1, std::move(handles)).has_value());
+        const auto added = builder.addGroup(name, 1, std::move(handles));
+        REQUIRE(added.has_value());
     }
     for (auto& [name, handles] : pointHandles) {
-        REQUIRE(builder.addGroup(name, 0, std::move(handles)).has_value());
+        const auto added = builder.addGroup(name, 0, std::move(handles));
+        REQUIRE(added.has_value());
     }
     auto mesh = builder.build();
     REQUIRE(mesh.has_value());
