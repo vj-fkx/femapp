@@ -10,11 +10,11 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <array>
 #include <atomic>
 #include <cstddef>
 #include <cstdlib>
 #include <new>
-#include <vector>
 
 namespace {
 
@@ -89,7 +89,9 @@ TEST_CASE("shape functions and geometry do not allocate", "[core][allocations]")
 
 TEST_CASE("the truss element does not allocate", "[core][allocations]")
 {
-    const std::vector<fem::core::BarData> bars(1);
+    // On the stack: a heap vector here trips GCC's mismatched-new-delete
+    // check against the counting operator new above.
+    const std::array<fem::core::BarData, 1> bars{};
     const fem::core::TrussElement element(fem::core::ElementKind::Truss3D, bars);
     fem::core::ElementNodes nodes;
     nodes.type = fem::core::ElementType::Line2;
