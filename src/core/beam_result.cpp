@@ -1,6 +1,7 @@
 #include "detail/section_detail.hpp"
 
 #include <fem/core/beam_result.hpp>
+#include <fem/core/beam_state.hpp>
 
 #include <algorithm>
 #include <array>
@@ -63,7 +64,36 @@ void endForces(const BeamData& beam, const BeamVector& forces, BeamForces& start
            .t = torque(6),
            .my = forces(10),
            .mz = forces(11)};
+    // Without warping, all the torque is Saint-Venant's.
+    start.tsv = start.t;
+    end.tsv = end.t;
 }
+
+namespace {
+
+// REQ-008b-19: a point of an exact beam from the state engine.
+BeamPoint exactPoint(const BeamResult::Data& data, double x, Side side)
+{
+    const BeamData& beam = data.beam;
+    const BarState s = stateAt(beam, data.length, data.loads, data.planar, data.ends, x, side);
+    BeamPoint point;
+    point.displacement = s.displacement;
+    point.rotation = s.rotation;
+    point.warping = s.warping;
+    BeamForces& f = point.forces;
+    f.n = s.force.x();
+    f.vy = s.force.y();
+    f.vz = s.force.z();
+    f.t = s.moment.x() + beam.shearCentre.y() * s.force.y() - beam.shearCentre.x() * s.force.z();
+    f.my = s.moment.y();
+    f.mz = s.moment.z();
+    f.b = s.bimoment;
+    f.tsv = beam.warpingStiffness > 0.0 ? beam.torsional * s.warping : f.t;
+    f.tw = f.t - f.tsv;
+    return point;
+}
+
+} // namespace
 
 BeamResult::BeamResult(Data data)
     : m_data(std::move(data))
@@ -71,6 +101,9 @@ BeamResult::BeamResult(Data data)
 
 BeamPoint BeamResult::at(double x, Side side) const
 {
+    if (m_data.exact) {
+        return exactPoint(m_data, x, side);
+    }
     const BeamData& beam = m_data.beam;
     const SpanLoads& loads = m_data.loads;
     const double length = m_data.length;

@@ -12,6 +12,7 @@
 
 #include <array>
 #include <cstddef>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -31,6 +32,9 @@ struct ValidationTables
     std::vector<int> foundationOf;
     std::vector<std::array<int, 2>> connectionOf; // start, end
     bool hasBeams = false;
+    // Per section of the model: solved once (design 008b §5.7), null when
+    // invalid or unused.
+    std::vector<std::shared_ptr<const SectionSolution>> sections;
 };
 
 struct Validation
@@ -51,6 +55,10 @@ struct Validation
 
 // The section area that a bar uses (shape or generic).
 [[nodiscard]] double sectionArea(const Section& section);
+
+// The solved section of that name, from the tables (solving it if needed).
+[[nodiscard]] std::shared_ptr<const SectionSolution>
+solvedSection(const Model& model, const ValidationTables& tables, std::string_view name);
 
 // A beam resolved from the model: its data without the span loads, the
 // frame of the loads and the flexible length.

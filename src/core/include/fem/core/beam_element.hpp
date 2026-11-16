@@ -22,6 +22,14 @@ inline constexpr int kBeamDofs = 12;
 using BeamVector = Eigen::Matrix<double, kBeamDofs, 1>;
 using BeamMatrix = Eigen::Matrix<double, kBeamDofs, kBeamDofs>;
 
+// The local dofs of both ends of an exact bar (design 008b §5.3), at most 7
+// per end: (u, v, w, rx, ry, rz, warping) with warping, (u, v, w, rx, ry, rz)
+// without, (u, v, rz) in the plane.
+inline constexpr int kMaxStateDofs = 14;
+using StateBarMatrix =
+    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, kMaxStateDofs, kMaxStateDofs>;
+using StateBarVector = Eigen::Matrix<double, Eigen::Dynamic, 1, 0, kMaxStateDofs, 1>;
+
 // What a beam needs, resolved from the model (design 008 §5.3, 5.4). All in
 // the principal local axes of the flexible length.
 struct BeamData
@@ -49,6 +57,14 @@ struct BeamData
     // §5.2, 5.3).
     double warpingStiffness = 0.0;
     Eigen::Vector3d curvature = Eigen::Vector3d::Zero();
+    // The warping condition of each end, resolved (design 008b §5.4).
+    std::array<WarpingCondition, 2> warpingEnds{WarpingCondition::Continuous,
+                                                WarpingCondition::Continuous};
+    // The principal local axes at the end of the flexible length (columns,
+    // global): the same as `axes` for a straight bar, turned along an arc.
+    Eigen::Matrix3d endAxes = Eigen::Matrix3d::Identity();
+    // > 0: the flexible length along an arc (design 008b §5.2).
+    double arcLength = 0.0;
 };
 
 // REQ-008-09, 10: local axes of a bar from x1 to x2, as columns (x, y, z).

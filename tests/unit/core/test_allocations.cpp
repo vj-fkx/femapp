@@ -161,3 +161,37 @@ TEST_CASE("the matrix exponential does not allocate", "[core][allocations]")
     CHECK(std::isfinite(e.norm()));
     CHECK(gAllocations == 0);
 }
+
+// REQ-008b: the exact beam element, with warping, springs and a span load,
+// computes on the stack.
+TEST_CASE("the exact beam element does not allocate", "[core][allocations]")
+{
+    std::array<fem::core::BeamData, 1> beams{};
+    fem::core::BeamData& beam = beams[0];
+    beam.axial = 1e6;
+    beam.torsional = 1e3;
+    beam.bendingY = beam.bendingZ = 1e4;
+    beam.shearY = beam.shearZ = 1e5;
+    beam.warpingStiffness = 50.0;
+    beam.shearCentre = Eigen::Vector2d(0.01, 0.02);
+    beam.springs[1][5] = 0.0;
+    beam.warpingEnds[1] = fem::core::WarpingCondition::Free;
+    beam.curvature = Eigen::Vector3d(0.0, 0.1, 0.2);
+    std::array<fem::core::SpanLoads, 1> loads{};
+    const fem::core::ExactBeamElement element(fem::core::ElementKind::Beam3D, {true, false}, beams,
+                                              loads);
+    fem::core::ElementNodes nodes;
+    nodes.type = fem::core::ElementType::Line2;
+    nodes.count = 2;
+    nodes.x[0] = Eigen::Vector3d(0.0, 0.0, 0.0);
+    nodes.x[1] = Eigen::Vector3d(3.0, 0.0, 0.0);
+    Eigen::MatrixXd matrix = Eigen::MatrixXd::Zero(13, 13);
+    Eigen::VectorXd vector = Eigen::VectorXd::Zero(13);
+
+    gAllocations = 0;
+    gCounting = true;
+    const bool computed = element.compute(nodes, 0, matrix, vector).has_value();
+    gCounting = false;
+    CHECK(computed);
+    CHECK(gAllocations == 0);
+}

@@ -64,26 +64,28 @@ double positionOn(const BarPosition& position, double length)
 
 void addDistributed(SpanLoads& loads, const SpanFrame& frame, Axes axes,
                     const Eigen::Vector3d& startValue, const Eigen::Vector3d& endValue, double from,
-                    double to)
+                    double to, double startTorque, double endTorque)
 {
     const Eigen::Vector3d q0 = toPrincipal(frame, axes, startValue);
     const Eigen::Vector3d q1 = toPrincipal(frame, axes, endValue);
     SpanPiece piece;
     piece.from = from;
     piece.to = to;
-    piece.start << q0, leverTorque(frame, q0);
-    piece.end << q1, leverTorque(frame, q1);
+    piece.start << q0, leverTorque(frame, q0) + startTorque;
+    piece.end << q1, leverTorque(frame, q1) + endTorque;
     loads.pieces.push_back(piece);
 }
 
 void addConcentrated(SpanLoads& loads, const SpanFrame& frame, Axes axes,
-                     const Eigen::Vector3d& force, const Eigen::Vector3d& moment, double at)
+                     const Eigen::Vector3d& force, const Eigen::Vector3d& moment, double at,
+                     double bimoment)
 {
     SpanPoint point;
     point.at = at;
     point.force = toPrincipal(frame, axes, force);
     point.moment = toPrincipal(frame, axes, moment);
     point.moment.x() += leverTorque(frame, point.force);
+    point.bimoment = bimoment;
     loads.points.push_back(point);
 }
 

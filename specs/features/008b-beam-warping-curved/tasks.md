@@ -98,17 +98,17 @@ Regras:
 
 ## Fase 4 — Viga com empenamento
 
-- [ ] **T19** `BeamData` ampliado (EIw, condições, curvatura, comprimento de
+- [x] **T19** `BeamData` ampliado (EIw, condições, curvatura, comprimento de
   arco) e `ExactBeamElement` para `Line2` com empenamento: cadeia de
   centro de cisalhamento, ligações (até 28 GDL), excentricidades e rotação;
   pontas livres condensadas e impedidas eliminadas; `dofsAt` pelas pontas
   contínuas; `test_allocations` ampliado — arquivos: `beam_element.hpp/.cpp`,
   testes — cobre: 07, 09, 11
-- [ ] **T20** Resolução das condições por ponta e do GDL `Warp` por nó
+- [x] **T20** Resolução das condições por ponta e do GDL `Warp` por nó
   (§5.4): padrão por colinearidade, `WarpingEnd`, nós com e sem o GDL;
   testes unitários da resolução — arquivos: `static_analysis.cpp` ou
   `beam_element.cpp`, testes — cobre: 09
-- [ ] **T21** `runLinearStatic` com empenamento: conjuntos por (formulação,
+- [x] **T21** `runLinearStatic` com empenamento: conjuntos por (formulação,
   pontas contínuas); prescrição de `Warp`; bimomento nodal; `warping` e
   `reactionBimoments` no resultado; B, Tsv e Tw em `BeamForces`; `BeamResult`
   pelo motor nas vigas exatas — arquivos: `static_analysis.hpp/.cpp`,

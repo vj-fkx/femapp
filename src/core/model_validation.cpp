@@ -53,6 +53,7 @@ public:
         const auto elements = static_cast<std::size_t>(m_mesh.elementCount());
         m_tables.owner.assign(elements, kNoAssignment);
         m_tables.nodeDofs.assign(static_cast<std::size_t>(m_mesh.nodeCount()), 0);
+        m_tables.sections.assign(m_model.sections.size(), nullptr);
         m_tables.offsetOf.assign(elements, kNoItem);
         m_tables.foundationOf.assign(elements, kNoItem);
         m_tables.connectionOf.assign(elements, {kNoItem, kNoItem});
@@ -143,11 +144,16 @@ private:
             addOnce(name + ": give either a shape or its properties, not both.");
             return false;
         }
-        const auto properties = sectionProperties(section);
-        if (!properties) {
-            addOnce(properties.error().message);
-            return false;
+        const auto index = static_cast<std::size_t>(&section - m_model.sections.data());
+        if (!m_tables.sections.at(index)) {
+            auto solution = solveSection(section);
+            if (!solution) {
+                addOnce(solution.error().message);
+                return false;
+            }
+            m_tables.sections.at(index) = std::move(*solution);
         }
+        const SectionProperties* properties = &m_tables.sections.at(index)->properties();
         if (!section.shape && !(section.area.value_or(0.0) > 0.0)) {
             addOnce(name + ": the area must be given and positive.");
             return false;
@@ -645,6 +651,21 @@ DofMask dofsOf(ElementKind kind)
                                 mask(DofType::RZ));
 }
 
+std::shared_ptr<const SectionSolution>
+solvedSection(const Model& model, const ValidationTables& tables, std::string_view name)
+{
+    const Section* section = model.findSection(name);
+    if (section == nullptr) {
+        return nullptr;
+    }
+    const auto index = static_cast<std::size_t>(section - model.sections.data());
+    if (index < tables.sections.size() && tables.sections[index]) {
+        return tables.sections[index];
+    }
+    auto solution = solveSection(*section);
+    return solution ? *solution : nullptr;
+}
+
 double sectionArea(const Section& section)
 {
     if (!section.shape) {
@@ -660,8 +681,8 @@ Expected<BeamSetup> beamSetup(const Model& model, ElementIndex element,
     const auto e = static_cast<std::size_t>(element);
     const Assignment& assignment = model.assignments[static_cast<std::size_t>(tables.owner[e])];
     const Material& material = *model.findMaterial(assignment.material);
-    const SectionProperties section =
-        sectionProperties(*model.findSection(assignment.section)).value_or(SectionProperties{});
+    const auto solved = solvedSection(model, tables, assignment.section);
+    const SectionProperties section = solved ? solved->properties() : SectionProperties{};
 
     BeamSetup setup;
     BeamData& beam = setup.data;
@@ -697,6 +718,11 @@ Expected<BeamSetup> beamSetup(const Model& model, ElementIndex element,
         beam.shearZ = g * section.shearAreaZ.value_or(0.0);
     }
     beam.shearCentre = section.shearCentre;
+    // REQ-008b-07: torsion with warping, 3D beams.
+    if (assignment.warping && assignment.kind == ElementKind::Beam3D) {
+        beam.warpingStiffness = e0 * section.warpingConstant;
+    }
+    beam.endAxes = beam.axes;
     for (int end = 0; end < 2; ++end) {
         const int item = tables.connectionOf[e][static_cast<std::size_t>(end)];
         if (item == kNoItem) {

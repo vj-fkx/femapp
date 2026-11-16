@@ -33,6 +33,10 @@ struct StaticResult
     std::vector<Eigen::Vector3d> reactions;       // per node: 0 where free
     std::vector<Eigen::Vector3d> rotations;       // per node: rx, ry, rz (0 without dof)
     std::vector<Eigen::Vector3d> reactionMoments; // per node: 0 where free
+    // REQ-008b-18: per node, the warping (rate of twist) and the reaction
+    // bimoment where it is restrained; 0 without the dof.
+    std::vector<double> warping;
+    std::vector<double> reactionBimoments;
     // Per element; NaN for elements that are not bars. For beams, at the
     // start of the flexible length.
     std::vector<double> axialForce; // N, tension positive

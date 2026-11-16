@@ -4,6 +4,7 @@
 #include <fem/core/beam_element.hpp>
 #include <fem/core/beam_loads.hpp>
 #include <fem/core/beam_result.hpp>
+#include <fem/core/beam_state.hpp>
 #include <fem/core/dof_map.hpp>
 #include <fem/core/element_formulation.hpp>
 #include <fem/core/element_type.hpp>
@@ -11,12 +12,15 @@
 #include <fem/core/static_analysis.hpp>
 #include <fem/core/truss_element.hpp>
 
+#include <Eigen/Geometry>
 #include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <map>
+#include <memory>
 #include <set>
 #include <string>
 #include <string_view>
@@ -79,7 +83,60 @@ struct Beams
     std::vector<BeamData> data;
     std::vector<SpanLoads> loads;
     std::vector<double> length;
+    std::vector<bool> exact; // the exact element of 008b (design 008b §5.3)
 };
+
+// REQ-008b-09: the warping condition of each end of the beams with warping
+// (design 008b §5.4): by default continuous between ends whose tangents at
+// a node are collinear, free otherwise; the WarpingEnd items override it.
+void resolveWarping(const Model& model, Beams& beams)
+{
+    constexpr double kCollinear = 1e-6;
+    const Mesh& mesh = *model.mesh;
+    const auto count = beams.data.size();
+    const auto warps = [&beams](std::size_t e) { return beams.data[e].warpingStiffness > 0.0; };
+    const auto tangent = [&beams](std::size_t e, int end) {
+        const BeamData& beam = beams.data[e];
+        return Eigen::Vector3d((end == 0 ? beam.axes : beam.endAxes).col(0));
+    };
+    std::vector<std::vector<std::pair<std::size_t, int>>> atNode(
+        static_cast<std::size_t>(mesh.nodeCount()));
+    for (std::size_t e = 0; e < count; ++e) {
+        if (warps(e)) {
+            const auto nodes = mesh.elementNodes(static_cast<ElementIndex>(e));
+            atNode[static_cast<std::size_t>(nodes[0])].emplace_back(e, 0);
+            atNode[static_cast<std::size_t>(nodes[1])].emplace_back(e, 1);
+        }
+    }
+    for (const auto& ends : atNode) {
+        for (const auto& [e, end] : ends) {
+            bool collinear = false;
+            for (const auto& [other, otherEnd] : ends) {
+                if ((other != e || otherEnd != end) &&
+                    tangent(e, end).cross(tangent(other, otherEnd)).norm() < kCollinear) {
+                    collinear = true;
+                }
+            }
+            beams.data[e].warpingEnds.at(static_cast<std::size_t>(end)) =
+                collinear ? WarpingCondition::Continuous : WarpingCondition::Free;
+        }
+    }
+    for (const WarpingEnd& item : model.warpingEnds) {
+        for (const ElementIndex element :
+             resolve(mesh, item.elements).value_or(std::vector<ElementIndex>{})) {
+            const auto e = static_cast<std::size_t>(element);
+            if (!warps(e)) {
+                continue;
+            }
+            if (item.end != BarEnd::End) {
+                beams.data[e].warpingEnds[0] = item.condition;
+            }
+            if (item.end != BarEnd::Start) {
+                beams.data[e].warpingEnds[1] = item.condition;
+            }
+        }
+    }
+}
 
 Beams beamData(const Model& model, const detail::ValidationTables& tables)
 {
@@ -89,6 +146,7 @@ Beams beamData(const Model& model, const detail::ValidationTables& tables)
     beams.data.resize(count);
     beams.loads.resize(count);
     beams.length.assign(count, 0.0);
+    beams.exact.assign(count, false);
     if (!tables.hasBeams) {
         return beams;
     }
@@ -110,6 +168,7 @@ Beams beamData(const Model& model, const detail::ValidationTables& tables)
         }
         isBeam[e] = true;
         beams.data[e] = setup->data;
+        beams.exact[e] = setup->data.warpingStiffness > 0.0;
         beams.length[e] = setup->length;
         frames[e] = setup->frame;
         materials[e] = model.findMaterial(assignment.material);
@@ -150,21 +209,22 @@ Beams beamData(const Model& model, const detail::ValidationTables& tables)
         forBeams(load.elements, [&](std::size_t e) {
             addDistributed(beams.loads[e], frames[e], load.axes, load.startValue, load.endValue,
                            positionOn(load.from, beams.length[e]),
-                           positionOn(load.to, beams.length[e]));
+                           positionOn(load.to, beams.length[e]), load.startTorque, load.endTorque);
         });
     }
     for (const ConcentratedLoad& load : model.concentratedLoads) {
         forBeams(load.elements, [&](std::size_t e) {
             addConcentrated(beams.loads[e], frames[e], load.axes, load.force, load.moment,
-                            positionOn(load.at, beams.length[e]));
+                            positionOn(load.at, beams.length[e]), load.bimoment);
         });
     }
     for (std::size_t e = 0; e < count; ++e) {
-        if (isBeam[e]) {
+        if (isBeam[e] && !beams.exact[e]) {
             beams.data[e].fixedEndLoads =
                 equivalentLoads(beams.data[e], beams.length[e], beams.loads[e]);
         }
     }
+    resolveWarping(model, beams);
     return beams;
 }
 
@@ -232,12 +292,25 @@ Expected<StaticResult> runLinearStatic(const Model& model, const StaticOptions& 
     std::array<std::vector<ElementIndex>, kKinds> members;
     std::vector<ElementKind> kindOf(static_cast<std::size_t>(mesh.elementCount()),
                                     ElementKind::Truss3D);
+    // The exact beams (design 008b §5.4): a set per kind and pair of
+    // continuous warping ends, since the ends decide the dofs.
+    std::map<int, std::vector<ElementIndex>> exactMembers;
+    const auto exactKey = [&beams](ElementKind kind, std::size_t e) {
+        const auto& ends = beams.data[e].warpingEnds;
+        return 4 * static_cast<int>(kind) + 2 * (ends[0] == WarpingCondition::Continuous ? 1 : 0) +
+               (ends[1] == WarpingCondition::Continuous ? 1 : 0);
+    };
     for (ElementIndex element = 0; element < mesh.elementCount(); ++element) {
-        const int owner = tables.owner[static_cast<std::size_t>(element)];
+        const auto e = static_cast<std::size_t>(element);
+        const int owner = tables.owner[e];
         if (owner != kNoAssignment) {
             const auto kind = model.assignments[static_cast<std::size_t>(owner)].kind;
-            kindOf[static_cast<std::size_t>(element)] = kind;
-            members.at(static_cast<std::size_t>(kind)).push_back(element);
+            kindOf[e] = kind;
+            if (beams.exact[e]) {
+                exactMembers[exactKey(kind, e)].push_back(element);
+            } else {
+                members.at(static_cast<std::size_t>(kind)).push_back(element);
+            }
         }
     }
     const TrussElement planarTruss(ElementKind::Truss2D, bars);
@@ -251,6 +324,14 @@ Expected<StaticResult> runLinearStatic(const Model& model, const StaticOptions& 
         if (!members.at(k).empty()) {
             sets.push_back({.elements = members.at(k), .formulation = formulations.at(k)});
         }
+    }
+    std::vector<std::unique_ptr<ExactBeamElement>> exactFormulations;
+    for (const auto& [key, elements] : exactMembers) {
+        const auto kind = static_cast<ElementKind>(key / 4);
+        const std::array<bool, 2> continuous = {(key / 2) % 2 == 1, key % 2 == 1};
+        exactFormulations.push_back(
+            std::make_unique<ExactBeamElement>(kind, continuous, beams.data, beams.loads));
+        sets.push_back({.elements = elements, .formulation = exactFormulations.back().get()});
     }
 
     // Dofs, supports and loads; validation guarantees every dof exists.
@@ -276,6 +357,9 @@ Expected<StaticResult> runLinearStatic(const Model& model, const StaticOptions& 
                 if (value != 0.0 && dofs.find(node, kNodeDofs.at(k))) {
                     loads.push_back({.node = node, .type = kNodeDofs.at(k), .value = value});
                 }
+            }
+            if (force.bimoment != 0.0 && dofs.find(node, DofType::Warp)) {
+                loads.push_back({.node = node, .type = DofType::Warp, .value = force.bimoment});
             }
         }
     }
@@ -325,8 +409,17 @@ Expected<StaticResult> runLinearStatic(const Model& model, const StaticOptions& 
     result.reactions.assign(nodeCount, Eigen::Vector3d::Zero());
     result.rotations.assign(nodeCount, Eigen::Vector3d::Zero());
     result.reactionMoments.assign(nodeCount, Eigen::Vector3d::Zero());
+    result.warping.assign(nodeCount, 0.0);
+    result.reactionBimoments.assign(nodeCount, 0.0);
     for (DofIndex d = 0; d < dofs.size(); ++d) {
         const auto node = static_cast<std::size_t>(dofs.nodeOf(d));
+        if (dofs.typeOf(d) == DofType::Warp) {
+            result.warping[node] = values[d];
+            if (dofs.isPrescribed(d)) {
+                result.reactionBimoments[node] = (*forces)[d];
+            }
+            continue;
+        }
         const auto k = static_cast<Eigen::Index>(dofs.typeOf(d));
         const bool rotation = k >= 3;
         (rotation ? result.rotations : result.displacements)[node](k % 3) = values[d];
@@ -347,6 +440,52 @@ Expected<StaticResult> runLinearStatic(const Model& model, const StaticOptions& 
         }
         const auto nodes = mesh.elementNodes(static_cast<ElementIndex>(e));
         const auto& assignment = model.assignments[static_cast<std::size_t>(owner)];
+        if (detail::isBeam(kindOf[e]) && beams.exact[e]) {
+            // The element's nodal values, in the order of its dofs.
+            const ExactBeamElement* formulation = nullptr;
+            for (const auto& f : exactFormulations) {
+                const auto& ends = beams.data[e].warpingEnds;
+                const bool c0 = ends[0] == WarpingCondition::Continuous;
+                const bool c1 = ends[1] == WarpingCondition::Continuous;
+                const DofMask m0 = f->dofsAt(mesh.elementType(static_cast<ElementIndex>(e)), 0);
+                const DofMask m1 = f->dofsAt(mesh.elementType(static_cast<ElementIndex>(e)), 1);
+                if (((m0 & mask(DofType::Warp)) != 0) == c0 &&
+                    ((m1 & mask(DofType::Warp)) != 0) == c1) {
+                    formulation = f.get();
+                }
+            }
+            std::vector<double> nodeValues;
+            for (int k = 0; k < 2; ++k) {
+                const DofMask used =
+                    formulation->dofsAt(mesh.elementType(static_cast<ElementIndex>(e)), k);
+                for (int t = 0; t < kDofTypeCount; ++t) {
+                    const auto type = static_cast<DofType>(t);
+                    if ((used & mask(type)) != 0) {
+                        const auto dof = dofs.find(nodes[static_cast<std::size_t>(k)], type);
+                        nodeValues.push_back(dof ? values[*dof] : 0.0);
+                    }
+                }
+            }
+            const Eigen::Vector3d x1 = mesh.nodeCoordinates(nodes[0]);
+            const Eigen::Vector3d x2 = mesh.nodeCoordinates(nodes[1]);
+            BeamResult::Data data;
+            data.length = exactLength(beams.data[e], x1, x2);
+            data.axes = beams.data[e].axes;
+            data.beam = beams.data[e];
+            data.loads = beams.loads[e];
+            data.exact = true;
+            data.planar = kindOf[e] == ElementKind::Beam2D;
+            data.ends = exactBeamEnds(beams.data[e], kindOf[e], beams.loads[e], x1, x2, nodeValues);
+            const BeamResult probe(data);
+            data.start = probe.at(0.0, Side::Before).forces;
+            data.end = probe.at(data.length, Side::After).forces;
+            const double n = data.start.n;
+            result.beams[e].emplace(std::move(data));
+            result.axialForce[e] = n;
+            result.strain[e] = n / beams.data[e].axial;
+            result.stress[e] = n / detail::sectionArea(*model.findSection(assignment.section));
+            continue;
+        }
         if (detail::isBeam(kindOf[e])) {
             const auto a = static_cast<std::size_t>(nodes[0]);
             const auto b = static_cast<std::size_t>(nodes[1]);

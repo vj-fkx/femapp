@@ -10,6 +10,7 @@ femapp_add_module(core
     SOURCES
         assembler.cpp
         beam_element.cpp
+        beam_exact.cpp
         beam_loads.cpp
         beam_result.cpp
         beam_state.cpp

@@ -166,6 +166,7 @@ FullVector pointJump(const BeamData& beam, const SpanPoint& point)
     j(MX) = -(point.moment.x() - (ez * point.force.y() - ey * point.force.z()));
     j(MY) = -point.moment.y();
     j(MZ) = -point.moment.z();
+    j(Q) = -point.bimoment;
     return j;
 }
 
