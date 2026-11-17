@@ -1,6 +1,6 @@
 # Tarefas — 008b beam-warping-curved
 
-Status: em andamento
+Status: concluído
 Design: [design.md](design.md) · Requisitos: [requirements.md](requirements.md)
 
 Regras:
@@ -176,12 +176,12 @@ Regras:
 
 ## Fase 9 — Fechamento
 
-- [ ] **T90** [M] Build e testes verdes nos jobs do CI, incluindo o de
+- [x] **T90** [M] Build e testes verdes nos jobs do CI, incluindo o de
   cobertura com `core` ≥ 80% (push com sua confirmação) — cobre: N04
-- [ ] **T91** `clang-format` e `clang-tidy` sem pendências (também o do
+- [x] **T91** `clang-format` e `clang-tidy` sem pendências (também o do
   Linux, pelo CI); `core` sem headers Qt — cobre: 24
-- [ ] **T92** Conferir os onze critérios de aceite de `requirements.md`
-- [ ] **T93** Atualizar `specs/roadmap.md` para `concluída`
+- [x] **T92** Conferir os onze critérios de aceite de `requirements.md`
+- [x] **T93** Atualizar `specs/roadmap.md` para `concluída`
 
 ## Matriz de rastreabilidade
 
@@ -313,4 +313,20 @@ Regras:
   travamento). O arco parabólico é conferido como triarticulado: a curva
   quadrática representa a parábola exatamente, e o empuxo bate com a
   estática em 1e−9.
+- T32 (na conferência do AC-6, T92): os demais casos do AC-5 também
+  convergem com a isoparamétrica pelos mesmos nós do arco (erro relativo
+  do deslocamento conferido; malha dobrada a cada passo): arco
+  biarticulado sob carga (4,15; 4,04) e sob temperatura (4,03; 4,01), anel
+  sob carga diametral (4,02; 4,01) e viga curva em planta biengastada
+  (3,80; 3,95).
+
+**Fechamento (T90 a T93):**
+
+- T90: CI verde nas quatro plataformas no commit 7a4e298 (o anterior só
+  falhou no `clang-tidy` do Linux, corrigido); cobertura de linhas do
+  `core` em 97,1% (5021 de 5171), funções 99,6%.
+- T91: `clang-format` e `clang-tidy` limpos (local e Linux);
+  `check_no_qt_includes` passa.
+- T92: AC-1, 2, 5, 6, 8, 9, 10 e 11 conferidos contra os testes; AC-3, 4 e
+  7 saíram com o empenamento (008d).
 

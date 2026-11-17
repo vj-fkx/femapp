@@ -105,12 +105,12 @@ constituição §5.1; nada muda na interface.
 
 ## 5. Critérios de aceite
 
-- [ ] **AC-1** (REQ-008b-01, 03, 04) Paredes finas e Iw: Iw e ω das formas
+- [x] **AC-1** (REQ-008b-01, 03, 04) Paredes finas e Iw: Iw e ω das formas
   paramétricas iguais às fórmulas fechadas (perfil I: Iw = Iz·h₀²/4 com as
   mesas; U contra tabelas; zero na cantoneira, no T e no tubo circular); seção de paredes finas de perfil I, U, Z, cartola
   e caixão de uma e de duas células igual às fórmulas de paredes finas;
   seções inválidas recusadas com a mensagem certa.
-- [ ] **AC-2** (REQ-008b-02, 04, NFR-008b-02) Seção poligonal:
+- [x] **AC-2** (REQ-008b-02, 04, NFR-008b-02) Seção poligonal:
   - retângulo, círculo poligonal fino e seção com furo: A, inércias e eixos
     principais exatos;
   - J do retângulo contra a série de Saint-Venant, do tubo contra a solução
@@ -122,29 +122,29 @@ constituição §5.1; nada muda na interface.
   - polígonos inválidos recusados.
 - [x] **AC-3** *Removido em 2026-11-16: a torção com empenamento foi adiada para uma versão futura (§6).*
 - [x] **AC-4** *Removido em 2026-11-16: a torção com empenamento foi adiada para uma versão futura (§6).*
-- [ ] **AC-5** (REQ-008b-12, 13, 15, NFR-008b-01) Arco exato, contra
+- [x] **AC-5** (REQ-008b-12, 13, 15, NFR-008b-01) Arco exato, contra
   soluções fechadas (Roark ou equivalente): quarto de anel em balanço com
   carga na ponta no plano e fora do plano (flexão e torção acopladas); anel
   fechado sob carga diametral; arco biarticulado semicircular sob carga
   uniforme e sob temperatura; viga curva em planta biengastada sob carga
   vertical; arco com raio → ∞ igual à viga reta; resultados em qualquer
   ponto do arco.
-- [ ] **AC-6** (REQ-008b-12, 14, 15) Isoparamétrica: patch test em barra
+- [x] **AC-6** (REQ-008b-12, 14, 15) Isoparamétrica: patch test em barra
   reta; os casos do AC-5 convergindo para a solução exata na taxa
   documentada, sem travamento em barra esbelta (L/h = 1000); arco parabólico
   convergindo para a solução de referência documentada; nó do meio com apoio
   e com carga.
 - [x] **AC-7** *Removido em 2026-11-16: a torção com empenamento foi adiada para uma versão futura (§6).*
-- [ ] **AC-8** (REQ-008b-15, 17) Recursos da 008 em vigas curvas: liberações,
+- [x] **AC-8** (REQ-008b-15, 17) Recursos da 008 em vigas curvas: liberações,
   molas de ligação, excentricidades, base elástica, cargas parciais e
   concentradas por comprimento de arco, eixos globais e locais, peso
   próprio e gradiente, cada um com sua solução analítica ou de referência.
-- [ ] **AC-9** (REQ-008b-06) Tensões: das seções poligonal (retângulo sob
+- [x] **AC-9** (REQ-008b-06) Tensões: das seções poligonal (retângulo sob
   torção: máximo no meio do lado maior contra a série) e de paredes finas
   contra as fórmulas; von Mises.
-- [ ] **AC-10** (REQ-008b-16, 21) Validação: cada problema do REQ-008b-21
+- [x] **AC-10** (REQ-008b-16, 21) Validação: cada problema do REQ-008b-21
   gera uma mensagem com o item envolvido, e vários aparecem juntos.
-- [ ] **AC-11** (REQ-008b-05, 23, 24, NFR-008b-03, 04) Os testes da 007 e da
+- [x] **AC-11** (REQ-008b-05, 23, 24, NFR-008b-03, 04) Os testes da 007 e da
   008 passam sem alteração de resultado; `core` segue sem Qt; benchmark do
   pórtico espacial registrado em `tasks.md`; CI verde nas quatro
   plataformas, com a cobertura de `core` ≥ 80%.
