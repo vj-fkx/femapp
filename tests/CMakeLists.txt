@@ -26,6 +26,7 @@ femapp_add_test(core SOURCES
     test_beam_curved.cpp
     test_beam_element.cpp
     test_beam_loads.cpp
+    test_beam_second_order.cpp
     test_beam_state.cpp
     test_beam_validation.cpp
     test_beam_exact.cpp

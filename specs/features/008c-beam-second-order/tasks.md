@@ -23,7 +23,7 @@ Regras:
   resultado com e sem reuso, `factorize` inalterado — arquivos:
   `linear_solver.hpp/.cpp`, `tests/unit/core/test_linear_solver.cpp` —
   cobre: 08, 10
-- [ ] **T02** [P] `AxialProfile` em `BeamData` (`at`, `largestCompression`,
+- [x] **T02** [P] `AxialProfile` em `BeamData` (`at`, `largestCompression`,
   tamanho fixo); testes do perfil (constante, linear por parte, pontos de
   Gauss) e `test_allocations` com o perfil cheio — arquivos:
   `beam_element.hpp/.cpp`, `tests/unit/core/test_beam_second_order.cpp`,

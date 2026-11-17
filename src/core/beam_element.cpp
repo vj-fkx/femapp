@@ -12,6 +12,69 @@ namespace fem::core {
 
 namespace {
 
+// The Gauss points of [0, 1], two points.
+constexpr double kGaussLow = 0.5 - 0.28867513459481288225; // 1/2 - sqrt(3)/6
+constexpr double kGaussHigh = 0.5 + 0.28867513459481288225;
+
+} // namespace
+
+AxialProfile AxialProfile::constant(double n)
+{
+    AxialProfile profile;
+    profile.count = 1;
+    profile.values[0] = n;
+    return profile;
+}
+
+std::array<double, 2> AxialProfile::gaussPoints(int part, int parts, double length)
+{
+    const double h = length / parts;
+    return {(part + kGaussLow) * h, (part + kGaussHigh) * h};
+}
+
+double AxialProfile::at(double s, double length) const
+{
+    if (count == 0) {
+        return 0.0;
+    }
+    if (count == 1) {
+        return values[0];
+    }
+    const int n = parts();
+    const double h = length / n;
+    const int part = std::clamp(static_cast<int>(std::floor(s / h)), 0, n - 1);
+    const double xi = s / h - part;
+    const double low = values.at(static_cast<std::size_t>(2 * part));
+    const double high = values.at(static_cast<std::size_t>(2 * part + 1));
+    return low + (high - low) * (xi - kGaussLow) / (kGaussHigh - kGaussLow);
+}
+
+double AxialProfile::largestCompression() const
+{
+    double smallest = 0.0;
+    if (count == 1) {
+        smallest = values[0];
+    }
+    for (int part = 0; count > 1 && part < parts(); ++part) {
+        const double low = values.at(static_cast<std::size_t>(2 * part));
+        const double high = values.at(static_cast<std::size_t>(2 * part + 1));
+        const double slope = (high - low) / (kGaussHigh - kGaussLow);
+        smallest = std::min({smallest, low - slope * kGaussLow, low + slope * (1.0 - kGaussLow)});
+    }
+    return std::max(0.0, -smallest);
+}
+
+AxialProfile AxialProfile::scaled(double factor) const
+{
+    AxialProfile out = *this;
+    for (int i = 0; i < count; ++i) {
+        out.values.at(static_cast<std::size_t>(i)) *= factor;
+    }
+    return out;
+}
+
+namespace {
+
 constexpr double kParallel = 1e-6;  // |x × r| below this: parallel (design 008 §5.2)
 constexpr double kSingular = 1e-12; // pivot of the internal dofs, of the largest
 constexpr int kMaxInternal = kBeamDofs;

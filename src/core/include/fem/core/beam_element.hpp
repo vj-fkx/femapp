@@ -37,6 +37,31 @@ using StateBarMatrix =
     Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, kMaxStateDofs, kMaxStateDofs>;
 using StateBarVector = Eigen::Matrix<double, Eigen::Dynamic, 1, 0, kMaxStateDofs, 1>;
 
+// REQ-008c-02, 04: the axial force of the reference state along the
+// flexible length, tension positive (design 008c §5.2). count 0: none
+// (first order); 1: constant; otherwise 2 per part of parts() equal parts,
+// at the two Gauss points of each, and N linear within a part.
+inline constexpr int kMaxAxialParts = 32;
+struct AxialProfile
+{
+    int count = 0;
+    std::array<double, 2 * kMaxAxialParts> values{};
+
+    [[nodiscard]] static AxialProfile constant(double n);
+    // The two Gauss points of part `part` of `parts` equal parts of
+    // [0, length].
+    [[nodiscard]] static std::array<double, 2> gaussPoints(int part, int parts, double length);
+
+    [[nodiscard]] bool active() const { return count > 0; }
+    [[nodiscard]] int parts() const { return count > 1 ? count / 2 : 1; }
+    // N at s in [0, length]; 0 when inactive.
+    [[nodiscard]] double at(double s, double length) const;
+    // The largest compression, >= 0, including the ends of the parts.
+    [[nodiscard]] double largestCompression() const;
+    // The same profile with every value times `factor`.
+    [[nodiscard]] AxialProfile scaled(double factor) const;
+};
+
 // What a beam needs, resolved from the model (design 008 §5.3, 5.4). All in
 // the principal local axes of the flexible length.
 struct BeamData
@@ -72,6 +97,9 @@ struct BeamData
     Eigen::Matrix3d endAxes = Eigen::Matrix3d::Identity();
     // > 0: the flexible length along an arc (design 008b §5.2).
     double arcLength = 0.0;
+    // Feature 008c: the axial force of the reference state, for the second
+    // order and the buckling (design 008c §5.1, 5.2).
+    AxialProfile axialForce;
 };
 
 // REQ-008-09, 10: local axes of a bar from x1 to x2, as columns (x, y, z).
