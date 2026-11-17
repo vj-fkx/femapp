@@ -28,7 +28,7 @@ Regras:
   Gauss) e `test_allocations` com o perfil cheio — arquivos:
   `beam_element.hpp/.cpp`, `tests/unit/core/test_beam_second_order.cpp`,
   `test_allocations.cpp` — cobre: 02, 04
-- [ ] **T03** [M] Medida de custo antes dos laços (design §5.7): no
+- [x] **T03** [M] Medida de custo antes dos laços (design §5.7): no
   `bench_frame`, montar todas as barras pelo motor exato com um N constante
   fictício e fatorar com `factorizeIndefinite`; registrar os tempos de
   montagem e fatoração contra a análise linear nas notas. Se a estimativa
@@ -183,4 +183,18 @@ Regras:
 
 ## Notas de implementação
 
-(preenchidas durante a implementação)
+**Fase 1 — Fundações (T01 a T03):**
+
+- T01: sem pivoteamento, a LDLᵀ pode encontrar um pivô zero numa matriz
+  regular (o laplaciano deslocado de 1,0 dá pivôs 1, 0, …): o teste usa
+  outros deslocamentos, e a flambagem desloca σ quando isso acontece
+  (design §7).
+- T03 (`bench_frame --cost`, Release, máquina do mantenedor, 29 040 GDL):
+  análise linear 3,05 a 3,16 s; o motor exato em todas as 13 640 barras,
+  sequencial, 0,20 a 0,23 s; montagem exata + LDLᵀ indefinida + solução
+  2,99 a 3,48 s, quase tudo na fatoração (cerca de 3,0 s cada; o reuso da
+  análise simbólica quase não muda); **uma solução com a fatoração pronta,
+  0,021 s**. Com uma fatoração por iteração, a estimativa do design §5.7
+  não fecha: segunda ordem com 5 iterações 5,9× a linear (meta 4×),
+  flambagem com 15 fatorações 15,8× (meta 6×). Parado para propor a
+  mudança do design (reaproveitar fatorações).
