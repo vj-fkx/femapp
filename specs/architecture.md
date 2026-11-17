@@ -150,6 +150,20 @@ Conceitos principais:
   seletiva, nó do meio com GDL). Cada seção é resolvida uma vez por modelo.
   O empenamento (Vlasov) existe no motor e no elemento exato, sem acesso pelo
   `Model`: fica para a 008d.
+  *Ampliada na 008c:* segunda ordem e flambagem (`stability_analysis.hpp`).
+  O esforço normal de referência (`AxialProfile` em `BeamData`, constante ou
+  linear por partes; `BarData::axialForce` na treliça) entra exatamente no
+  motor (termo N·u' no equilíbrio de momentos, cortante de Engesser; Magnus
+  de 4ª ordem quando N varia), na isoparamétrica e na treliça pela rigidez
+  geométrica, e no braço rígido pelo termo de segunda ordem. As etapas da
+  análise estática ficam em `detail::StaticProblem` (preparar uma vez;
+  montar com os perfis, resolver, recuperar). `runSecondOrderStatic` itera
+  os esforços normais com aceleração de Anderson, resolvendo cada iteração
+  por gradiente conjugado pré-condicionado pela fatoração da análise
+  linear; `runLinearBuckling` resolve o problema de autovalor não linear
+  K(λ)φ = 0 (subespaço, iteração inversa residual e contagem de Sturm de
+  Wittrick-Williams, ADR 0007), inclusive os modos de uma barra que flamba
+  com os nós parados. Flexo-torção e o termo de Wagner ficam para a 008d.
 - **`DofMap`** — GDL **variáveis por nó** (u, v, w, θx, θy, θz, T), definidos
   pelos elementos conectados; trata restrições e a compatibilização entre barras,
   cascas e sólidos (REQ-G-13). *Feito na 006:* máscara por nó vinda das
@@ -161,10 +175,13 @@ Conceitos principais:
   cor por cor, sem travas; o resultado não depende do número de threads;
   reações por uma segunda passada.
 - **`LinearSolver`** (interface) — `SparseCholesky` (Eigen `SimplicialLDLT`,
-  reordenação AMD, pivôs verificados; feito na 006) e `ConjugateGradient`
+  reordenação AMD, pivôs verificados; feito na 006; na 008c, também a
+  fatoração indefinida com a inércia, para a contagem de Sturm) e `ConjugateGradient`
   (pré-condicionador IC/diagonal, feature 025). A interface permite
   plugar solvers externos (ex.: PARDISO) sem tocar no restante.
 - **`EigenSolver`** — problema generalizado `K φ = λ M φ` via Spectra (shift-invert).
+  *A flambagem da 008c não usa o Spectra* (ADR 0007): o problema dela é não
+  linear em λ; a análise modal decide entre o Spectra e a mesma iteração.
 - **`TimeIntegrator`** — Newmark (dinâmica) e θ-method (térmica transiente).
 - **`Analysis`** (interface) — `StaticAnalysis`, `ThermalAnalysis`,
   `ModalAnalysis`, `TransientAnalysis`; orquestram montagem → solução →

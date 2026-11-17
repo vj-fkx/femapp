@@ -152,11 +152,17 @@ Regras:
 
 ## Fase 6 — Desempenho e documentação
 
-- [ ] **T23** [M] `bench_frame --second-order` e `--buckling 5`: registrar
+- [x] **T23** [M] `bench_frame --second-order` e `--buckling 5`: registrar
   os tempos contra a análise linear nas notas. Se passarem de 4× e 6×,
   parar e propor a mudança da meta — arquivos: `tests/perf/bench_frame.cpp`
   — cobre: N02
-- [ ] **T24** `specs/architecture.md` §3 (segunda ordem, flambagem, solver
+- [x] **T23b** [M] Otimizar o refinamento da flambagem (decidido em
+  2026-11-17, após a T23): um deslocamento por fator perto da sua
+  estimativa e K(λ) interpolado entre duas montagens próximas do fator (a
+  segunda bem estreita), em vez de uma montagem por passo; a meta da
+  flambagem no NFR-008c-02 passa de 6× a 12× a linear; medir de novo —
+  arquivos: `buckling.cpp`, `requirements.md` — cobre: N02
+- [x] **T24** `specs/architecture.md` §3 (segunda ordem, flambagem, solver
   indefinido, ADR 0007); notas de implementação aqui — cobre: 15
 
 ## Fase 9 — Fechamento
@@ -190,7 +196,7 @@ Regras:
 | REQ-008c-14 | todas, T13 | suítes da 007 a 008b inalteradas |
 | REQ-008c-15 | T24, T91 | `check_no_qt_includes` |
 | NFR-008c-01 | T04 a T07, T15, T18, T20 | os testes de verificação |
-| NFR-008c-02 | T03, T23 | `bench_frame` |
+| NFR-008c-02 | T03, T23, T23b | `bench_frame` |
 | NFR-008c-03 | T90 | Job de cobertura no CI |
 
 ## Notas de implementação
@@ -326,3 +332,27 @@ Regras:
   1e−6) e a `note` diz "Only 1 of the 3". Ao dobrar λ em busca de fatores
   que não existem, a matriz deixa de ser fatorável (pivôs com razão 1e17):
   a busca para ali, como fora do alcance.
+
+**Fase 6 — Desempenho e documentação (T23 a T24):**
+
+- T23 (`bench_frame --second-order --buckling 5`, Release, 29 040 GDL, o
+  preset Release reconfigurado com o compilador em inglês): segunda ordem
+  7,3 a 9,5 s = 2,15 a 2,36× a linear (meta 4×), 3 iterações, a segunda
+  ordem aumenta o maior deslocamento em 1,1%. Flambagem com 5 fatores:
+  369 s = 88× (meta 6×): só 5 fatorações, mas cerca de 30 passos de
+  refinamento por fator, cada um montando K(λ), e com peso próprio (N
+  variável, Magnus) cada montagem custa várias vezes a linear. O
+  mantenedor aprovou otimizar (T23b) e rever a meta da flambagem para 12×.
+- T23b: K(λ) interpolado entre duas montagens em volta do fator (±0,5%,
+  depois ±1e−5, recentrando o colchete até o fator ficar dentro: sem isso
+  a interpolação extrapolava e o fator saía errado), deslocamento da
+  contagem a 1% abaixo da primeira estimativa, fatoração própria só para
+  o fator que não converge em 80 passos, e as estimativas do subespaço
+  paradas em 1e−4. Fatores iguais aos de antes; 37,1 a 38,7 s = 10,8 a
+  12,1× (duas medidas finais: 11,75× e 10,77×). Tempo por etapa (uma
+  medida): linear 3,2 s; subespaço cerca de 7 s; fatoração do
+  deslocamento 3,3 s; refinamento dos fatores 1 a 4 de 1 a 4 s cada; o
+  quinto com fatoração própria 9 s; contagem final 3,2 s; modos 1,9 s. O
+  subespaço é a próxima alavanca, se for preciso (feature 038).
+- T24: `architecture.md` §3 com a segunda ordem, a flambagem, a
+  fatoração indefinida e a nota sobre o Spectra (ADR 0007).

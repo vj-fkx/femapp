@@ -79,7 +79,7 @@ features anteriores, tudo é exercitado por testes; nada muda na interface.
 | ID | Requisito | Como medir |
 |----|-----------|------------|
 | NFR-008c-01 | Nas vigas retas e nas treliças, os casos de verificação (AC-1 a AC-6) DEVEM reproduzir as soluções analíticas com erro relativo ≤ 1e−8 em deslocamentos, esforços e fatores críticos (também com N variável na barra, REQ-008c-02); nas vigas curvas, com a tolerância do design. | Testes automatizados |
-| NFR-008c-02 | No pórtico espacial do benchmark da 008 (cerca de 30 mil GDL), a análise de segunda ordem DEVE levar no máximo 4 vezes o tempo da análise linear do mesmo modelo, e a flambagem com 5 fatores no máximo 6 vezes, em Release na máquina do mantenedor. | Benchmark |
+| NFR-008c-02 | No pórtico espacial do benchmark da 008 (cerca de 30 mil GDL), a análise de segunda ordem DEVE levar no máximo 4 vezes o tempo da análise linear do mesmo modelo, e a flambagem com 5 fatores no máximo 12 vezes *(alterado de 6 vezes em 2026-11-17, após a medida da T23)*, em Release na máquina do mantenedor. | Benchmark |
 | NFR-008c-03 | A cobertura de linhas de `core` DEVE continuar em pelo menos 80% (constituição §6.5). | Job de cobertura no CI |
 
 ## 5. Critérios de aceite

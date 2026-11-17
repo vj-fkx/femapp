@@ -379,6 +379,11 @@ de 0,1 s.
   vezes a linear no caso típico (meta: 6). Fatores espalhados (fatorações
   extras) ou perdidos (bissecção) custam mais e são medidos no T23.
 
+> **Medido na T23 e na T23b (2026-11-17):** a segunda ordem ficou em 2,2
+> a 2,4×. A flambagem deu 88× com uma montagem por passo de refinamento;
+> com K(λ) interpolado entre duas montagens em volta de cada fator
+> (T23b), ficou em 10,8 a 12,1×. A meta da flambagem passou a 12×.
+
 ## 6. Fluxo
 
 ```

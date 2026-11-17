@@ -1,7 +1,7 @@
 // Measures the beam analysis (NFR-008-02). Not part of ctest: run it on a
 // Release build.
 //
-// Usage: bench_frame [bays] [storeys] [--cost]
+// Usage: bench_frame [bays] [storeys] [--cost] [--second-order] [--buckling n]
 //   A space frame building of (bays + 1)^2 columns and `storeys` storeys
 //   (default 10 x 10 bays and 40 storeys: 4 961 nodes, about 29 000 free
 //   dofs): columns between the levels, beams along x and y at each level,
@@ -9,6 +9,9 @@
 //   --cost (design 008c §5.7): also assembles every bar with the exact
 //   engine and factorizes with the indefinite LDL^T, to estimate the second
 //   order and the buckling before they exist.
+//   --second-order, --buckling n (NFR-008c-02): the second-order analysis
+//   and the n first buckling factors of the same load case, against the
+//   linear analysis.
 
 #include <fem/core/beam_state.hpp>
 #include <fem/core/dof_map.hpp>
@@ -17,6 +20,7 @@
 #include <fem/core/mesh_builder.hpp>
 #include <fem/core/model.hpp>
 #include <fem/core/section.hpp>
+#include <fem/core/stability_analysis.hpp>
 #include <fem/core/static_analysis.hpp>
 
 #include <algorithm>
@@ -257,6 +261,16 @@ int run(int argc, char** argv)
 {
     std::vector<std::string> args(argv, argv + argc);
     const bool costs = std::erase(args, std::string("--cost")) > 0;
+    const bool second = std::erase(args, std::string("--second-order")) > 0;
+    int buckling = 0;
+    if (const auto at = std::ranges::find(args, std::string("--buckling")); at != args.end()) {
+        if (at + 1 == args.end()) {
+            std::fputs("usage: --buckling n\n", stderr);
+            return EXIT_FAILURE;
+        }
+        buckling = std::stoi(*(at + 1));
+        args.erase(at, at + 2);
+    }
     const int bays = args.size() > 1 ? std::stoi(args[1]) : 10;
     const int storeys = args.size() > 2 ? std::stoi(args[2]) : 40;
     if (bays < 1 || storeys < 1) {
@@ -287,6 +301,37 @@ int run(int argc, char** argv)
     std::printf("analysis, %d free dofs: %.3f s (validation, assembly, solution, "
                 "reactions and end forces); largest displacement %.4g\n",
                 6 * side * side * storeys, total, largest);
+    if (second) {
+        start = Clock::now();
+        const auto r = fem::core::runSecondOrderStatic(model);
+        const double seconds = secondsSince(start);
+        if (!r) {
+            std::fprintf(stderr, "%s\n", r.error().message.c_str());
+            return EXIT_FAILURE;
+        }
+        double sway = 0.0;
+        for (const auto& u : r->result.displacements) {
+            sway = std::max(sway, u.norm());
+        }
+        std::printf("second order: %.3f s = %.2f x linear, %d iterations (change %.2g); largest "
+                    "displacement %.4g (%.3f x linear)\n",
+                    seconds, seconds / total, r->iterations, r->change, sway, sway / largest);
+    }
+    if (buckling > 0) {
+        start = Clock::now();
+        const auto r = fem::core::runLinearBuckling(model, {.count = buckling});
+        const double seconds = secondsSince(start);
+        if (!r) {
+            std::fprintf(stderr, "%s\n", r.error().message.c_str());
+            return EXIT_FAILURE;
+        }
+        std::printf("buckling, %d factors: %.3f s = %.2f x linear; factors", buckling, seconds,
+                    seconds / total);
+        for (const auto& mode : r->modes) {
+            std::printf(" %.6g", mode.factor);
+        }
+        std::printf("%s%s\n", r->note.empty() ? "" : "; ", r->note.c_str());
+    }
     if (costs) {
         return cost(model, total);
     }

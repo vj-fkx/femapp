@@ -41,8 +41,14 @@ using detail::StaticProblem;
 constexpr double kDerivativeStep = 1e-4; // of the load factor, for G
 constexpr int kSubspaceIterations = 40;
 constexpr int kSubspaceExtra = 4;
-constexpr double kShiftFraction = 0.95;
-constexpr int kRefinementSteps = 30;
+// The estimates only start the refinement: they need not be close.
+constexpr double kEstimateSettled = 1e-4;
+constexpr double kFirstShift = 1e-2;                      // below the first estimate, for the count
+constexpr double kModeShift = 1e-3;                       // below the estimate of each other factor
+constexpr std::array<double, 2> kBrackets = {5e-3, 1e-5}; // of the interpolation
+constexpr double kWideTolerance = 1e-7;
+constexpr int kRecentring = 12;
+constexpr int kRefinementSteps = 80;
 constexpr double kResidual = 1e-9;     // of K(lambda) x against K0 x
 constexpr double kCountMargin = 1e-6;  // above the last factor
 constexpr double kSameFactor = 1e-7;   // repeated factors
@@ -121,76 +127,91 @@ struct Factor
 };
 
 // Residual inverse iteration from (x, lambda) with the factorization at a
-// shift; false when it does not converge in the steps.
+// shift near the factor (T23b): K(lambda) is interpolated between two
+// assemblies about lambda, first wide then narrow, so that a step costs
+// products and not an assembly; lambda by Newton on x^T K(l) x = 0 with
+// the slope of the interpolation. False when it does not converge.
 Expected<bool> refine(Pencil& pencil, const SparseCholesky& shifted, const SparseMatrix& k0,
-                      const SparseMatrix& g, const std::vector<Factor>& found, double tolerance,
-                      Eigen::VectorXd& x, double& lambda, SparseMatrix& kOut)
+                      const std::vector<Factor>& found, double tolerance, Eigen::VectorXd& x,
+                      double& lambda, SparseMatrix& kOut)
 {
     x.normalize();
-    auto current = pencil.at(lambda);
-    if (!current) {
-        return tl::unexpected(current.error());
-    }
-    SparseMatrix k = std::move(*current);
-    SparseMatrix previous;
-    double previousLambda = 0.0;
-    bool hasPrevious = false;
-    for (int step = 0; step < kRefinementSteps; ++step) {
-        // The load factor: the secant on x^T K(l) x = 0, with this x.
-        const double f = x.dot(times(k, x));
-        double slope = -x.dot(times(g, x));
-        if (hasPrevious && previousLambda != lambda) {
-            slope = (f - x.dot(times(previous, x))) / (lambda - previousLambda);
+    // Each width again, centred on the last lambda, until lambda stays
+    // inside its bracket: outside, the interpolation extrapolates.
+    std::size_t stage = 0;
+    for (int round = 0; stage < kBrackets.size() && round < kRecentring; ++round) {
+        const bool last = stage + 1 == kBrackets.size();
+        const double centre = lambda;
+        const double a = lambda * (1.0 - kBrackets.at(stage));
+        const double b = lambda * (1.0 + kBrackets.at(stage));
+        auto ka = pencil.at(a);
+        if (!ka) {
+            return tl::unexpected(ka.error());
         }
-        const double next = slope != 0.0 ? lambda - f / slope : lambda;
-        auto assembled = pencil.at(next);
-        if (!assembled) {
-            return tl::unexpected(assembled.error());
+        auto kb = pencil.at(b);
+        if (!kb) {
+            return tl::unexpected(kb.error());
         }
-        previous = std::move(k);
-        previousLambda = lambda;
-        hasPrevious = true;
-        k = std::move(*assembled);
-        lambda = next;
-        // The residual, and the step of the vector. A vector that vanished
-        // (no mode in the nodal dofs, as a bar buckling with its nodes held)
-        // never converges: the count finds that factor.
-        const Eigen::VectorXd r = times(k, x);
-        const double size = times(k0, x).norm();
-        if (!(x.norm() > 0.5) || !(size > 0.0)) {
-            kOut = std::move(k);
+        const SparseMatrix slope = (*kb - *ka) / (b - a); // dK / dlambda
+        const auto product = [&](double l, const Eigen::VectorXd& v) {
+            return Eigen::VectorXd(times(*ka, v) + (l - a) * times(slope, v));
+        };
+        bool converged = false;
+        for (int step = 0; step < kRefinementSteps && !converged; ++step) {
+            const double derivative = x.dot(times(slope, x));
+            const double next =
+                derivative != 0.0 ? lambda - x.dot(product(lambda, x)) / derivative : lambda;
+            const double change = std::abs(next - lambda);
+            lambda = next;
+            // A vector that vanished (no mode in the nodal dofs, as a bar
+            // buckling with its nodes held) never converges: the count finds
+            // that factor.
+            const Eigen::VectorXd r = product(lambda, x);
+            const double size = times(k0, x).norm();
+            if (!(x.norm() > 0.5) || !(size > 0.0)) {
+                return false;
+            }
+            converged = last ? r.norm() <= kResidual * size && change <= tolerance * lambda
+                             : change <= kWideTolerance * lambda;
+            if (converged) {
+                break;
+            }
+            auto correction = shifted.solve(r);
+            if (!correction) {
+                return tl::unexpected(correction.error());
+            }
+            x -= *correction;
+            // Deflate the converged modes (nonlinear orthogonality).
+            for (const Factor& other : found) {
+                Eigen::VectorXd dx;
+                Eigen::VectorXd dphi;
+                if (std::abs(lambda - other.lambda) > kSameFactor * lambda) {
+                    const double gap = lambda - other.lambda;
+                    dx = (product(lambda, x) - times(other.k, x)) / gap;
+                    dphi = (product(lambda, other.x) - times(other.k, other.x)) / gap;
+                } else {
+                    dx = times(slope, x);
+                    dphi = times(slope, other.x);
+                }
+                const double norm = other.x.dot(dphi);
+                if (norm != 0.0) {
+                    x -= other.x * (other.x.dot(dx) / norm);
+                }
+            }
+            x.normalize();
+        }
+        if (!converged) {
             return false;
         }
-        if (r.norm() <= kResidual * size &&
-            std::abs(lambda - previousLambda) <= tolerance * lambda) {
-            kOut = std::move(k);
+        if (std::abs(lambda - centre) > 0.5 * kBrackets.at(stage) * centre) {
+            continue; // the same width about the new lambda
+        }
+        if (last) {
+            kOut = *ka + (lambda - a) * slope;
             return true;
         }
-        auto correction = shifted.solve(r);
-        if (!correction) {
-            return tl::unexpected(correction.error());
-        }
-        x -= *correction;
-        // Deflate the converged modes (nonlinear orthogonality).
-        for (const Factor& other : found) {
-            Eigen::VectorXd dx;
-            Eigen::VectorXd dphi;
-            if (std::abs(lambda - other.lambda) > kSameFactor * lambda) {
-                const double gap = lambda - other.lambda;
-                dx = (times(k, x) - times(other.k, x)) / gap;
-                dphi = (times(k, other.x) - times(other.k, other.x)) / gap;
-            } else {
-                dx = times(g, x);
-                dphi = times(g, other.x);
-            }
-            const double norm = other.x.dot(dphi);
-            if (norm != 0.0) {
-                x -= other.x * (other.x.dot(dx) / norm);
-            }
-        }
-        x.normalize();
+        ++stage;
     }
-    kOut = std::move(k);
     return false;
 }
 
@@ -301,7 +322,7 @@ Expected<BucklingResult> runLinearBuckling(const Model& model, const BucklingOpt
             const std::size_t check =
                 std::min<std::size_t>(now.size(), static_cast<std::size_t>(wanted));
             for (std::size_t i = 0; i < check; ++i) {
-                if (std::abs(now[i] - last[i]) > 1e-6 * now[i]) {
+                if (std::abs(now[i] - last[i]) > kEstimateSettled * now[i]) {
                     return false;
                 }
             }
@@ -315,7 +336,7 @@ Expected<BucklingResult> runLinearBuckling(const Model& model, const BucklingOpt
     // The shift below the first estimate: nothing below it. Without
     // estimates (the bars buckle with their nodes held) only the count finds
     // the factors.
-    double sigma = estimates.empty() ? 0.0 : kShiftFraction * estimates.front().first;
+    double sigma = estimates.empty() ? 0.0 : (1.0 - kFirstShift) * estimates.front().first;
     std::unique_ptr<SparseCholesky> shifted;
     for (int halving = 0; !estimates.empty(); ++halving) {
         auto count = sturmCount(pencil, sigma, &shifted);
@@ -329,7 +350,9 @@ Expected<BucklingResult> runLinearBuckling(const Model& model, const BucklingOpt
             return makeError("The buckling search could not find a load factor below the first "
                              "buckling factor.");
         }
-        sigma /= 2.0;
+        // The estimate was high: further below.
+        sigma = std::max(0.0, estimates.front().first *
+                                  (1.0 - kFirstShift * std::pow(2.0, halving + 1)));
     }
 
     // Refine the estimates in order until `wanted` factors converge.
@@ -339,20 +362,23 @@ Expected<BucklingResult> runLinearBuckling(const Model& model, const BucklingOpt
             break;
         }
         Factor factor{.lambda = mu, .x = start, .k = {}};
-        auto converged = refine(pencil, *shifted, k0, g, found, options.tolerance, factor.x,
+        // The shift of the count first: a step costs only products and a
+        // solution. A factor too far from it for the steps gets a
+        // factorization of its own just below its estimate.
+        auto converged = refine(pencil, *shifted, k0, found, options.tolerance, factor.x,
                                 factor.lambda, factor.k);
         if (!converged) {
             return tl::unexpected(converged.error());
         }
         if (!*converged) {
-            // Far from the shift: a factorization of its own near it.
             std::unique_ptr<SparseCholesky> near;
-            auto count = sturmCount(pencil, kShiftFraction * factor.lambda, &near);
+            auto count = sturmCount(pencil, (1.0 - kModeShift) * mu, &near);
             if (!count) {
                 return tl::unexpected(count.error());
             }
-            converged = refine(pencil, *near, k0, g, found, options.tolerance, factor.x,
-                               factor.lambda, factor.k);
+            factor = {.lambda = mu, .x = start, .k = {}};
+            converged = refine(pencil, *near, k0, found, options.tolerance, factor.x, factor.lambda,
+                               factor.k);
             if (!converged) {
                 return tl::unexpected(converged.error());
             }
@@ -425,7 +451,7 @@ Expected<BucklingResult> runLinearBuckling(const Model& model, const BucklingOpt
         Eigen::VectorXd start = Eigen::VectorXd::NullaryExpr(n, [&] { return uniform(random); });
         double lambda = top;
         SparseMatrix k;
-        auto converged = refine(pencil, *near, k0, g, found, options.tolerance, start, lambda, k);
+        auto converged = refine(pencil, *near, k0, found, options.tolerance, start, lambda, k);
         if (!converged) {
             return tl::unexpected(converged.error());
         }
