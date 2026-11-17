@@ -87,7 +87,7 @@ Regras:
 
 ## Fase 4 — Segunda ordem
 
-- [ ] **T13** Partir `runLinearStatic` em etapas reaproveitáveis
+- [x] **T13** Partir `runLinearStatic` em etapas reaproveitáveis
   (`detail/static_stages.hpp`: preparar, montar com perfis, resolver,
   recuperar), sem mudar resultados; nenhum teste novo, todas as suítes
   passam — arquivos: `static_analysis.cpp`, `detail/static_stages.hpp` —

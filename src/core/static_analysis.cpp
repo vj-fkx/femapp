@@ -1,4 +1,5 @@
 #include "detail/model_validation.hpp"
+#include "detail/static_stages.hpp"
 
 #include <fem/core/assembler.hpp>
 #include <fem/core/beam_element.hpp>
@@ -81,20 +82,10 @@ std::vector<BarData> barData(const Model& model, const detail::ValidationTables&
     return bars;
 }
 
-// The beams of the model, per element (design 008 §5.6): data, span loads
-// and flexible length; default values for elements that are not beams.
-struct Beams
-{
-    std::vector<BeamData> data;
-    std::vector<SpanLoads> loads;
-    std::vector<double> length;
-    std::vector<bool> exact; // the exact element of 008b (design 008b §5.3)
-    // The isoparametric curved beams (design 008b §5.5).
-    std::vector<IsoBeamData> iso;
-    std::vector<bool> isIso;
-};
+using detail::Beams;
 
-Beams beamData(const Model& model, const detail::ValidationTables& tables)
+// With `secondOrder` (feature 008c) the straight beams use the exact element.
+Beams beamData(const Model& model, const detail::ValidationTables& tables, bool secondOrder)
 {
     const Mesh& mesh = *model.mesh;
     const auto count = static_cast<std::size_t>(mesh.elementCount());
@@ -126,7 +117,8 @@ Beams beamData(const Model& model, const detail::ValidationTables& tables)
         }
         isBeam[e] = true;
         beams.data[e] = setup->data;
-        beams.exact[e] = setup->data.warpingStiffness > 0.0 || setup->data.arcLength > 0.0;
+        beams.exact[e] = setup->data.warpingStiffness > 0.0 || setup->data.arcLength > 0.0 ||
+                         (secondOrder && !setup->isoparametric);
         if (setup->isoparametric) {
             beams.isIso[e] = true;
             beams.iso[e] = {.beam = setup->data,
@@ -234,9 +226,124 @@ std::string dofLabel(const Mesh& mesh, const DofMap& dofs, DofIndex dof)
            std::string(dofName(dofs.typeOf(dof)));
 }
 
-// REQ-007-15: free dofs without stiffness, all of them.
-Expected<void> checkDiagonal(const Mesh& mesh, const DofMap& dofs,
-                             const std::vector<DofIndex>& dofOfEquation, const SparseMatrix& matrix)
+} // namespace
+
+namespace detail {
+
+StaticProblem::StaticProblem(const Model& model, const StaticOptions& options)
+    : m_model(model)
+    , m_options(options)
+{}
+
+StaticProblem::~StaticProblem() = default;
+
+Expected<std::unique_ptr<StaticProblem>>
+StaticProblem::prepare(const Model& model, const StaticOptions& options, bool secondOrder)
+{
+    if (!model.mesh) {
+        return makeError(issueList({{"The model has no mesh."}}));
+    }
+    // The constructor is private: no make_unique.
+    std::unique_ptr<StaticProblem> problem(new StaticProblem(model, options));
+    StaticProblem& p = *problem;
+    p.m_validation = validateModel(model);
+    if (!p.m_validation.issues.empty()) {
+        return makeError(issueList(p.m_validation.issues));
+    }
+    const ValidationTables& tables = p.m_validation.tables;
+    const Mesh& mesh = *model.mesh;
+    const auto elementCount = static_cast<std::size_t>(mesh.elementCount());
+
+    // Bars and beams, and their sets, one per kind.
+    p.m_bars = barData(model, tables);
+    p.m_beams = beamData(model, tables, secondOrder);
+    p.m_negative.assign(elementCount, 0);
+    p.m_kindOf.assign(elementCount, ElementKind::Truss3D);
+    // The exact beams (design 008b §5.3): a set per kind.
+    std::map<int, std::vector<ElementIndex>> exactMembers;
+    for (ElementIndex element = 0; element < mesh.elementCount(); ++element) {
+        const auto e = static_cast<std::size_t>(element);
+        const int owner = tables.owner[e];
+        if (owner != kNoAssignment) {
+            const auto kind = model.assignments[static_cast<std::size_t>(owner)].kind;
+            p.m_kindOf[e] = kind;
+            if (p.m_beams.isIso[e]) {
+                p.m_isoMembers.at(kind == ElementKind::Beam2D ? 0 : 1).push_back(element);
+            } else if (p.m_beams.exact[e]) {
+                exactMembers[static_cast<int>(kind)].push_back(element);
+            } else {
+                p.m_members.at(static_cast<std::size_t>(kind)).push_back(element);
+            }
+        }
+    }
+    p.m_formulations.push_back(std::make_unique<TrussElement>(ElementKind::Truss2D, p.m_bars));
+    p.m_formulations.push_back(std::make_unique<TrussElement>(ElementKind::Truss3D, p.m_bars));
+    p.m_formulations.push_back(std::make_unique<BeamElement>(ElementKind::Beam2D, p.m_beams.data));
+    p.m_formulations.push_back(std::make_unique<BeamElement>(ElementKind::Beam3D, p.m_beams.data));
+    for (std::size_t k = 0; k < p.m_members.size(); ++k) {
+        if (!p.m_members.at(k).empty()) {
+            p.m_sets.push_back(
+                {.elements = p.m_members.at(k), .formulation = p.m_formulations.at(k).get()});
+        }
+    }
+    for (std::size_t k = 0; k < p.m_isoMembers.size(); ++k) {
+        p.m_formulations.push_back(std::make_unique<IsoBeamElement>(
+            k == 0 ? ElementKind::Beam2D : ElementKind::Beam3D, p.m_beams.iso));
+        if (!p.m_isoMembers.at(k).empty()) {
+            p.m_sets.push_back(
+                {.elements = p.m_isoMembers.at(k), .formulation = p.m_formulations.back().get()});
+        }
+    }
+    p.m_exactMembers.reserve(exactMembers.size());
+    for (auto& [key, elements] : exactMembers) {
+        p.m_exactMembers.push_back(std::move(elements));
+        p.m_formulations.push_back(std::make_unique<ExactBeamElement>(
+            static_cast<ElementKind>(key), p.m_beams.data, p.m_beams.loads, p.m_negative));
+        p.m_sets.push_back(
+            {.elements = p.m_exactMembers.back(), .formulation = p.m_formulations.back().get()});
+    }
+
+    // Dofs, supports and loads; validation guarantees every dof exists.
+    p.m_dofs = DofMap::build(mesh, p.m_sets);
+    for (const Restraint& restraint : model.restraints) {
+        for (const NodeIndex node :
+             resolve(mesh, restraint.nodes).value_or(std::vector<NodeIndex>{})) {
+            if (auto prescribed = p.m_dofs.prescribe(node, restraint.dof, restraint.value);
+                !prescribed) {
+                return tl::unexpected(prescribed.error());
+            }
+        }
+    }
+    constexpr std::array<DofType, 6> kNodeDofs = {DofType::U,  DofType::V,  DofType::W,
+                                                  DofType::RX, DofType::RY, DofType::RZ};
+    for (const NodalForce& force : model.nodalForces) {
+        Eigen::Matrix<double, 6, 1> values;
+        values << force.force, force.moment;
+        for (const NodeIndex node : resolve(mesh, force.nodes).value_or(std::vector<NodeIndex>{})) {
+            for (std::size_t k = 0; k < kNodeDofs.size(); ++k) {
+                const double value = values(static_cast<Eigen::Index>(k));
+                if (value != 0.0 && p.m_dofs.find(node, kNodeDofs.at(k))) {
+                    p.m_loads.push_back({.node = node, .type = kNodeDofs.at(k), .value = value});
+                }
+            }
+        }
+    }
+    p.m_dofOfEquation.assign(static_cast<std::size_t>(p.m_dofs.freeCount()), 0);
+    for (DofIndex d = 0; d < p.m_dofs.size(); ++d) {
+        if (const std::int32_t eq = p.m_dofs.equation(d); eq >= 0) {
+            p.m_dofOfEquation[static_cast<std::size_t>(eq)] = d;
+        }
+    }
+    return problem;
+}
+
+Expected<AssembledSystem> StaticProblem::assemble() const
+{
+    std::fill(m_negative.begin(), m_negative.end(), 0);
+    return core::assemble(mesh(), m_dofs, m_sets, m_loads, m_options.threads);
+}
+
+Expected<void> StaticProblem::checkDiagonal(const SparseMatrix& matrix) const
 {
     const Eigen::VectorXd diagonal = matrix.diagonal();
     if (diagonal.size() == 0) {
@@ -246,7 +353,7 @@ Expected<void> checkDiagonal(const Mesh& mesh, const DofMap& dofs,
     std::string list;
     for (Eigen::Index eq = 0; eq < diagonal.size(); ++eq) {
         if (!(diagonal[eq] > kNoStiffness * largest)) {
-            list += "\n- " + dofLabel(mesh, dofs, dofOfEquation[static_cast<std::size_t>(eq)]);
+            list += "\n- " + equationLabel(static_cast<std::int32_t>(eq));
         }
     }
     if (list.empty()) {
@@ -260,132 +367,49 @@ Expected<void> checkDiagonal(const Mesh& mesh, const DofMap& dofs,
     return makeError("The structure is unstable: no bar gives stiffness to" + list);
 }
 
-} // namespace
-
-Expected<StaticResult> runLinearStatic(const Model& model, const StaticOptions& options)
+std::string StaticProblem::equationLabel(std::int32_t equation) const
 {
-    if (!model.mesh) {
-        return makeError(issueList({{"The model has no mesh."}}));
-    }
-    const detail::Validation validation = detail::validateModel(model);
-    if (!validation.issues.empty()) {
-        return makeError(issueList(validation.issues));
-    }
-    const detail::ValidationTables& tables = validation.tables;
-    const Mesh& mesh = *model.mesh;
+    return dofLabel(mesh(), m_dofs, m_dofOfEquation[static_cast<std::size_t>(equation)]);
+}
 
-    // Bars and beams, and their sets, one per kind.
-    const std::vector<BarData> bars = barData(model, tables);
-    const Beams beams = beamData(model, tables);
-    constexpr std::size_t kKinds = 4; // in ElementKind order
-    std::array<std::vector<ElementIndex>, kKinds> members;
-    std::vector<ElementKind> kindOf(static_cast<std::size_t>(mesh.elementCount()),
-                                    ElementKind::Truss3D);
-    // The exact beams (design 008b §5.3): a set per kind.
-    std::map<int, std::vector<ElementIndex>> exactMembers;
-    std::array<std::vector<ElementIndex>, 2> isoMembers; // 2D, 3D
-    for (ElementIndex element = 0; element < mesh.elementCount(); ++element) {
-        const auto e = static_cast<std::size_t>(element);
-        const int owner = tables.owner[e];
-        if (owner != kNoAssignment) {
-            const auto kind = model.assignments[static_cast<std::size_t>(owner)].kind;
-            kindOf[e] = kind;
-            if (beams.isIso[e]) {
-                isoMembers.at(kind == ElementKind::Beam2D ? 0 : 1).push_back(element);
-            } else if (beams.exact[e]) {
-                exactMembers[static_cast<int>(kind)].push_back(element);
-            } else {
-                members.at(static_cast<std::size_t>(kind)).push_back(element);
-            }
-        }
+Eigen::VectorXd StaticProblem::valuesOf(const Eigen::VectorXd& free) const
+{
+    Eigen::VectorXd values(m_dofs.size());
+    for (DofIndex d = 0; d < m_dofs.size(); ++d) {
+        const std::int32_t eq = m_dofs.equation(d);
+        values[d] = eq < 0 ? m_dofs.prescribedValue(d) : free[eq];
     }
-    const TrussElement planarTruss(ElementKind::Truss2D, bars);
-    const TrussElement spatialTruss(ElementKind::Truss3D, bars);
-    const BeamElement planarBeam(ElementKind::Beam2D, beams.data);
-    const BeamElement spatialBeam(ElementKind::Beam3D, beams.data);
-    const std::array<const ElementFormulation*, kKinds> formulations = {&planarTruss, &spatialTruss,
-                                                                        &planarBeam, &spatialBeam};
-    std::vector<ElementSet> sets;
-    for (std::size_t k = 0; k < kKinds; ++k) {
-        if (!members.at(k).empty()) {
-            sets.push_back({.elements = members.at(k), .formulation = formulations.at(k)});
-        }
-    }
-    const IsoBeamElement planarIso(ElementKind::Beam2D, beams.iso);
-    const IsoBeamElement spatialIso(ElementKind::Beam3D, beams.iso);
-    if (!isoMembers[0].empty()) {
-        sets.push_back({.elements = isoMembers[0], .formulation = &planarIso});
-    }
-    if (!isoMembers[1].empty()) {
-        sets.push_back({.elements = isoMembers[1], .formulation = &spatialIso});
-    }
-    std::vector<std::unique_ptr<ExactBeamElement>> exactFormulations;
-    for (const auto& [key, elements] : exactMembers) {
-        exactFormulations.push_back(std::make_unique<ExactBeamElement>(
-            static_cast<ElementKind>(key), beams.data, beams.loads));
-        sets.push_back({.elements = elements, .formulation = exactFormulations.back().get()});
-    }
+    return values;
+}
 
-    // Dofs, supports and loads; validation guarantees every dof exists.
-    DofMap dofs = DofMap::build(mesh, sets);
-    for (const Restraint& restraint : model.restraints) {
-        for (const NodeIndex node :
-             resolve(mesh, restraint.nodes).value_or(std::vector<NodeIndex>{})) {
-            if (auto prescribed = dofs.prescribe(node, restraint.dof, restraint.value);
-                !prescribed) {
-                return tl::unexpected(prescribed.error());
-            }
-        }
+std::int64_t StaticProblem::negativePivots() const
+{
+    std::int64_t total = 0;
+    for (const int n : m_negative) {
+        total += n;
     }
-    std::vector<NodalLoad> loads;
-    constexpr std::array<DofType, 6> kNodeDofs = {DofType::U,  DofType::V,  DofType::W,
-                                                  DofType::RX, DofType::RY, DofType::RZ};
-    for (const NodalForce& force : model.nodalForces) {
-        Eigen::Matrix<double, 6, 1> values;
-        values << force.force, force.moment;
-        for (const NodeIndex node : resolve(mesh, force.nodes).value_or(std::vector<NodeIndex>{})) {
-            for (std::size_t k = 0; k < kNodeDofs.size(); ++k) {
-                const double value = values(static_cast<Eigen::Index>(k));
-                if (value != 0.0 && dofs.find(node, kNodeDofs.at(k))) {
-                    loads.push_back({.node = node, .type = kNodeDofs.at(k), .value = value});
-                }
-            }
-        }
-    }
+    return total;
+}
 
-    auto system = assemble(mesh, dofs, sets, loads, options.threads);
-    if (!system) {
-        return tl::unexpected(system.error());
+ElementIndex StaticProblem::unstableElement() const
+{
+    const auto most = std::max_element(m_negative.begin(), m_negative.end());
+    if (most == m_negative.end() || *most <= 0) {
+        return -1;
     }
-    std::vector<DofIndex> dofOfEquation(static_cast<std::size_t>(dofs.freeCount()));
-    for (DofIndex d = 0; d < dofs.size(); ++d) {
-        if (const std::int32_t eq = dofs.equation(d); eq >= 0) {
-            dofOfEquation[static_cast<std::size_t>(eq)] = d;
-        }
-    }
-    if (auto stable = checkDiagonal(mesh, dofs, dofOfEquation, system->matrix); !stable) {
-        return tl::unexpected(stable.error());
-    }
-    SparseCholesky solver;
-    if (auto factorized = solver.factorize(system->matrix); !factorized) {
-        const auto eq = solver.singularEquation();
-        if (!eq) {
-            return tl::unexpected(factorized.error());
-        }
-        return makeError("The structure is a mechanism: " +
-                         dofLabel(mesh, dofs, dofOfEquation[static_cast<std::size_t>(*eq)]) +
-                         " can move without resistance (a support may be missing).");
-    }
-    auto free = solver.solve(system->rhs);
-    if (!free) {
-        return tl::unexpected(free.error());
-    }
-    Eigen::VectorXd values(dofs.size());
-    for (DofIndex d = 0; d < dofs.size(); ++d) {
-        const std::int32_t eq = dofs.equation(d);
-        values[d] = eq < 0 ? dofs.prescribedValue(d) : (*free)[eq];
-    }
-    auto forces = reactions(mesh, dofs, sets, loads, values, options.threads);
+    return static_cast<ElementIndex>(most - m_negative.begin());
+}
+
+Expected<StaticResult> StaticProblem::recover(const Eigen::VectorXd& values) const
+{
+    const Model& model = m_model;
+    const Mesh& mesh = this->mesh();
+    const DofMap& dofs = m_dofs;
+    const ValidationTables& tables = m_validation.tables;
+    const Beams& beams = m_beams;
+    const std::vector<BarData>& bars = m_bars;
+    const std::vector<ElementKind>& kindOf = m_kindOf;
+    auto forces = reactions(mesh, dofs, m_sets, m_loads, values, m_options.threads);
     if (!forces) {
         return tl::unexpected(forces.error());
     }
@@ -518,7 +542,7 @@ Expected<StaticResult> runLinearStatic(const Model& model, const StaticOptions& 
         result.strain[e] = n / bars[e].axialStiffness;
         result.stress[e] = n / detail::sectionArea(*model.findSection(assignment.section));
     };
-    tbb::task_arena arena(options.threads > 0 ? options.threads : tbb::task_arena::automatic);
+    tbb::task_arena arena(m_options.threads > 0 ? m_options.threads : tbb::task_arena::automatic);
     arena.execute([&] {
         tbb::parallel_for(tbb::blocked_range<std::size_t>(0, elementCount),
                           [&](const tbb::blocked_range<std::size_t>& range) {
@@ -528,6 +552,38 @@ Expected<StaticResult> runLinearStatic(const Model& model, const StaticOptions& 
                           });
     });
     return result;
+}
+
+} // namespace detail
+
+Expected<StaticResult> runLinearStatic(const Model& model, const StaticOptions& options)
+{
+    auto prepared = detail::StaticProblem::prepare(model, options, false);
+    if (!prepared) {
+        return tl::unexpected(prepared.error());
+    }
+    const detail::StaticProblem& problem = **prepared;
+    auto system = problem.assemble();
+    if (!system) {
+        return tl::unexpected(system.error());
+    }
+    if (auto stable = problem.checkDiagonal(system->matrix); !stable) {
+        return tl::unexpected(stable.error());
+    }
+    SparseCholesky solver;
+    if (auto factorized = solver.factorize(system->matrix); !factorized) {
+        const auto eq = solver.singularEquation();
+        if (!eq) {
+            return tl::unexpected(factorized.error());
+        }
+        return makeError("The structure is a mechanism: " + problem.equationLabel(*eq) +
+                         " can move without resistance (a support may be missing).");
+    }
+    auto free = solver.solve(system->rhs);
+    if (!free) {
+        return tl::unexpected(free.error());
+    }
+    return problem.recover(problem.valuesOf(*free));
 }
 
 std::vector<ModelIssue> validate(const Model& model)
