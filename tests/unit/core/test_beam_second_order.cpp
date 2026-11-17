@@ -334,3 +334,97 @@ TEST_CASE("beam-columns along the bar", "[core][beam][second-order]")
         CHECK(unstable(-critical * (1.0 + 1e-6)) == 1);
     }
 }
+
+namespace {
+
+// A profile of `parts` parts sampled from n(s) at the Gauss points.
+template <typename F>
+fem::core::AxialProfile sampled(const F& n, int parts, double length)
+{
+    fem::core::AxialProfile profile;
+    profile.count = 2 * parts;
+    for (int part = 0; part < parts; ++part) {
+        const auto points = fem::core::AxialProfile::gaussPoints(part, parts, length);
+        profile.values.at(static_cast<std::size_t>(2 * part)) = n(points[0]);
+        profile.values.at(static_cast<std::size_t>(2 * part + 1)) = n(points[1]);
+    }
+    return profile;
+}
+
+// Greenhill's column (a cantilever under its own weight q per length):
+// beta = q L^3 / EI makes theta = sum c_k x^(3k), from the free end, vanish
+// at the clamped one: f(beta) = sum (-beta)^k / prod 3j (3j - 1) = 0.
+double greenhill()
+{
+    const auto f = [](double beta) {
+        double term = 1.0;
+        double sum = 1.0;
+        for (int k = 1; k < 60; ++k) {
+            term *= -beta / (3.0 * k * (3.0 * k - 1.0));
+            sum += term;
+        }
+        return sum;
+    };
+    double low = 6.0;
+    double high = 9.0;
+    for (int i = 0; i < 200; ++i) {
+        const double middle = (low + high) / 2.0;
+        (f(low) > 0.0) == (f(middle) > 0.0) ? low = middle : high = middle;
+    }
+    return (low + high) / 2.0;
+}
+
+} // namespace
+
+// REQ-008c-02, NFR-008c-01: an axial force that varies along the bar, by
+// the fourth-order Magnus integrator (design 008c §5.2).
+TEST_CASE("an axial force that varies along the bar", "[core][beam][second-order]")
+{
+    const double l = 5.0;
+    const fem::core::SpanLoads none;
+    SECTION("equal values are the constant profile")
+    {
+        fem::core::BeamData varying = bar(0.0, true);
+        varying.axialForce = sampled([](double) { return -4e5; }, 3, l);
+        const StateBarMatrices a = fem::core::stateBarMatrices(varying, l, none, false);
+        const StateBarMatrices b = fem::core::stateBarMatrices(bar(-4e5, true), l, none, false);
+        CHECK((a.stiffness - b.stiffness).norm() <= 1e-10 * b.stiffness.norm());
+    }
+    SECTION("a linear force in one part or in three is the same bar")
+    {
+        const auto n = [l](double s) { return -6e5 + 2e5 * s / l; };
+        fem::core::BeamData one = bar(0.0);
+        one.axialForce = sampled(n, 1, l);
+        fem::core::BeamData three = bar(0.0);
+        three.axialForce = sampled(n, 3, l);
+        const StateBarMatrices a = fem::core::stateBarMatrices(one, l, none, true);
+        const StateBarMatrices b = fem::core::stateBarMatrices(three, l, none, true);
+        CHECK((a.stiffness - b.stiffness).norm() <= 1e-8 * b.stiffness.norm());
+    }
+    SECTION("Greenhill's column: buckling under its own weight")
+    {
+        const double ei = 2e6;
+        const double reference = greenhill();
+        CHECK(std::abs(reference - 7.8373474) < 1e-6);
+        // Clamped at s = 0, free at s = l: N(s) = -q (l - s).
+        const auto unstable = [&](double beta) {
+            const double q = beta * ei / (l * l * l);
+            fem::core::BeamData beam = bar(0.0);
+            beam.axialForce = sampled([&](double s) { return -q * (l - s); }, 1, l);
+            const StateBarMatrices m = fem::core::stateBarMatrices(beam, l, none, true);
+            const Eigen::Matrix3d k22 = m.stiffness.bottomRightCorner(3, 3);
+            const Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> eigen(k22);
+            return m.negativePivots + (eigen.eigenvalues().array() < 0.0).count() > 0;
+        };
+        double low = 5.0;
+        double high = 10.0;
+        REQUIRE_FALSE(unstable(low));
+        REQUIRE(unstable(high));
+        for (int i = 0; i < 60; ++i) {
+            const double middle = (low + high) / 2.0;
+            unstable(middle) ? high = middle : low = middle;
+        }
+        INFO("Greenhill " << reference << ", engine " << low);
+        CHECK(std::abs(low - reference) <= 1e-8 * reference);
+    }
+}

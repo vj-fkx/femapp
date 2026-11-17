@@ -229,22 +229,28 @@ double growthRate(const BeamData& beam)
 using PartMatrix = StateBarMatrix;
 using PartVector = StateBarVector;
 
+// The two Gauss points of [0, 1] and the weight of the commutator of the
+// fourth-order Magnus integrator (design 008c §5.2).
+constexpr double kGaussLow = 0.5 - 0.28867513459481288225; // 1/2 - sqrt(3)/6
+constexpr double kGaussHigh = 0.5 + 0.28867513459481288225;
+constexpr double kMagnusCommutator = 0.14433756729740644113; // sqrt(3)/12
+
 // Transfer over one part: s(end) = T s(start) + p, in physical units, with
-// the loads and jumps inside the part.
+// the loads and jumps inside the part. With an axial force that varies
+// along the bar (design 008c §5.2), A follows it and each segment is
+// integrated by the fourth-order Magnus method.
 class Part
 {
 public:
-    Part(const BeamData& beam, const Plan& plan, const FullMatrix& full, double from, double to)
+    Part(const BeamData& beam, const Plan& plan, double length, double from, double to)
         : m_plan(plan)
+        , m_beam(beam)
+        , m_length(length)
+        , m_varying(beam.axialForce.count > 1)
         , m_omega(skew(beam.curvature))
     {
         const int n = plan.count;
-        m_a = StateMatrix::Zero(n, n);
-        for (int i = 0; i < n; ++i) {
-            for (int j = 0; j < n; ++j) {
-                m_a(i, j) = full(state(i), state(j));
-            }
-        }
+        m_a = reduced(systemMatrix(beam, beam.axialForce.at((from + to) / 2.0, length)));
         // Scales: lengths h, rotations 1, warping 1/h, forces S/h^2,
         // moments S/h, Q S, with S a bending stiffness.
         const double h = to - from;
@@ -295,16 +301,19 @@ public:
         if (!(l > 0.0)) {
             return;
         }
-        StateMatrix m = StateMatrix::Zero(n + 2, n + 2);
-        for (int i = 0; i < n; ++i) {
-            for (int j = 0; j < n; ++j) {
-                m(i, j) = l * m_a(i, j) * m_scale(j) / m_scale(i);
+        const auto generator = [&](const StateMatrix& a) {
+            StateMatrix m = StateMatrix::Zero(n + 2, n + 2);
+            for (int i = 0; i < n; ++i) {
+                for (int j = 0; j < n; ++j) {
+                    m(i, j) = l * a(i, j) * m_scale(j) / m_scale(i);
+                }
+                m(i, n) = l * l * b1(state(i)) / m_scale(i);
+                m(i, n + 1) = l * b0(state(i)) / m_scale(i);
             }
-            m(i, n) = l * l * b1(state(i)) / m_scale(i);
-            m(i, n + 1) = l * b0(state(i)) / m_scale(i);
-        }
-        m(n, n + 1) = 1.0;
-        const StateMatrix e = matrixExponential(m);
+            m(n, n + 1) = 1.0;
+            return m;
+        };
+        const StateMatrix e = matrixExponential(magnus(x0, l, generator));
         StateMatrix t(n, n);
         StateBarVector p(n);
         for (int i = 0; i < n; ++i) {
@@ -314,7 +323,7 @@ public:
             p(i) = m_scale(i) * e(i, n + 1);
         }
         if (fixed) {
-            p += fixedParticular(l, c0, d0);
+            p += fixedParticular(x0, l, c0, d0);
         }
         m_t = t * m_t;
         m_p = t * m_p + p;
@@ -323,27 +332,31 @@ public:
     // The particular solution of a force fixed in space over a segment of
     // length l: c' = -Omega x c + d, d' = -Omega x d, F' gets -c (augmented
     // states c and l d, design 008b §5.3).
-    [[nodiscard]] StateBarVector fixedParticular(double l, const Vec3& c0, const Vec3& d0) const
+    [[nodiscard]] StateBarVector fixedParticular(double x0, double l, const Vec3& c0,
+                                                 const Vec3& d0) const
     {
         const int n = m_plan.count;
-        StateMatrix m = StateMatrix::Zero(n + 6, n + 6);
-        for (int i = 0; i < n; ++i) {
-            for (int j = 0; j < n; ++j) {
-                m(i, j) = l * m_a(i, j) * m_scale(j) / m_scale(i);
+        const auto generator = [&](const StateMatrix& a) {
+            StateMatrix m = StateMatrix::Zero(n + 6, n + 6);
+            for (int i = 0; i < n; ++i) {
+                for (int j = 0; j < n; ++j) {
+                    m(i, j) = l * a(i, j) * m_scale(j) / m_scale(i);
+                }
+                const int s = state(i);
+                if (s == N || s == VY || s == VZ) {
+                    m(i, n + (s - N)) = -l / m_scale(i);
+                }
             }
-            const int s = state(i);
-            if (s == N || s == VY || s == VZ) {
-                m(i, n + (s - N)) = -l / m_scale(i);
+            for (int i = 0; i < 3; ++i) {
+                for (int j = 0; j < 3; ++j) {
+                    m(n + i, n + j) = -l * m_omega(i, j);
+                    m(n + 3 + i, n + 3 + j) = -l * m_omega(i, j);
+                }
+                m(n + i, n + 3 + i) = 1.0;
             }
-        }
-        for (int i = 0; i < 3; ++i) {
-            for (int j = 0; j < 3; ++j) {
-                m(n + i, n + j) = -l * m_omega(i, j);
-                m(n + 3 + i, n + 3 + j) = -l * m_omega(i, j);
-            }
-            m(n + i, n + 3 + i) = 1.0;
-        }
-        const StateMatrix e = matrixExponential(m);
+            return m;
+        };
+        const StateMatrix e = matrixExponential(magnus(x0, l, generator));
         Eigen::Matrix<double, 6, 1> start;
         start << c0, l * d0;
         StateBarVector p(n);
@@ -390,7 +403,40 @@ public:
 private:
     [[nodiscard]] int state(int i) const { return m_plan.state.at(static_cast<std::size_t>(i)); }
 
+    // The states used, from the full matrix.
+    [[nodiscard]] StateMatrix reduced(const FullMatrix& full) const
+    {
+        const int n = m_plan.count;
+        StateMatrix a(n, n);
+        for (int i = 0; i < n; ++i) {
+            for (int j = 0; j < n; ++j) {
+                a(i, j) = full(state(i), state(j));
+            }
+        }
+        return a;
+    }
+
+    // The exponent over [x0, x0 + l]: the generator of the constant A, or
+    // with a varying axial force the fourth-order Magnus exponent
+    // (G1 + G2) / 2 + sqrt(3) / 12 [G2, G1], G at the two Gauss points.
+    template <typename Generator>
+    [[nodiscard]] StateMatrix magnus(double x0, double l, const Generator& generator) const
+    {
+        if (!m_varying) {
+            return generator(m_a);
+        }
+        const auto at = [&](double xi) {
+            return reduced(systemMatrix(m_beam, m_beam.axialForce.at(x0 + xi * l, m_length)));
+        };
+        const StateMatrix g1 = generator(at(kGaussLow));
+        const StateMatrix g2 = generator(at(kGaussHigh));
+        return 0.5 * (g1 + g2) + kMagnusCommutator * (g2 * g1 - g1 * g2);
+    }
+
     const Plan& m_plan;
+    const BeamData& m_beam;
+    double m_length;
+    bool m_varying;
     Mat3 m_omega;
     StateMatrix m_a;
     StateBarVector m_scale;
@@ -473,6 +519,8 @@ double smallestPositive(double a, double b)
 // that no part buckles on its own; 0 when the compression needs none, and
 // < 0 when it is beyond the reach of any part (|N| near G As).
 constexpr double kCriticalMargin = 4.0;
+constexpr double kVaryingChange = 5e-5;
+constexpr int kMaxVaryingPieces = 256;
 double longestPart(const BeamData& beam)
 {
     const double c = beam.axialForce.largestCompression();
@@ -500,18 +548,26 @@ int partCount(const BeamData& beam, double length)
     if (longest > 0.0) {
         parts = std::max(parts, static_cast<int>(std::ceil(length / longest)));
     }
-    // The parts of the profile of N are split evenly.
+    // The parts of the profile of N are split evenly and, when N varies,
+    // so that each piece changes (k h)^2 by at most kVaryingChange: the
+    // error of the fourth-order Magnus integrator (design 008c §5.2,
+    // calibrated on Greenhill's column for 1e-8).
     const int profile = beam.axialForce.parts();
-    if (profile > 1) {
-        parts = profile * ((parts + profile - 1) / profile);
+    const double ei = smallestPositive(beam.bendingY, beam.bendingZ);
+    if (beam.axialForce.count > 1 && ei > 0.0) {
+        const double h = length / profile;
+        int pieces = 1;
+        for (int part = 0; part < profile; ++part) {
+            const double low = beam.axialForce.values.at(static_cast<std::size_t>(2 * part));
+            const double high = beam.axialForce.values.at(static_cast<std::size_t>(2 * part + 1));
+            const double change = std::abs(high - low) / (kGaussHigh - kGaussLow) * h * h / ei;
+            pieces =
+                std::max(pieces, static_cast<int>(std::ceil(std::cbrt(change / kVaryingChange))));
+        }
+        parts = std::max(parts, profile * std::min(pieces, kMaxVaryingPieces));
     }
+    parts = profile * ((parts + profile - 1) / profile);
     return parts;
-}
-
-// The axial force of a part (design 008c §5.2): constant along it.
-double partAxialForce(const BeamData& beam, double length, double from, double to)
-{
-    return beam.axialForce.at((from + to) / 2.0, length);
 }
 
 // Integrates the part from `from` up to `until`, segment by segment between
@@ -592,8 +648,7 @@ StateBarMatrices stateBarMatrices(const BeamData& beam, double length, const Spa
     for (int k = 0; k < parts; ++k) {
         const double from = length * k / parts;
         const double to = k + 1 == parts ? length : length * (k + 1) / parts;
-        const FullMatrix full = systemMatrix(beam, partAxialForce(beam, length, from, to));
-        Part part(beam, plan, full, from, to);
+        Part part(beam, plan, length, from, to);
         walk(part, beam, loads, length, from, to, k == 0, k + 1 == parts);
         PartMatrix kp;
         PartVector rp;
@@ -614,13 +669,11 @@ StateBarMatrices stateBarMatrices(const BeamData& beam, double length, const Spa
         if (second) {
             // May be indefinite: its negative eigenvalues count the
             // buckling loads of the clamped bar below N (design 008c §5.4).
-            const Eigen::SelfAdjointEigenSolver<PartMatrix> eigen(kjj);
-            const auto& values = eigen.eigenvalues();
-            negative += static_cast<int>((values.array() < 0.0).count());
-            const PartMatrix inverse = eigen.eigenvectors() * values.cwiseInverse().asDiagonal() *
-                                       eigen.eigenvectors().transpose();
-            solved = inverse * coupling.transpose();
-            junction = inverse * rj;
+            const Eigen::SelfAdjointEigenSolver<PartMatrix> eigen(kjj, Eigen::EigenvaluesOnly);
+            negative += static_cast<int>((eigen.eigenvalues().array() < 0.0).count());
+            const Eigen::PartialPivLU<PartMatrix> lu(kjj);
+            solved = lu.solve(coupling.transpose());
+            junction = lu.solve(rj);
         } else {
             const Eigen::LDLT<PartMatrix> ldlt(kjj);
             solved = ldlt.solve(coupling.transpose());
@@ -651,15 +704,11 @@ BarState stateAt(const BeamData& beam, double length, const SpanLoads& loads, bo
     const Eigen::Index d = plan.dofs;
     const int parts = partCount(beam, length);
     const auto bound = [length, parts](int k) { return k >= parts ? length : length * k / parts; };
-    const auto fullOf = [&](int k) {
-        return systemMatrix(beam, partAxialForce(beam, length, bound(k), bound(k + 1)));
-    };
     // The stiffness of every part, then the displacements of the junctions.
     std::vector<PartMatrix> stiffness(static_cast<std::size_t>(parts));
     std::vector<PartVector> forces(static_cast<std::size_t>(parts));
     for (int k = 0; k < parts; ++k) {
-        const FullMatrix full = fullOf(k);
-        Part part(beam, plan, full, bound(k), bound(k + 1));
+        Part part(beam, plan, length, bound(k), bound(k + 1));
         walk(part, beam, loads, length, bound(k), bound(k + 1), k == 0, k + 1 == parts);
         part.stiffness(stiffness[static_cast<std::size_t>(k)], forces[static_cast<std::size_t>(k)]);
     }
@@ -725,8 +774,7 @@ BarState stateAt(const BeamData& beam, double length, const SpanLoads& loads, bo
     StateBarVector start(2 * d);
     start.head(d) = dk.head(d);
     start.tail(d) = -p.head(d);
-    const FullMatrix full = fullOf(k);
-    Part part(beam, plan, full, bound(k), bound(k + 1));
+    Part part(beam, plan, length, bound(k), bound(k + 1));
     walk(part, beam, loads, length, bound(k), x, k == 0, side == Side::After);
     const StateBarVector state = part.transfer() * start + part.particular();
     BarState out;

@@ -53,7 +53,7 @@ Regras:
   lateral e compressão, momentos e deslocamentos por `stateAt` ao longo,
   Engesser contra a sua forma fechada, base elástica com N (viga de
   Hetényi comprimida) — arquivo: `test_beam_second_order.cpp` — cobre: 02, 06
-- [ ] **T07** N variável (design §5.2): testes de viga-coluna com carga
+- [x] **T07** N variável (design §5.2): testes de viga-coluna com carga
   axial uniforme e trapezoidal contra integração muito refinada (deve
   falhar); implementar `axialParts` e o Magnus de 4ª ordem (com a matriz
   aumentada das cargas e as forças fixas no espaço) até passar com erro
@@ -216,3 +216,15 @@ Regras:
   não eram recompilados, e o construtor implícito antigo de `BeamData`
   ficava no executável). Resolvido com `VSLANG=1033` antes de configurar
   (`--fresh`) e uma recompilação completa; o CI não é afetado.
+- T06: no balanço o teste fica abaixo da crítica do balanço (π²EI/4L²);
+  acima dela o deslocamento muda de sinal, como deve.
+- T07: o Magnus de 4ª ordem com um número fixo de pedaços (4 por parte do
+  perfil) errava 2,4e−4 no pilar de Greenhill. A subdivisão passou a
+  depender da variação de N: cada pedaço muda (kh)² = |ΔN|h²/EI no máximo
+  5e−5, o que dá m = ∛(|ΔN|ℓ²/(EI·5e−5)) pedaços por parte do perfil (até
+  256). Com isso, Greenhill (qL³/EI = 7,8373474…, pela série de θ'' = −βxθ
+  calculada no próprio teste) bate em 1e−8, e o mesmo N linear em 1 ou 3
+  partes dá a mesma barra em 1e−8. No pilar do benchmark (peso próprio de
+  um andar) são cerca de 4 pedaços. As junções com N são resolvidas por LU
+  (a inversa pela decomposição de autovalores perdia dígitos), e a
+  contagem usa só os autovalores.
