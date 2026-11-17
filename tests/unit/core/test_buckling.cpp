@@ -3,13 +3,17 @@
 
 #include "beam_models.hpp"
 
+#include <fem/core/mesh_builder.hpp>
 #include <fem/core/stability_analysis.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
 #include <cmath>
+#include <memory>
 #include <numbers>
+#include <optional>
 #include <string>
+#include <vector>
 
 using fem::core::DofType;
 using fem::core::ElementKind;
@@ -213,5 +217,172 @@ TEST_CASE("buckling modes", "[core][buckling]")
         CHECK(near(std::abs(mode.displacements[2].x()), 1.0, 1e-8));
         const double top = mode.displacements[2].x();
         CHECK(near(mode.displacements[1].x(), top * (1.0 - std::cos(kPi / 4)), 1e-8));
+    }
+}
+
+// REQ-008c-09, 10, AC-5: frames, in order, and a column with an offset.
+TEST_CASE("buckling of frames", "[core][buckling]")
+{
+    const double euler = kPi * kPi * kEi / (kL * kL);
+    // Two clamped columns tied at the top by a pinned link (a truss bar).
+    const auto tied = [&](bool braced) {
+        fem::core::test::TrussSpec spec;
+        spec.nodes = {Vec(0, 0, 0), Vec(0, kL, 0), Vec(6, 0, 0), Vec(6, kL, 0)};
+        spec.bars = {{0, 1}, {2, 3}, {1, 3}};
+        fem::core::Model model = fem::core::test::beamModel(spec, ElementKind::Beam2D);
+        model.assignments.front().elements = fem::core::ElementIds{{1, 2}};
+        model.assignments.push_back({.elements = fem::core::ElementIds{{3}},
+                                     .kind = ElementKind::Truss2D,
+                                     .material = "Steel",
+                                     .section = "S"});
+        fem::core::test::fixAll(model, {1, 3}, ElementKind::Beam2D);
+        if (braced) {
+            fem::core::test::restrain(model, {2, 4}, {DofType::U, DofType::RZ});
+        }
+        model.nodalForces.push_back({.nodes = fem::core::NodeIds{{2, 4}}, .force = Vec(0, -kP, 0)});
+        return model;
+    };
+    SECTION("sway: the columns lean together, as cantilevers")
+    {
+        const auto result = buckle(tied(false), 3);
+        REQUIRE(result.modes.size() == 3);
+        CHECK(near(result.modes.at(0).factor * kP, euler / 4.0, 1e-8));
+        for (std::size_t i = 0; i + 1 < result.modes.size(); ++i) {
+            CHECK(result.modes.at(i).factor <= result.modes.at(i + 1).factor);
+        }
+        // The tops move together.
+        CHECK(near(result.modes.at(0).displacements[1].x(), result.modes.at(0).displacements[3].x(),
+                   1e-6));
+    }
+    SECTION("braced at the top: each column clamped at both ends, a double factor")
+    {
+        const auto result = buckle(tied(true), 2);
+        REQUIRE(result.modes.size() == 2);
+        CHECK(near(result.modes.at(0).factor * kP, 4.0 * euler, 1e-8));
+        CHECK(near(result.modes.at(1).factor * kP, 4.0 * euler, 1e-8));
+    }
+    SECTION("a clamped column with a rigid offset at its free top: a k tan(k l) = 1")
+    {
+        const double a = 0.6;
+        fem::core::test::TrussSpec spec;
+        spec.nodes = {Vec(0, 0, 0), Vec(0, kL + a, 0)};
+        spec.bars = {{0, 1}};
+        fem::core::Model model = fem::core::test::beamModel(spec, ElementKind::Beam2D);
+        fem::core::test::fixAll(model, {1}, ElementKind::Beam2D);
+        model.rigidOffsets.push_back(
+            {.elements = fem::core::ElementIds{{1}}, .start = Vec::Zero(), .end = Vec(0, -a, 0)});
+        model.nodalForces.push_back({.nodes = fem::core::NodeIds{{2}}, .force = Vec(0, -kP, 0)});
+        double low = 1e-6;
+        double high = kPi / (2.0 * kL) - 1e-12;
+        for (int i = 0; i < 200; ++i) {
+            const double k = (low + high) / 2.0;
+            (a * k * std::tan(k * kL) < 1.0 ? low : high) = k;
+        }
+        CHECK(near(buckle(model).modes.at(0).factor * kP, low * low * kEi, 1e-8));
+    }
+}
+
+namespace {
+
+// A two-hinged half circle (as in test_second_order_analysis.cpp) loaded at
+// the crown by kP: n Line3 elements with `curved`, or n chords.
+fem::core::Model arch(double r, int n, std::optional<fem::core::CurvedFormulation> curved)
+{
+    const auto point = [r](double a) { return Vec(r * std::cos(a), r * std::sin(a), 0.0); };
+    fem::core::MeshBuilder builder;
+    for (int k = 0; k <= n; ++k) {
+        REQUIRE(builder.addNode(k + 1, point(kPi - kPi * k / n)).has_value());
+    }
+    if (curved) {
+        for (int k = 0; k < n; ++k) {
+            REQUIRE(builder.addNode(1001 + k, point(kPi - kPi * (k + 0.5) / n)).has_value());
+        }
+    }
+    fem::core::ElementIds all;
+    for (int k = 0; k < n; ++k) {
+        const auto id = static_cast<fem::core::ExternalId>(k) + 1;
+        const std::vector<fem::core::ExternalId> line =
+            curved ? std::vector<fem::core::ExternalId>{id, id + 1, 1000 + id}
+                   : std::vector<fem::core::ExternalId>{id, id + 1};
+        const auto type = curved ? fem::core::ElementType::Line3 : fem::core::ElementType::Line2;
+        REQUIRE(builder.addElement(type, id, line).has_value());
+        all.ids.push_back(id);
+    }
+    auto mesh = builder.build();
+    REQUIRE(mesh.has_value());
+    fem::core::Model model;
+    model.mesh = std::make_shared<const fem::core::Mesh>(std::move(*mesh));
+    model.materials.push_back(fem::core::test::steel());
+    model.sections.push_back(fem::core::test::genericSection());
+    fem::core::Assignment assignment{.elements = all,
+                                     .kind = ElementKind::Beam2D,
+                                     .material = "Steel",
+                                     .section = "S",
+                                     .theory = fem::core::BeamTheory::Timoshenko};
+    if (curved) {
+        assignment.curved = *curved;
+    }
+    model.assignments.push_back(assignment);
+    fem::core::test::restrain(model, {1, static_cast<fem::core::ExternalId>(n) + 1},
+                              {DofType::U, DofType::V});
+    model.nodalForces.push_back(
+        {.nodes = fem::core::NodeIds{{static_cast<fem::core::ExternalId>(n / 2) + 1}},
+         .force = Vec(0, -kP, 0)});
+    return model;
+}
+
+} // namespace
+
+// REQ-008c-04, 10, AC-6: the arch buckles alike as arcs, as isoparametric
+// beams and as a fine chain of straight bars.
+TEST_CASE("buckling of a curved arch", "[core][buckling][arc]")
+{
+    using fem::core::CurvedFormulation;
+    const double r = 5.0;
+    const double arc = buckle(arch(r, 2, CurvedFormulation::Arc)).modes.at(0).factor;
+    const double arc4 = buckle(arch(r, 4, CurvedFormulation::Arc)).modes.at(0).factor;
+    const double coarse = buckle(arch(r, 64, std::nullopt)).modes.at(0).factor;
+    const double fine = buckle(arch(r, 128, std::nullopt)).modes.at(0).factor;
+    const double chain = (4.0 * fine - coarse) / 3.0;
+    std::vector<double> iso;
+    for (const int n : {8, 16, 32}) {
+        iso.push_back(buckle(arch(r, n, CurvedFormulation::Isoparametric)).modes.at(0).factor);
+    }
+    INFO("arc " << arc << ", arc4 " << arc4 << ", chain " << chain << " (" << coarse << ", " << fine
+                << "), iso " << iso[0] << " " << iso[1] << " " << iso[2]);
+    CHECK(near(arc4, arc, 1e-6));
+    CHECK(near(chain, arc, 1e-6));
+    for (std::size_t i = 0; i + 1 < iso.size(); ++i) {
+        CHECK(std::log2(std::abs(iso[i] - arc) / std::abs(iso[i + 1] - arc)) >= 3.5);
+    }
+}
+
+// REQ-008c-12, AC-7: what the buckling refuses or cannot give.
+TEST_CASE("buckling failures", "[core][buckling]")
+{
+    // A truss mast leaning on a spring: one factor, k l / P.
+    const auto mast = [](double load) {
+        const double l = 3.0;
+        fem::core::test::TrussSpec spec;
+        spec.nodes = {Vec(0, 0, 0), Vec(0, l, 0), Vec(-30.0, l, 0)};
+        spec.bars = {{0, 1}, {1, 2}};
+        fem::core::Model model = fem::core::test::beamModel(spec, ElementKind::Truss2D);
+        fem::core::test::restrain(model, {1, 3}, {DofType::U, DofType::V});
+        model.nodalForces.push_back({.nodes = fem::core::NodeIds{{2}}, .force = Vec(0, load, 0)});
+        return model;
+    };
+    SECTION("only tension: no factor")
+    {
+        const auto result = fem::core::runLinearBuckling(mast(kP));
+        REQUIRE_FALSE(result.has_value());
+        CHECK(result.error().message.find("No bar is compressed") != std::string::npos);
+    }
+    SECTION("fewer factors than asked")
+    {
+        const auto result = buckle(mast(-kP), 3);
+        REQUIRE(result.modes.size() == 1);
+        const double spring = kE * fem::core::test::kArea / 30.0;
+        CHECK(near(result.modes.at(0).factor * kP, spring * 3.0, 1e-6));
+        CHECK(result.note.find("Only 1 of the 3") != std::string::npos);
     }
 }

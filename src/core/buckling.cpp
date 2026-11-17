@@ -370,11 +370,14 @@ Expected<BucklingResult> runLinearBuckling(const Model& model, const BucklingOpt
         return tl::unexpected(total.error());
     }
     for (int doubling = 0; *total < wanted && doubling < kDoublings; ++doubling) {
-        high *= 2.0;
-        total = sturmCount(pencil, high);
-        if (!total) {
-            return tl::unexpected(total.error());
+        // So far up that the matrix cannot be factorized: beyond the reach
+        // of the search (REQ-008c-12).
+        auto further = sturmCount(pencil, 2.0 * high);
+        if (!further) {
+            break;
         }
+        high *= 2.0;
+        total = further;
     }
     // Two refinements that met the same factor: keep one.
     while (below(high) > *total) {

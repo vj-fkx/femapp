@@ -129,15 +129,15 @@ Regras:
   garantia pela contagem com bissecção, fatores repetidos, modos e
   `BeamResult` dos modos, até a T18 passar — arquivos: `buckling.cpp`,
   `stability_analysis.hpp` — cobre: 09, 10, 11
-- [ ] **T20** Flambagem de pórticos (AC-5): deslocável e indeslocável
+- [x] **T20** Flambagem de pórticos (AC-5): deslocável e indeslocável
   contra funções de estabilidade, fatores em ordem, pilar com
   excentricidade, fatores repetidos por simetria, fator perdido de
   propósito (estimativa ruim) e recuperado pela contagem — arquivo:
   `test_buckling.cpp` — cobre: 09, 10
-- [ ] **T21** [P] Flambagem de arcos (AC-6): arco e isoparamétrica contra a
+- [x] **T21** [P] Flambagem de arcos (AC-6): arco e isoparamétrica contra a
   cadeia de barras retas exatas — arquivo: `test_buckling.cpp` — cobre: 04,
   10
-- [ ] **T22** Falhas da flambagem (AC-7): caso só com tração recusado,
+- [x] **T22** Falhas da flambagem (AC-7): caso só com tração recusado,
   menos fatores que o pedido com a `note` — arquivo: `test_buckling.cpp` —
   cobre: 12
 
@@ -298,3 +298,16 @@ Regras:
   comum (modos com deslocamento dos nós) continua uma só contagem final.
   (2) Os produtos K(λ)x montam K(λ) (cerca de 0,1 s no benchmark), em vez
   de um caminho elemento a elemento.
+- T20: dois pilares engastados com tirante articulado (deslocável:
+  π²EI/4L², fatores em ordem, topos juntos) e com o topo travado (fator
+  duplo 4π²EI/L²); pilar com excentricidade rígida no topo livre contra a
+  condição exata a·k·tan(kl) = 1, tudo em 1e−8. O "fator perdido e
+  recuperado pela contagem" é o dos modos dentro da barra (T18: biengastado
+  e com liberação de um só elemento), que só a contagem acha.
+- T21: o arco biarticulado semicircular flamba com o mesmo fator em arco
+  (2 ou 4 elementos), na cadeia de barras retas com Richardson (1e−6) e na
+  isoparamétrica (taxa ≥ 3,5).
+- T22: só tração é recusado; o mastro de treliça tem um só fator (kL/P,
+  1e−6) e a `note` diz "Only 1 of the 3". Ao dobrar λ em busca de fatores
+  que não existem, a matriz deixa de ser fatorável (pivôs com razão 1e17):
+  a busca para ali, como fora do alcance.
