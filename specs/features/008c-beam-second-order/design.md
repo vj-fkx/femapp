@@ -5,6 +5,15 @@ Requisitos: [requirements.md](requirements.md)
 
 ## 1. Resumo da abordagem
 
+> **Alteração de 2026-11-17 (T03, aprovada pelo mantenedor):** a medida
+> mostrou que cada fatoração custa quase uma análise linear (cerca de 3 s
+> em 29 mil GDL), e uma solução com a fatoração pronta, 0,02 s. Os laços
+> passam a **reaproveitar fatorações**: na segunda ordem, a fatoração da
+> análise linear pré-condiciona o gradiente conjugado de cada iteração, com
+> uma fatoração final para a contagem (§5.5); na flambagem, uma fatoração
+> perto do primeiro fator serve à iteração inversa residual de todos os
+> modos, com uma contagem final (§5.6). As metas do NFR-008c-02 ficam.
+
 Tudo em `core`, sem Qt, sobre a análise, o motor exato e as formulações de
 barra da 008 e da 008b:
 
@@ -23,13 +32,15 @@ barra da 008 e da 008b:
    rígido, que gira com o nó levando a força que transmite.
 4. **Segunda ordem** (`runSecondOrderStatic`): a análise linear dá o
    primeiro N, e depois a iteração de ponto fixo sobre os esforços normais
-   (acelerada por Anderson) remonta e resolve até convergir. A fatoração
-   simbólica é feita uma vez.
+   (acelerada por Anderson) remonta e resolve até convergir. Cada solução é
+   um gradiente conjugado pré-condicionado pela fatoração da análise
+   linear; uma fatoração final dá a contagem de estabilidade.
 5. **Flambagem** (`runLinearBuckling`): os esforços normais da análise
    linear, multiplicados por λ, entram de forma exata nas barras. Assim, a
-   flambagem é um problema de autovalor **não linear**, K(λ)·φ = 0. Ele é
-   resolvido por iteração com deslocamento (subespaço sobre o problema
-   linearizado em λ), e a contagem de Sturm de Wittrick-Williams garante que
+   flambagem é um problema de autovalor **não linear**, K(λ)·φ = 0. As
+   estimativas vêm de um subespaço com a fatoração da análise linear; o
+   refinamento, da iteração inversa residual com uma fatoração perto do
+   primeiro fator; e a contagem de Sturm de Wittrick-Williams garante que
    nenhum fator ficou para trás (ADR 0007).
 6. **A contagem de Sturm** soma os pivôs negativos da matriz global (LDLᵀ
    sem pivoteamento, que dá a inércia) e os de cada barra: as junções das
@@ -282,20 +293,31 @@ primeiro pivô negativo global ou, se só houver negativos internos, a barra
    `ExactBeamElement` (o caminho fechado da 008 fica para N = 0, REQ-008c-14).
 2. n₀ = perfis de N da solução linear.
 3. Para k = 1, 2, …:
-   - montar K(n_{k−1}) e as cargas equivalentes;
-   - fatorar (`factorizeIndefinite`, reaproveitando a análise simbólica) e
-     contar (J > 0 → instabilidade);
-   - resolver;
+   - montar K(n_{k−1}) e as cargas equivalentes, com a contagem interna das
+     barras (Σ J₀,e > 0 → instabilidade dentro de uma barra);
+   - resolver K(n_{k−1}) u = f por **gradiente conjugado pré-condicionado
+     pela fatoração da análise linear** (K₀, guardada), a partir da solução
+     anterior, até o resíduo relativo ≤ 10⁻¹²;
+   - se o gradiente conjugado achar curvatura não positiva (pᵀKp ≤ 0), a
+     matriz não é positiva definida: instabilidade, a confirmar pela
+     contagem (passo 4);
+   - se passar de 100 iterações (pré-condicionador ruim, perto da
+     crítica), fatorar K(n_{k−1}) com `factorizeIndefinite` (que já conta) e
+     usá-la como novo pré-condicionador;
    - calcular os perfis g(n_{k−1}) da nova solução;
    - medir a variação r = max(‖Δu‖/‖u‖, ‖Δn‖/‖n‖);
    - parar se r ≤ tolerância;
    - n_k = Anderson(g, histórico de até 5 resíduos).
-4. Se um passo acelerado der J > 0, o histórico é zerado e o passo cai à
-   metade, rumo ao último n estável (até 5 vezes), antes de declarar
-   instabilidade. Isso evita alarmes falsos perto da crítica, onde o ponto
-   fixo puro converge devagar (taxa ≈ P/Pcr): o Anderson leva os casos com
-   P/Pcr = 0,95 a convergir em menos de 50 iterações (teste).
-5. Resultados pela mesma recuperação da análise linear, com os perfis
+4. Instabilidade suspeita num passo acelerado (curvatura não positiva ou
+   J₀ interno): o histórico é zerado e o passo cai à metade, rumo ao último
+   n estável (até 5 vezes). Persistindo, uma fatoração de K(n) com a
+   contagem decide: J > 0 é instabilidade (REQ-008c-08). Isso evita alarmes
+   falsos perto da crítica, onde o ponto fixo puro converge devagar (taxa ≈
+   P/Pcr): o Anderson leva os casos com P/Pcr = 0,95 a convergir em menos
+   de 50 iterações (teste).
+5. Na convergência, **uma fatoração** de K(n_final) com a contagem
+   confirma a estabilidade (J = 0); com J > 0, a mensagem de instabilidade.
+6. Resultados pela mesma recuperação da análise linear, com os perfis
    finais nas barras. `at(x)` usa o motor com N, e portanto inclui N·δ.
 
 ### 5.6 Flambagem (REQ-008c-09 a 12)
@@ -305,31 +327,34 @@ primeiro pivô negativo global ou, se só houver negativos internos, a barra
    nenhuma barra → recusa (REQ-008c-12).
 2. Limite de busca: λ_max = min sobre as barras de G As/|N_ref| (Engesser) e
    10¹²; acima dele não há fator a procurar.
-3. **Estimativa e refinamento por deslocamento** (ADR 0007):
-   - em σ (início 0), monta-se K(σ) e K'(σ) ≈ dK/dλ (no início, diferença
-     central com passo 10⁻⁴·λ_escala; depois, a secante entre as duas
-     últimas montagens, que sai de graça);
-   - fatora-se K(σ);
-   - iteração de subespaço (bloco de p = count + 4 vetores) sobre o
-     problema linearizado K(σ)φ = −μ K'(σ)φ: soluções com a fatoração,
-     Rayleigh-Ritz com o `GeneralizedSelfAdjointEigenSolver` denso do
-     Eigen;
-   - os μ dão as estimativas λ ≈ σ + μ;
-   - para cada fator ainda não convergido, em ordem: σ ← estimativa, até
-     |μ_min| ≤ tolerância·λ (convergência quadrática quando K' é a
-     derivada; superlinear com a secante).
-4. **Garantia** por contagem: J(λ_i·(1 − ε)) = i − 1 e
-   J(λ_count·(1 + ε)) = count, com ε = 10⁻⁶. Se faltar fator (J maior que o
-   esperado), bissecção entre os fatores conhecidos até isolar o que
-   faltou, depois o refinamento do passo 3. Fatores múltiplos (simetria)
-   aparecem como saltos de 2 em J e são devolvidos repetidos, com modos
-   independentes.
-5. **Modos**: vetor de K(λ_i) no espaço nulo (última iteração de
-   subespaço), normalizado com a maior translação = 1 (se não houver
+3. **Estimativas** (ADR 0007): K'(0) ≈ dK/dλ pela diferença central de
+   duas montagens (passo 10⁻⁴ da escala de λ); iteração de subespaço (bloco
+   de p = count + 4 vetores) sobre o problema linearizado K₀φ = −μ K'(0)φ,
+   com as soluções pela **fatoração da análise linear** (K₀, guardada) e
+   Rayleigh-Ritz pelo `GeneralizedSelfAdjointEigenSolver` denso do Eigen.
+   Os μ são estimativas dos fatores (exatas para treliças e
+   isoparamétricas, onde K é linear em λ).
+4. **Uma fatoração em σ₁** = 0,95·(menor estimativa), com
+   `factorizeIndefinite`: J(σ₁) deve ser 0 (nenhum fator abaixo de σ₁);
+   se não for, σ₁ desce à metade até ser.
+5. **Refinamento** de cada fator pela **iteração inversa residual**
+   (Neumaier), com a fatoração de σ₁ e os vetores do subespaço como
+   início: x ← x − K(σ₁)⁻¹ K(λ_i) x, reortogonalizando contra os modos já
+   convergidos (em K'), e λ_i atualizado pela raiz escalar de
+   xᵀK(λ)x = 0 (secante sobre os produtos K(λ)x, feitos elemento a
+   elemento sem montar a matriz). Para quando o resíduo relativo de
+   K(λ_i)x ≤ tolerância. Um fator que não converge em 30 passos (longe de
+   σ₁) ganha uma fatoração própria perto dele.
+6. **Garantia** por contagem: uma fatoração em λ_count·(1 + ε), ε = 10⁻⁶,
+   deve dar J = count. Se der mais, falta fator entre σ₁ e λ_count:
+   bissecção por contagens até isolá-lo e refinamento do passo 5. Fatores
+   múltiplos (simetria) aparecem como saltos de 2 em J e são devolvidos
+   repetidos, com modos independentes (K'-ortogonais).
+7. **Modos**: o vetor x de cada fator convergido, normalizado com a maior translação = 1 (se não houver
    translação, a maior rotação). As barras do modo são `BeamResult` com os
    perfis λ_i·N_ref e sem cargas. `at(x).displacement` dá a forma ao longo
    da barra (a senoide de Euler num pilar biarticulado).
-6. Fatores pedidos acima de λ_max ou não encontrados → `note` com os fatores
+8. Fatores pedidos acima de λ_max ou não encontrados → `note` com os fatores
    achados (REQ-008c-12). Fatores negativos (inversão da carga) não são
    procurados.
 
@@ -340,30 +365,38 @@ barra (cerca de 10 a 20 µs). No pórtico de cerca de 5 mil barras do
 benchmark, isso dá algo como 0,1 s por montagem. O peso fica na
 fatoração.
 
-- **Segunda ordem**: tipicamente 4 a 6 iterações, cada uma com montagem,
-  fatoração numérica (a simbólica é reaproveitada), solução e perfis. A
-  estimativa é de 2,5 a 3,5 vezes a linear (meta: 4).
-- **Flambagem com 5 fatores**: de 10 a 20 fatorações, contando as das
-  contagens. A estimativa é de 4 a 6 vezes a linear (meta: 6).
+Medido na T03 (29 040 GDL, Release): análise linear cerca de 3,1 s;
+uma fatoração cerca de 3,0 s; uma solução com a fatoração pronta 0,02 s;
+o motor em todas as barras 0,2 s sequencial, uma montagem paralela cerca
+de 0,1 s.
 
-Uma tarefa inicial mede antes de construir os laços. Se a estimativa
-falhar, para-se para propor a mudança da meta, como na 008b.
+- **Segunda ordem**: a análise linear, mais 4 a 6 iterações de cerca de
+  0,3 a 0,5 s (montagem, 10 a 20 passos de gradiente conjugado, perfis),
+  mais a fatoração final: de 2,5 a 3 vezes a linear (meta: 4).
+- **Flambagem com 5 fatores**: a análise linear, as duas montagens de K',
+  a fatoração em σ₁, os produtos K(λ)x do refinamento (cerca de 0,1 s
+  cada, algumas dezenas) e a fatoração da contagem final: de 3,5 a 4,5
+  vezes a linear no caso típico (meta: 6). Fatores espalhados (fatorações
+  extras) ou perdidos (bissecção) custam mais e são medidos no T23.
 
 ## 6. Fluxo
 
 ```
 runSecondOrderStatic(model)
   stages = prepare(model)              // validate, DofMap, loads, beam setup
-  linear = solveWith(stages, profiles = 0)
+  linear = solveWith(stages, profiles = 0)        // keeps the factorization K0
   n = profilesOf(linear)
-  loop: K(n), f(n) → factorizeIndefinite → count → solve → g(n) → Anderson
+  loop: K(n), f(n) → PCG(K0) → g(n) → Anderson   // refactorize if PCG stalls
+  factorizeIndefinite(K(n)) → count = 0, else unstable
   recover(stages, final solution, profiles)
 
 runLinearBuckling(model)
   stages = prepare(model); linear = solveWith(stages, 0); nRef = profilesOf(linear)
-  σ = 0: K(σ), K'(σ) → subspace → estimates
-  for each wanted factor: shift until |μ| small; Sturm checks; bisect if needed
-  modes: null vectors → normalize → BeamResult per beam with λ nRef
+  K'(0) by two assemblies → subspace with K0 → estimates
+  factorizeIndefinite(K(σ1)), J(σ1) = 0
+  each wanted factor: residual inverse iteration with K(σ1)
+  factorizeIndefinite(K(λ_count (1 + ε))): J = count, else bisect
+  modes: converged vectors → normalize → BeamResult per beam with λ nRef
 ```
 
 A montagem segue paralela por cores (oneTBB). Cada elemento escreve a sua
@@ -408,6 +441,7 @@ estado compartilhado novo.
 | Funções de estabilidade em forma fechada | Uma fórmula por caso (Timoshenko, base elástica, ligações, cargas no vão); o motor já faz todos de uma vez e está verificado |
 | Flambagem por autovalor linear K φ = −λ Kg φ (Spectra) | Não é exata com um elemento por vão; nova dependência para um problema que, com N exato, é não linear de qualquer jeito |
 | Wittrick-Williams puro (só bissecção) | Exato, mas 30 a 40 fatorações por fator; a iteração com deslocamento converge em poucas e usa a contagem só para garantir |
+| Uma fatoração por iteração ou por deslocamento (o design aprovado antes da T03) | Medido na T03: cada fatoração custa quase uma análise linear; daria 5,9× (segunda ordem) e 15,8× (flambagem), contra metas de 4× e 6× |
 | Ponto fixo sem aceleração | Converge com taxa P/Pcr: inviável perto da crítica com 50 iterações |
 | Newton completo na segunda ordem | Exige a derivada da rigidez exata em relação a N de cada barra; o Anderson chega perto sem ela |
 | Haringx no lugar de Engesser | Diverge da energia da isoparamétrica; Engesser é a referência mais comum |
@@ -418,8 +452,14 @@ estado compartilhado novo.
   de um pivô quase nulo** → σ nunca fica exatamente num fator (deslocamento
   de 10⁻⁸); a contagem só é lida em pontos afastados dos fatores (ε =
   10⁻⁶); teste de inércia em matrizes indefinidas.
-- **Tempo** (NFR-008c-02) → medida no início (§5.7); a análise simbólica é
-  reaproveitada; a secante evita montagens extras.
+- **Tempo** (NFR-008c-02) → medido na T03 (§5.7); fatorações
+  reaproveitadas (gradiente conjugado pré-condicionado, iteração inversa
+  residual); produtos K(λ)x elemento a elemento sem montar.
+- **Pré-condicionador ruim perto da crítica** (o gradiente conjugado
+  converge devagar quando K(n) se afasta de K₀) → nova fatoração após 100
+  iterações, que passa a ser o pré-condicionador.
+- **Fatores longe de σ₁ convergem devagar** na iteração inversa residual →
+  fatoração própria após 30 passos.
 - **Anderson pode oscilar** → zerar o histórico e meio passo (§5.5); teste
   perto da crítica.
 - **Perfil de N nos arcos com muitas avaliações de `stateAt`** → só onde

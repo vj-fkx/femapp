@@ -15,11 +15,13 @@ resolve só problemas lineares e ainda não está no projeto.
 
 ## Decisão
 
-- Resolver K(λ) φ = 0 por **iteração com deslocamento**: em σ, fatorar
-  K(σ) e fazer iteração de subespaço sobre o problema linearizado
-  K(σ) φ = −μ K'(σ) φ (Rayleigh-Ritz com os solvers densos do Eigen), com
-  K' pela diferença central no início e depois pela secante; repetir com
-  σ ← σ + μ até convergir.
+- Resolver K(λ) φ = 0 **reaproveitando fatorações** (alterado em
+  2026-11-17, após a medida da T03: uma fatoração custa quase uma análise
+  linear, uma solução com ela 1/150 disso): estimativas por iteração de
+  subespaço sobre o problema linearizado K₀ φ = −μ K'(0) φ com a fatoração
+  da análise linear (Rayleigh-Ritz com os solvers densos do Eigen); uma
+  fatoração em σ₁ abaixo da primeira estimativa; refinamento de cada fator
+  pela iteração inversa residual (Neumaier) com essa fatoração.
 - Garantir que nenhum fator falte pela **contagem de Wittrick-Williams**:
   pivôs negativos da LDLᵀ global (sem pivoteamento, que dá a inércia) mais
   os pivôs negativos das condensações internas de cada barra, com as partes
@@ -35,9 +37,12 @@ resolve só problemas lineares e ainda não está no projeto.
 - Fatores exatos com um elemento por vão, inclusive com ligações, base
   elástica e Timoshenko.
 - A contagem também detecta a instabilidade na análise de segunda ordem.
-- Custo: algumas fatorações por fator (deslocamento), mais as das
-  contagens. É mais que um autovalor linear de um subespaço, e o NFR-008c-02
-  mede.
+- Custo: no caso típico, três fatorações (a da análise linear, a de σ₁ e
+  a da contagem final), mais produtos K(λ)x baratos; fatores espalhados ou
+  perdidos pedem fatorações extras. O NFR-008c-02 mede.
+- A mesma ideia serve à segunda ordem: a fatoração da análise linear
+  pré-condiciona o gradiente conjugado das iterações, e uma fatoração final
+  dá a contagem.
 - A LDLᵀ indefinida sem pivoteamento é sensível perto de pivôs quase nulos:
   os pontos de contagem ficam afastados dos fatores.
 - A análise modal (dinâmica) pode reaproveitar a iteração de subespaço e a

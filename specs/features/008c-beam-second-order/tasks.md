@@ -104,9 +104,11 @@ Regras:
   global (AC-2, AC-3) — arquivo: `test_second_order_analysis.cpp` — cobre:
   01, 03, 05, 06
 - [ ] **T16** `stability_analysis.hpp` e `runSecondOrderStatic` (design §5.5):
-  iteração com Anderson, contagem de Sturm, meio passo, mensagens de
-  instabilidade (nó e direção, ou elemento) e de não convergência, até a
-  T15 e os testes de falha (AC-7) passarem — arquivos:
+  iteração com Anderson, gradiente conjugado pré-condicionado pela
+  fatoração linear (nova fatoração se estagnar), fatoração final com a
+  contagem de Sturm, meio passo, mensagens de instabilidade (nó e direção,
+  ou elemento) e de não convergência, até a T15 e os testes de falha (AC-7)
+  passarem — arquivos:
   `stability_analysis.hpp`, `second_order.cpp`, `src/core/CMakeLists.txt` —
   cobre: 01, 05, 06, 07, 08, 13
 - [ ] **T17** Segunda ordem com vigas curvas (AC-6): arco biarticulado
@@ -122,7 +124,8 @@ Regras:
   senoidal ao longo da barra — arquivo: `test_buckling.cpp` — cobre: 09,
   10, 11
 - [ ] **T19** `runLinearBuckling` (design §5.6, ADR 0007): contagem J(λ),
-  deslocamento com iteração de subespaço (K' central e depois secante),
+  estimativas por subespaço com a fatoração linear, fatoração em σ₁,
+  iteração inversa residual com produtos K(λ)x elemento a elemento,
   garantia pela contagem com bissecção, fatores repetidos, modos e
   `BeamResult` dos modos, até a T18 passar — arquivos: `buckling.cpp`,
   `stability_analysis.hpp` — cobre: 09, 10, 11
@@ -196,5 +199,6 @@ Regras:
   análise simbólica quase não muda); **uma solução com a fatoração pronta,
   0,021 s**. Com uma fatoração por iteração, a estimativa do design §5.7
   não fecha: segunda ordem com 5 iterações 5,9× a linear (meta 4×),
-  flambagem com 15 fatorações 15,8× (meta 6×). Parado para propor a
-  mudança do design (reaproveitar fatorações).
+  flambagem com 15 fatorações 15,8× (meta 6×). O mantenedor aprovou
+  reaproveitar fatorações (design §5.5 a 5.7 e ADR 0007 alterados em
+  2026-11-17), com as mesmas metas.
