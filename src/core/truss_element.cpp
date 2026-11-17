@@ -31,13 +31,15 @@ Expected<void> TrussElement::compute(const ElementNodes& nodes, ElementIndex ele
     const int dims = m_kind == ElementKind::Truss2D ? 2 : 3;
     const Eigen::Vector3d e = delta / length;
 
-    // K = EA/L [e e^T, -e e^T; -e e^T, e e^T]
+    // K = EA/L [e e^T, -e e^T; -e e^T, e e^T] + N/L [G, -G; -G, G], with
+    // G = I - e e^T: the chord turning under the axial force.
     const double k = bar.axialStiffness / length;
+    const double g = bar.axialForce / length;
     const double imposed = bar.axialStiffness * bar.imposedStrain;
     const double halfWeight = 0.5 * length;
     for (int i = 0; i < dims; ++i) {
         for (int j = 0; j < dims; ++j) {
-            const double kij = k * e(i) * e(j);
+            const double kij = k * e(i) * e(j) + g * ((i == j ? 1.0 : 0.0) - e(i) * e(j));
             matrix(i, j) = kij;
             matrix(dims + i, dims + j) = kij;
             matrix(i, dims + j) = -kij;

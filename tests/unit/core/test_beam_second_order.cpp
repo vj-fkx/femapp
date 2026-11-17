@@ -3,6 +3,7 @@
 
 #include <fem/core/beam_element.hpp>
 #include <fem/core/beam_state.hpp>
+#include <fem/core/truss_element.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -533,5 +534,33 @@ TEST_CASE("the exact element with an axial force", "[core][beam][second-order]")
             (void)planarElement(beam, l, count);
             CHECK(count == expected);
         }
+    }
+}
+
+// REQ-008c-03: the geometric stiffness of a truss bar.
+TEST_CASE("the truss bar with an axial force", "[core][beam][second-order]")
+{
+    const Eigen::Vector3d delta(3.0, 4.0, 12.0); // length 13
+    const double l = 13.0;
+    const Eigen::Vector3d e = delta / l;
+    for (const double n : {-2e4, 0.0, 3e4}) {
+        const std::array<fem::core::BarData, 1> bars = {
+            fem::core::BarData{.axialStiffness = 1e8, .axialForce = n}};
+        const fem::core::TrussElement element(fem::core::ElementKind::Truss3D, bars);
+        fem::core::ElementNodes nodes;
+        nodes.type = fem::core::ElementType::Line2;
+        nodes.count = 2;
+        nodes.x.at(0) = Eigen::Vector3d(1.0, 1.0, 1.0);
+        nodes.x.at(1) = nodes.x.at(0) + delta;
+        Eigen::MatrixXd k = Eigen::MatrixXd::Zero(6, 6);
+        Eigen::VectorXd f = Eigen::VectorXd::Zero(6);
+        REQUIRE(element.compute(nodes, 0, k, f).has_value());
+        const Eigen::Matrix3d expected =
+            1e8 / l * e * e.transpose() + n / l * (Eigen::Matrix3d::Identity() - e * e.transpose());
+        CHECK((k.topLeftCorner(3, 3) - expected).norm() <= 1e-12 * expected.norm());
+        CHECK((k.topRightCorner(3, 3) + expected).norm() <= 1e-12 * expected.norm());
+        // A taut bar resists a sideways motion of its end with N / L.
+        const Eigen::Vector3d side = e.cross(Eigen::Vector3d::UnitX()).normalized();
+        CHECK(std::abs(side.dot(k.bottomRightCorner(3, 3) * side) - n / l) <= 1e-12 * 1e8 / l);
     }
 }

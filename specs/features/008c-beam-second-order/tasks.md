@@ -73,7 +73,7 @@ Regras:
   §5.3) contra a barra muito rígida (1e−6), contagem de um pilar com as
   pontas liberadas além da sua crítica — arquivos: `beam_state.hpp`,
   `beam_exact.cpp`, `test_beam_second_order.cpp` — cobre: 02, 08, 10
-- [ ] **T10** [P] Rigidez geométrica da treliça (2D e 3D) contra a forma
+- [x] **T10** [P] Rigidez geométrica da treliça (2D e 3D) contra a forma
   fechada; corda tensa — arquivos: `truss_element.hpp/.cpp`,
   `test_beam_second_order.cpp` — cobre: 03
 - [ ] **T11** [P] Rigidez geométrica da isoparamétrica (design §5.3):
@@ -237,3 +237,7 @@ Regras:
   em vez da barra muito rígida do design (1e−6): a referência analítica é
   mais forte. As ligações com N contam pelos autovalores e resolvem por LU;
   sem N, o caminho LDLᵀ da 008b não mudou.
+- T10: o esforço de referência da treliça ficou em `BarData::axialForce`,
+  e não num `span` à parte como no design §4, do mesmo jeito que o perfil
+  fica em `BeamData`; a rigidez geométrica N/L (I − e eᵀ) entra direto nos
+  blocos de translação.
