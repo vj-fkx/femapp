@@ -33,8 +33,10 @@ O escopo é amplo; a entrega é incremental, em versões intermediárias utiliz�
 | Térmica | Condução de calor estacionária e transiente (2D e 3D) |
 | Modal | Frequências naturais e modos de vibração |
 | Dinâmica linear | Resposta transiente (Newmark) e por superposição modal |
+| Segunda ordem e flambagem de barras | P-Δ/P-δ iterativo e flambagem linear de pórticos e treliças (feature 008c) |
 
-Fora da 1.0: não linearidade (geométrica, material, contato), flambagem,
+Fora da 1.0: não linearidade geométrica geral (grandes deslocamentos),
+flambagem de cascas e sólidos, não linearidade de material, contato,
 acoplamento termomecânico, fadiga.
 
 ### 3.2 Biblioteca de elementos
@@ -142,7 +144,8 @@ Notação: **QUANDO** <gatilho>, **O sistema DEVE** <resposta>.
 - **REQ-G-14** QUANDO o usuário solicitar a análise de um modelo incompleto ou
   singular, O sistema DEVE recusar a execução indicando o que falta.
 - **REQ-G-15** O sistema DEVE executar análises estática linear, térmica
-  (estacionária e transiente), modal e dinâmica linear.
+  (estacionária e transiente), modal e dinâmica linear e, para barras,
+  estática de segunda ordem e flambagem linear (alterado em 2026-11-17, 008c).
 - **REQ-G-16** O sistema DEVE reproduzir soluções analíticas e benchmarks de
   referência (NAFEMS e equivalentes) dentro das tolerâncias definidas em cada feature.
 

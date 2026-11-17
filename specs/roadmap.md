@@ -29,7 +29,7 @@ cargas, resolver e ver diagramas de esforços.
 | 007 | truss-elements | Treliça 2D/3D, verificação analítica; `Material`, seção e `Model` em `core` | 006 | concluída |
 | 008 | beam-elements | Viga reta Euler-Bernoulli e Timoshenko 2D/3D; seções simétricas e assimétricas; orientação; liberações, molas de ligação e excentricidades; base elástica; cargas no vão; tensões na seção | 007 | concluída |
 | 008b | beam-warping-curved | Viga curva `Line3` com curvatura em qualquer direção; seções de paredes finas e poligonal com propriedades numéricas (o empenamento foi adiado para a 008d) | 008 | concluída |
-| 008c | beam-second-order | Análise P-Δ iterativa com rigidez geométrica | 008 | planejada |
+| 008c | beam-second-order | Estática de segunda ordem (P-Δ e P-δ exato na barra, iterativa) e flambagem linear de treliças e vigas retas e curvas | 008b | requisitos |
 | 009 | line-meshing | Divisão de linhas em elementos, nós coincidentes fundidos | 005, 003 | planejada |
 | 010 | model-setup-ui | Árvore do modelo, propriedades, materiais, seções, apoios, cargas nodais e distribuídas, undo/redo | 004, 005, 008 | planejada |
 | 011 | analysis-runner | Execução assíncrona, progresso, cancelamento, validação do modelo | 008, 010 | planejada |
@@ -91,7 +91,7 @@ cargas, resolver e ver diagramas de esforços.
 
 | Nº | Feature | Entrega | Depende de | Status |
 |----|---------|---------|------------|--------|
-| 008d | beam-warping | Torção com empenamento (7º GDL, Vlasov) em vigas retas e curvas: condições por ponta, bimomento, tensões de empenamento; parte do núcleo já existe da 008b (Iw, ω e o motor exato) | 008b | planejada |
+| 008d | beam-warping | Torção com empenamento (7º GDL, Vlasov) em vigas retas e curvas: condições por ponta, bimomento, tensões de empenamento; parte do núcleo já existe da 008b (Iw, ω e o motor exato). Também a flexo-torção (instabilidade lateral com torção) e o termo de Wagner na segunda ordem e na flambagem, vindos da 008c | 008b, 008c | planejada |
 
 ## v0.9 — Placas e cascas
 
@@ -108,12 +108,25 @@ cargas, resolver e ver diagramas de esforços.
 | 038 | performance | Metas REQ-G-20 a REQ-G-22: perfis, paralelismo, solver externo opcional | 025, 037 | planejada |
 | 039 | packaging | Instaladores por plataforma (windeployqt, macdeployqt, AppImage) | 014 | planejada |
 
+## Pendências de features anteriores
+
+Itens deixados fora de uma feature por decisão do mantenedor, a incluir nas
+tarefas da feature indicada (ou de uma nova) quando ela for especificada.
+
+| Origem | Item | Destino sugerido |
+|--------|------|------------------|
+| 008c | Grandes deslocamentos e rotações de barras (corrotacional), pós-flambagem e controle por comprimento de arco | Pós-1.0 (não linearidade geométrica) |
+| 008c | Cargas que acompanham a deformação (pressão hidrostática) | Pós-1.0 (não linearidade geométrica) |
+| 008c | Imperfeições iniciais: curvatura inicial, cargas nocionais e imperfeição pelo modo de flambagem | 010 ou feature própria após a 008c |
+| 008c | Combinações de casos de carga (a segunda ordem não superpõe) | 010 / 011 |
+| 008c | Flambagem da própria barra de treliça entre os nós (hoje: modelar como viga) | 010 (aviso ou opção na atribuição) |
+
 ## Pós-1.0 (ideias, sem ordem)
 
 - Importação de DWG
 - Blocos, hachuras e cotas avançadas no módulo de desenho
 - Não linearidade geométrica e de material, contato
-- Flambagem linear
+- Flambagem de cascas e sólidos
 - Acoplamento termomecânico
 - Cortes, isosuperfícies
 - Solver em GPU
