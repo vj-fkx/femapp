@@ -28,6 +28,7 @@ femapp_add_test(core SOURCES
     test_beam_loads.cpp
     test_beam_second_order.cpp
     test_beam_state.cpp
+    test_buckling.cpp
     test_beam_validation.cpp
     test_beam_exact.cpp
     test_beam_verification.cpp

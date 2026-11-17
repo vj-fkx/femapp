@@ -4,6 +4,11 @@
 #include <fem/core/model.hpp>
 #include <fem/core/static_analysis.hpp>
 
+#include <Eigen/Core>
+#include <optional>
+#include <string>
+#include <vector>
+
 namespace fem::core {
 
 // REQ-008c-05, 13: the options of the second-order analysis.
@@ -31,5 +36,39 @@ struct SecondOrderResult
 // or no convergence within the iterations.
 [[nodiscard]] Expected<SecondOrderResult>
 runSecondOrderStatic(const Model& model, const SecondOrderOptions& options = {});
+
+// REQ-008c-09, 13: the options of the linear buckling analysis.
+struct BucklingOptions
+{
+    StaticOptions base;
+    int count = 1;            // the factors wanted
+    double tolerance = 1e-10; // relative, on the factors
+};
+
+// REQ-008c-09, 11: a buckling factor and its mode: the load case times
+// `factor` makes the structure unstable. The mode is normalized with its
+// largest nodal translation 1 (its largest rotation without translations);
+// the beams give its shape along each bar by at(x).displacement.
+struct BucklingMode
+{
+    double factor = 0.0;
+    std::vector<Eigen::Vector3d> displacements; // per node
+    std::vector<Eigen::Vector3d> rotations;
+    std::vector<std::optional<BeamResult>> beams;
+};
+
+struct BucklingResult
+{
+    std::vector<BucklingMode> modes; // increasing factors
+    std::string note;                // REQ-008c-12: fewer factors than asked, and why
+};
+
+// REQ-008c-09 to 12 (design 008c §5.6, ADR 0007): the smallest positive
+// load factors of the model's load case (all of its actions) at which its
+// trusses and beams buckle, exact in the bars, with their modes. The axial
+// forces come from the linear analysis. Fails with the issues of
+// validate(), a mechanism, or when no bar is compressed.
+[[nodiscard]] Expected<BucklingResult> runLinearBuckling(const Model& model,
+                                                         const BucklingOptions& options = {});
 
 } // namespace fem::core

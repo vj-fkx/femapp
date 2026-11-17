@@ -68,10 +68,14 @@ public:
     [[nodiscard]] Expected<void> checkDiagonal(const SparseMatrix& matrix) const;
     // "the node 12 in v" for an equation of the system.
     [[nodiscard]] std::string equationLabel(std::int32_t equation) const;
-    // The values of all dofs from those of the free ones.
-    [[nodiscard]] Eigen::VectorXd valuesOf(const Eigen::VectorXd& free) const;
-    // Displacements, reactions and the forces of every bar.
-    [[nodiscard]] Expected<StaticResult> recover(const Eigen::VectorXd& values) const;
+    // The values of all dofs from those of the free ones; the prescribed
+    // ones at their values, or at zero (a buckling mode).
+    [[nodiscard]] Eigen::VectorXd valuesOf(const Eigen::VectorXd& free,
+                                           bool prescribed = true) const;
+    // Displacements, reactions and the forces of every bar; without
+    // `loaded`, without the loads (the shape of a buckling mode).
+    [[nodiscard]] Expected<StaticResult> recover(const Eigen::VectorXd& values,
+                                                 bool loaded = true) const;
 
     // Feature 008c: the sum of the negative pivots of the elements in the
     // last assembly, and the element with the most (-1 if none).

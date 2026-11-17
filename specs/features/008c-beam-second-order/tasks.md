@@ -118,12 +118,12 @@ Regras:
 
 ## Fase 5 — Flambagem
 
-- [ ] **T18** Testes de flambagem de barras (devem falhar, AC-4): Euler nos
+- [x] **T18** Testes de flambagem de barras (devem falhar, AC-4): Euler nos
   quatro casos em 2D e 3D, Euler-Bernoulli e Engesser, mola rotacional,
   liberação, Hetényi com o número de semiondas, modos normalizados, forma
   senoidal ao longo da barra — arquivo: `test_buckling.cpp` — cobre: 09,
   10, 11
-- [ ] **T19** `runLinearBuckling` (design §5.6, ADR 0007): contagem J(λ),
+- [x] **T19** `runLinearBuckling` (design §5.6, ADR 0007): contagem J(λ),
   estimativas por subespaço com a fatoração linear, fatoração em σ₁,
   iteração inversa residual com produtos K(λ)x elemento a elemento,
   garantia pela contagem com bissecção, fatores repetidos, modos e
@@ -278,3 +278,23 @@ Regras:
   7,7e−6 na carga no topo; 3,6e−3, 2,3e−4, 1,4e−5 na distribuída).
   Tolerâncias documentadas das vigas curvas na segunda ordem: 1e−6 para o
   arco, taxa ≥ 3,5 para a isoparamétrica.
+
+**Fase 5 — Flambagem (T18 a T22):**
+
+- T18/T19: Euler nos quatro casos com um elemento, os três primeiros
+  fatores do pilar biarticulado (1, 4, 9 vezes), Engesser, o pilar 3D (o
+  fraco e depois um fator duplo, 4π²EIy = π²EIz), mola na base (u tan u =
+  kl/EI), liberação no topo (engastado-rotulado) e Hetényi com duas
+  semiondas, todos em 1e−8; o modo do pilar biarticulado (normalizado pela
+  rotação, senoide de amplitude L/π ao longo da barra) e o do balanço
+  (1 − cos) em 1e−8.
+- Desvios do design §5.6, achados nos testes: (1) quando a barra flamba
+  com os nós parados (o pilar biengastado ou com liberação de um só
+  elemento), K(λ) global nunca fica singular: o fator só aparece na
+  contagem de Wittrick-Williams. Os fatores que os vetores não acham são
+  então localizados por bissecção na contagem (até 1e−13) e, sem vetor
+  nodal, o modo fica com os nós parados e uma `note` diz que a forma ao
+  longo da barra não é dada (ver a questão levada ao mantenedor). No caso
+  comum (modos com deslocamento dos nós) continua uma só contagem final.
+  (2) Os produtos K(λ)x montam K(λ) (cerca de 0,1 s no benchmark), em vez
+  de um caminho elemento a elemento.

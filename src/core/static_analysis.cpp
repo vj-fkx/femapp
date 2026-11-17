@@ -405,12 +405,16 @@ std::string StaticProblem::equationLabel(std::int32_t equation) const
     return dofLabel(mesh(), m_dofs, m_dofOfEquation[static_cast<std::size_t>(equation)]);
 }
 
-Eigen::VectorXd StaticProblem::valuesOf(const Eigen::VectorXd& free) const
+Eigen::VectorXd StaticProblem::valuesOf(const Eigen::VectorXd& free, bool prescribed) const
 {
     Eigen::VectorXd values(m_dofs.size());
     for (DofIndex d = 0; d < m_dofs.size(); ++d) {
         const std::int32_t eq = m_dofs.equation(d);
-        values[d] = eq < 0 ? m_dofs.prescribedValue(d) : free[eq];
+        if (eq >= 0) {
+            values[d] = free[eq];
+        } else {
+            values[d] = prescribed ? m_dofs.prescribedValue(d) : 0.0;
+        }
     }
     return values;
 }
@@ -565,8 +569,10 @@ void StaticProblem::setAxialForces(const std::vector<AxialProfile>& profiles)
     }
 }
 
-Expected<StaticResult> StaticProblem::recover(const Eigen::VectorXd& values) const
+Expected<StaticResult> StaticProblem::recover(const Eigen::VectorXd& values, bool loaded) const
 {
+    const SpanLoads none;
+    const std::vector<NodalLoad> noNodalLoads;
     const Model& model = m_model;
     const Mesh& mesh = this->mesh();
     const DofMap& dofs = m_dofs;
@@ -574,7 +580,8 @@ Expected<StaticResult> StaticProblem::recover(const Eigen::VectorXd& values) con
     const Beams& beams = m_beams;
     const std::vector<BarData>& bars = m_bars;
     const std::vector<ElementKind>& kindOf = m_kindOf;
-    auto forces = reactions(mesh, dofs, m_sets, m_loads, values, m_options.threads);
+    auto forces =
+        reactions(mesh, dofs, m_sets, loaded ? m_loads : noNodalLoads, values, m_options.threads);
     if (!forces) {
         return tl::unexpected(forces.error());
     }
@@ -631,7 +638,11 @@ Expected<StaticResult> StaticProblem::recover(const Eigen::VectorXd& values) con
             data.axes = beams.data[e].axes;
             data.beam = beams.data[e];
             data.planar = kindOf[e] == ElementKind::Beam2D;
-            data.iso = std::make_shared<const IsoBeamData>(beams.iso[e]);
+            IsoBeamData iso = beams.iso[e];
+            if (!loaded) {
+                iso.loads = {};
+            }
+            data.iso = std::make_shared<const IsoBeamData>(std::move(iso));
             data.isoNodes = elementNodes;
             data.isoValues = std::move(nodeValues);
             const BeamResult probe(data);
@@ -663,12 +674,12 @@ Expected<StaticResult> StaticProblem::recover(const Eigen::VectorXd& values) con
             data.length = exactLength(beams.data[e], x1, x2);
             data.axes = beams.data[e].axes;
             data.beam = beams.data[e];
-            data.loads = beams.loads[e];
+            data.loads = loaded ? beams.loads[e] : none;
             data.exact = true;
             data.planar = kindOf[e] == ElementKind::Beam2D;
             StateBarVector endLoads;
-            data.ends = exactBeamEnds(beams.data[e], kindOf[e], beams.loads[e], x1, x2, nodeValues,
-                                      &endLoads);
+            data.ends =
+                exactBeamEnds(beams.data[e], kindOf[e], data.loads, x1, x2, nodeValues, &endLoads);
             exactEndForces(beams.data[e], data.planar, endLoads, data.start, data.end);
             const double n = data.start.n;
             result.beams[e].emplace(std::move(data));
