@@ -222,7 +222,7 @@ int cost(const fem::core::Model& model, double linear)
     const double sequential = secondsSince(start);
 
     TimedIndefinite solver;
-    double rounds[2] = {0.0, 0.0};
+    std::array<double, 2> rounds = {0.0, 0.0};
     for (double& round : rounds) {
         start = Clock::now();
         const auto solution = fem::core::solveLinear(mesh, dofs, sets, nodal, solver);

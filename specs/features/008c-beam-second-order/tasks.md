@@ -59,7 +59,7 @@ Regras:
   aumentada das cargas e as forças fixas no espaço) até passar com erro
   ≤ 1e−8; calibrar as subdivisões e registrar nas notas — arquivos:
   `beam_state.hpp/.cpp`, `test_beam_second_order.cpp` — cobre: 02, N01
-- [ ] **T08** Pivôs negativos das junções (design §5.4): testes de barra
+- [x] **T08** Pivôs negativos das junções (design §5.4): testes de barra
   biengastada subdividida com N entre as suas cargas críticas (4π²EI/L²,
   8,18π²EI/L², …) dando a contagem certa; implementar a inércia das junções
   em `stateBarMatrices` (`negativePivots`) — arquivos: `beam_state.cpp`,

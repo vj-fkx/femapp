@@ -44,8 +44,8 @@ double AxialProfile::at(double s, double length) const
     const double h = length / n;
     const int part = std::clamp(static_cast<int>(std::floor(s / h)), 0, n - 1);
     const double xi = s / h - part;
-    const double low = values.at(static_cast<std::size_t>(2 * part));
-    const double high = values.at(static_cast<std::size_t>(2 * part + 1));
+    const double low = values.at(2 * static_cast<std::size_t>(part));
+    const double high = values.at(2 * static_cast<std::size_t>(part) + 1);
     return low + (high - low) * (xi - kGaussLow) / (kGaussHigh - kGaussLow);
 }
 
@@ -56,8 +56,8 @@ double AxialProfile::largestCompression() const
         smallest = values[0];
     }
     for (int part = 0; count > 1 && part < parts(); ++part) {
-        const double low = values.at(static_cast<std::size_t>(2 * part));
-        const double high = values.at(static_cast<std::size_t>(2 * part + 1));
+        const double low = values.at(2 * static_cast<std::size_t>(part));
+        const double high = values.at(2 * static_cast<std::size_t>(part) + 1);
         const double slope = (high - low) / (kGaussHigh - kGaussLow);
         smallest = std::min({smallest, low - slope * kGaussLow, low + slope * (1.0 - kGaussLow)});
     }

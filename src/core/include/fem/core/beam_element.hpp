@@ -5,6 +5,7 @@
 
 #include <Eigen/Core>
 #include <array>
+#include <cstddef>
 #include <limits>
 #include <optional>
 #include <span>
@@ -45,7 +46,7 @@ inline constexpr int kMaxAxialParts = 32;
 struct AxialProfile
 {
     int count = 0;
-    std::array<double, 2 * kMaxAxialParts> values{};
+    std::array<double, std::size_t{2} * kMaxAxialParts> values{};
 
     [[nodiscard]] static AxialProfile constant(double n);
     // The two Gauss points of part `part` of `parts` equal parts of

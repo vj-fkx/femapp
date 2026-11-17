@@ -558,8 +558,8 @@ int partCount(const BeamData& beam, double length)
         const double h = length / profile;
         int pieces = 1;
         for (int part = 0; part < profile; ++part) {
-            const double low = beam.axialForce.values.at(static_cast<std::size_t>(2 * part));
-            const double high = beam.axialForce.values.at(static_cast<std::size_t>(2 * part + 1));
+            const double low = beam.axialForce.values.at(2 * static_cast<std::size_t>(part));
+            const double high = beam.axialForce.values.at(2 * static_cast<std::size_t>(part) + 1);
             const double change = std::abs(high - low) / (kGaussHigh - kGaussLow) * h * h / ei;
             pieces =
                 std::max(pieces, static_cast<int>(std::ceil(std::cbrt(change / kVaryingChange))));

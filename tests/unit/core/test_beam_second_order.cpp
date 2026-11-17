@@ -51,8 +51,8 @@ TEST_CASE("the axial force profile", "[core][beam][second-order]")
             const auto points = AxialProfile::gaussPoints(part, 3, length);
             CHECK(points[0] > part * length / 3);
             CHECK(points[1] < (part + 1) * length / 3);
-            profile.values.at(static_cast<std::size_t>(2 * part)) = n(points[0]);
-            profile.values.at(static_cast<std::size_t>(2 * part + 1)) = n(points[1]);
+            profile.values.at(2 * static_cast<std::size_t>(part)) = n(points[0]);
+            profile.values.at(2 * static_cast<std::size_t>(part) + 1) = n(points[1]);
         }
         CHECK(profile.parts() == 3);
         for (const double s : {0.0, 0.4, 1.33, 2.0, 3.1, length}) {
@@ -93,11 +93,13 @@ struct Stability
 Stability stability(double u, bool compression)
 {
     if (compression) {
-        return {u * (std::sin(u) - u * std::cos(u)) / (2.0 - 2.0 * std::cos(u) - u * std::sin(u)),
-                (u - std::sin(u)) / (std::sin(u) - u * std::cos(u))};
+        return {.s = u * (std::sin(u) - u * std::cos(u)) /
+                     (2.0 - 2.0 * std::cos(u) - u * std::sin(u)),
+                .c = (u - std::sin(u)) / (std::sin(u) - u * std::cos(u))};
     }
-    return {u * (u * std::cosh(u) - std::sinh(u)) / (2.0 - 2.0 * std::cosh(u) + u * std::sinh(u)),
-            (std::sinh(u) - u) / (u * std::cosh(u) - std::sinh(u))};
+    return {.s = u * (u * std::cosh(u) - std::sinh(u)) /
+                 (2.0 - 2.0 * std::cosh(u) + u * std::sinh(u)),
+            .c = (std::sinh(u) - u) / (u * std::cosh(u) - std::sinh(u))};
 }
 
 // The tip deflection of a cantilever of length l under a lateral force h
@@ -345,8 +347,8 @@ fem::core::AxialProfile sampled(const F& n, int parts, double length)
     profile.count = 2 * parts;
     for (int part = 0; part < parts; ++part) {
         const auto points = fem::core::AxialProfile::gaussPoints(part, parts, length);
-        profile.values.at(static_cast<std::size_t>(2 * part)) = n(points[0]);
-        profile.values.at(static_cast<std::size_t>(2 * part + 1)) = n(points[1]);
+        profile.values.at(2 * static_cast<std::size_t>(part)) = n(points[0]);
+        profile.values.at(2 * static_cast<std::size_t>(part) + 1) = n(points[1]);
     }
     return profile;
 }
@@ -426,5 +428,39 @@ TEST_CASE("an axial force that varies along the bar", "[core][beam][second-order
         }
         INFO("Greenhill " << reference << ", engine " << low);
         CHECK(std::abs(low - reference) <= 1e-8 * reference);
+    }
+}
+
+// REQ-008c-08, 10: the junctions of the parts count the buckling loads of
+// the bar with both ends clamped below N (design 008c §5.4).
+TEST_CASE("the negative pivots of the parts", "[core][beam][second-order]")
+{
+    const double l = 6.0;
+    const double ei = 2e6;
+    // Clamped-clamped: 4 pi^2, 80.763 (tan(u/2) = u/2), 16 pi^2 times EI/l^2.
+    const double pi = std::numbers::pi;
+    const double first = 4.0 * pi * pi;
+    const double second = 80.763;
+    const double third = 16.0 * pi * pi;
+    const auto count = [&](double factor, bool planar) {
+        return fem::core::stateBarMatrices(bar(-factor * ei / (l * l)), l, {}, planar)
+            .negativePivots;
+    };
+    SECTION("in the plane")
+    {
+        CHECK(count(0.5 * first, true) == 0);
+        CHECK(count(0.99 * first, true) == 0);
+        CHECK(count(1.01 * first, true) == 1);
+        CHECK(count(0.99 * second, true) == 1);
+        CHECK(count(1.01 * second, true) == 2);
+        CHECK(count(1.01 * third, true) == 3);
+        CHECK(fem::core::stateBarMatrices(bar(5e6), l, {}, true).negativePivots == 0);
+    }
+    SECTION("in space: both planes (EIy = 1.5e6 buckles first)")
+    {
+        // About y the factors are times 1.5e6 / 2e6.
+        CHECK(count(0.99 * 0.75 * first, false) == 0);
+        CHECK(count(1.01 * 0.75 * first, false) == 1);
+        CHECK(count(1.01 * first, false) == 2);
     }
 }
