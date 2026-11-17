@@ -102,6 +102,13 @@ Conceitos principais:
   (retângulo, círculo, tubos circular e retangular, perfis I, U, T e
   cantoneira); `sectionProperties` devolve tudo nos eixos principais, e
   `stressPoints` dá os pontos característicos para as tensões.
+  *Ampliado na 008b:* Iw e coordenada setorial ω das formas; seção de paredes
+  finas pela linha média (`ThinWalled`: grafo, Bredt com várias células,
+  setorial, centro de Trefftz, áreas pelo fluxo) e polígono maciço com furos
+  (`SolidPolygon`), triangulado em `core` (`detail/section_mesh.hpp`, ADR
+  0005) e resolvido em T6 (empenamento de Saint-Venant, funções de
+  cisalhamento); `solveSection` resolve uma vez e guarda os campos
+  (`SectionSolution`), usados por `stressAt` e `largestVonMises`.
 - **`Model`** — malha + materiais + seções + atribuições + condições de contorno
   + cargas. É o documento editado pela UI.
   *Feito na 007:* agregado de valor (`model.hpp`) com a malha em
@@ -115,6 +122,9 @@ Conceitos principais:
   excentricidades rígidas, base elástica, cargas distribuídas (inteiras ou
   parciais, uniformes ou trapezoidais), cargas concentradas no vão e
   gradiente de temperatura.
+  *Ampliado na 008b:* vigas curvas em `Line3`, com a formulação na atribuição
+  (`CurvedFormulation`: arco ou isoparamétrica) e torque distribuído nas
+  cargas.
 - **Análise estática** (`static_analysis.hpp`, feita na 007) — `validate`
   lista todos os problemas do modelo; `runLinearStatic` monta, verifica a
   diagonal (nó sem rigidez numa direção), fatora (equação singular →
@@ -131,6 +141,15 @@ Conceitos principais:
   nodais equivalentes. O `StaticResult` traz rotações, momentos de reação e
   um `BeamResult` por viga (`beam_result.hpp`), com os esforços nas pontas,
   `at(x)` exato ao longo da barra e `sectionStresses`.
+  *Ampliada na 008b:* um motor exato de viga por espaço de estados
+  (`beam_state.hpp`: exponencial de matriz do Eigen, ADR 0006; partes
+  condensadas para não perder precisão; base elástica exata; cargas fixas no
+  espaço sobre arcos; `stateAt` em qualquer ponto) e duas formulações novas:
+  `ExactBeamElement` (arco de circunferência pelos três nós, nó do meio sem
+  GDL) e `IsoBeamElement` (`beam_iso.hpp`: quadrática com integração reduzida
+  seletiva, nó do meio com GDL). Cada seção é resolvida uma vez por modelo.
+  O empenamento (Vlasov) existe no motor e no elemento exato, sem acesso pelo
+  `Model`: fica para a 008d.
 - **`DofMap`** — GDL **variáveis por nó** (u, v, w, θx, θy, θz, T), definidos
   pelos elementos conectados; trata restrições e a compatibilização entre barras,
   cascas e sólidos (REQ-G-13). *Feito na 006:* máscara por nó vinda das

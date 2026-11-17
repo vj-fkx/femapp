@@ -170,7 +170,7 @@ Regras:
 
 ## Fase 8 — Documentação
 
-- [ ] **T36** `specs/architecture.md` §3: seções novas, motor exato,
+- [x] **T36** `specs/architecture.md` §3: seções novas, motor exato,
   formulações de viga, empenamento; notas de implementação em `tasks.md`
   — cobre: 24
 
