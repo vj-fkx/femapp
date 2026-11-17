@@ -148,12 +148,12 @@ Regras:
 
 ## Fase 6 — Viga curva isoparamétrica
 
-- [ ] **T30** Testes e implementação de `IsoBeamElement` (§5.5): campos
+- [x] **T30** Testes e implementação de `IsoBeamElement` (§5.5): campos
   quadráticos, deformações generalizadas, integração seletiva, penalidades
   de Euler-Bernoulli e de Vlasov, cargas consistentes, jacobiano recusado;
   patch test reto (1e−10); sem alocação — arquivos: `beam_element.hpp/.cpp`,
   testes — cobre: 14, 16
-- [ ] **T31** `BeamResult` da isoparamétrica e a análise com `Line3`
+- [x] **T31** `BeamResult` da isoparamétrica e a análise com `Line3`
   isoparamétrico (nó do meio com GDL, apoio e carga) — cobre: 14, 19
 - [ ] **T32** Convergência (AC-6): os casos do arco com n = 2, 4, 8, 16
   elementos (taxa 4 ± 0,5, registrada nas notas); L/h = 1000 sem travamento;

@@ -1,5 +1,6 @@
 #include "detail/section_detail.hpp"
 
+#include <fem/core/beam_iso.hpp>
 #include <fem/core/beam_result.hpp>
 #include <fem/core/beam_state.hpp>
 
@@ -122,6 +123,10 @@ BeamPoint BeamResult::at(double x, Side side) const
 {
     if (m_data.exact) {
         return exactPoint(m_data, x, side);
+    }
+    if (m_data.iso) {
+        return isoBeamAt(*m_data.iso, m_data.planar ? ElementKind::Beam2D : ElementKind::Beam3D,
+                         m_data.isoNodes, m_data.isoValues, x);
     }
     const BeamData& beam = m_data.beam;
     const SpanLoads& loads = m_data.loads;

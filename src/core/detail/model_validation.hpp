@@ -13,6 +13,7 @@
 #include <array>
 #include <cstddef>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -67,6 +68,10 @@ struct BeamSetup
     BeamData data;
     SpanFrame frame;
     double length = 0.0;
+    // REQ-008b-14: an isoparametric curved beam, with the rule of its axes.
+    bool isoparametric = false;
+    std::optional<Eigen::Vector3d> reference;
+    double roll = 0.0; // of the assignment plus the principal angle
 };
 
 // For an element whose assignment, material and section are valid; fails

@@ -1,5 +1,6 @@
 #include "detail/model_validation.hpp"
 
+#include <fem/core/beam_iso.hpp>
 #include <fem/core/beam_state.hpp>
 #include <fem/core/element_type.hpp>
 #include <fem/core/mesh.hpp>
@@ -381,11 +382,6 @@ private:
                           : ", not a 2-node line, and cannot be a truss bar."));
                 continue;
             }
-            if (curved && assignment->curved == CurvedFormulation::Isoparametric) {
-                add("The " + elementName(element) +
-                    ": the isoparametric curved beam is not available yet.");
-                continue;
-            }
             const auto nodes = m_mesh.elementNodes(element);
             const Eigen::Vector3d a = m_mesh.nodeCoordinates(nodes[0]);
             const Eigen::Vector3d b = m_mesh.nodeCoordinates(nodes[1]);
@@ -416,7 +412,8 @@ private:
                 checkBeam(element, (b - a).norm());
             }
             // The middle node of an arc has no dofs (design 008b §5.2).
-            for (std::size_t k = 0; k < (curved ? 2U : nodes.size()); ++k) {
+            const bool arc = curved && assignment->curved == CurvedFormulation::Arc;
+            for (std::size_t k = 0; k < (arc ? 2U : nodes.size()); ++k) {
                 m_tables.nodeDofs[static_cast<std::size_t>(nodes[k])] |= dofsOf(kind);
             }
         }
@@ -438,9 +435,29 @@ private:
             return;
         }
         const ElementKind kind = assignmentOf(element)->kind;
-        const bool stable = setup->data.arcLength > 0.0
-                                ? hasStableExactConnections(setup->data, kind, setup->length)
-                                : hasStableConnections(setup->data, setup->length, kind);
+        bool stable = true;
+        if (setup->isoparametric) {
+            const IsoBeamData iso{.beam = setup->data,
+                                  .reference = setup->reference,
+                                  .roll = setup->roll,
+                                  .loads = {}};
+            ElementNodes nodes;
+            nodes.type = ElementType::Line3;
+            nodes.count = 3;
+            const auto ids = m_mesh.elementNodes(element);
+            for (std::size_t k = 0; k < 3; ++k) {
+                nodes.x.at(k) = m_mesh.nodeCoordinates(ids[k]);
+            }
+            if (auto valid = isoCheck(iso, kind, nodes); !valid) {
+                add("The " + elementName(element) + ": " + valid.error().message);
+                return;
+            }
+            stable = hasStableIsoConnections(iso, kind, nodes);
+        } else if (setup->data.arcLength > 0.0) {
+            stable = hasStableExactConnections(setup->data, kind, setup->length);
+        } else {
+            stable = hasStableConnections(setup->data, setup->length, kind);
+        }
         if (!stable) {
             add("The " + elementName(element) +
                 " is unstable on its own: its end releases let it move without strain.");
@@ -717,7 +734,16 @@ Expected<BeamSetup> beamSetup(const Model& model, ElementIndex element,
     // REQ-008b-13: an arc through the ends of the flexible length and the
     // middle node (design 008b §5.2).
     std::optional<Arc> arc;
-    if (mesh.elementType(element) == ElementType::Line3) {
+    const bool line3 = mesh.elementType(element) == ElementType::Line3;
+    Eigen::Vector3d towards = q;
+    if (line3 && assignment.curved == CurvedFormulation::Isoparametric) {
+        // REQ-008b-14: the quadratic curve through the ends and the middle
+        // node; its tangent at the start gives the axes there (for the loads).
+        const Eigen::Vector3d m = mesh.nodeCoordinates(nodes[2]);
+        setup.isoparametric = true;
+        setup.length = isoLength({p, q, m});
+        towards = p + (-1.5 * p - 0.5 * q + 2.0 * m);
+    } else if (line3) {
         auto through = arcThrough(p, mesh.nodeCoordinates(nodes[2]), q);
         if (!through) {
             return tl::unexpected(through.error());
@@ -727,7 +753,9 @@ Expected<BeamSetup> beamSetup(const Model& model, ElementIndex element,
     }
     // The principal axes: the local ones turned by the principal angle.
     const double angle = assignment.kind == ElementKind::Beam2D ? 0.0 : section.principalAngle;
-    const Eigen::Vector3d towards = arc ? Eigen::Vector3d(p + arc->startTangent) : q;
+    if (arc) {
+        towards = p + arc->startTangent;
+    }
     const auto axes =
         beamAxes(p, towards, assignment.reference, assignment.rollAngle + angle, assignment.kind);
     if (!axes) {
@@ -769,6 +797,8 @@ Expected<BeamSetup> beamSetup(const Model& model, ElementIndex element,
     }
     setup.frame.principalAxes = beam.axes;
     setup.frame.curvature = beam.curvature;
+    setup.reference = assignment.reference;
+    setup.roll = assignment.rollAngle + angle;
     setup.frame.principalAngle = angle;
     setup.frame.shearCentre = section.shearCentre;
     return setup;

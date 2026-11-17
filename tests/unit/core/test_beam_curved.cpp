@@ -4,6 +4,7 @@
 #include "beam_models.hpp"
 
 #include <fem/core/beam_element.hpp>
+#include <fem/core/beam_iso.hpp>
 #include <fem/core/mesh_builder.hpp>
 
 #include <catch2/catch_test_macros.hpp>
@@ -764,4 +765,194 @@ TEST_CASE("elastic foundation on the exact element", "[core][beam][curved][verif
     model.nodalForces.push_back({.nodes = fem::core::NodeIds{{2}}, .force = Vec(0.0, -p, 0.0)});
     const fem::core::StaticResult result = fem::core::test::solve(model);
     CHECK(fem::core::test::near(result.displacements[1].y(), -p * beta / (2 * k), 1e-8));
+}
+
+namespace {
+
+fem::core::IsoBeamData isoData()
+{
+    using namespace fem::core::test;
+    fem::core::IsoBeamData data;
+    data.beam.axial = kE * kArea;
+    data.beam.torsional = kG * kJ;
+    data.beam.bendingY = kE * kIy;
+    data.beam.bendingZ = kE * kIz;
+    data.beam.shearY = data.beam.shearZ = kG * kShearArea;
+    data.beam.shearCentre = Eigen::Vector2d(0.01, -0.02);
+    return data;
+}
+
+struct IsoComputed
+{
+    Eigen::MatrixXd k;
+    Eigen::VectorXd f;
+    bool ok = false;
+};
+
+IsoComputed isoCompute(const fem::core::IsoBeamData& data, const Vec& a, const Vec& b,
+                       const Vec& middle)
+{
+    const std::vector<fem::core::IsoBeamData> beams = {data};
+    const fem::core::IsoBeamElement element(fem::core::ElementKind::Beam3D, beams);
+    fem::core::ElementNodes nodes;
+    nodes.type = fem::core::ElementType::Line3;
+    nodes.count = 3;
+    nodes.x[0] = a;
+    nodes.x[1] = b;
+    nodes.x[2] = middle;
+    IsoComputed out{.k = Eigen::MatrixXd::Zero(18, 18), .f = Eigen::VectorXd::Zero(18)};
+    out.ok = element.compute(nodes, 0, out.k, out.f).has_value();
+    return out;
+}
+
+} // namespace
+
+// REQ-008b-14: the isoparametric element: rigid modes of a curved one,
+// the patch test of a straight one, and a folded curve refused.
+TEST_CASE("the isoparametric beam element", "[core][beam][curved][iso]")
+{
+    const fem::core::IsoBeamData data = isoData();
+
+    SECTION("six rigid modes on a curve")
+    {
+        const Vec a(2.0, 0.0, 0.0);
+        const Vec b(0.0, 2.0, 0.5);
+        const Vec m(1.5, 1.3, 0.1);
+        const IsoComputed e = isoCompute(data, a, b, m);
+        REQUIRE(e.ok);
+        CHECK((e.k - e.k.transpose()).norm() <= 1e-12 * e.k.norm());
+        const std::array<Vec, 3> points = {a, b, m};
+        for (int mode = 0; mode < 6; ++mode) {
+            Vec t = Vec::Zero();
+            Vec phi = Vec::Zero();
+            (mode < 3 ? t : phi)(mode % 3) = 1.0;
+            Eigen::VectorXd d(18);
+            for (std::size_t i = 0; i < 3; ++i) {
+                d.segment<3>(6 * static_cast<Eigen::Index>(i)) = t + phi.cross(points.at(i));
+                d.segment<3>(6 * static_cast<Eigen::Index>(i) + 3) = phi;
+            }
+            CHECK((e.k * d).norm() <= 1e-9 * e.k.norm());
+        }
+    }
+    SECTION("patch test: a straight cantilever under end moments, normal force and torque")
+    {
+        using namespace fem::core::test;
+        const double length = 3.0;
+        const IsoComputed e =
+            isoCompute(data, Vec::Zero(), Vec(length, 0, 0), Vec(length / 2, 0, 0));
+        REQUIRE(e.ok);
+        // Free dofs: the end node (6 to 11) and the middle node (12 to 17).
+        const Eigen::MatrixXd k = e.k.bottomRightCorner(12, 12);
+        Eigen::VectorXd f = Eigen::VectorXd::Zero(12);
+        const double n = 1e5;
+        const double t = 2e3;
+        const double my = 3e3;
+        const double mz = -4e3;
+        f.head<6>() << n, 0.0, 0.0, t, my, mz;
+        const Eigen::VectorXd d = k.ldlt().solve(f);
+        // Along X with the default reference, the local y is the global Z
+        // and the local z is -Y: a moment about Z bends with EIy, about Y
+        // with EIz; the twist moves the centroid by ey rx along Y.
+        const double ey = data.beam.shearCentre.x();
+        CHECK(std::abs(d(0) - n * length / (kE * kArea)) <= 1e-10 * std::abs(d(0)));
+        CHECK(std::abs(d(3) - t * length / (kG * kJ)) <= 1e-10 * std::abs(d(3)));
+        CHECK(std::abs(d(5) - mz * length / (kE * kIy)) <= 1e-10 * std::abs(d(5)));
+        CHECK(std::abs(d(4) - my * length / (kE * kIz)) <= 1e-10 * std::abs(d(4)));
+        CHECK(std::abs(d(1) - (mz * length * length / (2 * kE * kIy) + ey * d(3))) <=
+              1e-10 * std::abs(d(1)));
+    }
+    SECTION("a curve that folds on itself is refused")
+    {
+        CHECK_FALSE(isoCompute(data, Vec::Zero(), Vec(1, 0, 0), Vec(0.9, 0, 0)).ok);
+    }
+}
+
+namespace {
+
+// Line3 isoparametric beams through the given end points, the middle nodes
+// given too (ids: ends 1, 2, ...; middles 1001, ...). Steel, the generic
+// section, Timoshenko.
+fem::core::Model isoModel(const std::vector<Vec>& ends, const std::vector<Vec>& middles,
+                          fem::core::ElementKind kind)
+{
+    fem::core::MeshBuilder builder;
+    for (std::size_t i = 0; i < ends.size(); ++i) {
+        REQUIRE(builder.addNode(static_cast<fem::core::ExternalId>(i + 1), ends[i]).has_value());
+    }
+    for (std::size_t i = 0; i < middles.size(); ++i) {
+        REQUIRE(
+            builder.addNode(static_cast<fem::core::ExternalId>(1001 + i), middles[i]).has_value());
+    }
+    fem::core::ElementIds all;
+    for (std::size_t i = 0; i < middles.size(); ++i) {
+        const std::vector<fem::core::ExternalId> line = {
+            static_cast<fem::core::ExternalId>(i + 1), static_cast<fem::core::ExternalId>(i + 2),
+            static_cast<fem::core::ExternalId>(1001 + i)};
+        REQUIRE(builder
+                    .addElement(fem::core::ElementType::Line3,
+                                static_cast<fem::core::ExternalId>(i + 1), line)
+                    .has_value());
+        all.ids.push_back(static_cast<fem::core::ExternalId>(i + 1));
+    }
+    auto mesh = builder.build();
+    REQUIRE(mesh.has_value());
+    fem::core::Model model;
+    model.mesh = std::make_shared<const fem::core::Mesh>(std::move(*mesh));
+    model.materials.push_back(fem::core::test::steel());
+    model.sections.push_back(fem::core::test::genericSection());
+    model.assignments.push_back({.elements = all,
+                                 .kind = kind,
+                                 .material = "Steel",
+                                 .section = "S",
+                                 .theory = fem::core::BeamTheory::Timoshenko,
+                                 .curved = fem::core::CurvedFormulation::Isoparametric});
+    return model;
+}
+
+} // namespace
+
+// REQ-008b-14, 19: the analysis with isoparametric beams: the patch test
+// through the model, and the middle node with a support and a load.
+TEST_CASE("analysis with isoparametric beams", "[core][beam][curved][iso]")
+{
+    using namespace fem::core::test;
+    SECTION("patch test: two unequal straight elements under end moments")
+    {
+        fem::core::Model model =
+            isoModel({Vec(0, 0, 0), Vec(1.0, 0, 0), Vec(3.0, 0, 0)},
+                     {Vec(0.5, 0, 0), Vec(2.0, 0, 0)}, fem::core::ElementKind::Beam2D);
+        fixAll(model, {1}, fem::core::ElementKind::Beam2D);
+        const double m = 5e3;
+        const double n = 2e5;
+        model.nodalForces.push_back({.nodes = fem::core::NodeIds{{3}},
+                                     .force = Vec(n, 0.0, 0.0),
+                                     .moment = Vec(0.0, 0.0, m)});
+        const fem::core::StaticResult result = solve(model);
+        const double length = 3.0;
+        CHECK(near(result.rotations[2].z(), m * length / (kE * kIz), 1e-10));
+        CHECK(near(result.displacements[2].y(), m * length * length / (2 * kE * kIz), 1e-10));
+        CHECK(near(result.displacements[2].x(), n * length / (kE * kArea), 1e-10));
+        // The forces along the bars are constant.
+        const fem::core::BeamResult& beam = beamOf(result, 1);
+        CHECK(near(beam.at(0.7).forces.mz, m, 1e-10));
+        CHECK(near(beam.at(1.3).forces.n, n, 1e-10));
+    }
+    SECTION("the middle node of a curved beam takes a support and a load")
+    {
+        const double r = 2.0;
+        fem::core::Model model =
+            isoModel({Vec(r, 0, 0), Vec(0, r, 0)}, {Vec(r * std::sqrt(0.5), r * std::sqrt(0.5), 0)},
+                     fem::core::ElementKind::Beam3D);
+        fixAll(model, {1}, fem::core::ElementKind::Beam3D);
+        restrain(model, {1001}, {fem::core::DofType::W});
+        const Vec force(1e3, -2e3, 5e2);
+        model.nodalForces.push_back({.nodes = fem::core::NodeIds{{1001}}, .force = force});
+        model.nodalForces.push_back({.nodes = fem::core::NodeIds{{2}}, .force = Vec(0, 0, 3e2)});
+        const fem::core::StaticResult result = solve(model);
+        // Equilibrium of the forces, with the supports at node 1 and the middle.
+        const Vec total = result.reactions[0] + result.reactions[2] + force + Vec(0, 0, 3e2);
+        CHECK(total.norm() <= 1e-9 * force.norm());
+        CHECK(std::abs(result.displacements[2].z()) == 0.0);
+        CHECK(result.displacements[2].norm() > 0.0);
+    }
 }

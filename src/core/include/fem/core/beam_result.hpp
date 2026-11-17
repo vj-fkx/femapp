@@ -5,6 +5,7 @@
 
 #include <Eigen/Core>
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -35,6 +36,8 @@ struct BeamPoint
 // At a concentrated load: the value just before or just after it.
 enum class Side : std::uint8_t { Before, After };
 
+struct IsoBeamData;
+
 // REQ-008-21, 22: one beam after the analysis.
 class BeamResult
 {
@@ -54,6 +57,11 @@ public:
         bool exact = false;
         bool planar = false;
         StateBarVector ends;
+        // REQ-008b-19: an isoparametric beam (design 008b §5.5): its data,
+        // its nodes and the values of its nodal dofs.
+        std::shared_ptr<const IsoBeamData> iso;
+        ElementNodes isoNodes;
+        std::vector<double> isoValues;
     };
 
     explicit BeamResult(Data data);

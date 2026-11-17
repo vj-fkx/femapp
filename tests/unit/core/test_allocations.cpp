@@ -4,6 +4,7 @@
 // operator new to count the allocations.
 
 #include <fem/core/beam_element.hpp>
+#include <fem/core/beam_iso.hpp>
 #include <fem/core/beam_state.hpp>
 #include <fem/core/element_type.hpp>
 #include <fem/core/isoparametric.hpp>
@@ -186,6 +187,45 @@ TEST_CASE("the exact beam element does not allocate", "[core][allocations]")
     nodes.x[1] = Eigen::Vector3d(3.0, 0.0, 0.0);
     Eigen::MatrixXd matrix = Eigen::MatrixXd::Zero(12, 12);
     Eigen::VectorXd vector = Eigen::VectorXd::Zero(12);
+
+    gAllocations = 0;
+    gCounting = true;
+    const bool computed = element.compute(nodes, 0, matrix, vector).has_value();
+    gCounting = false;
+    CHECK(computed);
+    CHECK(gAllocations == 0);
+}
+
+// REQ-008b-14: the isoparametric element, with a spring, an offset, a
+// foundation and loads, computes on the stack.
+TEST_CASE("the isoparametric beam element does not allocate", "[core][allocations]")
+{
+    std::array<fem::core::IsoBeamData, 1> beams{};
+    fem::core::IsoBeamData& data = beams[0];
+    data.beam.axial = 1e6;
+    data.beam.torsional = 1e3;
+    data.beam.bendingY = data.beam.bendingZ = 1e4;
+    data.beam.shearY = data.beam.shearZ = 1e5;
+    data.beam.shearCentre = Eigen::Vector2d(0.01, 0.02);
+    data.beam.springs[1][5] = 0.0;
+    data.beam.offsets[0] = Eigen::Vector3d(0.05, 0.0, 0.0);
+    data.beam.foundation = Eigen::Vector4d(1.0, 2.0, 3.0, 4.0);
+    data.loads.distributed.push_back({.axes = fem::core::Axes::Local,
+                                      .startValue = Eigen::Vector3d(0.0, 1.0, 0.0),
+                                      .endValue = Eigen::Vector3d(0.0, 2.0, 0.0),
+                                      .from = 0.1,
+                                      .to = 1.0});
+    const fem::core::IsoBeamElement element(fem::core::ElementKind::Beam3D, beams);
+    fem::core::ElementNodes nodes;
+    nodes.type = fem::core::ElementType::Line3;
+    nodes.count = 3;
+    nodes.x[0] = Eigen::Vector3d(0.0, 0.0, 0.0);
+    nodes.x[1] = Eigen::Vector3d(2.0, 1.0, 0.0);
+    nodes.x[2] = Eigen::Vector3d(1.1, 0.8, 0.0);
+    Eigen::MatrixXd matrix = Eigen::MatrixXd::Zero(18, 18);
+    Eigen::VectorXd vector = Eigen::VectorXd::Zero(18);
+    // The first call prepares the tables of the shape functions.
+    REQUIRE(element.compute(nodes, 0, matrix, vector).has_value());
 
     gAllocations = 0;
     gCounting = true;

@@ -2,6 +2,7 @@
 
 #include <fem/core/assembler.hpp>
 #include <fem/core/beam_element.hpp>
+#include <fem/core/beam_iso.hpp>
 #include <fem/core/beam_loads.hpp>
 #include <fem/core/beam_result.hpp>
 #include <fem/core/beam_state.hpp>
@@ -88,6 +89,9 @@ struct Beams
     std::vector<SpanLoads> loads;
     std::vector<double> length;
     std::vector<bool> exact; // the exact element of 008b (design 008b §5.3)
+    // The isoparametric curved beams (design 008b §5.5).
+    std::vector<IsoBeamData> iso;
+    std::vector<bool> isIso;
 };
 
 Beams beamData(const Model& model, const detail::ValidationTables& tables)
@@ -99,6 +103,8 @@ Beams beamData(const Model& model, const detail::ValidationTables& tables)
     beams.loads.resize(count);
     beams.length.assign(count, 0.0);
     beams.exact.assign(count, false);
+    beams.iso.resize(count);
+    beams.isIso.assign(count, false);
     if (!tables.hasBeams) {
         return beams;
     }
@@ -121,6 +127,13 @@ Beams beamData(const Model& model, const detail::ValidationTables& tables)
         isBeam[e] = true;
         beams.data[e] = setup->data;
         beams.exact[e] = setup->data.warpingStiffness > 0.0 || setup->data.arcLength > 0.0;
+        if (setup->isoparametric) {
+            beams.isIso[e] = true;
+            beams.iso[e] = {.beam = setup->data,
+                            .reference = setup->reference,
+                            .roll = setup->roll,
+                            .loads = {}};
+        }
         beams.length[e] = setup->length;
         frames[e] = setup->frame;
         materials[e] = model.findMaterial(assignment.material);
@@ -130,6 +143,11 @@ Beams beamData(const Model& model, const detail::ValidationTables& tables)
                 materials[e]->density.value_or(0.0) * area * *model.gravity;
             addDistributed(beams.loads[e], frames[e], Axes::Global, weight, weight, 0.0,
                            setup->length);
+            beams.iso[e].loads.distributed.push_back({.axes = Axes::Global,
+                                                      .startValue = weight,
+                                                      .endValue = weight,
+                                                      .from = 0.0,
+                                                      .to = setup->length});
         }
     }
     // Every element of a target that is a beam.
@@ -143,18 +161,26 @@ Beams beamData(const Model& model, const detail::ValidationTables& tables)
     };
     for (const TemperatureChange& change : model.temperatureChanges) {
         forBeams(change.elements, [&](std::size_t e) {
-            beams.loads[e].imposedStrain +=
-                materials[e]->thermalExpansion.value_or(0.0) * change.deltaT;
+            const double strain = materials[e]->thermalExpansion.value_or(0.0) * change.deltaT;
+            beams.loads[e].imposedStrain += strain;
+            beams.iso[e].loads.imposedStrain += strain;
         });
     }
     for (const InitialStrain& initial : model.initialStrains) {
-        forBeams(initial.elements,
-                 [&](std::size_t e) { beams.loads[e].imposedStrain += initial.strain; });
+        forBeams(initial.elements, [&](std::size_t e) {
+            beams.loads[e].imposedStrain += initial.strain;
+            beams.iso[e].loads.imposedStrain += initial.strain;
+        });
     }
     for (const TemperatureGradient& gradient : model.temperatureGradients) {
         forBeams(gradient.elements, [&](std::size_t e) {
-            addGradient(beams.loads[e], frames[e], materials[e]->thermalExpansion.value_or(0.0),
+            SpanLoads curvatures;
+            addGradient(curvatures, frames[e], materials[e]->thermalExpansion.value_or(0.0),
                         gradient.alongY, gradient.alongZ);
+            beams.loads[e].curvatureY += curvatures.curvatureY;
+            beams.loads[e].curvatureZ += curvatures.curvatureZ;
+            beams.iso[e].loads.curvatureY += curvatures.curvatureY;
+            beams.iso[e].loads.curvatureZ += curvatures.curvatureZ;
         });
     }
     for (const DistributedLoad& load : model.distributedLoads) {
@@ -162,16 +188,28 @@ Beams beamData(const Model& model, const detail::ValidationTables& tables)
             addDistributed(beams.loads[e], frames[e], load.axes, load.startValue, load.endValue,
                            positionOn(load.from, beams.length[e]),
                            positionOn(load.to, beams.length[e]), load.startTorque, load.endTorque);
+            beams.iso[e].loads.distributed.push_back(
+                {.axes = load.axes,
+                 .startValue = load.startValue,
+                 .endValue = load.endValue,
+                 .from = positionOn(load.from, beams.length[e]),
+                 .to = positionOn(load.to, beams.length[e]),
+                 .startTorque = load.startTorque,
+                 .endTorque = load.endTorque});
         });
     }
     for (const ConcentratedLoad& load : model.concentratedLoads) {
         forBeams(load.elements, [&](std::size_t e) {
             addConcentrated(beams.loads[e], frames[e], load.axes, load.force, load.moment,
                             positionOn(load.at, beams.length[e]));
+            beams.iso[e].loads.concentrated.push_back({.axes = load.axes,
+                                                       .force = load.force,
+                                                       .moment = load.moment,
+                                                       .at = positionOn(load.at, beams.length[e])});
         });
     }
     for (std::size_t e = 0; e < count; ++e) {
-        if (isBeam[e] && !beams.exact[e]) {
+        if (isBeam[e] && !beams.exact[e] && !beams.isIso[e]) {
             beams.data[e].fixedEndLoads =
                 equivalentLoads(beams.data[e], beams.length[e], beams.loads[e]);
         }
@@ -245,13 +283,16 @@ Expected<StaticResult> runLinearStatic(const Model& model, const StaticOptions& 
                                     ElementKind::Truss3D);
     // The exact beams (design 008b §5.3): a set per kind.
     std::map<int, std::vector<ElementIndex>> exactMembers;
+    std::array<std::vector<ElementIndex>, 2> isoMembers; // 2D, 3D
     for (ElementIndex element = 0; element < mesh.elementCount(); ++element) {
         const auto e = static_cast<std::size_t>(element);
         const int owner = tables.owner[e];
         if (owner != kNoAssignment) {
             const auto kind = model.assignments[static_cast<std::size_t>(owner)].kind;
             kindOf[e] = kind;
-            if (beams.exact[e]) {
+            if (beams.isIso[e]) {
+                isoMembers.at(kind == ElementKind::Beam2D ? 0 : 1).push_back(element);
+            } else if (beams.exact[e]) {
                 exactMembers[static_cast<int>(kind)].push_back(element);
             } else {
                 members.at(static_cast<std::size_t>(kind)).push_back(element);
@@ -269,6 +310,14 @@ Expected<StaticResult> runLinearStatic(const Model& model, const StaticOptions& 
         if (!members.at(k).empty()) {
             sets.push_back({.elements = members.at(k), .formulation = formulations.at(k)});
         }
+    }
+    const IsoBeamElement planarIso(ElementKind::Beam2D, beams.iso);
+    const IsoBeamElement spatialIso(ElementKind::Beam3D, beams.iso);
+    if (!isoMembers[0].empty()) {
+        sets.push_back({.elements = isoMembers[0], .formulation = &planarIso});
+    }
+    if (!isoMembers[1].empty()) {
+        sets.push_back({.elements = isoMembers[1], .formulation = &spatialIso});
     }
     std::vector<std::unique_ptr<ExactBeamElement>> exactFormulations;
     for (const auto& [key, elements] : exactMembers) {
@@ -372,6 +421,40 @@ Expected<StaticResult> runLinearStatic(const Model& model, const StaticOptions& 
         }
         const auto nodes = mesh.elementNodes(static_cast<ElementIndex>(e));
         const auto& assignment = model.assignments[static_cast<std::size_t>(owner)];
+        if (detail::isBeam(kindOf[e]) && beams.isIso[e]) {
+            ElementNodes elementNodes;
+            elementNodes.type = ElementType::Line3;
+            elementNodes.count = 3;
+            std::vector<double> nodeValues;
+            const DofMask used = detail::dofsOf(kindOf[e]);
+            for (std::size_t k = 0; k < 3; ++k) {
+                elementNodes.x.at(k) = mesh.nodeCoordinates(nodes[k]);
+                for (int t = 0; t < kDofTypeCount; ++t) {
+                    const auto type = static_cast<DofType>(t);
+                    if ((used & mask(type)) != 0) {
+                        const auto dof = dofs.find(nodes[k], type);
+                        nodeValues.push_back(dof ? values[*dof] : 0.0);
+                    }
+                }
+            }
+            BeamResult::Data data;
+            data.length = beams.length[e];
+            data.axes = beams.data[e].axes;
+            data.beam = beams.data[e];
+            data.planar = kindOf[e] == ElementKind::Beam2D;
+            data.iso = std::make_shared<const IsoBeamData>(beams.iso[e]);
+            data.isoNodes = elementNodes;
+            data.isoValues = std::move(nodeValues);
+            const BeamResult probe(data);
+            data.start = probe.at(0.0).forces;
+            data.end = probe.at(data.length).forces;
+            const double n = data.start.n;
+            result.beams[e].emplace(std::move(data));
+            result.axialForce[e] = n;
+            result.strain[e] = n / beams.data[e].axial;
+            result.stress[e] = n / detail::sectionArea(*model.findSection(assignment.section));
+            return;
+        }
         if (detail::isBeam(kindOf[e]) && beams.exact[e]) {
             // The element's nodal values, in the order of its dofs.
             std::vector<double> nodeValues;
