@@ -505,3 +505,263 @@ TEST_CASE("curved beam in plan fixed at both ends", "[core][beam][curved][verifi
     CHECK(close(result.reactionMoments[2], Vec(redundant(1), redundant(2), 0.0),
                 std::abs(redundant(1)) + std::abs(redundant(2))));
 }
+
+// REQ-008b-15, AC-8: the end connections of the 008 on arcs: moment
+// releases at the supports of an arch give the hinges; rotational springs
+// tend to the hinge and to the fixed end.
+TEST_CASE("connections at the ends of arcs", "[core][beam][curved][verification]")
+{
+    const double r = 5.0;
+    const double pi = std::numbers::pi;
+    const Vec q(0.0, -4e3, 0.0);
+    const auto arch = [&](std::optional<double> spring, bool fixed) {
+        fem::core::Model m = arcModel(r, {0.0, pi / 2, pi}, fem::core::ElementKind::Beam2D);
+        fem::core::test::restrain(m, {1, 3}, {fem::core::DofType::U, fem::core::DofType::V});
+        if (fixed) {
+            fem::core::test::restrain(m, {1, 3}, {fem::core::DofType::RZ});
+        }
+        if (spring) {
+            fem::core::EndConnection start{.elements = fem::core::ElementIds{{1}},
+                                           .end = fem::core::BarEnd::Start};
+            start.stiffness[5] = *spring;
+            fem::core::EndConnection end{.elements = fem::core::ElementIds{{2}},
+                                         .end = fem::core::BarEnd::End};
+            end.stiffness[5] = *spring;
+            m.endConnections = {start, end};
+        }
+        m.distributedLoads.push_back({.elements = fem::core::ElementIds{{1, 2}},
+                                      .axes = fem::core::Axes::Global,
+                                      .startValue = q,
+                                      .endValue = q});
+        return fem::core::test::solve(m);
+    };
+    const fem::core::StaticResult hinged = arch(std::nullopt, false);
+    const fem::core::StaticResult fixedEnds = arch(std::nullopt, true);
+    const double ei = fem::core::test::kE * fem::core::test::kIz;
+    CHECK(fem::core::test::near(arch(0.0, true).reactions[2].x(), hinged.reactions[2].x(), 1e-10));
+    CHECK(fem::core::test::near(arch(1e-6 * ei / r, true).displacements[1].y(),
+                                hinged.displacements[1].y(), 1e-5));
+    CHECK(fem::core::test::near(arch(1e9 * ei / r, true).displacements[1].y(),
+                                fixedEnds.displacements[1].y(), 1e-6));
+}
+
+// REQ-008b-15, AC-8: a rigid offset at the start of an arc: the same arc
+// from the offset end, and the reaction moment moved by the lever.
+TEST_CASE("rigid offsets on arcs", "[core][beam][curved][verification]")
+{
+    const double r = 2.0;
+    const double tip = std::numbers::pi / 2;
+    const Vec offset(0.15, -0.1, 0.05);
+    const Vec force(2e3, -3e3, 1.5e3);
+    fem::core::Model plain = arcModel(r, {0.0, tip}, fem::core::ElementKind::Beam3D);
+    fem::core::test::fixAll(plain, {1}, fem::core::ElementKind::Beam3D);
+    plain.nodalForces.push_back({.nodes = fem::core::NodeIds{{2}}, .force = force});
+    // The node moved back by the offset, which brings the arc where it was.
+    fem::core::MeshBuilder builder;
+    REQUIRE(builder.addNode(1, Vec(r, 0.0, 0.0) - offset).has_value());
+    REQUIRE(builder.addNode(2, Vec(0.0, r, 0.0)).has_value());
+    REQUIRE(builder.addNode(3, Vec(r * std::cos(tip / 2), r * std::sin(tip / 2), 0.0)).has_value());
+    const std::vector<fem::core::ExternalId> line = {1, 2, 3};
+    REQUIRE(builder.addElement(fem::core::ElementType::Line3, 1, line).has_value());
+    auto mesh = builder.build();
+    REQUIRE(mesh.has_value());
+    fem::core::Model offsetModel = plain;
+    offsetModel.mesh = std::make_shared<const fem::core::Mesh>(std::move(*mesh));
+    offsetModel.rigidOffsets.push_back({.elements = fem::core::ElementIds{{1}}, .start = offset});
+    const fem::core::StaticResult a = fem::core::test::solve(plain);
+    const fem::core::StaticResult b = fem::core::test::solve(offsetModel);
+    CHECK(close(b.displacements[1], a.displacements[1], a.displacements[1].norm()));
+    CHECK(close(b.rotations[1], a.rotations[1], a.rotations[1].norm()));
+    CHECK(close(b.reactions[0], a.reactions[0], a.reactions[0].norm()));
+    CHECK(close(b.reactionMoments[0], a.reactionMoments[0] + offset.cross(a.reactions[0]),
+                a.reactionMoments[0].norm()));
+}
+
+// REQ-008b-15, 17, AC-8: span loads along the arc length, in global and in
+// local axes, partial and concentrated, with a distributed torque; and the
+// weight as a global load.
+TEST_CASE("span loads on arcs", "[core][beam][curved][verification]")
+{
+    const double r = 2.0;
+    const double tip = std::numbers::pi / 2;
+    const double length = r * tip;
+    const ArcReference reference{.r = r, .section = genericArcSection(), .planar = false};
+    const Vec global(0.0, 1e3, -2e3);         // on [0.25, 0.75] of the arc
+    const Vec local(-300.0, 500.0, 400.0);    // the whole arc, local axes
+    const double torque = 150.0;              // about the local x, on [0.1, 0.6]
+    const Vec point(1e3, -500.0, 2e3);        // global, at 0.3
+    const Vec pointLocal(0.0, -800.0, 600.0); // local, at 0.7
+    const auto angle = [&](double fraction) { return fraction * tip; };
+    const auto inside = [&](double theta, double from, double to) {
+        return theta >= angle(from) && theta <= angle(to);
+    };
+    const auto q = [&](double theta) {
+        Vec value = reference.axes(theta) * local;
+        if (inside(theta, 0.25, 0.75)) {
+            value += global;
+        }
+        return value;
+    };
+    const auto c = [&](double theta) {
+        return inside(theta, 0.1, 0.6) ? Vec(torque * reference.axes(theta).col(0)) : Vec::Zero();
+    };
+    const auto real = [&](double theta) {
+        // The load between its breaks, then the concentrated loads.
+        Internal x = Internal::Zero();
+        double from = 0.0;
+        for (const double fraction : {0.1, 0.25, 0.6, 0.75, 1.0}) {
+            const double to = angle(fraction);
+            x += reference.fromLoad(theta, std::max(from, theta), to, q, c);
+            from = to;
+        }
+        if (theta < angle(0.3)) {
+            x += reference.fromPoint(theta, angle(0.3), point, Vec::Zero());
+        }
+        if (theta < angle(0.7)) {
+            x += reference.fromPoint(theta, angle(0.7), reference.axes(angle(0.7)) * pointLocal,
+                                     Vec::Zero());
+        }
+        return x;
+    };
+    Vec displacement;
+    for (int i = 0; i < 3; ++i) {
+        const auto unit = [&](double theta) {
+            return reference.fromPoint(theta, tip, Vec::Unit(i), Vec::Zero());
+        };
+        displacement(i) = 0.0;
+        double from = 0.0;
+        for (const double fraction : {0.1, 0.25, 0.3, 0.6, 0.7, 0.75, 1.0}) {
+            displacement(i) += reference.work(from, angle(fraction), real, unit);
+            from = angle(fraction);
+        }
+    }
+
+    fem::core::Model model = arcModel(r, {0.0, tip}, fem::core::ElementKind::Beam3D);
+    fem::core::test::fixAll(model, {1}, fem::core::ElementKind::Beam3D);
+    const fem::core::ElementIds arc{{1}};
+    model.distributedLoads.push_back({.elements = arc,
+                                      .axes = fem::core::Axes::Global,
+                                      .startValue = global,
+                                      .endValue = global,
+                                      .from = {.value = 0.25, .fraction = true},
+                                      .to = {.value = 0.75 * length, .fraction = false}});
+    model.distributedLoads.push_back(
+        {.elements = arc, .axes = fem::core::Axes::Local, .startValue = local, .endValue = local});
+    model.distributedLoads.push_back({.elements = arc,
+                                      .axes = fem::core::Axes::Local,
+                                      .from = {.value = 0.1, .fraction = true},
+                                      .to = {.value = 0.6, .fraction = true},
+                                      .startTorque = torque,
+                                      .endTorque = torque});
+    model.concentratedLoads.push_back({.elements = arc,
+                                       .axes = fem::core::Axes::Global,
+                                       .force = point,
+                                       .at = {.value = 0.3, .fraction = true}});
+    model.concentratedLoads.push_back({.elements = arc,
+                                       .axes = fem::core::Axes::Local,
+                                       .force = pointLocal,
+                                       .at = {.value = 0.7, .fraction = true}});
+    const fem::core::StaticResult result = fem::core::test::solve(model);
+    CHECK(close(result.displacements[1], displacement, displacement.norm()));
+    const fem::core::BeamResult& beam = fem::core::test::beamOf(result, 0);
+    for (const double fraction : {0.05, 0.45, 0.9}) {
+        const fem::core::BeamForces f = beam.at(fraction * length).forces;
+        Internal at;
+        at << f.n, f.vy, f.vz, f.t, f.my, f.mz;
+        const Internal expected = real(angle(fraction));
+        CHECK((at - expected).norm() <= kTolerance * expected.norm());
+    }
+
+    SECTION("the weight is a global load per length of arc")
+    {
+        fem::core::Model heavy = arcModel(r, {0.0, tip}, fem::core::ElementKind::Beam3D);
+        fem::core::test::fixAll(heavy, {1}, fem::core::ElementKind::Beam3D);
+        fem::core::Model loaded = heavy;
+        heavy.gravity = Vec(0.0, 0.0, -9.81);
+        const double weight =
+            fem::core::test::steel().density.value_or(0.0) * fem::core::test::kArea * 9.81;
+        loaded.distributedLoads.push_back({.elements = arc,
+                                           .axes = fem::core::Axes::Global,
+                                           .startValue = Vec(0.0, 0.0, -weight),
+                                           .endValue = Vec(0.0, 0.0, -weight)});
+        const fem::core::StaticResult a = fem::core::test::solve(heavy);
+        const fem::core::StaticResult b = fem::core::test::solve(loaded);
+        CHECK(close(a.displacements[1], b.displacements[1], b.displacements[1].norm()));
+    }
+}
+
+// REQ-008b-15, AC-8: a temperature gradient across an arc in cantilever:
+// the tip moves by the virtual work of the imposed curvatures.
+TEST_CASE("temperature gradient on an arc", "[core][beam][curved][verification]")
+{
+    const double r = 2.0;
+    const double tip = std::numbers::pi / 2;
+    const ArcReference reference{.r = r, .section = genericArcSection(), .planar = false};
+    const double alpha = fem::core::test::steel().thermalExpansion.value_or(0.0);
+    const double alongY = 30.0;
+    const double alongZ = -20.0;
+    // The imposed curvatures of design 008 (sigma = E alpha (gy y + gz z)).
+    const double curvatureY = alpha * alongZ;
+    const double curvatureZ = -alpha * alongY;
+    Vec displacement;
+    for (int i = 0; i < 3; ++i) {
+        const auto unit = [&](double theta) {
+            return reference.fromPoint(theta, tip, Vec::Unit(i), Vec::Zero());
+        };
+        const auto curvature = [&](double /*theta*/) {
+            Internal k = Internal::Zero();
+            k(4) = curvatureY * reference.section.eiy;
+            k(5) = curvatureZ * reference.section.eiz;
+            return k;
+        };
+        displacement(i) = reference.work(0.0, tip, curvature, unit);
+    }
+    fem::core::Model model = arcModel(r, {0.0, tip}, fem::core::ElementKind::Beam3D);
+    fem::core::test::fixAll(model, {1}, fem::core::ElementKind::Beam3D);
+    model.temperatureGradients.push_back(
+        {.elements = fem::core::ElementIds{{1}}, .alongY = alongY, .alongZ = alongZ});
+    const fem::core::StaticResult result = fem::core::test::solve(model);
+    CHECK(close(result.displacements[1], displacement, displacement.norm()));
+}
+
+// REQ-008b-13, 15, AC-8: the exact element takes the elastic foundation
+// exactly: a long straight 3-node beam is Hetenyi's beam, w = P beta / 2k
+// under a concentrated load.
+TEST_CASE("elastic foundation on the exact element", "[core][beam][curved][verification]")
+{
+    const double k = 2e6;
+    const double ei = fem::core::test::kE * fem::core::test::kIz;
+    const double beta = std::pow(k / (4 * ei), 0.25);
+    const double half = 20.0 / beta;
+    fem::core::MeshBuilder builder;
+    REQUIRE(builder.addNode(1, Vec(-half, 0.0, 0.0)).has_value());
+    REQUIRE(builder.addNode(2, Vec(0.0, 0.0, 0.0)).has_value());
+    REQUIRE(builder.addNode(3, Vec(half, 0.0, 0.0)).has_value());
+    REQUIRE(builder.addNode(4, Vec(-half / 2, 0.0, 0.0)).has_value());
+    REQUIRE(builder.addNode(5, Vec(half / 2, 0.0, 0.0)).has_value());
+    REQUIRE(builder
+                .addElement(fem::core::ElementType::Line3, 1,
+                            std::vector<fem::core::ExternalId>{1, 2, 4})
+                .has_value());
+    REQUIRE(builder
+                .addElement(fem::core::ElementType::Line3, 2,
+                            std::vector<fem::core::ExternalId>{2, 3, 5})
+                .has_value());
+    auto mesh = builder.build();
+    REQUIRE(mesh.has_value());
+    fem::core::Model model;
+    model.mesh = std::make_shared<const fem::core::Mesh>(std::move(*mesh));
+    model.materials.push_back(fem::core::test::steel());
+    model.sections.push_back(fem::core::test::genericSection());
+    model.assignments.push_back({.elements = fem::core::ElementIds{{1, 2}},
+                                 .kind = fem::core::ElementKind::Beam2D,
+                                 .material = "Steel",
+                                 .section = "S"});
+    model.foundations.push_back(
+        {.elements = fem::core::ElementIds{{1, 2}}, .translational = Vec(0.0, k, 0.0)});
+    fem::core::test::restrain(model, {2}, {fem::core::DofType::U});
+    const double p = 1e5;
+    model.nodalForces.push_back({.nodes = fem::core::NodeIds{{2}}, .force = Vec(0.0, -p, 0.0)});
+    const fem::core::StaticResult result = fem::core::test::solve(model);
+    CHECK(fem::core::test::near(result.displacements[1].y(), -p * beta / (2 * k), 1e-8));
+}

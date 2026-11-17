@@ -142,7 +142,7 @@ Regras:
   biarticulado com carga uniforme e com temperatura; viga curva em planta
   biengastada; at(s) ao longo do arco; 2D e 3D — arquivo:
   `tests/unit/core/test_beam_curved.cpp` — cobre: 12, 13, 19, N01
-- [ ] **T29** [P] Recursos da 008 no arco (AC-8): liberações, molas,
+- [x] **T29** [P] Recursos da 008 no arco (AC-8): liberações, molas,
   excentricidades, base elástica, cargas parciais e concentradas em eixos
   globais e locais, peso próprio, gradiente — cobre: 15, 17
 
@@ -271,4 +271,30 @@ Regras:
   a cadeia de partes (alocação permitida: só nos resultados) e integra a
   partir do início da parte que contém s; conferido contra as pontas e
   contra a barra cortada em x, inclusive com carga concentrada numa junção.
+
+**Fase 4 (parte feita) e retirada do empenamento (T19 a T21b):**
+
+- T22: com empenamento em todas as barras, o pórtico levou 6,2 a 7,1 s
+  (meta de 6 s); antes disso, os pilares-caixão (kL ≈ 150) levavam 116 s
+  pelas subdivisões. Na mesma sessão, sem empenamento: 3,4 a 4,1 s. Ganhos
+  que ficaram: parte com crescimento até e⁸ (`kGrowthPerPart`), uma só
+  chamada do motor por viga nos resultados e resultados em paralelo. O
+  mantenedor adiou então o empenamento (T21b; feature 008d).
+
+**Fase 5 — Viga em arco (T26 a T29):**
+
+- T26: o vetor de referência define só os eixos no início do arco; eles
+  são transportados ao longo dele com a taxa de giro constante (design
+  §5.2). Por isso a recusa por referência paralela vale na tangente
+  inicial, onde a regra da 008 já a aplica (no meio do arco o referencial
+  transportado nunca degenera).
+- T28: as soluções de referência saem de uma implementação independente
+  no teste (`arc_reference.hpp`): esforços estáticos exatos, trabalho
+  virtual por Gauss-Legendre de 64 pontos e método das forças para os
+  redundantes, com flexão nos dois planos, torção, normal e cortante — as
+  mesmas hipóteses das tabelas de Roark com as correções α e β. Todos os
+  casos batem em 1e−8.
+- T29: a base elástica é conferida na viga de Hetényi com o elemento exato
+  (1e−8); no arco, o acoplamento com a curvatura já é coberto pelos testes
+  do motor (T17, T18).
 

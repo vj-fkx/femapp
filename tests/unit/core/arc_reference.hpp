@@ -123,6 +123,26 @@ struct ArcReference
         return local(theta, force, moment);
     }
 
+    // From forces q and couples c per length of arc (global, functions of
+    // the angle) on [from, to], at the section theta, by Gauss-Legendre.
+    [[nodiscard]] Internal fromLoad(double theta, double from, double to,
+                                    const std::function<Eigen::Vector3d(double)>& q,
+                                    const std::function<Eigen::Vector3d(double)>& c) const
+    {
+        static const auto rule = gaussLegendre(64);
+        Eigen::Vector3d force = Eigen::Vector3d::Zero();
+        Eigen::Vector3d moment = Eigen::Vector3d::Zero();
+        if (to > from) {
+            for (const auto& [x, w] : rule) {
+                const double at = (from + to) / 2.0 + (to - from) / 2.0 * x;
+                const double ds = w * r * (to - from) / 2.0;
+                force += ds * q(at);
+                moment += ds * ((point(at) - point(theta)).cross(q(at)) + c(at));
+            }
+        }
+        return local(theta, force, moment);
+    }
+
     // The integral over [from, to] of a . c . b ds.
     [[nodiscard]] double work(double from, double to, const std::function<Internal(double)>& a,
                               const std::function<Internal(double)>& b) const
