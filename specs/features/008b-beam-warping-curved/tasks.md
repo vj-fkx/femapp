@@ -137,7 +137,7 @@ Regras:
   rotação diferente em cada ponta) e cargas por comprimento de arco no
   `beam_loads` (posições, torque distribuído, bimomento concentrado);
   conjuntos na análise — cobre: 12, 13, 15, 17
-- [ ] **T28** Verificação do arco (AC-5): quarto de anel em balanço no plano
+- [x] **T28** Verificação do arco (AC-5): quarto de anel em balanço no plano
   e fora do plano; anel com carga diametral; arco semicircular
   biarticulado com carga uniforme e com temperatura; viga curva em planta
   biengastada; at(s) ao longo do arco; 2D e 3D — arquivo:
