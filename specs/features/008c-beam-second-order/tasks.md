@@ -1,6 +1,6 @@
 # Tarefas — 008c beam-second-order
 
-Status: rascunho
+Status: em andamento
 Design: [design.md](design.md) · Requisitos: [requirements.md](requirements.md)
 
 Regras:
@@ -16,7 +16,7 @@ Regras:
 
 ## Fase 1 — Fundações
 
-- [ ] **T01** `SparseCholesky::factorizeIndefinite` e `negativePivots`, com
+- [x] **T01** `SparseCholesky::factorizeIndefinite` e `negativePivots`, com
   reuso da análise simbólica enquanto o padrão não muda (design §4, ADR
   0007). Testes: inércia de matrizes indefinidas conhecidas (diagonais,
   tridiagonais com autovalores sabidos), falha só em pivô zero, mesmo

@@ -43,8 +43,19 @@ public:
     [[nodiscard]] Expected<Eigen::VectorXd> solve(const Eigen::VectorXd& rhs) const override;
 
     // REQ-007-15: after a failed factorize(), the first equation (in the
-    // numbering of the input matrix) whose pivot was not clearly positive.
+    // numbering of the input matrix) whose pivot was not clearly positive;
+    // after a failed factorizeIndefinite(), the first negligible pivot.
     [[nodiscard]] std::optional<std::int32_t> singularEquation() const;
+
+    // REQ-008c-08, 10 (ADR 0007): LDL^T of a symmetric matrix that may be
+    // indefinite, without pivoting: it fails only on a negligible pivot
+    // (below 1e-14 of the largest). The symbolic analysis is kept while the
+    // pattern of the matrix stays the same.
+    [[nodiscard]] Expected<void> factorizeIndefinite(const SparseMatrix& lowerTriangle);
+
+    // The negative pivots of the last successful factorization: by
+    // Sylvester's law, the number of negative eigenvalues of the matrix.
+    [[nodiscard]] std::int64_t negativePivots() const;
 
 private:
     struct Impl;
