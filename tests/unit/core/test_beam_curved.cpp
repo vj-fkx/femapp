@@ -237,9 +237,10 @@ fem::core::test::ArcSection genericArcSection()
 // Arcs of radius r in the XY plane, one Line3 between consecutive angles
 // (the end nodes numbered 1, 2, ... in order, the middle ones from 1001);
 // `closed` joins the last angle to the first node. Steel, the generic
-// section, Timoshenko.
+// section, Timoshenko; arcs, or isoparametric beams through the same nodes.
 fem::core::Model arcModel(double r, const std::vector<double>& angles, fem::core::ElementKind kind,
-                          bool closed = false)
+                          bool closed = false,
+                          fem::core::CurvedFormulation curved = fem::core::CurvedFormulation::Arc)
 {
     fem::core::MeshBuilder builder;
     const auto point = [r](double theta) {
@@ -278,13 +279,41 @@ fem::core::Model arcModel(double r, const std::vector<double>& angles, fem::core
                                  .kind = kind,
                                  .material = "Steel",
                                  .section = "S",
-                                 .theory = fem::core::BeamTheory::Timoshenko});
+                                 .theory = fem::core::BeamTheory::Timoshenko,
+                                 .curved = curved});
     return model;
 }
 
 bool close(const Vec& value, const Vec& reference, double scale)
 {
     return (value - reference).norm() <= kTolerance * scale;
+}
+
+// n equal steps from `from` to `to`.
+std::vector<double> split(double from, double to, int n)
+{
+    std::vector<double> angles;
+    for (int i = 0; i <= n; ++i) {
+        angles.push_back(from + (to - from) * i / n);
+    }
+    return angles;
+}
+
+// AC-6: the relative errors of the isoparametric beam, the mesh halved each
+// time, fall with h^4 (design 008b §5.5).
+void checkRate(const std::vector<double>& errors)
+{
+    INFO("errors " << errors[0] << " " << errors[1] << " " << errors[2]);
+    for (std::size_t i = 0; i + 1 < errors.size(); ++i) {
+        const double rate = std::log2(errors[i] / errors[i + 1]);
+        CHECK(rate >= 3.5);
+        CHECK(rate <= 4.5);
+    }
+}
+
+double relative(double value, double reference)
+{
+    return std::abs(value - reference) / std::abs(reference);
 }
 
 } // namespace
@@ -371,11 +400,15 @@ TEST_CASE("two-hinged half circle arch", "[core][beam][curved][verification]")
         }
         return x;
     };
-    const auto model = [&] {
-        fem::core::Model m = arcModel(r, {0.0, pi / 2, pi}, fem::core::ElementKind::Beam2D);
-        fem::core::test::restrain(m, {1, 3}, {fem::core::DofType::U, fem::core::DofType::V});
+    // n elements; the supports are the nodes 1 and n + 1, the crown n / 2 + 1.
+    const auto model = [&](fem::core::CurvedFormulation curved, int n) {
+        fem::core::Model m =
+            arcModel(r, split(0.0, pi, n), fem::core::ElementKind::Beam2D, false, curved);
+        fem::core::test::restrain(m, {1, static_cast<fem::core::ExternalId>(n + 1)},
+                                  {fem::core::DofType::U, fem::core::DofType::V});
         return m;
     };
+    using fem::core::CurvedFormulation;
 
     SECTION("uniform load")
     {
@@ -383,14 +416,24 @@ TEST_CASE("two-hinged half circle arch", "[core][beam][curved][verification]")
         const auto total = [&](double theta) { return Internal(base(theta) + h * thrust(theta)); };
         const double deflection =
             reference.work(0.0, pi / 2, total, crown) + reference.work(pi / 2, pi, total, crown);
-        fem::core::Model m = model();
-        m.distributedLoads.push_back({.elements = fem::core::ElementIds{{1, 2}},
-                                      .axes = fem::core::Axes::Global,
-                                      .startValue = q,
-                                      .endValue = q});
-        const fem::core::StaticResult result = fem::core::test::solve(m);
+        const auto solve = [&](CurvedFormulation curved, int n) {
+            fem::core::Model m = model(curved, n);
+            m.distributedLoads.push_back({.elements = m.assignments.front().elements,
+                                          .axes = fem::core::Axes::Global,
+                                          .startValue = q,
+                                          .endValue = q});
+            return fem::core::test::solve(m);
+        };
+        const fem::core::StaticResult result = solve(CurvedFormulation::Arc, 2);
         CHECK(fem::core::test::near(result.reactions[2].x(), h, kTolerance));
         CHECK(fem::core::test::near(result.displacements[1].y(), deflection, kTolerance));
+        std::vector<double> errors;
+        for (const int n : {4, 8, 16}) {
+            const auto top = static_cast<std::size_t>(n / 2);
+            errors.push_back(relative(
+                solve(CurvedFormulation::Isoparametric, n).displacements[top].y(), deflection));
+        }
+        checkRate(errors);
     }
     SECTION("uniform temperature")
     {
@@ -400,12 +443,22 @@ TEST_CASE("two-hinged half circle arch", "[core][beam][curved][verification]")
         const auto total = [&](double theta) { return Internal(h * thrust(theta)); };
         const double rise = reference.work(0.0, pi / 2, total, crown) +
                             reference.work(pi / 2, pi, total, crown) + alpha * deltaT * r;
-        fem::core::Model m = model();
-        m.temperatureChanges.push_back(
-            {.elements = fem::core::ElementIds{{1, 2}}, .deltaT = deltaT});
-        const fem::core::StaticResult result = fem::core::test::solve(m);
+        const auto solve = [&](CurvedFormulation curved, int n) {
+            fem::core::Model m = model(curved, n);
+            m.temperatureChanges.push_back(
+                {.elements = m.assignments.front().elements, .deltaT = deltaT});
+            return fem::core::test::solve(m);
+        };
+        const fem::core::StaticResult result = solve(CurvedFormulation::Arc, 2);
         CHECK(fem::core::test::near(result.reactions[2].x(), h, kTolerance));
         CHECK(fem::core::test::near(result.displacements[1].y(), rise, kTolerance));
+        std::vector<double> errors;
+        for (const int n : {4, 8, 16}) {
+            const auto top = static_cast<std::size_t>(n / 2);
+            errors.push_back(
+                relative(solve(CurvedFormulation::Isoparametric, n).displacements[top].y(), rise));
+        }
+        checkRate(errors);
     }
 }
 
@@ -446,13 +499,27 @@ TEST_CASE("ring under a diametral load", "[core][beam][curved][verification]")
     };
     const double shortening = reference.work(bottom, top, total, down);
 
-    fem::core::Model model =
-        arcModel(r, {0.0, pi / 2, pi, 3 * pi / 2, 2 * pi}, fem::core::ElementKind::Beam2D, true);
-    fem::core::test::restrain(model, {2}, {fem::core::DofType::U});
-    fem::core::test::restrain(model, {4}, {fem::core::DofType::U, fem::core::DofType::V});
-    model.nodalForces.push_back({.nodes = fem::core::NodeIds{{2}}, .force = Vec(0.0, -p, 0.0)});
-    const fem::core::StaticResult result = fem::core::test::solve(model);
-    CHECK(fem::core::test::near(result.displacements[1].y(), shortening, kTolerance));
+    // n elements around the ring: the top is the node n / 4 + 1, the bottom
+    // 3 n / 4 + 1.
+    const auto topOf = [&](fem::core::CurvedFormulation curved, int n) {
+        fem::core::Model model =
+            arcModel(r, split(0.0, 2 * pi, n), fem::core::ElementKind::Beam2D, true, curved);
+        const auto top = static_cast<fem::core::ExternalId>(n / 4) + 1;
+        const auto foot = 3 * static_cast<fem::core::ExternalId>(n / 4) + 1;
+        fem::core::test::restrain(model, {top}, {fem::core::DofType::U});
+        fem::core::test::restrain(model, {foot}, {fem::core::DofType::U, fem::core::DofType::V});
+        model.nodalForces.push_back(
+            {.nodes = fem::core::NodeIds{{top}}, .force = Vec(0.0, -p, 0.0)});
+        return fem::core::test::solve(model).displacements[static_cast<std::size_t>(n / 4)].y();
+    };
+    CHECK(
+        fem::core::test::near(topOf(fem::core::CurvedFormulation::Arc, 4), shortening, kTolerance));
+    std::vector<double> errors;
+    for (const int n : {8, 16, 32}) {
+        errors.push_back(
+            relative(topOf(fem::core::CurvedFormulation::Isoparametric, n), shortening));
+    }
+    checkRate(errors);
 }
 
 // REQ-008b-13, 15, NFR-008b-01: a curved beam in plan (a quarter of a
@@ -494,13 +561,27 @@ TEST_CASE("curved beam in plan fixed at both ends", "[core][beam][curved][verifi
     };
     const double deflection = reference.work(0.0, middle, total, atMiddle);
 
-    fem::core::Model model = arcModel(r, {0.0, middle, end}, fem::core::ElementKind::Beam3D);
-    fem::core::test::fixAll(model, {1, 3}, fem::core::ElementKind::Beam3D);
-    model.distributedLoads.push_back({.elements = fem::core::ElementIds{{1, 2}},
-                                      .axes = fem::core::Axes::Global,
-                                      .startValue = q,
-                                      .endValue = q});
-    const fem::core::StaticResult result = fem::core::test::solve(model);
+    // n elements: fixed at the nodes 1 and n + 1, the middle is n / 2 + 1.
+    const auto solve = [&](fem::core::CurvedFormulation curved, int n) {
+        fem::core::Model model =
+            arcModel(r, split(0.0, end, n), fem::core::ElementKind::Beam3D, false, curved);
+        fem::core::test::fixAll(model, {1, static_cast<fem::core::ExternalId>(n + 1)},
+                                fem::core::ElementKind::Beam3D);
+        model.distributedLoads.push_back({.elements = model.assignments.front().elements,
+                                          .axes = fem::core::Axes::Global,
+                                          .startValue = q,
+                                          .endValue = q});
+        return fem::core::test::solve(model);
+    };
+    std::vector<double> errors;
+    for (const int n : {4, 8, 16}) {
+        errors.push_back(relative(solve(fem::core::CurvedFormulation::Isoparametric, n)
+                                      .displacements[static_cast<std::size_t>(n / 2)]
+                                      .z(),
+                                  deflection));
+    }
+    checkRate(errors);
+    const fem::core::StaticResult result = solve(fem::core::CurvedFormulation::Arc, 2);
     CHECK(fem::core::test::near(result.displacements[1].z(), deflection, kTolerance));
     CHECK(fem::core::test::near(result.reactions[2].z(), redundant(0), kTolerance));
     CHECK(close(result.reactionMoments[2], Vec(redundant(1), redundant(2), 0.0),
