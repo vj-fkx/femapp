@@ -75,9 +75,12 @@ class ExactBeamElement final : public ElementFormulation
 {
 public:
     // `beams` and `loads` are indexed by ElementIndex and must outlive the
-    // formulation.
+    // formulation. Feature 008c: with `negativePivots` (indexed the same),
+    // compute() writes the negative pivots of the element's internal
+    // condensations, for the Sturm count (design 008c §5.4); each element
+    // writes only its own entry.
     ExactBeamElement(ElementKind kind, std::span<const BeamData> beams,
-                     std::span<const SpanLoads> loads);
+                     std::span<const SpanLoads> loads, std::span<int> negativePivots = {});
 
     [[nodiscard]] DofMask dofsAt(ElementType type, int localNode) const override;
     [[nodiscard]] Expected<void> compute(const ElementNodes& nodes, ElementIndex element,
@@ -88,6 +91,7 @@ private:
     ElementKind m_kind;
     std::span<const BeamData> m_beams;
     std::span<const SpanLoads> m_loads;
+    std::span<int> m_negativePivots;
 };
 
 // The flexible length of an exact beam: along the arc, or between the ends

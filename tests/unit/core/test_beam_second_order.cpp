@@ -10,8 +10,10 @@
 #include <Eigen/Eigenvalues>
 #include <Eigen/LU>
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <numbers>
+#include <utility>
 
 namespace {
 
@@ -462,5 +464,74 @@ TEST_CASE("the negative pivots of the parts", "[core][beam][second-order]")
         CHECK(count(0.99 * 0.75 * first, false) == 0);
         CHECK(count(1.01 * 0.75 * first, false) == 1);
         CHECK(count(1.01 * first, false) == 2);
+    }
+}
+
+namespace {
+
+// The 2D exact element of one bar from (0, 0, 0) to (x2, 0, 0); its count of
+// negative pivots in `count`.
+Eigen::MatrixXd planarElement(const fem::core::BeamData& beam, double x2, int& count)
+{
+    const std::array<fem::core::BeamData, 1> beams = {beam};
+    const std::array<fem::core::SpanLoads, 1> loads{};
+    std::array<int, 1> counts = {-1};
+    const fem::core::ExactBeamElement element(fem::core::ElementKind::Beam2D, beams, loads, counts);
+    fem::core::ElementNodes nodes;
+    nodes.type = fem::core::ElementType::Line2;
+    nodes.count = 2;
+    nodes.x.at(0) = Eigen::Vector3d::Zero();
+    nodes.x.at(1) = Eigen::Vector3d(x2, 0.0, 0.0);
+    Eigen::MatrixXd k = Eigen::MatrixXd::Zero(6, 6);
+    Eigen::VectorXd f = Eigen::VectorXd::Zero(6);
+    REQUIRE(element.compute(nodes, 0, k, f).has_value());
+    count = counts[0];
+    return k;
+}
+
+} // namespace
+
+// REQ-008c-02, 08, 10: the exact element with an axial force: the rigid
+// offset in second order and the count of its connections.
+TEST_CASE("the exact element with an axial force", "[core][beam][second-order]")
+{
+    const double l = 4.0;
+    const double ei = 2e6;
+    SECTION("a cantilever with a rigid offset at its tip: P-Delta of the arm")
+    {
+        const double p = 2e5;
+        const double a = 0.5;
+        const double h = 1e3;
+        fem::core::BeamData beam = bar(-p);
+        beam.offsets.at(1) = Eigen::Vector3d(-a, 0.0, 0.0); // node at l + a
+        int count = 0;
+        const Eigen::MatrixXd k = planarElement(beam, l + a, count);
+        CHECK(count == 0);
+        const Eigen::Matrix3d k22 = k.bottomRightCorner(3, 3);
+        const Eigen::Vector3d node = k22.inverse() * Eigen::Vector3d(0.0, h, 0.0);
+        // The flexible cantilever under the shear h and the moment
+        // m = h a + p a theta at its tip, the arm turning with it.
+        const double kk = std::sqrt(p / ei);
+        const double u = kk * l;
+        const double c1 = (1.0 - std::cos(u)) / (p * std::cos(u));
+        const double c2 = std::tan(u) / (kk * ei);
+        const double d1 = (std::tan(u) - u) / (p * kk);
+        const double theta = h * (c1 + a * c2) / (1.0 - p * a * c2);
+        const double m = h * a + p * a * theta;
+        const double tip = h * d1 + m * c1;
+        CHECK(near(node(1), tip + a * theta, 1e-10));
+        CHECK(near(node(2), theta, 1e-10));
+    }
+    SECTION("released ends count the buckling of the pinned bar")
+    {
+        const double euler = std::numbers::pi * std::numbers::pi * ei / (l * l);
+        for (const auto& [factor, expected] : {std::pair{0.99, 0}, std::pair{1.01, 1}}) {
+            fem::core::BeamData beam = bar(-factor * euler);
+            beam.springs.at(0).at(5) = 0.0;
+            beam.springs.at(1).at(5) = 0.0;
+            int count = -1;
+            (void)planarElement(beam, l, count);
+            CHECK(count == expected);
+        }
     }
 }

@@ -5,6 +5,8 @@
 #include <fem/core/beam_state.hpp>
 
 #include <Eigen/Cholesky>
+#include <Eigen/Eigenvalues>
+#include <Eigen/LU>
 #include <array>
 #include <cstddef>
 
@@ -82,8 +84,13 @@ Layout layoutOf(const BeamData& beam, ElementKind kind)
 class ExactConnections
 {
 public:
-    ExactConnections(const Layout& layout, const StateBarMatrix& k, const StateBarVector& f)
+    // `indefinite`: with an axial force (feature 008c) the internal dofs may
+    // be indefinite; they are solved by LU and their negative eigenvalues
+    // counted (design 008c §5.4).
+    ExactConnections(const Layout& layout, const StateBarMatrix& k, const StateBarVector& f,
+                     bool indefinite = false)
         : m_layout(layout)
+        , m_indefinite(indefinite)
     {
         const int ne = layout.external;
         const int ni = layout.internal;
@@ -130,10 +137,17 @@ public:
                 m_kei(e, i) -= s;
             }
         }
-        if (ni > 0) {
+        if (ni > 0 && m_indefinite) {
+            m_lu.compute(m_kii);
+            const Eigen::SelfAdjointEigenSolver<SystemMatrix> eigen(m_kii, Eigen::EigenvaluesOnly);
+            m_negative = static_cast<int>((eigen.eigenvalues().array() < 0.0).count());
+        } else if (ni > 0) {
             m_ldlt.compute(m_kii);
         }
     }
+
+    // The negative eigenvalues of the internal dofs (indefinite only).
+    [[nodiscard]] int negative() const { return m_negative; }
 
     [[nodiscard]] bool stable() const
     {
@@ -153,7 +167,7 @@ public:
         if (m_layout.internal == 0) {
             return;
         }
-        const SystemMatrix x = m_ldlt.solve(m_kei.transpose()).transpose();
+        const SystemMatrix x = solve(m_kei.transpose()).transpose();
         k.noalias() -= x * m_kei.transpose();
         f.noalias() -= x * m_fi;
     }
@@ -164,7 +178,7 @@ public:
         const int n = 2 * m_layout.dofs;
         SystemVector internal = SystemVector::Zero(m_layout.internal);
         if (m_layout.internal > 0) {
-            internal = m_ldlt.solve(m_fi - m_kei.transpose() * external);
+            internal = solve(m_fi - m_kei.transpose() * external);
         }
         StateBarVector d = StateBarVector::Zero(n);
         for (int a = 0; a < n; ++a) {
@@ -179,7 +193,19 @@ public:
     }
 
 private:
+    template <typename Rhs>
+    [[nodiscard]] SystemMatrix solve(const Rhs& rhs) const
+    {
+        if (m_indefinite) {
+            return m_lu.solve(rhs);
+        }
+        return m_ldlt.solve(rhs);
+    }
+
     const Layout& m_layout;
+    bool m_indefinite = false;
+    int m_negative = 0;
+    Eigen::PartialPivLU<SystemMatrix> m_lu;
     SystemMatrix m_kee;
     SystemMatrix m_kei;
     SystemMatrix m_kii;
@@ -231,6 +257,35 @@ SystemMatrix nodesToExternal(const BeamData& beam, ElementKind kind, const Layou
     return t;
 }
 
+// Feature 008c (design 008c §5.3): a rigid offset turns with its node and
+// carries the force F that the flexible length applies on its tip; the
+// second-order part of its tip, theta x (theta x e) / 2, adds
+// (F . e) I - (F e^T + e F^T) / 2 to the rotations of the node. F is the
+// axial force of the reference state along the axis at that end.
+void addOffsetGeometry(const BeamData& beam, ElementKind kind, double length,
+                       Eigen::Ref<Eigen::MatrixXd> matrix)
+{
+    const bool planar = planarKind(kind);
+    const int perNode = planar ? 3 : 6;
+    for (std::size_t end = 0; end < 2; ++end) {
+        const Eigen::Vector3d& e = beam.offsets.at(end);
+        if (e.isZero()) {
+            continue;
+        }
+        const Eigen::Vector3d axis = (end == 0 ? beam.axes : beam.endAxes).col(0);
+        const double n = beam.axialForce.at(end == 0 ? 0.0 : length, length);
+        const Eigen::Vector3d force = (end == 0 ? n : -n) * axis;
+        const Eigen::Matrix3d g = force.dot(e) * Eigen::Matrix3d::Identity() -
+                                  0.5 * (force * e.transpose() + e * force.transpose());
+        const auto first = static_cast<Eigen::Index>(end) * perNode;
+        if (planar) {
+            matrix(first + 2, first + 2) += g(2, 2);
+        } else {
+            matrix.block(first + 3, first + 3, 3, 3) += g;
+        }
+    }
+}
+
 } // namespace
 
 double exactLength(const BeamData& beam, const Eigen::Vector3d& x1, const Eigen::Vector3d& x2)
@@ -239,10 +294,11 @@ double exactLength(const BeamData& beam, const Eigen::Vector3d& x1, const Eigen:
 }
 
 ExactBeamElement::ExactBeamElement(ElementKind kind, std::span<const BeamData> beams,
-                                   std::span<const SpanLoads> loads)
+                                   std::span<const SpanLoads> loads, std::span<int> negativePivots)
     : m_kind(kind)
     , m_beams(beams)
     , m_loads(loads)
+    , m_negativePivots(negativePivots)
 {}
 
 DofMask ExactBeamElement::dofsAt(ElementType type, int localNode) const
@@ -272,13 +328,20 @@ Expected<void> ExactBeamElement::compute(const ElementNodes& nodes, ElementIndex
     }
     const StateBarMatrices bar = stateBarMatrices(beam, length, m_loads[index], planarKind(m_kind));
     const Layout layout = layoutOf(beam, m_kind);
-    const ExactConnections connections(layout, bar.stiffness, bar.loads);
+    const bool second = beam.axialForce.active();
+    const ExactConnections connections(layout, bar.stiffness, bar.loads, second);
     SystemMatrix k;
     SystemVector f;
     connections.condense(k, f);
     const SystemMatrix t = nodesToExternal(beam, m_kind, layout);
     matrix = t.transpose() * k * t;
     vector = t.transpose() * f;
+    if (second) {
+        addOffsetGeometry(beam, m_kind, length, matrix);
+    }
+    if (!m_negativePivots.empty()) {
+        m_negativePivots[index] = bar.negativePivots + connections.negative();
+    }
     return {};
 }
 
@@ -289,7 +352,7 @@ StateBarVector exactBeamEnds(const BeamData& beam, ElementKind kind, const SpanL
     const double length = exactLength(beam, x1, x2);
     const StateBarMatrices bar = stateBarMatrices(beam, length, loads, planarKind(kind));
     const Layout layout = layoutOf(beam, kind);
-    const ExactConnections connections(layout, bar.stiffness, bar.loads);
+    const ExactConnections connections(layout, bar.stiffness, bar.loads, beam.axialForce.active());
     const SystemMatrix t = nodesToExternal(beam, kind, layout);
     SystemVector values(t.cols());
     for (Eigen::Index i = 0; i < t.cols(); ++i) {

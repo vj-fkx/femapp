@@ -67,7 +67,7 @@ Regras:
 
 ## Fase 3 — Elementos
 
-- [ ] **T09** `ExactBeamElement` com N: ligações condensadas pela
+- [x] **T09** `ExactBeamElement` com N: ligações condensadas pela
   decomposição de autovalores (blocos indefinidos permitidos), contagem por
   elemento num `span<int>`, termo de segunda ordem do braço rígido (design
   §5.3) contra a barra muito rígida (1e−6), contagem de um pilar com as
@@ -228,3 +228,12 @@ Regras:
   um andar) são cerca de 4 pedaços. As junções com N são resolvidas por LU
   (a inversa pela decomposição de autovalores perdia dígitos), e a
   contagem usa só os autovalores.
+
+**Fase 3 — Elementos (T09 a T12):**
+
+- T09: o termo do braço rígido foi conferido contra a solução analítica
+  do balanço com braço no topo (fórmulas de viga-coluna com cortante e
+  momento na ponta da parte flexível, o braço girando com ela), em 1e−10,
+  em vez da barra muito rígida do design (1e−6): a referência analítica é
+  mais forte. As ligações com N contam pelos autovalores e resolvem por LU;
+  sem N, o caminho LDLᵀ da 008b não mudou.
