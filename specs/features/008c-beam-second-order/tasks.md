@@ -92,18 +92,18 @@ Regras:
   recuperar), sem mudar resultados; nenhum teste novo, todas as suítes
   passam — arquivos: `static_analysis.cpp`, `detail/static_stages.hpp` —
   cobre: 14
-- [ ] **T14** Perfis a partir de uma solução (design §5.2): barra reta
+- [x] **T14** Perfis a partir de uma solução (design §5.2): barra reta
   (esforço de ponta mais carga axial), arco (`stateAt` nos pontos de
   Gauss), isoparamétrica (pontos reduzidos), treliça; testes contra os
   esforços da análise linear — arquivos: `static_stages`,
   `test_second_order_analysis.cpp` — cobre: 05
-- [ ] **T15** Testes da segunda ordem (devem falhar): pórtico plano de um
+- [x] **T15** Testes da segunda ordem (devem falhar): pórtico plano de um
   andar contra funções de estabilidade, ordem de grandeza de
   1/(1 − P/Pcr), iterações e variação no resultado, P/Pcr = 0,95
   convergindo em menos de 50 iterações, treliça com corda tensa e P-Δ
   global (AC-2, AC-3) — arquivo: `test_second_order_analysis.cpp` — cobre:
   01, 03, 05, 06
-- [ ] **T16** `stability_analysis.hpp` e `runSecondOrderStatic` (design §5.5):
+- [x] **T16** `stability_analysis.hpp` e `runSecondOrderStatic` (design §5.5):
   iteração com Anderson, gradiente conjugado pré-condicionado pela
   fatoração linear (nova fatoração se estagnar), fatoração final com a
   contagem de Sturm, meio passo, mensagens de instabilidade (nó e direção,
@@ -249,3 +249,23 @@ Regras:
   de 64 e 128 barras retas exatas nas cordas, extrapoladas por Richardson
   (as cordas erram com h²): a flexibilidade da ponta bate em 1e−6, a
   tolerância documentada dos arcos com N variável.
+
+**Fase 4 — Segunda ordem (T13 a T17):**
+
+- T13: `detail::StaticProblem` (preparar uma vez; montar, resolver e
+  recuperar); 298 testes inalterados.
+- T14: os perfis saem de `StaticProblem::profilesOf`; como o cabeçalho é
+  interno, a conferência contra os esforços é feita pelos testes da T15
+  (os N da treliça e do pilar são exatamente os da estática). Na barra
+  reta com carga axial no vão, N(s) = N(0) − ∫q_x − ΣP_x, em 4 partes, sem
+  `stateAt`; a base elástica axial (k_x) não entra no perfil.
+- T15/T16: balanço (Euler-Bernoulli e Engesser) em 1e−8 com um elemento,
+  momento na base h l + p δ, amplificação ≈ 1/(1 − P/Pcr), P/Pcr = 0,95
+  convergindo, pilar em 1 ou 4 elementos igual em 1e−8, dois pilares com
+  tirante de treliça (duas molas em série) em 1e−8, pórtico em 1 ou 4
+  elementos por barra igual em 1e−8, corda tensa δ = F/(k + 2T/L) em 1e−8,
+  mastro de treliça δ = H/(k − P/L) em 1e−6 (a segunda ordem da própria
+  mola, de ordem 1e−7). A referência do pórtico do AC-2 é a invariância
+  com a subdivisão: as barras são exatas na T04 (funções de estabilidade
+  em 1e−10). Falhas: acima da crítica (nó e direção), limite de iterações,
+  pilar biarticulado além da sua crítica ("inside the element 1").

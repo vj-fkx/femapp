@@ -20,6 +20,7 @@ struct SparseCholesky::Impl
     bool factorized = false;
     std::optional<std::int32_t> singular;
     std::int64_t negative = 0;
+    std::optional<std::int32_t> firstNegative;
     // The pattern of the symbolic analysis kept by factorizeIndefinite().
     bool analyzed = false;
     std::vector<std::int32_t> outer;
@@ -105,6 +106,7 @@ Expected<void> SparseCholesky::factorizeIndefinite(const SparseMatrix& lowerTria
     m_impl->factorized = false;
     m_impl->singular.reset();
     m_impl->negative = 0;
+    m_impl->firstNegative.reset();
     if (lowerTriangle.rows() == 0) {
         m_impl->factorized = true;
         return {};
@@ -136,8 +138,19 @@ Expected<void> SparseCholesky::factorizeIndefinite(const SparseMatrix& lowerTria
         }
     }
     m_impl->negative = (d.array() < 0.0).count();
+    for (Eigen::Index k = 0; k < d.size(); ++k) {
+        if (d[k] < 0.0) {
+            m_impl->firstNegative = m_impl->ldlt.permutationPinv().indices()[k];
+            break;
+        }
+    }
     m_impl->factorized = true;
     return {};
+}
+
+std::optional<std::int32_t> SparseCholesky::firstNegativeEquation() const
+{
+    return m_impl->firstNegative;
 }
 
 std::int64_t SparseCholesky::negativePivots() const

@@ -78,8 +78,17 @@ public:
     [[nodiscard]] std::int64_t negativePivots() const;
     [[nodiscard]] ElementIndex unstableElement() const;
 
+    // Feature 008c (design 008c §5.2): the axial force of every bar of the
+    // solution `values`, per element (inactive for the others), and the
+    // reference axial forces of the next assemblies.
+    [[nodiscard]] std::vector<AxialProfile> profilesOf(const Eigen::VectorXd& values) const;
+    void setAxialForces(const std::vector<AxialProfile>& profiles);
+
 private:
     StaticProblem(const Model& model, const StaticOptions& options);
+    // The values of the element's dofs, node by node in its order.
+    [[nodiscard]] std::vector<double> nodeValues(ElementIndex element, int nodes,
+                                                 const Eigen::VectorXd& values) const;
 
     const Model& m_model;
     StaticOptions m_options;

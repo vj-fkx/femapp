@@ -56,6 +56,9 @@ public:
     // The negative pivots of the last successful factorization: by
     // Sylvester's law, the number of negative eigenvalues of the matrix.
     [[nodiscard]] std::int64_t negativePivots() const;
+    // The first negative pivot in elimination order, as an equation of the
+    // input matrix: where the matrix stops being positive definite.
+    [[nodiscard]] std::optional<std::int32_t> firstNegativeEquation() const;
 
 private:
     struct Impl;
