@@ -956,3 +956,141 @@ TEST_CASE("analysis with isoparametric beams", "[core][beam][curved][iso]")
         CHECK(result.displacements[2].norm() > 0.0);
     }
 }
+
+namespace {
+
+// A quarter ring of n isoparametric elements, nodes on the circle.
+fem::core::Model isoRing(double r, int n, fem::core::ElementKind kind)
+{
+    std::vector<Vec> ends;
+    std::vector<Vec> middles;
+    const double quarter = std::numbers::pi / 2;
+    for (int i = 0; i <= n; ++i) {
+        const double a = quarter * i / n;
+        ends.emplace_back(r * std::cos(a), r * std::sin(a), 0.0);
+    }
+    for (int i = 0; i < n; ++i) {
+        const double a = quarter * (i + 0.5) / n;
+        middles.emplace_back(r * std::cos(a), r * std::sin(a), 0.0);
+    }
+    return isoModel(ends, middles, kind);
+}
+
+// The exact tip displacement of the quarter ring in cantilever under a
+// tip force (virtual work).
+Vec ringTip(double r, const fem::core::test::ArcSection& section, const Vec& force)
+{
+    const ArcReference reference{.r = r, .section = section, .planar = false};
+    const double tip = std::numbers::pi / 2;
+    const auto real = [&](double theta) {
+        return reference.fromPoint(theta, tip, force, Vec::Zero());
+    };
+    Vec d;
+    for (int i = 0; i < 3; ++i) {
+        const auto unit = [&](double theta) {
+            return reference.fromPoint(theta, tip, Vec::Unit(i), Vec::Zero());
+        };
+        d(i) = reference.work(0.0, tip, real, unit);
+    }
+    return d;
+}
+
+// The relative error of the tip of a quarter ring of n elements.
+double ringError(fem::core::Model model, int n, const Vec& force, const Vec& exact)
+{
+    fem::core::test::fixAll(model, {1}, fem::core::ElementKind::Beam3D);
+    model.nodalForces.push_back(
+        {.nodes = fem::core::NodeIds{{static_cast<fem::core::ExternalId>(n + 1)}}, .force = force});
+    const fem::core::StaticResult result = fem::core::test::solve(model);
+    return (result.displacements[static_cast<std::size_t>(n)] - exact).norm() / exact.norm();
+}
+
+} // namespace
+
+// REQ-008b-14, AC-6: the isoparametric beam converges to the exact arc with
+// h^4 (design 008b §5.5), does not lock when slender, and represents a
+// parabola exactly (a three-hinged parabolic arch: its thrust by statics).
+TEST_CASE("convergence of the isoparametric beam", "[core][beam][curved][iso]")
+{
+    using namespace fem::core::test;
+    const double r = 2.0;
+    const Vec force(2e3, -3e3, 1.5e3);
+
+    SECTION("rate 4 on the quarter ring")
+    {
+        const Vec exact = ringTip(r, genericArcSection(), force);
+        std::vector<double> errors;
+        for (const int n : {4, 8, 16}) {
+            errors.push_back(
+                ringError(isoRing(r, n, fem::core::ElementKind::Beam3D), n, force, exact));
+        }
+        INFO("errors " << errors[0] << " " << errors[1] << " " << errors[2]);
+        for (std::size_t i = 0; i + 1 < errors.size(); ++i) {
+            const double rate = std::log2(errors[i] / errors[i + 1]);
+            CHECK(rate >= 3.5);
+            CHECK(rate <= 4.5);
+        }
+    }
+    SECTION("no locking when slender: L / h = 1000, both theories")
+    {
+        const double b = 0.05;
+        const double h = r * std::numbers::pi / 2 / 1000;
+        for (const auto theory :
+             {fem::core::BeamTheory::Timoshenko, fem::core::BeamTheory::EulerBernoulli}) {
+            fem::core::Model model = isoRing(r, 8, fem::core::ElementKind::Beam3D);
+            fem::core::Section& section = model.sections.front();
+            section.area = b * h;
+            section.inertiaY = h * b * b * b / 12; // about the local y (Z): in the plane
+            section.inertiaZ = b * h * h * h / 12; // out of the plane
+            section.torsionConstant = b * h * h * h / 3;
+            section.shearAreaY = section.shearAreaZ = 5.0 / 6.0 * b * h;
+            model.assignments.front().theory = theory;
+            const bool timoshenko = theory == fem::core::BeamTheory::Timoshenko;
+            const ArcSection exact{.ea = kE * b * h,
+                                   .gay = timoshenko ? kG * 5.0 / 6.0 * b * h : 1e300,
+                                   .gaz = timoshenko ? kG * 5.0 / 6.0 * b * h : 1e300,
+                                   .gj = kG * b * h * h * h / 3,
+                                   .eiy = kE * h * b * b * b / 12,
+                                   .eiz = kE * b * h * h * h / 12};
+            const Vec small = 1e-6 * force;
+            CHECK(ringError(model, 8, small, ringTip(r, exact, small)) <= 1e-3);
+        }
+    }
+    SECTION("a three-hinged parabolic arch")
+    {
+        const double span = 10.0;
+        const double rise = 2.5;
+        const auto y = [&](double x) { return rise * (1.0 - std::pow(2.0 * x / span - 1.0, 2)); };
+        // Two elements, each half of the parabola, exact on their curve.
+        fem::core::Model model =
+            isoModel({Vec(0, 0, 0), Vec(span / 2, rise, 0), Vec(span, 0, 0)},
+                     {Vec(span / 4, y(span / 4), 0), Vec(3 * span / 4, y(3 * span / 4), 0)},
+                     fem::core::ElementKind::Beam2D);
+        restrain(model, {1, 3}, {fem::core::DofType::U, fem::core::DofType::V});
+        fem::core::EndConnection hinge{.elements = fem::core::ElementIds{{1}},
+                                       .end = fem::core::BarEnd::End};
+        hinge.stiffness[5] = 0.0;
+        model.endConnections.push_back(hinge);
+        const double w = 3e3; // per length of arc, downwards
+        model.distributedLoads.push_back({.elements = fem::core::ElementIds{{1, 2}},
+                                          .axes = fem::core::Axes::Global,
+                                          .startValue = Vec(0, -w, 0),
+                                          .endValue = Vec(0, -w, 0)});
+        const fem::core::StaticResult result = solve(model);
+        // Statics of the left half about the crown hinge: with the vertical
+        // reaction W (the load of the half, by symmetry), the thrust is
+        // H = (integral of x dW) / f, by Gauss-Legendre on the arc.
+        double weight = 0.0;
+        double moment = 0.0; // of the load about the support, x * dW
+        for (const auto& [t, g] : gaussLegendre(64)) {
+            const double x = span / 4 * (1.0 + t);
+            const double slope = -4.0 * rise / span * (2.0 * x / span - 1.0);
+            const double ds = g * span / 4 * std::sqrt(1.0 + slope * slope);
+            weight += w * ds;
+            moment += w * ds * x;
+        }
+        const double thrust = moment / rise;
+        CHECK(near(result.reactions[0].x(), thrust, 1e-9));
+        CHECK(near(result.reactions[0].y(), weight, 1e-9));
+    }
+}

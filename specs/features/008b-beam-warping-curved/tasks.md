@@ -155,7 +155,7 @@ Regras:
   testes — cobre: 14, 16
 - [x] **T31** `BeamResult` da isoparamétrica e a análise com `Line3`
   isoparamétrico (nó do meio com GDL, apoio e carga) — cobre: 14, 19
-- [ ] **T32** Convergência (AC-6): os casos do arco com n = 2, 4, 8, 16
+- [x] **T32** Convergência (AC-6): os casos do arco com n = 2, 4, 8, 16
   elementos (taxa 4 ± 0,5, registrada nas notas); L/h = 1000 sem travamento;
   arco parabólico contra a referência documentada — cobre: 14
 - [x] **T33** ~~Viga curva com empenamento (AC-7): R grande igual à reta;   arco e isoparamétrica concordando com o refinamento; caso de Yang e Kuo   (1987), 1% — cobre: 07, 13, 14~~ *Removida em 2026-11-16 com o empenamento (requirements §6).*
@@ -297,4 +297,20 @@ Regras:
 - T29: a base elástica é conferida na viga de Hetényi com o elemento exato
   (1e−8); no arco, o acoplamento com a curvatura já é coberto pelos testes
   do motor (T17, T18).
+
+**Fase 6 — Viga isoparamétrica (T30 a T32):**
+
+- T30: no patch test, uma barra ao longo de X tem o y local no Z global
+  (regra da 008): o momento em torno de Z trabalha com EIy — o teste usa
+  essa correspondência.
+- T31: as cargas da isoparamétrica ficam como o modelo as dá
+  (`IsoLoads`), com posições pelo comprimento de arco da curva quadrática;
+  os esforços ao longo da barra extrapolam N, Vy e Vz dos dois pontos
+  reduzidos e tiram os momentos das curvaturas no ponto.
+- T32: taxas medidas no quarto de anel (erro relativo da ponta, n = 1 a
+  32): 3,28, 3,74, 3,93, 3,98, 4,00 — a taxa 4 do design. Com L/h = 1000 o
+  erro com 8 elementos fica abaixo de 10⁻³ nas duas teorias (sem
+  travamento). O arco parabólico é conferido como triarticulado: a curva
+  quadrática representa a parábola exatamente, e o empuxo bate com a
+  estática em 1e−9.
 
