@@ -48,7 +48,7 @@ Regras:
   partes por N (crítica biengastada da parte acima de 4|N|; crescimento em
   tração) até a T04 passar; N ≤ −G As informado como instável — arquivos:
   `beam_state.cpp` — cobre: 02
-- [ ] **T06** Viga-coluna (AC-1): biapoiada com carga uniforme e
+- [x] **T06** Viga-coluna (AC-1): biapoiada com carga uniforme e
   concentrada sob compressão e tração (Timoshenko-Gere), balanço com força
   lateral e compressão, momentos e deslocamentos por `stateAt` ao longo,
   Engesser contra a sua forma fechada, base elástica com N (viga de

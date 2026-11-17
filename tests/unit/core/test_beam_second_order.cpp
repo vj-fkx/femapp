@@ -7,9 +7,11 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <Eigen/Cholesky>
+#include <Eigen/Eigenvalues>
 #include <Eigen/LU>
 #include <algorithm>
 #include <cmath>
+#include <numbers>
 
 namespace {
 
@@ -216,5 +218,119 @@ TEST_CASE("the exact bar with an axial force", "[core][beam][second-order]")
             CHECK(near(std::abs(m.loads(2)), q * l * l / 12.0 * psi, 1e-10));
             CHECK(near(std::abs(m.loads(1)), q * l / 2, 1e-10));
         }
+    }
+}
+
+namespace {
+
+// A simply supported bar in the plane (u1, v1, v2, u2 held; both rotations
+// free), solved with the exact stiffness; the local dofs of its ends.
+fem::core::StateBarVector simplySupported(const fem::core::BeamData& beam, double l,
+                                          const fem::core::SpanLoads& loads)
+{
+    const StateBarMatrices m = fem::core::stateBarMatrices(beam, l, loads, true);
+    Eigen::Matrix2d k;
+    k << m.stiffness(2, 2), m.stiffness(2, 5), m.stiffness(5, 2), m.stiffness(5, 5);
+    const Eigen::Vector2d rotations = k.inverse() * Eigen::Vector2d(m.loads(2), m.loads(5));
+    fem::core::StateBarVector ends = fem::core::StateBarVector::Zero(6);
+    ends(2) = rotations(0);
+    ends(5) = rotations(1);
+    return ends;
+}
+
+} // namespace
+
+// REQ-008c-02, 06, AC-1: the beam-column of Timoshenko and Gere along the
+// bar, and the second order on an elastic foundation.
+TEST_CASE("beam-columns along the bar", "[core][beam][second-order]")
+{
+    const double l = 4.0;
+    const double ei = 2e6;
+    SECTION("simply supported under a uniform load: compression and tension")
+    {
+        const double q = 3e3;
+        fem::core::SpanLoads loads;
+        loads.pieces.push_back({.from = 0.0,
+                                .to = l,
+                                .start = Eigen::Vector4d(0.0, -q, 0.0, 0.0),
+                                .end = Eigen::Vector4d(0.0, -q, 0.0, 0.0)});
+        for (const double n : {-5e5, -1.1e6, 8e5}) {
+            const fem::core::BeamData beam = bar(n);
+            const auto ends = simplySupported(beam, l, loads);
+            const auto middle = fem::core::stateAt(beam, l, loads, true, ends, l / 2);
+            const double u = std::sqrt(std::abs(n) / ei) * l / 2;
+            const double u2 = u * u;
+            const double eta = n < 0.0 ? 12.0 * (2.0 / std::cos(u) - 2.0 - u2) / (5.0 * u2 * u2)
+                                       : 12.0 * (2.0 / std::cosh(u) - 2.0 + u2) / (5.0 * u2 * u2);
+            const double moment = n < 0.0 ? 2.0 * (1.0 / std::cos(u) - 1.0) / u2
+                                          : 2.0 * (1.0 - 1.0 / std::cosh(u)) / u2;
+            INFO("N = " << n);
+            CHECK(near(std::abs(middle.displacement.y()),
+                       5.0 * q * l * l * l * l / (384.0 * ei) * eta, 1e-10));
+            CHECK(near(std::abs(middle.moment.z()), q * l * l / 8.0 * moment, 1e-10));
+            // No moment at the pinned ends; the axial force carried along.
+            CHECK(std::abs(fem::core::stateAt(beam, l, loads, true, ends, 0.0).moment.z()) <=
+                  1e-8 * q * l * l);
+        }
+    }
+    SECTION("simply supported under a load at the middle")
+    {
+        const double p = 4e4;
+        fem::core::SpanLoads loads;
+        loads.points.push_back({.at = l / 2, .force = Eigen::Vector3d(0.0, -p, 0.0)});
+        for (const double n : {-7e5, 6e5}) {
+            const fem::core::BeamData beam = bar(n);
+            const auto ends = simplySupported(beam, l, loads);
+            const auto middle = fem::core::stateAt(beam, l, loads, true, ends, l / 2);
+            const double u = std::sqrt(std::abs(n) / ei) * l / 2;
+            const double delta = n < 0.0 ? 3.0 * (std::tan(u) - u) / (u * u * u)
+                                         : 3.0 * (u - std::tanh(u)) / (u * u * u);
+            const double moment = n < 0.0 ? std::tan(u) / u : std::tanh(u) / u;
+            CHECK(near(std::abs(middle.displacement.y()), p * l * l * l / (48.0 * ei) * delta,
+                       1e-10));
+            CHECK(near(std::abs(middle.moment.z()), p * l / 4.0 * moment, 1e-10));
+        }
+    }
+    SECTION("the cantilever: the moment at the root is H L + P delta")
+    {
+        const double h = 1e3;
+        const double n = -2e5; // below pi^2 EI / 4 l^2
+        const StateBarMatrices m = fem::core::stateBarMatrices(bar(n), l, {}, true);
+        const Eigen::Matrix3d k22 = m.stiffness.bottomRightCorner(3, 3);
+        const Eigen::Vector3d tip = k22.inverse() * Eigen::Vector3d(0.0, h, 0.0);
+        fem::core::StateBarVector ends = fem::core::StateBarVector::Zero(6);
+        ends.tail(3) = tip;
+        const auto root = fem::core::stateAt(bar(n), l, {}, true, ends, 0.0);
+        CHECK(near(std::abs(root.moment.z()), h * l - n * tip(1), 1e-10));
+        CHECK(near(tip(1), cantileverTip(l, ei, 0.0, n, h), 1e-10));
+    }
+    SECTION("on an elastic foundation: the critical load of Hetenyi")
+    {
+        // Pinned ends: N_cr = min over m of EI (m pi / l)^2 + k (l / m pi)^2.
+        const double k = 8e6;
+        const double pi = std::numbers::pi;
+        double critical = 1e300;
+        int waves = 0;
+        for (int m = 1; m <= 6; ++m) {
+            const double value = ei * std::pow(m * pi / l, 2) + k * std::pow(l / (m * pi), 2);
+            if (value < critical) {
+                critical = value;
+                waves = m;
+            }
+        }
+        REQUIRE(waves > 1); // the foundation shortens the waves
+        // The pinned bar is stable just below and unstable just above: the
+        // determinant of the rotational stiffness plus the internal count.
+        const auto unstable = [&](double n) {
+            fem::core::BeamData beam = bar(n);
+            beam.foundation = Eigen::Vector4d(0.0, k, k, 0.0);
+            const StateBarMatrices m = fem::core::stateBarMatrices(beam, l, {}, true);
+            Eigen::Matrix2d kr;
+            kr << m.stiffness(2, 2), m.stiffness(2, 5), m.stiffness(5, 2), m.stiffness(5, 5);
+            const Eigen::SelfAdjointEigenSolver<Eigen::Matrix2d> eigen(kr);
+            return m.negativePivots + (eigen.eigenvalues().array() < 0.0).count();
+        };
+        CHECK(unstable(-critical * (1.0 - 1e-6)) == 0);
+        CHECK(unstable(-critical * (1.0 + 1e-6)) == 1);
     }
 }
