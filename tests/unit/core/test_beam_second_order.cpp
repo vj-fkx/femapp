@@ -2,6 +2,7 @@
 // (design 008c §5.1 to 5.4).
 
 #include <fem/core/beam_element.hpp>
+#include <fem/core/beam_iso.hpp>
 #include <fem/core/beam_state.hpp>
 #include <fem/core/truss_element.hpp>
 
@@ -14,7 +15,9 @@
 #include <array>
 #include <cmath>
 #include <numbers>
+#include <optional>
 #include <utility>
+#include <vector>
 
 namespace {
 
@@ -562,5 +565,69 @@ TEST_CASE("the truss bar with an axial force", "[core][beam][second-order]")
         // A taut bar resists a sideways motion of its end with N / L.
         const Eigen::Vector3d side = e.cross(Eigen::Vector3d::UnitX()).normalized();
         CHECK(std::abs(side.dot(k.bottomRightCorner(3, 3) * side) - n / l) <= 1e-12 * 1e8 / l);
+    }
+}
+
+namespace {
+
+// A straight 3D cantilever along x of n isoparametric elements (node k at
+// x = k l / 2n), clamped at x = 0, with a force h along global Y at the tip
+// and the constant axial force of `beam`: the tip deflection.
+double isoCantilever(const fem::core::BeamData& beam, double l, int n, double h)
+{
+    const std::array<fem::core::IsoBeamData, 1> data = {
+        fem::core::IsoBeamData{.beam = beam, .reference = std::nullopt, .roll = 0.0, .loads = {}}};
+    const fem::core::IsoBeamElement element(fem::core::ElementKind::Beam3D, data);
+    const int nodes = 2 * n + 1;
+    Eigen::MatrixXd k = Eigen::MatrixXd::Zero(6 * nodes, 6 * nodes);
+    for (int e = 0; e < n; ++e) {
+        const std::array<int, 3> ids = {2 * e, 2 * e + 2, 2 * e + 1};
+        fem::core::ElementNodes x;
+        x.type = fem::core::ElementType::Line3;
+        x.count = 3;
+        for (std::size_t i = 0; i < 3; ++i) {
+            x.x.at(i) = Eigen::Vector3d(ids.at(i) * l / (2.0 * n), 0.0, 0.0);
+        }
+        Eigen::MatrixXd ke = Eigen::MatrixXd::Zero(18, 18);
+        Eigen::VectorXd fe = Eigen::VectorXd::Zero(18);
+        REQUIRE(element.compute(x, 0, ke, fe).has_value());
+        for (int a = 0; a < 3; ++a) {
+            for (int b = 0; b < 3; ++b) {
+                k.block(6 * ids.at(static_cast<std::size_t>(a)),
+                        6 * ids.at(static_cast<std::size_t>(b)), 6, 6) +=
+                    ke.block(6 * a, 6 * b, 6, 6);
+            }
+        }
+    }
+    const Eigen::Index free = 6 * (nodes - 1);
+    Eigen::VectorXd f = Eigen::VectorXd::Zero(free);
+    f(free - 6 + 1) = h;
+    const Eigen::VectorXd d = k.bottomRightCorner(free, free).partialPivLu().solve(f);
+    return d(free - 6 + 1);
+}
+
+} // namespace
+
+// REQ-008c-04: the geometric stiffness of the isoparametric beam converges
+// to the exact second-order bar (design 008c §5.3).
+TEST_CASE("the isoparametric beam with an axial force", "[core][beam][second-order][iso]")
+{
+    const double l = 4.0;
+    const double h = 1e3;
+    for (const double n : {-2e5, 3e5}) {
+        // Along x with the default reference, global Y is the local -z:
+        // bending about the local y (EI = 1.5e6, G As = 4e7).
+        const double exact = cantileverTip(l, 1.5e6, 4e7, n, h);
+        std::vector<double> errors;
+        for (const int elements : {2, 4, 8, 16}) {
+            errors.push_back(std::abs(isoCantilever(bar(n, true), l, elements, h) - exact) /
+                             std::abs(exact));
+        }
+        INFO("N = " << n << ", errors " << errors[0] << " " << errors[1] << " " << errors[2] << " "
+                    << errors[3]);
+        for (std::size_t i = 0; i + 1 < errors.size(); ++i) {
+            CHECK(std::log2(errors[i] / errors[i + 1]) >= 3.5);
+        }
+        CHECK(errors.back() <= 1e-5);
     }
 }

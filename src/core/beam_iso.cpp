@@ -6,7 +6,8 @@
 // one of the exact engine (shear centre included); the normal and shear
 // terms are integrated with 2 points and the curvature terms with 3
 // (Stolarski and Belytschko, 1983; Prathap, 1993), free of shear and
-// membrane locking.
+// membrane locking. Feature 008c: the reference axial force adds its
+// geometric stiffness, integrated with 3 points.
 
 #include <fem/core/beam_iso.hpp>
 #include <fem/core/shape_functions.hpp>
@@ -202,6 +203,21 @@ Expected<Flexible> flexible(const IsoBeamData& data, ElementKind kind, const Iso
         const auto bk = b.bottomRows<3>();
         out.k.noalias() += w * bk.transpose() * d.bottomRightCorner<3, 3>() * bk;
         out.f.noalias() += w * bk.transpose() * d.bottomRightCorner<3, 3>() * imposed.tail<3>();
+        // Feature 008c (design 008c §5.3): the geometric stiffness of the
+        // reference axial force on the transverse slope of the centroid,
+        // N (I - t t^T) on u' (the total slope, as Engesser).
+        if (beam.axialForce.active()) {
+            const double n = beam.axialForce.at(arcLength(x, kGauss3.at(g)), length);
+            const Eigen::Matrix3d transverse =
+                Eigen::Matrix3d::Identity() - p->t * p->t.transpose();
+            for (int i = 0; i < 3; ++i) {
+                for (int jn = 0; jn < 3; ++jn) {
+                    const double dd = p->shape.dn.at(static_cast<std::size_t>(i)) *
+                                      p->shape.dn.at(static_cast<std::size_t>(jn)) / (p->j * p->j);
+                    out.k.block<3, 3>(at(i), at(jn)) += w * n * dd * transverse;
+                }
+            }
+        }
         // The foundation, on the centroid displacements and the twist.
         if (!beam.foundation.isZero()) {
             const Eigen::Matrix3d kf =

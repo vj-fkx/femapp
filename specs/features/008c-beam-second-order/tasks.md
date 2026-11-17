@@ -76,7 +76,7 @@ Regras:
 - [x] **T10** [P] Rigidez geométrica da treliça (2D e 3D) contra a forma
   fechada; corda tensa — arquivos: `truss_element.hpp/.cpp`,
   `test_beam_second_order.cpp` — cobre: 03
-- [ ] **T11** [P] Rigidez geométrica da isoparamétrica (design §5.3):
+- [x] **T11** [P] Rigidez geométrica da isoparamétrica (design §5.3):
   simetria, modos rígidos sem energia geométrica em translação,
   convergência contra a barra exata com N (reta e arco), taxa registrada —
   arquivos: `beam_iso.hpp/.cpp`, `test_beam_second_order.cpp` — cobre: 04
@@ -241,3 +241,7 @@ Regras:
   e não num `span` à parte como no design §4, do mesmo jeito que o perfil
   fica em `BeamData`; a rigidez geométrica N/L (I − e eᵀ) entra direto nos
   blocos de translação.
+- T11: a isoparamétrica com N lê o perfil de `BeamData` no comprimento de
+  arco de cada ponto. Balanço 3D com N constante, contra Engesser fechado,
+  com 2, 4, 8 e 16 elementos: compressão 6,3e−3, 4,1e−4, 2,6e−5, 1,6e−6;
+  tração 2,1e−4, 1,2e−5, 7,7e−7, 4,8e−8 — taxa 4 (3,96 a 4,05).
