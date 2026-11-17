@@ -578,24 +578,24 @@ double isoCantilever(const fem::core::BeamData& beam, double l, int n, double h)
     const std::array<fem::core::IsoBeamData, 1> data = {
         fem::core::IsoBeamData{.beam = beam, .reference = std::nullopt, .roll = 0.0, .loads = {}}};
     const fem::core::IsoBeamElement element(fem::core::ElementKind::Beam3D, data);
-    const int nodes = 2 * n + 1;
+    const Eigen::Index nodes = 2 * Eigen::Index{n} + 1;
     Eigen::MatrixXd k = Eigen::MatrixXd::Zero(6 * nodes, 6 * nodes);
-    for (int e = 0; e < n; ++e) {
-        const std::array<int, 3> ids = {2 * e, 2 * e + 2, 2 * e + 1};
+    for (Eigen::Index e = 0; e < n; ++e) {
+        const std::array<Eigen::Index, 3> ids = {2 * e, 2 * e + 2, 2 * e + 1};
         fem::core::ElementNodes x;
         x.type = fem::core::ElementType::Line3;
         x.count = 3;
         for (std::size_t i = 0; i < 3; ++i) {
-            x.x.at(i) = Eigen::Vector3d(ids.at(i) * l / (2.0 * n), 0.0, 0.0);
+            x.x.at(i) = Eigen::Vector3d(static_cast<double>(ids.at(i)) * l / (2.0 * n), 0.0, 0.0);
         }
         Eigen::MatrixXd ke = Eigen::MatrixXd::Zero(18, 18);
         Eigen::VectorXd fe = Eigen::VectorXd::Zero(18);
         REQUIRE(element.compute(x, 0, ke, fe).has_value());
-        for (int a = 0; a < 3; ++a) {
-            for (int b = 0; b < 3; ++b) {
-                k.block(6 * ids.at(static_cast<std::size_t>(a)),
-                        6 * ids.at(static_cast<std::size_t>(b)), 6, 6) +=
-                    ke.block(6 * a, 6 * b, 6, 6);
+        for (std::size_t a = 0; a < 3; ++a) {
+            for (std::size_t b = 0; b < 3; ++b) {
+                const auto ea = static_cast<Eigen::Index>(a);
+                const auto eb = static_cast<Eigen::Index>(b);
+                k.block(6 * ids.at(a), 6 * ids.at(b), 6, 6) += ke.block(6 * ea, 6 * eb, 6, 6);
             }
         }
     }
@@ -630,4 +630,83 @@ TEST_CASE("the isoparametric beam with an axial force", "[core][beam][second-ord
         }
         CHECK(errors.back() <= 1e-5);
     }
+}
+
+namespace {
+
+// The rotation by angle a about Z, as columns of local axes in global.
+Eigen::Matrix3d turned(double a)
+{
+    Eigen::Matrix3d r;
+    r << std::cos(a), -std::sin(a), 0.0, std::sin(a), std::cos(a), 0.0, 0.0, 0.0, 1.0;
+    return r;
+}
+
+// The tip compliance (u, v, rz in the tangent axes at the tip) of a planar
+// quarter circle of radius r from the origin, tangent +X, turning about +Z,
+// clamped at its start, with the axial force n(s): as m exact straight bars
+// on its chords, each with n at its middle.
+template <typename F>
+Eigen::Matrix3d chainCompliance(double r, int m, const F& n)
+{
+    const double angle = std::numbers::pi / 2;
+    const double step = angle / m;
+    const auto point = [r](double a) {
+        return Eigen::Vector3d(r * std::sin(a), r * (1.0 - std::cos(a)), 0.0);
+    };
+    std::vector<fem::core::BeamData> beams(static_cast<std::size_t>(m));
+    const std::vector<fem::core::SpanLoads> loads(static_cast<std::size_t>(m));
+    for (int k = 0; k < m; ++k) {
+        const Eigen::Vector3d chord = point((k + 1) * step) - point(k * step);
+        fem::core::BeamData& beam = beams.at(static_cast<std::size_t>(k));
+        beam = bar(n((k + 0.5) * step * r));
+        beam.axes = turned(std::atan2(chord.y(), chord.x()));
+        beam.endAxes = beam.axes;
+    }
+    const fem::core::ExactBeamElement element(fem::core::ElementKind::Beam2D, beams, loads);
+    const Eigen::Index count = m;
+    Eigen::MatrixXd k = Eigen::MatrixXd::Zero(3 * (count + 1), 3 * (count + 1));
+    for (int e = 0; e < m; ++e) {
+        const Eigen::Index first = 3 * Eigen::Index{e};
+        fem::core::ElementNodes nodes;
+        nodes.type = fem::core::ElementType::Line2;
+        nodes.count = 2;
+        nodes.x.at(0) = point(e * step);
+        nodes.x.at(1) = point((e + 1) * step);
+        Eigen::MatrixXd ke = Eigen::MatrixXd::Zero(6, 6);
+        Eigen::VectorXd fe = Eigen::VectorXd::Zero(6);
+        REQUIRE(element.compute(nodes, e, ke, fe).has_value());
+        k.block(first, first, 6, 6) += ke;
+    }
+    const Eigen::Index free = 3 * count;
+    const Eigen::MatrixXd compliance = k.bottomRightCorner(free, free).inverse();
+    const Eigen::Matrix3d tip = compliance.bottomRightCorner(3, 3);
+    const Eigen::Matrix3d frame = turned(angle);
+    return frame.transpose() * tip * frame;
+}
+
+} // namespace
+
+// REQ-008c-04: the exact arc with an axial force that varies along it,
+// against a fine chain of straight bars (Richardson).
+TEST_CASE("the arc with an axial force", "[core][beam][second-order][arc]")
+{
+    const double r = 3.0;
+    const double length = r * std::numbers::pi / 2;
+    const auto n = [length](double s) { return -2e5 * (1.0 + 0.5 * s / length); };
+    fem::core::BeamData arc = bar(0.0);
+    arc.axialForce = sampled(n, 8, length);
+    arc.curvature = Eigen::Vector3d(0.0, 0.0, 1.0 / r);
+    arc.arcLength = length;
+    arc.endAxes = turned(std::numbers::pi / 2);
+    const StateBarMatrices m = fem::core::stateBarMatrices(arc, length, {}, true);
+    const Eigen::Matrix3d exact = Eigen::Matrix3d(m.stiffness.bottomRightCorner(3, 3)).inverse();
+    // Richardson on chains of 64 and 128 bars: the chords err with h^2.
+    const Eigen::Matrix3d coarse = chainCompliance(r, 64, n);
+    const Eigen::Matrix3d fine = chainCompliance(r, 128, n);
+    const Eigen::Matrix3d extrapolated = (4.0 * fine - coarse) / 3.0;
+    INFO("exact\n" << exact << "\nchain\n" << extrapolated);
+    CHECK((extrapolated - exact).norm() <= 1e-6 * exact.norm());
+    // The extrapolation improves on the finer chain.
+    CHECK((fine - exact).norm() > (extrapolated - exact).norm());
 }

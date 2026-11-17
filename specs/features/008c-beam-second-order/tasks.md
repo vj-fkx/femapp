@@ -80,7 +80,7 @@ Regras:
   simetria, modos rígidos sem energia geométrica em translação,
   convergência contra a barra exata com N (reta e arco), taxa registrada —
   arquivos: `beam_iso.hpp/.cpp`, `test_beam_second_order.cpp` — cobre: 04
-- [ ] **T12** Arcos com perfil de N: o motor no arco com N variável contra
+- [x] **T12** Arcos com perfil de N: o motor no arco com N variável contra
   uma cadeia refinada de barras retas exatas (extrapolação de Richardson);
   tolerância documentada nas notas — arquivos: `beam_state.cpp`,
   `test_beam_second_order.cpp` — cobre: 04
@@ -245,3 +245,7 @@ Regras:
   arco de cada ponto. Balanço 3D com N constante, contra Engesser fechado,
   com 2, 4, 8 e 16 elementos: compressão 6,3e−3, 4,1e−4, 2,6e−5, 1,6e−6;
   tração 2,1e−4, 1,2e−5, 7,7e−7, 4,8e−8 — taxa 4 (3,96 a 4,05).
+- T12: o quarto de anel com N variável (perfil em 8 partes) contra cadeias
+  de 64 e 128 barras retas exatas nas cordas, extrapoladas por Richardson
+  (as cordas erram com h²): a flexibilidade da ponta bate em 1e−6, a
+  tolerância documentada dos arcos com N variável.
