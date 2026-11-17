@@ -5,6 +5,14 @@ Requisitos: [requirements.md](requirements.md)
 
 ## 1. Resumo da abordagem
 
+> **Alteração de 2026-11-16 (durante a implementação):** a torção com
+> empenamento foi adiada para uma versão futura (feature 008d). O que segue
+> sobre empenamento vale como registro e como base dessa versão: no `core`
+> ficam Iw e ω das seções e a capacidade de empenamento do motor exato
+> (§5.3) e da `ExactBeamElement` com pontas livres ou impedidas, sem acesso
+> pelo `Model`; saem o `DofType::Warp`, as condições por ponta na análise
+> (§5.4), os bimomentos e os resultados de empenamento.
+
 Tudo em `core`, sem Qt, sobre o `Model`, a análise e a viga da 008:
 
 1. **Seções** (`section.hpp`, `section_thin_walled.cpp`, `section_solid.cpp`,

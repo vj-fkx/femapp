@@ -22,12 +22,6 @@ struct BeamForces
     double t = 0.0;
     double my = 0.0;
     double mz = 0.0;
-    // REQ-008b-18: the bimoment B (sigma_w = B omega / Iw) and the parts of
-    // the torque, t = tsv + tw (Saint-Venant and warping; without warping,
-    // tsv = t).
-    double b = 0.0;
-    double tsv = 0.0;
-    double tw = 0.0;
 };
 
 // Forces, and displacements and rotations of the centroid axis, at a point.
@@ -36,7 +30,6 @@ struct BeamPoint
     BeamForces forces;
     Eigen::Vector3d displacement = Eigen::Vector3d::Zero(); // principal local axes
     Eigen::Vector3d rotation = Eigen::Vector3d::Zero();
-    double warping = 0.0; // REQ-008b-19: the rate of twist, with warping
 };
 
 // At a concentrated load: the value just before or just after it.
@@ -117,9 +110,9 @@ struct PointStress
 // that the nodes apply on the bar, on the centroid dofs).
 void endForces(const BeamData& beam, const BeamVector& forces, BeamForces& start, BeamForces& end);
 
-// REQ-008b-18: the same for an exact beam, from the local dofs of its ends
-// and the forces the nodes apply on its flexible length (design 008b §5.3).
-void exactEndForces(const BeamData& beam, bool planar, const StateBarVector& ends,
-                    const StateBarVector& forces, BeamForces& start, BeamForces& end);
+// REQ-008b-19: the same for an exact beam, from the forces that the nodes
+// apply on its flexible length (design 008b §5.3).
+void exactEndForces(const BeamData& beam, bool planar, const StateBarVector& forces,
+                    BeamForces& start, BeamForces& end);
 
 } // namespace fem::core

@@ -77,15 +77,13 @@ void addDistributed(SpanLoads& loads, const SpanFrame& frame, Axes axes,
 }
 
 void addConcentrated(SpanLoads& loads, const SpanFrame& frame, Axes axes,
-                     const Eigen::Vector3d& force, const Eigen::Vector3d& moment, double at,
-                     double bimoment)
+                     const Eigen::Vector3d& force, const Eigen::Vector3d& moment, double at)
 {
     SpanPoint point;
     point.at = at;
     point.force = toPrincipal(frame, axes, force);
     point.moment = toPrincipal(frame, axes, moment);
     point.moment.x() += leverTorque(frame, point.force);
-    point.bimoment = bimoment;
     loads.points.push_back(point);
 }
 

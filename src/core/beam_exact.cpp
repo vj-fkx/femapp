@@ -58,9 +58,7 @@ Layout layoutOf(const BeamData& beam, ElementKind kind)
             if (c >= translational) { // the warping
                 const WarpingCondition condition =
                     beam.warpingEnds.at(static_cast<std::size_t>(end));
-                if (condition == WarpingCondition::Continuous) {
-                    l.externalOf.at(j) = l.external++;
-                } else if (condition == WarpingCondition::Free) {
+                if (condition == WarpingCondition::Free) {
                     l.internalOf.at(j) = l.internal++;
                 }
                 continue;
@@ -240,11 +238,9 @@ double exactLength(const BeamData& beam, const Eigen::Vector3d& x1, const Eigen:
     return beam.arcLength > 0.0 ? beam.arcLength : flexibleLength(beam, x1, x2);
 }
 
-ExactBeamElement::ExactBeamElement(ElementKind kind, std::array<bool, 2> continuous,
-                                   std::span<const BeamData> beams,
+ExactBeamElement::ExactBeamElement(ElementKind kind, std::span<const BeamData> beams,
                                    std::span<const SpanLoads> loads)
     : m_kind(kind)
-    , m_continuous(continuous)
     , m_beams(beams)
     , m_loads(loads)
 {}
@@ -258,12 +254,7 @@ DofMask ExactBeamElement::dofsAt(ElementType type, int localNode) const
     if (planarKind(m_kind)) {
         return plane;
     }
-    auto dofs =
-        static_cast<DofMask>(plane | mask(DofType::W) | mask(DofType::RX) | mask(DofType::RY));
-    if (m_continuous.at(localNode == 0 ? 0 : 1)) {
-        dofs = static_cast<DofMask>(dofs | mask(DofType::Warp));
-    }
-    return dofs;
+    return static_cast<DofMask>(plane | mask(DofType::W) | mask(DofType::RX) | mask(DofType::RY));
 }
 
 Expected<void> ExactBeamElement::compute(const ElementNodes& nodes, ElementIndex element,

@@ -28,9 +28,6 @@ struct SpanPoint
     double at = 0.0;
     Eigen::Vector3d force = Eigen::Vector3d::Zero();
     Eigen::Vector3d moment = Eigen::Vector3d::Zero();
-    // REQ-008b-17: the load on the warping (the generalised force of the
-    // rate of twist, as a nodal bimoment), beams with warping only.
-    double bimoment = 0.0;
 };
 
 // REQ-008b-15: a force per length fixed in space (a global load, the weight)
@@ -73,8 +70,7 @@ void addDistributed(SpanLoads& loads, const SpanFrame& frame, Axes axes,
                     const Eigen::Vector3d& startValue, const Eigen::Vector3d& endValue, double from,
                     double to, double startTorque = 0.0, double endTorque = 0.0);
 void addConcentrated(SpanLoads& loads, const SpanFrame& frame, Axes axes,
-                     const Eigen::Vector3d& force, const Eigen::Vector3d& moment, double at,
-                     double bimoment = 0.0);
+                     const Eigen::Vector3d& force, const Eigen::Vector3d& moment, double at);
 // The gradients dT/dy, dT/dz of the local axes, as imposed curvatures.
 void addGradient(SpanLoads& loads, const SpanFrame& frame, double alpha, double alongY,
                  double alongZ);

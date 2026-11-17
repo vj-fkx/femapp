@@ -143,33 +143,3 @@ TEST_CASE("prescribed dofs are eliminated", "[core][dofs]")
     CHECK(missing.error().message == "Node 40 has no dof u.");
     CHECK_FALSE(dofs.prescribe(node(m, 10), DofType::W, 0.0).has_value());
 }
-
-// REQ-008b-07, 10: the warping dof is the last type; a node can use all eight.
-TEST_CASE("the warping dof completes the eight dof types", "[core][dofs]")
-{
-    CHECK(fem::core::kDofTypeCount == 8);
-    CHECK(fem::core::dofName(DofType::Warp) == "warp");
-    const fem::core::Mesh m = mesh();
-    const auto all = static_cast<DofMask>(0xFFU);
-    const Declares everything(all);
-    const Declares bar(fem::core::mask(DofType::U) | fem::core::mask(DofType::Warp));
-    const std::vector<ElementIndex> first = {element(m, 1)};
-    const std::vector<ElementIndex> second = {element(m, 2)};
-    const std::vector<ElementSet> sets = {{.elements = first, .formulation = &everything},
-                                          {.elements = second, .formulation = &bar}};
-    DofMap dofs = DofMap::build(m, sets);
-
-    // 10, 20: all eight; 30: u and warp.
-    CHECK(dofs.size() == 8 + 8 + 2);
-    CHECK(dofs.maskOf(node(m, 20)) == all);
-    CHECK(dofs.find(node(m, 20), DofType::Warp) == std::optional<fem::core::DofIndex>(15));
-    CHECK(dofs.find(node(m, 30), DofType::Warp) == std::optional<fem::core::DofIndex>(17));
-    CHECK(dofs.typeOf(17) == DofType::Warp);
-
-    REQUIRE(dofs.prescribe(node(m, 30), DofType::Warp, 0.0).has_value());
-    CHECK(dofs.freeCount() == 17);
-    CHECK(dofs.equation(17) == -1);
-    const auto missing = dofs.prescribe(node(m, 40), DofType::Warp, 0.0);
-    REQUIRE_FALSE(missing.has_value());
-    CHECK(missing.error().message == "Node 40 has no dof warp.");
-}

@@ -14,9 +14,8 @@ namespace fem::core {
 struct ElementSet;
 
 // REQ-006-08: degrees of freedom of a node.
-// Warp: the rate of twist of a beam with warping (REQ-008b-07).
-enum class DofType : std::uint8_t { U, V, W, RX, RY, RZ, T, Warp };
-inline constexpr int kDofTypeCount = 8;
+enum class DofType : std::uint8_t { U, V, W, RX, RY, RZ, T };
+inline constexpr int kDofTypeCount = 7;
 
 // Bit k set: DofType k used.
 using DofMask = std::uint8_t;

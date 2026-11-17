@@ -54,13 +54,6 @@ enum class CurvedFormulation : std::uint8_t {
     Isoparametric // quadratic curve, dofs at the three nodes
 };
 
-// REQ-008b-09: the warping at one end of a beam with warping.
-enum class WarpingCondition : std::uint8_t {
-    Free,       // no bimoment
-    Restrained, // no warping (end plate, stiffener)
-    Continuous  // shares the warping dof of the node with the other continuous ends
-};
-
 // REQ-007-04, 008-07, 09: what the elements of a target are made of. The
 // theory and the orientation only matter for beams.
 struct Assignment
@@ -74,14 +67,12 @@ struct Assignment
     // (default: global Z, or global X for a bar along Z; design 008 §5.2).
     std::optional<Eigen::Vector3d> reference = std::nullopt;
     double rollAngle = 0.0; // about the bar axis, radians
-    // REQ-008b-07: torsion with warping (Vlasov), 3D beams.
-    bool warping = false;
     // REQ-008b-12: how Line3 beams are formulated.
     CurvedFormulation curved = CurvedFormulation::Arc;
 };
 
 // REQ-007-05, 008-16: a support (value 0) or a settlement in one direction,
-// a translation (u, v, w), a rotation (rx, ry, rz) or the warping (REQ-008b-10).
+// a translation (u, v, w) or a rotation (rx, ry, rz).
 struct Restraint
 {
     NodeTarget nodes;
@@ -95,7 +86,6 @@ struct NodalForce
     NodeTarget nodes;
     Eigen::Vector3d force = Eigen::Vector3d::Zero();  // on each node
     Eigen::Vector3d moment = Eigen::Vector3d::Zero(); // REQ-008-16: Mx, My, Mz
-    double bimoment = 0.0;                            // REQ-008b-10, on the warping dof
 };
 
 struct TemperatureChange
@@ -170,7 +160,6 @@ struct ConcentratedLoad
     Eigen::Vector3d force = Eigen::Vector3d::Zero();
     Eigen::Vector3d moment = Eigen::Vector3d::Zero();
     BarPosition at{.value = 0.5, .fraction = true};
-    double bimoment = 0.0; // REQ-008b-17, beams with warping
 };
 
 // REQ-008-16: temperature gradients across the section, local axes, uniform
@@ -180,15 +169,6 @@ struct TemperatureGradient
     ElementTarget elements;
     double alongY = 0.0; // dT/dy
     double alongZ = 0.0; // dT/dz
-};
-
-// REQ-008b-09: the warping condition of ends of beams with warping, instead
-// of the default (continuous between collinear ends, free otherwise).
-struct WarpingEnd
-{
-    ElementTarget elements;
-    BarEnd end = BarEnd::Both;
-    WarpingCondition condition = WarpingCondition::Restrained;
 };
 
 // REQ-007-03: the document of an analysis. A value type: copies share the
@@ -212,8 +192,6 @@ struct Model
     std::vector<DistributedLoad> distributedLoads;
     std::vector<ConcentratedLoad> concentratedLoads;
     std::vector<TemperatureGradient> temperatureGradients;
-    // Feature 008b: warping.
-    std::vector<WarpingEnd> warpingEnds;
 
     // The first with that name, or null.
     [[nodiscard]] const Material* findMaterial(std::string_view name) const;

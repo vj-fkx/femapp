@@ -61,18 +61,17 @@ struct BarState
                                Side side = Side::After);
 
 // REQ-008b-07, 09, 11, 13: the exact beam element (design 008b §5.3, 5.4)
-// for a Line2 with warping and a Line3 arc (no dofs at its middle node):
-// the exact flexible length, then the connections (springs, releases, the
-// free warping of an end condensed, the restrained one removed), the
-// offsets and the rotation of each end. `continuous` says which ends use
-// the warping dof of their node; all the beams of the formulation agree.
+// for a Line3 arc (no dofs at its middle node) and, in the core only, a
+// Line2 with warping: the exact flexible length, then the connections
+// (springs, releases, the free warping of an end condensed, the restrained
+// one removed), the offsets and the rotation of each end.
 class ExactBeamElement final : public ElementFormulation
 {
 public:
     // `beams` and `loads` are indexed by ElementIndex and must outlive the
     // formulation.
-    ExactBeamElement(ElementKind kind, std::array<bool, 2> continuous,
-                     std::span<const BeamData> beams, std::span<const SpanLoads> loads);
+    ExactBeamElement(ElementKind kind, std::span<const BeamData> beams,
+                     std::span<const SpanLoads> loads);
 
     [[nodiscard]] DofMask dofsAt(ElementType type, int localNode) const override;
     [[nodiscard]] Expected<void> compute(const ElementNodes& nodes, ElementIndex element,
@@ -81,7 +80,6 @@ public:
 
 private:
     ElementKind m_kind;
-    std::array<bool, 2> m_continuous;
     std::span<const BeamData> m_beams;
     std::span<const SpanLoads> m_loads;
 };

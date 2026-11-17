@@ -178,15 +178,14 @@ TEST_CASE("the exact beam element does not allocate", "[core][allocations]")
     beam.warpingEnds[1] = fem::core::WarpingCondition::Free;
     beam.curvature = Eigen::Vector3d(0.0, 0.1, 0.2);
     std::array<fem::core::SpanLoads, 1> loads{};
-    const fem::core::ExactBeamElement element(fem::core::ElementKind::Beam3D, {true, false}, beams,
-                                              loads);
+    const fem::core::ExactBeamElement element(fem::core::ElementKind::Beam3D, beams, loads);
     fem::core::ElementNodes nodes;
     nodes.type = fem::core::ElementType::Line2;
     nodes.count = 2;
     nodes.x[0] = Eigen::Vector3d(0.0, 0.0, 0.0);
     nodes.x[1] = Eigen::Vector3d(3.0, 0.0, 0.0);
-    Eigen::MatrixXd matrix = Eigen::MatrixXd::Zero(13, 13);
-    Eigen::VectorXd vector = Eigen::VectorXd::Zero(13);
+    Eigen::MatrixXd matrix = Eigen::MatrixXd::Zero(12, 12);
+    Eigen::VectorXd vector = Eigen::VectorXd::Zero(12);
 
     gAllocations = 0;
     gCounting = true;

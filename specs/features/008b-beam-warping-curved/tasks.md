@@ -113,21 +113,18 @@ Regras:
   `reactionBimoments` no resultado; B, Tsv e Tw em `BeamForces`; `BeamResult`
   pelo motor nas vigas exatas — arquivos: `static_analysis.hpp/.cpp`,
   `beam_result.hpp/.cpp` — cobre: 10, 18, 19
-- [ ] **T22** [M] Benchmark `bench_frame` com empenamento em todas as vigas
-  (argumento de linha de comando), registrado nas notas. Se passar de 6 s,
-  parar e propor a mudança da meta antes de seguir — cobre: N03
-- [ ] **T23** Verificação da viga com empenamento (AC-3): balanço de I com
-  torque na ponta e engaste impedido; biapoiada com torque distribuído e
-  concentrado, pontas livres e impedidas; bimomento nodal; B, Tsv e Tw ao
-  longo da barra contra senh/cosh (1e−8) — arquivo:
-  `tests/unit/core/test_beam_warping.cpp` — cobre: 07, 08, 10, 18, 19, N01
-- [ ] **T24** [P] Condições de empenamento (AC-4): viga de dois vãos
-  contínua igual a uma barra; T de três barras; chapa de topo; liberação de
-  torção e excentricidade com empenamento; base elástica de torção contra a
-  solução analítica — cobre: 09, 11
-- [ ] **T25** Tensões de empenamento: σw = B·ω/Iw e τw nos pontos com ω;
-  `PointStress::warpingNormal` — arquivos: `beam_result.cpp`, testes —
-  cobre: 20
+- [x] **T22** ~~[M] Benchmark `bench_frame` com empenamento em todas as vigas   (argumento de linha de comando), registrado nas notas. Se passar de 6 s,   parar e propor a mudança da meta antes de seguir — cobre: N03~~ *Removida em 2026-11-16 com o empenamento (requirements §6).*
+- [x] **T23** ~~Verificação da viga com empenamento (AC-3): balanço de I com   torque na ponta e engaste impedido; biapoiada com torque distribuído e   concentrado, pontas livres e impedidas; bimomento nodal; B, Tsv e Tw ao   longo da barra contra senh/cosh (1e−8) — arquivo:   `tests/unit/core/test_beam_warping.cpp` — cobre: 07, 08, 10, 18, 19, N01~~ *Removida em 2026-11-16 com o empenamento (requirements §6).*
+- [x] **T24** ~~[P] Condições de empenamento (AC-4): viga de dois vãos   contínua igual a uma barra; T de três barras; chapa de topo; liberação de   torção e excentricidade com empenamento; base elástica de torção contra a   solução analítica — cobre: 09, 11~~ *Removida em 2026-11-16 com o empenamento (requirements §6).*
+- [x] **T25** ~~Tensões de empenamento: σw = B·ω/Iw e τw nos pontos com ω;   `PointStress::warpingNormal` — arquivos: `beam_result.cpp`, testes —   cobre: 20~~ *Removida em 2026-11-16 com o empenamento (requirements §6).*
+- [x] **T21b** Retirar o empenamento do que o usuário vê, mantendo o núcleo
+  (decisão de 2026-11-16): sai do `Model` (`Assignment::warping`,
+  `WarpingEnd`, bimomentos nodal e concentrado), do `DofType` (`Warp`), da
+  análise (condições por ponta, conjuntos por pontas contínuas) e dos
+  resultados (`warping`, `reactionBimoments`, B, Tsv e Tw); ficam Iw e ω das
+  seções, o torque distribuído e, no motor exato e na `ExactBeamElement`,
+  o empenamento interno com pontas livres ou impedidas, com os seus
+  testes — cobre: 01, 17, 23
 
 ## Fase 5 — Viga curva em arco
 
@@ -161,10 +158,7 @@ Regras:
 - [ ] **T32** Convergência (AC-6): os casos do arco com n = 2, 4, 8, 16
   elementos (taxa 4 ± 0,5, registrada nas notas); L/h = 1000 sem travamento;
   arco parabólico contra a referência documentada — cobre: 14
-- [ ] **T33** Viga curva com empenamento (AC-7): R grande igual à reta;
-  arco e isoparamétrica concordando com o refinamento; caso de Yang e Kuo
-  (1987), 1% — cobre: 07, 13, 14
-
+- [x] **T33** ~~Viga curva com empenamento (AC-7): R grande igual à reta;   arco e isoparamétrica concordando com o refinamento; caso de Yang e Kuo   (1987), 1% — cobre: 07, 13, 14~~ *Removida em 2026-11-16 com o empenamento (requirements §6).*
 ## Fase 7 — Validação
 
 - [ ] **T34** Testes de validação: cada problema do §5.8 isolado e vários
@@ -199,27 +193,27 @@ Regras:
 | REQ-008b-04 | T06 a T09, T35 | `test_section_thin_walled.cpp`, `test_section_mesh.cpp`, `test_beam_validation.cpp` |
 | REQ-008b-05 | T11 | `test_section_solid.cpp` (seção poligonal em treliça e viga) |
 | REQ-008b-06 | T12 | `test_section_solid.cpp`, `test_section_thin_walled.cpp` |
-| REQ-008b-07 | T01, T02, T16, T19, T23, T33 | `test_beam_state.cpp`, `test_beam_warping.cpp`, `test_beam_curved.cpp` |
-| REQ-008b-08 | T03, T14 a T16, T23 | `test_beam_state.cpp`, `test_beam_warping.cpp` |
-| REQ-008b-09 | T02, T19, T20, T24 | `test_beam_warping.cpp` |
-| REQ-008b-10 | T01, T02, T21, T23 | `test_dof_map.cpp`, `test_beam_warping.cpp` |
-| REQ-008b-11 | T16, T19, T24 | `test_beam_state.cpp`, `test_beam_warping.cpp` |
+| REQ-008b-07 | removido (empenamento adiado) | — |
+| REQ-008b-08 | removido (empenamento adiado) | — |
+| REQ-008b-09 | removido (empenamento adiado) | — |
+| REQ-008b-10 | removido (empenamento adiado) | — |
+| REQ-008b-11 | removido (empenamento adiado) | — |
 | REQ-008b-12 | T02, T26 a T28 | `test_beam_curved.cpp` |
 | REQ-008b-13 | T03, T17, T26 a T28, T33 | `test_beam_state.cpp`, `test_beam_curved.cpp` |
 | REQ-008b-14 | T30 a T33 | `test_beam_curved.cpp` |
 | REQ-008b-15 | T17, T26, T27, T29 | `test_beam_state.cpp`, `test_beam_curved.cpp` |
 | REQ-008b-16 | T26, T30, T34, T35 | `test_beam_curved.cpp`, `test_beam_validation.cpp` |
-| REQ-008b-17 | T02, T27, T29 | `test_beam_curved.cpp`, `test_beam_warping.cpp` |
-| REQ-008b-18 | T21, T23 | `test_beam_warping.cpp` |
-| REQ-008b-19 | T18, T21, T23, T28, T31 | `test_beam_state.cpp`, `test_beam_warping.cpp`, `test_beam_curved.cpp` |
-| REQ-008b-20 | T25 | `test_beam_warping.cpp` |
+| REQ-008b-17 | T02, T21, T27, T29 | `test_beam_curved.cpp` |
+| REQ-008b-18 | removido (empenamento adiado) | — |
+| REQ-008b-19 | T18, T21, T28, T31 | `test_beam_state.cpp`, `test_beam_curved.cpp` |
+| REQ-008b-20 | removido (empenamento adiado) | — |
 | REQ-008b-21 | T34, T35 | `test_beam_validation.cpp` |
-| REQ-008b-22 | T34, T35 | `test_beam_validation.cpp` |
-| REQ-008b-23 | todas, T14 | suítes da 007 e da 008 inalteradas |
+| REQ-008b-22 | removido (empenamento adiado) | — |
+| REQ-008b-23 | todas, T14, T21b | suítes da 007 e da 008 inalteradas |
 | REQ-008b-24 | T36, T91 | `check_no_qt_includes` |
-| NFR-008b-01 | T23, T28 | `test_beam_warping.cpp`, `test_beam_curved.cpp` |
+| NFR-008b-01 | T28 | `test_beam_curved.cpp` |
 | NFR-008b-02 | T10, T13 | `test_section_solid.cpp`, `bench_section` |
-| NFR-008b-03 | T22 | `bench_frame` |
+| NFR-008b-03 | T21b | `bench_frame` sem empenamento |
 | NFR-008b-04 | T90 | Job de cobertura no CI |
 
 ## Notas de implementação

@@ -64,13 +64,10 @@ void endForces(const BeamData& beam, const BeamVector& forces, BeamForces& start
            .t = torque(6),
            .my = forces(10),
            .mz = forces(11)};
-    // Without warping, all the torque is Saint-Venant's.
-    start.tsv = start.t;
-    end.tsv = end.t;
 }
 
-void exactEndForces(const BeamData& beam, bool planar, const StateBarVector& ends,
-                    const StateBarVector& forces, BeamForces& start, BeamForces& end)
+void exactEndForces(const BeamData& beam, bool planar, const StateBarVector& forces,
+                    BeamForces& start, BeamForces& end)
 {
     const Eigen::Index d = forces.size() / 2;
     const auto internal = [&](Eigen::Index o, double sign) {
@@ -89,13 +86,6 @@ void exactEndForces(const BeamData& beam, bool planar, const StateBarVector& end
             f.my = at(4);
             f.mz = at(5);
         }
-        if (d == 7) {
-            f.b = -at(6);
-            f.tsv = beam.torsional * ends(o + 6);
-        } else {
-            f.tsv = f.t;
-        }
-        f.tw = f.t - f.tsv;
         return f;
     };
     start = internal(0, -1.0);
@@ -112,7 +102,6 @@ BeamPoint exactPoint(const BeamResult::Data& data, double x, Side side)
     BeamPoint point;
     point.displacement = s.displacement;
     point.rotation = s.rotation;
-    point.warping = s.warping;
     BeamForces& f = point.forces;
     f.n = s.force.x();
     f.vy = s.force.y();
@@ -120,9 +109,6 @@ BeamPoint exactPoint(const BeamResult::Data& data, double x, Side side)
     f.t = s.moment.x() + beam.shearCentre.y() * s.force.y() - beam.shearCentre.x() * s.force.z();
     f.my = s.moment.y();
     f.mz = s.moment.z();
-    f.b = s.bimoment;
-    f.tsv = beam.warpingStiffness > 0.0 ? beam.torsional * s.warping : f.t;
-    f.tw = f.t - f.tsv;
     return point;
 }
 
