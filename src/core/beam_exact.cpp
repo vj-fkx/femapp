@@ -9,6 +9,8 @@
 #include <Eigen/LU>
 #include <array>
 #include <cstddef>
+#include <optional>
+#include <vector>
 
 namespace fem::core {
 
@@ -370,6 +372,67 @@ StateBarVector exactEndLoads(const BeamData& beam, double length, const SpanLoad
 {
     const StateBarMatrices bar = stateBarMatrices(beam, length, loads, planar);
     return bar.stiffness * ends - bar.loads;
+}
+
+std::optional<ExactInternalMode> exactInternalMode(const BeamData& beam, ElementKind kind,
+                                                   const Eigen::Vector3d& x1,
+                                                   const Eigen::Vector3d& x2)
+{
+    const bool planar = planarKind(kind);
+    const double length = exactLength(beam, x1, x2);
+    const std::vector<StateBarMatrix> parts = partStiffnesses(beam, length, planar);
+    const Layout layout = layoutOf(beam, kind);
+    const Eigen::Index d = layout.dofs;
+    const auto count = static_cast<Eigen::Index>(parts.size());
+    // The chain of the flexible bar: its start, the junctions, its end.
+    const Eigen::Index total = (count + 1) * d;
+    Eigen::MatrixXd k = Eigen::MatrixXd::Zero(total, total);
+    for (Eigen::Index i = 0; i < count; ++i) {
+        k.block(i * d, i * d, 2 * d, 2 * d) += parts[static_cast<std::size_t>(i)];
+    }
+    // The unknowns: the junctions and the ends tied to internal dofs (a
+    // release, or a spring to the held node).
+    std::vector<Eigen::Index> unknown;
+    for (Eigen::Index end = 0; end < 2; ++end) {
+        for (Eigen::Index c = 0; c < d; ++c) {
+            const auto j = static_cast<std::size_t>(end * d + c);
+            const Eigen::Index chain = end == 0 ? c : count * d + c;
+            if (layout.internalOf.at(j) >= 0) {
+                unknown.push_back(chain);
+                if (layout.externalOf.at(j) >= 0) {
+                    k(chain, chain) += layout.spring.at(j);
+                }
+            }
+        }
+    }
+    for (Eigen::Index i = d; i < count * d; ++i) {
+        unknown.push_back(i);
+    }
+    if (unknown.empty()) {
+        return std::nullopt;
+    }
+    const auto n = static_cast<Eigen::Index>(unknown.size());
+    Eigen::MatrixXd kuu(n, n);
+    for (Eigen::Index a = 0; a < n; ++a) {
+        for (Eigen::Index b = 0; b < n; ++b) {
+            kuu(a, b) =
+                k(unknown[static_cast<std::size_t>(a)], unknown[static_cast<std::size_t>(b)]);
+        }
+    }
+    // The singular direction: the eigenvalue nearest zero.
+    const Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eigen((kuu + kuu.transpose()) / 2.0);
+    Eigen::Index nearest = 0;
+    eigen.eigenvalues().cwiseAbs().minCoeff(&nearest);
+    Eigen::VectorXd chain = Eigen::VectorXd::Zero(total);
+    for (Eigen::Index a = 0; a < n; ++a) {
+        chain(unknown[static_cast<std::size_t>(a)]) = eigen.eigenvectors()(a, nearest);
+    }
+    ExactInternalMode mode;
+    mode.ends = StateBarVector(2 * d);
+    mode.ends.head(d) = chain.head(d);
+    mode.ends.tail(d) = chain.tail(d);
+    mode.junctions.assign(chain.data() + d, chain.data() + count * d);
+    return mode;
 }
 
 bool hasStableExactConnections(const BeamData& beam, ElementKind kind, double length)

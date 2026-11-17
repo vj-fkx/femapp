@@ -57,6 +57,9 @@ public:
         bool exact = false;
         bool planar = false;
         StateBarVector ends;
+        // Feature 008c: the junctions of the parts, when given (the shape of
+        // a bar buckling with its nodes held, design 008c §5.6).
+        std::vector<double> junctions;
         // REQ-008b-19: an isoparametric beam (design 008b §5.5): its data,
         // its nodes and the values of its nodal dofs.
         std::shared_ptr<const IsoBeamData> iso;

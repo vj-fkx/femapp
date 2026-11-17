@@ -6,7 +6,9 @@
 
 #include <Eigen/Core>
 #include <array>
+#include <optional>
 #include <span>
+#include <vector>
 
 namespace fem::core {
 
@@ -62,9 +64,31 @@ struct BarState
     Eigen::Vector3d moment = Eigen::Vector3d::Zero();
     double bimoment = 0.0; // B = -E Iw psi'
 };
+// Feature 008c: with `junctions`, the local dofs of the junctions between
+// the parts of the engine (partStiffnesses) are given instead of solved
+// for: the shape of a bar buckling with its ends held (design 008c §5.6).
 [[nodiscard]] BarState stateAt(const BeamData& beam, double length, const SpanLoads& loads,
                                bool planar, const StateBarVector& ends, double s,
-                               Side side = Side::After);
+                               Side side = Side::After, std::span<const double> junctions = {});
+
+// Feature 008c: the stiffness of each part of the engine, without loads,
+// in order along the bar (the dofs of both ends of each part).
+[[nodiscard]] std::vector<StateBarMatrix> partStiffnesses(const BeamData& beam, double length,
+                                                          bool planar);
+
+// Feature 008c (design 008c §5.6): the buckling mode of an exact bar with
+// its nodes held, at the axial force of `beam` (a buckling factor where the
+// internal dofs are singular): its flexible end dofs (zero where held by
+// the nodes) and its junctions; nothing when it has no internal dofs.
+struct ExactInternalMode
+{
+    StateBarVector ends;
+    std::vector<double> junctions;
+};
+[[nodiscard]] std::optional<ExactInternalMode> exactInternalMode(const BeamData& beam,
+                                                                 ElementKind kind,
+                                                                 const Eigen::Vector3d& x1,
+                                                                 const Eigen::Vector3d& x2);
 
 // REQ-008b-07, 09, 11, 13: the exact beam element (design 008b §5.3, 5.4)
 // for a Line3 arc (no dofs at its middle node) and, in the core only, a

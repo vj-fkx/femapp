@@ -560,6 +560,46 @@ std::vector<AxialProfile> StaticProblem::profilesOf(const Eigen::VectorXd& value
     return profiles;
 }
 
+std::optional<BeamResult> StaticProblem::internalMode(ElementIndex element) const
+{
+    const auto e = static_cast<std::size_t>(element);
+    if (!isBeam(m_kindOf[e]) || m_beams.isIso[e] || !m_beams.exact[e]) {
+        return std::nullopt;
+    }
+    const auto ids = mesh().elementNodes(element);
+    const Eigen::Vector3d x1 = mesh().nodeCoordinates(ids[0]);
+    const Eigen::Vector3d x2 = mesh().nodeCoordinates(ids[1]);
+    const BeamData& beam = m_beams.data[e];
+    auto mode = exactInternalMode(beam, m_kindOf[e], x1, x2);
+    if (!mode) {
+        return std::nullopt;
+    }
+    BeamResult::Data data;
+    data.length = exactLength(beam, x1, x2);
+    data.axes = beam.axes;
+    data.beam = beam;
+    data.exact = true;
+    data.planar = m_kindOf[e] == ElementKind::Beam2D;
+    data.ends = mode->ends;
+    data.junctions = mode->junctions;
+    // Normalized: the largest displacement along the bar is 1.
+    double largest = 0.0;
+    {
+        const BeamResult probe(data);
+        constexpr int kSamples = 200;
+        for (int i = 0; i <= kSamples; ++i) {
+            largest = std::max(largest, probe.at(data.length * i / kSamples).displacement.norm());
+        }
+    }
+    if (largest > 0.0) {
+        data.ends /= largest;
+        for (double& value : data.junctions) {
+            value /= largest;
+        }
+    }
+    return BeamResult(std::move(data));
+}
+
 void StaticProblem::setAxialForces(const std::vector<AxialProfile>& profiles)
 {
     for (std::size_t e = 0; e < profiles.size(); ++e) {

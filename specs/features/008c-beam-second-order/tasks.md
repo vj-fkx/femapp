@@ -129,6 +129,15 @@ Regras:
   garantia pela contagem com bissecção, fatores repetidos, modos e
   `BeamResult` dos modos, até a T18 passar — arquivos: `buckling.cpp`,
   `stability_analysis.hpp` — cobre: 09, 10, 11
+- [x] **T19b** Forma dos modos dentro de uma barra (decidido em 2026-11-17,
+  na implementação): quando a barra flamba com os nós parados, o vetor nulo
+  dos seus GDL internos (junções das partes e ligações) no fator dá a forma
+  ao longo dela, normalizada com o maior deslocamento 1; `BeamResult` com
+  as junções dadas. Testes: biengastado (1 − cos 2πx/L) e engastado-rotulado
+  por liberação, a forma contra a analítica — arquivos: `beam_state.hpp/.cpp`,
+  `beam_exact.cpp`, `beam_result.hpp/.cpp`, `buckling.cpp`,
+  `detail/static_stages.hpp`, `static_analysis.cpp`, `test_buckling.cpp` —
+  cobre: 11
 - [x] **T20** Flambagem de pórticos (AC-5): deslocável e indeslocável
   contra funções de estabilidade, fatores em ordem, pilar com
   excentricidade, fatores repetidos por simetria, fator perdido de
@@ -175,7 +184,7 @@ Regras:
 | REQ-008c-08 | T01, T08, T09, T16 | `test_linear_solver.cpp`, `test_beam_second_order.cpp`, `test_second_order_analysis.cpp` |
 | REQ-008c-09 | T18 a T20 | `test_buckling.cpp` |
 | REQ-008c-10 | T01, T08, T09, T18 a T21 | `test_buckling.cpp`, `test_beam_second_order.cpp` |
-| REQ-008c-11 | T18, T19 | `test_buckling.cpp` |
+| REQ-008c-11 | T18, T19, T19b | `test_buckling.cpp` |
 | REQ-008c-12 | T22 | `test_buckling.cpp` |
 | REQ-008c-13 | T16 | `test_second_order_analysis.cpp` |
 | REQ-008c-14 | todas, T13 | suítes da 007 a 008b inalteradas |
@@ -293,9 +302,15 @@ Regras:
   elemento), K(λ) global nunca fica singular: o fator só aparece na
   contagem de Wittrick-Williams. Os fatores que os vetores não acham são
   então localizados por bissecção na contagem (até 1e−13) e, sem vetor
-  nodal, o modo fica com os nós parados e uma `note` diz que a forma ao
-  longo da barra não é dada (ver a questão levada ao mantenedor). No caso
-  comum (modos com deslocamento dos nós) continua uma só contagem final.
+  nodal, o modo fica com os nós parados; a barra é a que tem a contagem
+  interna subindo no fator, e a forma ao longo dela sai do vetor nulo dos
+  seus GDL internos (T19b, decidido pelo mantenedor). No caso comum (modos
+  com deslocamento dos nós) continua uma só contagem final.
+- T19b: forma do biengastado (1 − cos 2πx/L)/2 e do engastado-rotulado por
+  liberação (sen kx − kL cos kx − kx + kL, tan kL = kL) em 1e−8. Achado no
+  caminho: com um só GDL nodal (o axial), K(σ) = K(λ) e a iteração inversa
+  residual zerava o vetor e "convergia" com x = 0; um vetor que some agora
+  conta como não convergido, e a contagem acha o fator.
   (2) Os produtos K(λ)x montam K(λ) (cerca de 0,1 s no benchmark), em vez
   de um caminho elemento a elemento.
 - T20: dois pilares engastados com tirante articulado (deslocável:

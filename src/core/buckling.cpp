@@ -43,9 +43,10 @@ constexpr int kSubspaceIterations = 40;
 constexpr int kSubspaceExtra = 4;
 constexpr double kShiftFraction = 0.95;
 constexpr int kRefinementSteps = 30;
-constexpr double kResidual = 1e-9;    // of K(lambda) x against K0 x
-constexpr double kCountMargin = 1e-6; // above the last factor
-constexpr double kSameFactor = 1e-7;  // repeated factors
+constexpr double kResidual = 1e-9;     // of K(lambda) x against K0 x
+constexpr double kCountMargin = 1e-6;  // above the last factor
+constexpr double kSameFactor = 1e-7;   // repeated factors
+constexpr double kInsideMargin = 1e-7; // about a factor inside a bar
 constexpr int kBisections = 200;
 constexpr double kBisectionPrecision = 1e-13;
 constexpr int kDoublings = 60;
@@ -115,7 +116,8 @@ struct Factor
 {
     double lambda = 0.0;
     Eigen::VectorXd x;
-    SparseMatrix k; // K(lambda), for the deflation
+    SparseMatrix k;           // K(lambda), for the deflation
+    ElementIndex inside = -1; // a bar buckling with its nodes held
 };
 
 // Residual inverse iteration from (x, lambda) with the factorization at a
@@ -150,9 +152,15 @@ Expected<bool> refine(Pencil& pencil, const SparseCholesky& shifted, const Spars
         hasPrevious = true;
         k = std::move(*assembled);
         lambda = next;
-        // The residual, and the step of the vector.
+        // The residual, and the step of the vector. A vector that vanished
+        // (no mode in the nodal dofs, as a bar buckling with its nodes held)
+        // never converges: the count finds that factor.
         const Eigen::VectorXd r = times(k, x);
         const double size = times(k0, x).norm();
+        if (!(x.norm() > 0.5) || !(size > 0.0)) {
+            kOut = std::move(k);
+            return false;
+        }
         if (r.norm() <= kResidual * size &&
             std::abs(lambda - previousLambda) <= tolerance * lambda) {
             kOut = std::move(k);
@@ -424,9 +432,28 @@ Expected<BucklingResult> runLinearBuckling(const Model& model, const BucklingOpt
         if (*converged && std::abs(lambda - top) <= 1e-6 * top) {
             missing = {.lambda = lambda, .x = std::move(start), .k = std::move(k)};
         } else {
-            // Inside the bars: the nodes do not move.
+            // Inside a bar: the nodes do not move. The bar is the one whose
+            // count rises across the factor (the next one for a repeated
+            // factor).
             missing.x = Eigen::VectorXd::Zero(n);
-            missing.k = pencil.at(top).value_or(SparseMatrix());
+            std::vector<int> before;
+            if (pencil.at(top * (1.0 - kInsideMargin))) {
+                before = problem.elementNegativePivots();
+            }
+            if (auto after = pencil.at(top * (1.0 + kInsideMargin)); after) {
+                missing.k = std::move(*after);
+            }
+            const std::vector<int>& now = problem.elementNegativePivots();
+            const auto taken = std::ranges::count_if(found, [top](const Factor& f) {
+                return f.inside >= 0 && std::abs(f.lambda - top) <= kSameFactor * top;
+            });
+            std::int64_t skip = taken;
+            for (std::size_t e = 0; e < now.size() && e < before.size(); ++e) {
+                if (now[e] > before[e] && skip-- == 0) {
+                    missing.inside = static_cast<ElementIndex>(e);
+                    break;
+                }
+            }
         }
         found.push_back(std::move(missing));
         std::ranges::sort(found, {}, &Factor::lambda);
@@ -477,15 +504,18 @@ Expected<BucklingResult> runLinearBuckling(const Model& model, const BucklingOpt
         if (!shape) {
             return tl::unexpected(shape.error());
         }
+        if (factor.inside >= 0) {
+            shape->beams[static_cast<std::size_t>(factor.inside)] =
+                problem.internalMode(factor.inside);
+        }
         out.modes.push_back({.factor = factor.lambda,
                              .displacements = std::move(shape->displacements),
                              .rotations = std::move(shape->rotations),
                              .beams = std::move(shape->beams)});
     }
     if (!inside.empty()) {
-        out.note = "The modes of the factors " + inside +
-                   " are inside the bars: their nodes do not move, and their shape along the "
-                   "bars is not given.";
+        out.note =
+            "The modes of the factors " + inside + " are inside the bars: their nodes do not move.";
     }
     if (static_cast<int>(out.modes.size()) < wanted) {
         out.note += out.note.empty() ? "" : " ";

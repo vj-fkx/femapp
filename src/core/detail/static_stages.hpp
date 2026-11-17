@@ -22,6 +22,7 @@
 #include <array>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -87,6 +88,13 @@ public:
     // reference axial forces of the next assemblies.
     [[nodiscard]] std::vector<AxialProfile> profilesOf(const Eigen::VectorXd& values) const;
     void setAxialForces(const std::vector<AxialProfile>& profiles);
+
+    // Feature 008c: the negative pivots of each element in the last
+    // assembly, and the shape of an exact bar buckling with its nodes held
+    // at the present axial forces, with its largest displacement 1 (design
+    // 008c §5.6); nothing for other elements.
+    [[nodiscard]] const std::vector<int>& elementNegativePivots() const { return m_negative; }
+    [[nodiscard]] std::optional<BeamResult> internalMode(ElementIndex element) const;
 
 private:
     StaticProblem(const Model& model, const StaticOptions& options);

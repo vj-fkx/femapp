@@ -697,8 +697,25 @@ StateBarMatrices stateBarMatrices(const BeamData& beam, double length, const Spa
     return out;
 }
 
+std::vector<StateBarMatrix> partStiffnesses(const BeamData& beam, double length, bool planar)
+{
+    const Plan plan = planFor(beam, planar);
+    const int parts = partCount(beam, length);
+    const SpanLoads none;
+    std::vector<StateBarMatrix> out(static_cast<std::size_t>(parts));
+    for (int k = 0; k < parts; ++k) {
+        const double from = length * k / parts;
+        const double to = k + 1 == parts ? length : length * (k + 1) / parts;
+        Part part(beam, plan, length, from, to);
+        walk(part, beam, none, length, from, to, k == 0, k + 1 == parts);
+        PartVector r;
+        part.stiffness(out[static_cast<std::size_t>(k)], r);
+    }
+    return out;
+}
+
 BarState stateAt(const BeamData& beam, double length, const SpanLoads& loads, bool planar,
-                 const StateBarVector& ends, double s, Side side)
+                 const StateBarVector& ends, double s, Side side, std::span<const double> given)
 {
     const Plan plan = planFor(beam, planar);
     const Eigen::Index d = plan.dofs;
@@ -714,7 +731,11 @@ BarState stateAt(const BeamData& beam, double length, const SpanLoads& loads, bo
     }
     const Eigen::Index inner = (parts - 1) * d;
     Eigen::VectorXd junctions = Eigen::VectorXd::Zero(std::max<Eigen::Index>(inner, 1));
-    if (inner > 0) {
+    if (inner > 0 && static_cast<Eigen::Index>(given.size()) == inner) {
+        for (Eigen::Index i = 0; i < inner; ++i) {
+            junctions(i) = given[static_cast<std::size_t>(i)];
+        }
+    } else if (inner > 0) {
         Eigen::MatrixXd kii = Eigen::MatrixXd::Zero(inner, inner);
         Eigen::VectorXd rhs = Eigen::VectorXd::Zero(inner);
         for (int k = 0; k < parts; ++k) {

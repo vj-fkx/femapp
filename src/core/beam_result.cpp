@@ -99,7 +99,8 @@ namespace {
 BeamPoint exactPoint(const BeamResult::Data& data, double x, Side side)
 {
     const BeamData& beam = data.beam;
-    const BarState s = stateAt(beam, data.length, data.loads, data.planar, data.ends, x, side);
+    const BarState s =
+        stateAt(beam, data.length, data.loads, data.planar, data.ends, x, side, data.junctions);
     BeamPoint point;
     point.displacement = s.displacement;
     point.rotation = s.rotation;

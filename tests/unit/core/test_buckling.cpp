@@ -8,6 +8,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <cmath>
 #include <memory>
 #include <numbers>
@@ -384,5 +385,65 @@ TEST_CASE("buckling failures", "[core][buckling]")
         const double spring = kE * fem::core::test::kArea / 30.0;
         CHECK(near(result.modes.at(0).factor * kP, spring * 3.0, 1e-6));
         CHECK(result.note.find("Only 1 of the 3") != std::string::npos);
+    }
+}
+
+namespace {
+
+// The largest |f| on the grid of 200 steps that the modes are normalized on.
+template <typename F>
+double largestOnGrid(const F& f)
+{
+    double largest = 0.0;
+    for (int i = 0; i <= 200; ++i) {
+        largest = std::max(largest, std::abs(f(kL * i / 200)));
+    }
+    return largest;
+}
+
+} // namespace
+
+// REQ-008c-11 (T19b): a bar buckling with its nodes held: the nodes stay,
+// and the shape along the bar comes from its internal dofs.
+TEST_CASE("modes inside a bar", "[core][buckling]")
+{
+    SECTION("clamped at both ends: (1 - cos 2 pi x / l) / 2")
+    {
+        fem::core::Model model = column(1);
+        fem::core::test::fixAll(model, {1}, ElementKind::Beam2D);
+        fem::core::test::restrain(model, {2}, {DofType::U, DofType::RZ});
+        const auto result = buckle(model);
+        const auto& mode = result.modes.at(0);
+        CHECK(mode.displacements[1].isZero());
+        CHECK(result.note.find("inside the bars") != std::string::npos);
+        REQUIRE(mode.beams.at(0).has_value());
+        const fem::core::BeamResult& beam = *mode.beams.at(0);
+        for (const double x : {kL / 8, kL / 4, kL / 2, 0.7 * kL}) {
+            const double expected = (1.0 - std::cos(2.0 * kPi * x / kL)) / 2.0;
+            CHECK(near(std::abs(beam.at(x).displacement.y()), expected, 1e-8, 1.0));
+        }
+    }
+    SECTION("clamped, and pinned by a release at the top")
+    {
+        fem::core::Model model = column(1);
+        fem::core::test::fixAll(model, {1}, ElementKind::Beam2D);
+        fem::core::test::restrain(model, {2}, {DofType::U, DofType::RZ});
+        fem::core::EndConnection hinge{.elements = fem::core::ElementIds{{1}},
+                                       .end = fem::core::BarEnd::End};
+        hinge.stiffness[5] = 0.0;
+        model.endConnections.push_back(hinge);
+        const auto result = buckle(model);
+        const auto& mode = result.modes.at(0);
+        REQUIRE(mode.beams.at(0).has_value());
+        const fem::core::BeamResult& beam = *mode.beams.at(0);
+        const double k = kFixedPinned / kL;
+        const auto shape = [k](double x) {
+            return std::sin(k * x) - k * kL * std::cos(k * x) - k * x + k * kL;
+        };
+        const double scale = largestOnGrid(shape);
+        for (const double x : {kL / 4, kL / 2, 0.8 * kL}) {
+            CHECK(
+                near(std::abs(beam.at(x).displacement.y()), std::abs(shape(x)) / scale, 1e-8, 1.0));
+        }
     }
 }
