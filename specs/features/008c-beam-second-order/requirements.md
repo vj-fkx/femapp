@@ -49,13 +49,13 @@ features anteriores, tudo é exercitado por testes; nada muda na interface.
 | ID | Requisito | História |
 |----|-----------|----------|
 | REQ-008c-01 | O sistema DEVE oferecer a análise estática de segunda ordem de um `Model` com treliças e vigas (2D e 3D), com as mesmas entradas da análise linear (apoios, apoios elásticos, recalques, cargas nodais, cargas no vão, peso próprio, temperatura, deformação inicial) e os mesmos resultados (`StaticResult`: deslocamentos, rotações, reações, esforços e tensões das barras). | US-1, US-3, US-5 |
-| REQ-008c-02 | Nas vigas retas, o esforço normal N DEVE entrar exatamente na rigidez e nas cargas equivalentes da barra (funções de estabilidade, com compressão e tração), nas duas teorias (Euler-Bernoulli e Timoshenko) e com ligações, molas de ligação, excentricidades, base elástica e cargas no vão, de modo que um único elemento por vão reproduza o P-δ. Na teoria de Timoshenko, a interação do cortante com N DEVE seguir uma formulação documentada no design (Engesser ou Haringx). | US-1, US-3 |
+| REQ-008c-02 | Nas vigas retas, o esforço normal N DEVE entrar exatamente na rigidez e nas cargas equivalentes da barra (funções de estabilidade, com compressão e tração), nas duas teorias (Euler-Bernoulli e Timoshenko) e com ligações, molas de ligação, excentricidades, base elástica e cargas no vão, com N constante na barra; com N variável ao longo dela (cargas axiais no vão), com erro relativo ≤ 1e−8 *(ajustado no design, 2026-11-17)*. Um único elemento por vão DEVE reproduzir o P-δ. Na teoria de Timoshenko, a interação do cortante com N DEVE seguir uma formulação documentada no design (Engesser ou Haringx). | US-1, US-3 |
 | REQ-008c-03 | Nas treliças, o esforço normal DEVE entrar pela rigidez geométrica da barra articulada (P-Δ da corda). | US-1, US-3 |
 | REQ-008c-04 | Nas vigas curvas (arco exato e isoparamétrica da 008b), o esforço normal ao longo da barra DEVE entrar na rigidez, com a precisão documentada no design e verificada contra uma referência. | US-1, US-3 |
 | REQ-008c-05 | A análise DEVE ser iterativa: começar pela solução linear, recalcular o esforço normal de cada barra a partir da solução corrente e repetir até que a variação relativa dos deslocamentos e dos esforços normais fique abaixo de uma tolerância (padrão 1e−8, ajustável), com um limite de iterações (padrão 50, ajustável). | US-1 |
 | REQ-008c-06 | O resultado DEVE informar o número de iterações feitas e a variação final, e os esforços ao longo das vigas (`BeamResult::at(x)`) DEVEM incluir o efeito de segunda ordem dentro da barra (momento N·δ). | US-1, US-5 |
 | REQ-008c-07 | As cargas DEVEM manter a direção que têm no modelo (cargas conservativas, sem acompanhar a deformação), e a teoria é a de deslocamentos e rotações pequenos: o equilíbrio considera o efeito do esforço normal nos deslocamentos, sem atualizar a geometria. | US-1 |
-| REQ-008c-08 | SE a iteração não convergir no limite de iterações, ou SE a rigidez de segunda ordem deixar de ser positiva definida (carga igual ou acima da crítica), ENTÃO O sistema DEVE recusar o resultado com uma mensagem que diga qual dos dois casos ocorreu e, no segundo, a iteração em que ocorreu e o nó e a direção indicados pela fatoração. | US-4 |
+| REQ-008c-08 | SE a iteração não convergir no limite de iterações, ou SE a rigidez de segunda ordem deixar de ser positiva definida (carga igual ou acima da crítica), ENTÃO O sistema DEVE recusar o resultado com uma mensagem que diga qual dos dois casos ocorreu e, no segundo, a iteração em que ocorreu e o nó e a direção indicados pela fatoração ou, se a instabilidade estiver dentro de uma barra, o elemento *(ajustado no design, 2026-11-17)*. | US-4 |
 
 ### Flambagem linear
 
@@ -78,7 +78,7 @@ features anteriores, tudo é exercitado por testes; nada muda na interface.
 
 | ID | Requisito | Como medir |
 |----|-----------|------------|
-| NFR-008c-01 | Nas vigas retas e nas treliças, os casos de verificação (AC-1 a AC-6) DEVEM reproduzir as soluções analíticas com erro relativo ≤ 1e−8 em deslocamentos, esforços e fatores críticos; nas vigas curvas, com a tolerância do design. | Testes automatizados |
+| NFR-008c-01 | Nas vigas retas e nas treliças, os casos de verificação (AC-1 a AC-6) DEVEM reproduzir as soluções analíticas com erro relativo ≤ 1e−8 em deslocamentos, esforços e fatores críticos (também com N variável na barra, REQ-008c-02); nas vigas curvas, com a tolerância do design. | Testes automatizados |
 | NFR-008c-02 | No pórtico espacial do benchmark da 008 (cerca de 30 mil GDL), a análise de segunda ordem DEVE levar no máximo 4 vezes o tempo da análise linear do mesmo modelo, e a flambagem com 5 fatores no máximo 6 vezes, em Release na máquina do mantenedor. | Benchmark |
 | NFR-008c-03 | A cobertura de linhas de `core` DEVE continuar em pelo menos 80% (constituição §6.5). | Job de cobertura no CI |
 

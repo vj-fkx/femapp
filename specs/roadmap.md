@@ -29,7 +29,7 @@ cargas, resolver e ver diagramas de esforços.
 | 007 | truss-elements | Treliça 2D/3D, verificação analítica; `Material`, seção e `Model` em `core` | 006 | concluída |
 | 008 | beam-elements | Viga reta Euler-Bernoulli e Timoshenko 2D/3D; seções simétricas e assimétricas; orientação; liberações, molas de ligação e excentricidades; base elástica; cargas no vão; tensões na seção | 007 | concluída |
 | 008b | beam-warping-curved | Viga curva `Line3` com curvatura em qualquer direção; seções de paredes finas e poligonal com propriedades numéricas (o empenamento foi adiado para a 008d) | 008 | concluída |
-| 008c | beam-second-order | Estática de segunda ordem (P-Δ e P-δ exato na barra, iterativa) e flambagem linear de treliças e vigas retas e curvas | 008b | requisitos |
+| 008c | beam-second-order | Estática de segunda ordem (P-Δ e P-δ exato na barra, iterativa) e flambagem linear de treliças e vigas retas e curvas | 008b | tarefas |
 | 009 | line-meshing | Divisão de linhas em elementos, nós coincidentes fundidos | 005, 003 | planejada |
 | 010 | model-setup-ui | Árvore do modelo, propriedades, materiais, seções, apoios, cargas nodais e distribuídas, undo/redo | 004, 005, 008 | planejada |
 | 011 | analysis-runner | Execução assíncrona, progresso, cancelamento, validação do modelo | 008, 010 | planejada |
