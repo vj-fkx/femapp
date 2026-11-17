@@ -1,5 +1,6 @@
 #include "detail/model_validation.hpp"
 
+#include <fem/core/beam_state.hpp>
 #include <fem/core/element_type.hpp>
 #include <fem/core/mesh.hpp>
 
@@ -371,10 +372,18 @@ private:
             const ElementKind kind = assignment->kind;
             const bool beam = isBeam(kind);
             const ElementType type = m_mesh.elementType(element);
-            if (type != ElementType::Line2) {
+            // REQ-008b-12: beams may also be curved, on 3-node lines.
+            const bool curved = beam && type == ElementType::Line3;
+            if (type != ElementType::Line2 && !curved) {
                 add("The " + elementName(element) + " is a " +
-                    std::string(elementTypeInfo(type).name) + ", not a 2-node line, and cannot " +
-                    (beam ? "be a beam." : "be a truss bar."));
+                    std::string(elementTypeInfo(type).name) +
+                    (beam ? ", not a 2- or 3-node line, and cannot be a beam."
+                          : ", not a 2-node line, and cannot be a truss bar."));
+                continue;
+            }
+            if (curved && assignment->curved == CurvedFormulation::Isoparametric) {
+                add("The " + elementName(element) +
+                    ": the isoparametric curved beam is not available yet.");
                 continue;
             }
             const auto nodes = m_mesh.elementNodes(element);
@@ -386,6 +395,9 @@ private:
             }
             if (kind == ElementKind::Truss2D || kind == ElementKind::Beam2D) {
                 bool flat = std::abs(a.z()) <= tolerance && std::abs(b.z()) <= tolerance;
+                if (curved) {
+                    flat = flat && std::abs(m_mesh.nodeCoordinates(nodes[2]).z()) <= tolerance;
+                }
                 const int offset = m_tables.offsetOf[static_cast<std::size_t>(element)];
                 if (offset != kNoItem) {
                     const RigidOffset& o = m_model.rigidOffsets[static_cast<std::size_t>(offset)];
@@ -403,8 +415,9 @@ private:
                 // supports there stay valid.
                 checkBeam(element, (b - a).norm());
             }
-            for (const NodeIndex node : nodes) {
-                m_tables.nodeDofs[static_cast<std::size_t>(node)] |= dofsOf(kind);
+            // The middle node of an arc has no dofs (design 008b §5.2).
+            for (std::size_t k = 0; k < (curved ? 2U : nodes.size()); ++k) {
+                m_tables.nodeDofs[static_cast<std::size_t>(nodes[k])] |= dofsOf(kind);
             }
         }
     }
@@ -424,7 +437,11 @@ private:
             add("The " + elementName(element) + ": the rigid offsets leave no flexible length.");
             return;
         }
-        if (!hasStableConnections(setup->data, setup->length, assignmentOf(element)->kind)) {
+        const ElementKind kind = assignmentOf(element)->kind;
+        const bool stable = setup->data.arcLength > 0.0
+                                ? hasStableExactConnections(setup->data, kind, setup->length)
+                                : hasStableConnections(setup->data, setup->length, kind);
+        if (!stable) {
             add("The " + elementName(element) +
                 " is unstable on its own: its end releases let it move without strain.");
             return;
@@ -697,14 +714,32 @@ Expected<BeamSetup> beamSetup(const Model& model, ElementIndex element,
     if (!(setup.length > 0.0)) {
         return makeError("the rigid offsets leave no flexible length.");
     }
+    // REQ-008b-13: an arc through the ends of the flexible length and the
+    // middle node (design 008b §5.2).
+    std::optional<Arc> arc;
+    if (mesh.elementType(element) == ElementType::Line3) {
+        auto through = arcThrough(p, mesh.nodeCoordinates(nodes[2]), q);
+        if (!through) {
+            return tl::unexpected(through.error());
+        }
+        arc = *through;
+        setup.length = arc->length;
+    }
     // The principal axes: the local ones turned by the principal angle.
     const double angle = assignment.kind == ElementKind::Beam2D ? 0.0 : section.principalAngle;
+    const Eigen::Vector3d towards = arc ? Eigen::Vector3d(p + arc->startTangent) : q;
     const auto axes =
-        beamAxes(p, q, assignment.reference, assignment.rollAngle + angle, assignment.kind);
+        beamAxes(p, towards, assignment.reference, assignment.rollAngle + angle, assignment.kind);
     if (!axes) {
         return makeError("the reference vector is parallel to the bar.");
     }
     beam.axes = *axes;
+    beam.endAxes = beam.axes;
+    if (arc) {
+        beam.curvature = arcCurvature(beam.axes, *arc);
+        beam.arcLength = arc->length;
+        beam.endAxes = arcAxesAt(beam.axes, beam.curvature, arc->length);
+    }
 
     const double e0 = material.youngsModulus.value_or(0.0);
     const double nu = material.poissonsRatio.value_or(0.0);
@@ -718,7 +753,6 @@ Expected<BeamSetup> beamSetup(const Model& model, ElementIndex element,
         beam.shearZ = g * section.shearAreaZ.value_or(0.0);
     }
     beam.shearCentre = section.shearCentre;
-    beam.endAxes = beam.axes;
     for (int end = 0; end < 2; ++end) {
         const int item = tables.connectionOf[e][static_cast<std::size_t>(end)];
         if (item == kNoItem) {
@@ -734,6 +768,7 @@ Expected<BeamSetup> beamSetup(const Model& model, ElementIndex element,
         beam.foundation << f.translational, f.torsional;
     }
     setup.frame.principalAxes = beam.axes;
+    setup.frame.curvature = beam.curvature;
     setup.frame.principalAngle = angle;
     setup.frame.shearCentre = section.shearCentre;
     return setup;

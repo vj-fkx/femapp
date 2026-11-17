@@ -120,7 +120,7 @@ Beams beamData(const Model& model, const detail::ValidationTables& tables)
         }
         isBeam[e] = true;
         beams.data[e] = setup->data;
-        beams.exact[e] = setup->data.warpingStiffness > 0.0;
+        beams.exact[e] = setup->data.warpingStiffness > 0.0 || setup->data.arcLength > 0.0;
         beams.length[e] = setup->length;
         frames[e] = setup->frame;
         materials[e] = model.findMaterial(assignment.material);

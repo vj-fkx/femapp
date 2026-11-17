@@ -149,7 +149,7 @@ TEST_CASE("elements that cannot be beams", "[core][validation][beam]")
         CHECK(messages(offset) == std::vector<std::string>{"The element 2 is a 2D beam but does "
                                                            "not lie in the XY plane."});
     }
-    SECTION("an element that is not a 2-node line")
+    SECTION("an element that is not a line")
     {
         fem::core::MeshBuilder builder;
         for (int i = 0; i < 3; ++i) {
@@ -163,8 +163,21 @@ TEST_CASE("elements that cannot be beams", "[core][validation][beam]")
         model.mesh = std::make_shared<const fem::core::Mesh>(std::move(*mesh));
         model.assignments.front().elements = ElementIds{{4}};
         model.restraints.clear();
-        CHECK(messages(model) == std::vector<std::string>{"The element 4 is a Line3, not a "
-                                                          "2-node line, and cannot be a beam."});
+        // REQ-008b-12: a 3-node line is a curved beam (here straight).
+        CHECK(messages(model).empty());
+
+        fem::core::MeshBuilder triangle;
+        for (int i = 0; i < 3; ++i) {
+            REQUIRE(triangle.addNode(i + 1, Eigen::Vector3d(i, 0.5 * i * i, 0.0)).has_value());
+        }
+        const std::vector<fem::core::ExternalId> corners = {1, 2, 3};
+        REQUIRE(triangle.addElement(fem::core::ElementType::Tri3, 4, corners).has_value());
+        auto plate = triangle.build();
+        REQUIRE(plate.has_value());
+        model.mesh = std::make_shared<const fem::core::Mesh>(std::move(*plate));
+        CHECK(messages(model) ==
+              std::vector<std::string>{"The element 4 is a Tri3, not a 2- or 3-node line, and "
+                                       "cannot be a beam."});
     }
     SECTION("a reference parallel to the bar")
     {

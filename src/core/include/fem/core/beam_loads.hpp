@@ -59,6 +59,10 @@ struct SpanFrame
     Eigen::Matrix3d principalAxes = Eigen::Matrix3d::Identity(); // columns, global
     double principalAngle = 0.0;                           // from the local y to the principal y'
     Eigen::Vector2d shearCentre = Eigen::Vector2d::Zero(); // principal, from the centroid
+    // REQ-008b-15: the turn rate of the axes along an arc (principal, local):
+    // a global load becomes a force fixed in space, and a concentrated one
+    // is taken in the axes at its point.
+    Eigen::Vector3d curvature = Eigen::Vector3d::Zero();
 };
 
 // A position along the flexible length.

@@ -128,12 +128,12 @@ Regras:
 
 ## Fase 5 — Viga curva em arco
 
-- [ ] **T26** Geometria do arco e eixos ao longo dele (§5.2): círculo pelos
+- [x] **T26** Geometria do arco e eixos ao longo dele (§5.2): círculo pelos
   três nós, Ω em eixos principais, transporte do referencial, colineares
   como reta, recusas (abertura, nó do meio na ponta, referência paralela à
   tangente); testes unitários — arquivos: `beam_element.cpp`, testes —
   cobre: 12, 13, 15, 16
-- [ ] **T27** `ExactBeamElement` para `Line3` arco (nó do meio sem GDL,
+- [x] **T27** `ExactBeamElement` para `Line3` arco (nó do meio sem GDL,
   rotação diferente em cada ponta) e cargas por comprimento de arco no
   `beam_loads` (posições, torque distribuído, bimomento concentrado);
   conjuntos na análise — cobre: 12, 13, 15, 17

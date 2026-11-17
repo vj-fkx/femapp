@@ -68,6 +68,19 @@ void addDistributed(SpanLoads& loads, const SpanFrame& frame, Axes axes,
 {
     const Eigen::Vector3d q0 = toPrincipal(frame, axes, startValue);
     const Eigen::Vector3d q1 = toPrincipal(frame, axes, endValue);
+    if (axes == Axes::Global && !frame.curvature.isZero()) {
+        // Fixed in space along the arc, by its components at the start.
+        loads.fixedPieces.push_back({.from = from, .to = to, .start = q0, .end = q1});
+        if (startTorque != 0.0 || endTorque != 0.0) {
+            SpanPiece torque;
+            torque.from = from;
+            torque.to = to;
+            torque.start << 0.0, 0.0, 0.0, startTorque;
+            torque.end << 0.0, 0.0, 0.0, endTorque;
+            loads.pieces.push_back(torque);
+        }
+        return;
+    }
     SpanPiece piece;
     piece.from = from;
     piece.to = to;
@@ -81,8 +94,12 @@ void addConcentrated(SpanLoads& loads, const SpanFrame& frame, Axes axes,
 {
     SpanPoint point;
     point.at = at;
-    point.force = toPrincipal(frame, axes, force);
-    point.moment = toPrincipal(frame, axes, moment);
+    SpanFrame here = frame;
+    if (axes == Axes::Global && !frame.curvature.isZero()) {
+        here.principalAxes = arcAxesAt(frame.principalAxes, frame.curvature, at);
+    }
+    point.force = toPrincipal(here, axes, force);
+    point.moment = toPrincipal(here, axes, moment);
     point.moment.x() += leverTorque(frame, point.force);
     loads.points.push_back(point);
 }

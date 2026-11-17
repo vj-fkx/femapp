@@ -84,6 +84,30 @@ struct BeamData
                                                  const std::optional<Eigen::Vector3d>& reference,
                                                  double roll, ElementKind kind);
 
+// REQ-008b-13, 16: the circular arc through the ends p and q and the middle
+// point m (design 008b §5.2). A straight bar has radius 0. Fails when m
+// coincides with an end, when the arc closes on itself, or when m is on the
+// line of the ends but not between them.
+struct Arc
+{
+    double length = 0.0; // along the arc
+    double radius = 0.0; // 0: straight
+    Eigen::Vector3d centre = Eigen::Vector3d::Zero();
+    // Unit normal of its plane, so that p, m, q turn counterclockwise about it:
+    // the tangent turns as t' = normal x t / radius.
+    Eigen::Vector3d normal = Eigen::Vector3d::UnitZ();
+    Eigen::Vector3d startTangent = Eigen::Vector3d::UnitX();
+    Eigen::Vector3d endTangent = Eigen::Vector3d::UnitX();
+};
+[[nodiscard]] Expected<Arc> arcThrough(const Eigen::Vector3d& p, const Eigen::Vector3d& m,
+                                       const Eigen::Vector3d& q);
+
+// The turn rate of the principal local axes along an arc, in those axes:
+// the axes at s are startAxes e^(s [curvature]x) (design 008b §5.2).
+[[nodiscard]] Eigen::Vector3d arcCurvature(const Eigen::Matrix3d& startAxes, const Arc& arc);
+[[nodiscard]] Eigen::Matrix3d arcAxesAt(const Eigen::Matrix3d& startAxes,
+                                        const Eigen::Vector3d& curvature, double s);
+
 // Transverse interpolation of the theory in one plane at xi in [0, 1], for
 // the dofs (v1, t1, v2, t2) with t = dv/dx in Euler-Bernoulli: the exact
 // homogeneous solutions, which depend on phi = 12 EI / (G As L^2)

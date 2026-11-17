@@ -2,9 +2,11 @@
 
 #include <Eigen/Cholesky>
 #include <Eigen/Geometry>
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstddef>
+#include <numbers>
 
 namespace fem::core {
 
@@ -242,6 +244,69 @@ Expected<Eigen::Matrix3d> beamAxes(const Eigen::Vector3d& x1, const Eigen::Vecto
     axes.col(1) = y;
     axes.col(2) = x.cross(y);
     return axes;
+}
+
+Expected<Arc> arcThrough(const Eigen::Vector3d& p, const Eigen::Vector3d& m,
+                         const Eigen::Vector3d& q)
+{
+    constexpr double kCoincident = 1e-9;
+    constexpr double kClosed = 1e-6; // of a full turn
+    const Eigen::Vector3d a = m - p;
+    const Eigen::Vector3d b = q - p;
+    const double scale = std::max({a.norm(), b.norm(), (q - m).norm()});
+    if (!(a.norm() > kCoincident * scale) || !((q - m).norm() > kCoincident * scale)) {
+        return makeError("the middle node coincides with an end node.");
+    }
+    if (!(b.norm() > kCoincident * scale)) {
+        return makeError("the arc closes on itself.");
+    }
+    const Eigen::Vector3d n = a.cross(b);
+    Arc arc;
+    if (n.norm() <= kParallel * a.norm() * b.norm()) {
+        // Collinear: a straight bar when m is between the ends.
+        const double along = a.dot(b) / b.squaredNorm();
+        if (!(along > 0.0) || !(along < 1.0)) {
+            return makeError("the middle node is not between the end nodes.");
+        }
+        arc.length = b.norm();
+        arc.startTangent = arc.endTangent = b / b.norm();
+        return arc;
+    }
+    // The circumcentre of p, m, q.
+    arc.centre = p + (a.squaredNorm() * b - b.squaredNorm() * a).cross(n) / (2.0 * n.squaredNorm());
+    arc.radius = (p - arc.centre).norm();
+    arc.normal = n.normalized();
+    const Eigen::Vector3d u = p - arc.centre;
+    const Eigen::Vector3d v = q - arc.centre;
+    double angle = std::atan2(arc.normal.dot(u.cross(v)), u.dot(v));
+    if (angle <= 0.0) {
+        angle += 2.0 * std::numbers::pi;
+    }
+    if (angle >= 2.0 * std::numbers::pi * (1.0 - kClosed)) {
+        return makeError("the arc closes on itself.");
+    }
+    arc.length = arc.radius * angle;
+    arc.startTangent = arc.normal.cross(u).normalized();
+    arc.endTangent = arc.normal.cross(v).normalized();
+    return arc;
+}
+
+Eigen::Vector3d arcCurvature(const Eigen::Matrix3d& startAxes, const Arc& arc)
+{
+    if (!(arc.radius > 0.0)) {
+        return Eigen::Vector3d::Zero();
+    }
+    return startAxes.transpose() * arc.normal / arc.radius;
+}
+
+Eigen::Matrix3d arcAxesAt(const Eigen::Matrix3d& startAxes, const Eigen::Vector3d& curvature,
+                          double s)
+{
+    const double rate = curvature.norm();
+    if (!(rate > 0.0)) {
+        return startAxes;
+    }
+    return startAxes * Eigen::AngleAxisd(rate * s, curvature / rate).toRotationMatrix();
 }
 
 double flexibleLength(const BeamData& beam, const Eigen::Vector3d& x1, const Eigen::Vector3d& x2)
