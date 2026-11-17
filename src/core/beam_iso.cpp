@@ -384,7 +384,7 @@ public:
     }
 
 private:
-    Mat18 m_local;
+    Mat18 m_local = Mat18::Identity();
     int m_count = 0;
     std::array<int, kDofs> m_internal{-1, -1, -1, -1, -1, -1, -1, -1, -1,
                                       -1, -1, -1, -1, -1, -1, -1, -1, -1};

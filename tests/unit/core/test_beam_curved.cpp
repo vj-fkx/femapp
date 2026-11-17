@@ -524,10 +524,10 @@ TEST_CASE("connections at the ends of arcs", "[core][beam][curved][verification]
         if (spring) {
             fem::core::EndConnection start{.elements = fem::core::ElementIds{{1}},
                                            .end = fem::core::BarEnd::Start};
-            start.stiffness[5] = *spring;
+            start.stiffness[5] = spring;
             fem::core::EndConnection end{.elements = fem::core::ElementIds{{2}},
                                          .end = fem::core::BarEnd::End};
-            end.stiffness[5] = *spring;
+            end.stiffness[5] = spring;
             m.endConnections = {start, end};
         }
         m.distributedLoads.push_back({.elements = fem::core::ElementIds{{1, 2}},

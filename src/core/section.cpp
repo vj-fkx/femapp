@@ -101,19 +101,20 @@ double thinPlate(double length, double thickness)
 // What a shape adds to the geometric properties.
 struct ShapeData
 {
-    std::vector<Part> parts;
+    // In the order that leaves the least padding.
+    Eigen::Vector2d shearCentre = Eigen::Vector2d::Zero(); // drawing, absolute
     // Exact values for the circular shapes, which are not rectangles.
     std::optional<Geometric> exact;
     double torsion = 0.0;
-    Eigen::Vector2d shearCentre = Eigen::Vector2d::Zero(); // drawing, absolute
-    bool shearCentreAtCentroid = true;
     double shearAreaY = 0.0;
     double shearAreaZ = 0.0;
-    double warping = 0.0; // Iw (design 008b section 5.1.1)
+    double warping = 0.0;                            // Iw (design 008b section 5.1.1)
+    std::shared_ptr<const detail::SolidField> field; // solid polygon
+    std::vector<Part> parts;
+    bool shearCentreAtCentroid = true;
     // The shear areas are already about the principal axes (thin-walled,
     // solid polygon).
     bool principalShearAreas = false;
-    std::shared_ptr<const detail::SolidField> field; // solid polygon
 };
 
 // REQ-008b-01: warping of the thin-walled shapes on their mid-lines
