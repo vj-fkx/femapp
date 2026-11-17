@@ -161,10 +161,10 @@ Regras:
 - [x] **T33** ~~Viga curva com empenamento (AC-7): R grande igual à reta;   arco e isoparamétrica concordando com o refinamento; caso de Yang e Kuo   (1987), 1% — cobre: 07, 13, 14~~ *Removida em 2026-11-16 com o empenamento (requirements §6).*
 ## Fase 7 — Validação
 
-- [ ] **T34** Testes de validação: cada problema do §5.8 isolado e vários
+- [x] **T34** Testes de validação: cada problema do §5.8 isolado e vários
   juntos; mecanismo com "warp" e a sugestão de impedir ou restringir —
   arquivo: `tests/unit/core/test_beam_validation.cpp` — cobre: 16, 21, 22
-- [ ] **T35** Implementar as verificações do §5.8 até a T34 passar —
+- [x] **T35** Implementar as verificações do §5.8 até a T34 passar —
   arquivos: `model_validation.cpp`, `detail/model_validation.hpp`,
   `static_analysis.cpp` — cobre: 04, 16, 21, 22
 

@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <map>
 #include <optional>
 #include <set>
 #include <string>
@@ -70,6 +71,7 @@ public:
         checkOffsets();
         checkFoundations();
         checkBars();
+        checkArcMiddles();
         checkThermal();
         checkInitialStrains();
         checkGradients();
@@ -413,6 +415,9 @@ private:
             }
             // The middle node of an arc has no dofs (design 008b §5.2).
             const bool arc = curved && assignment->curved == CurvedFormulation::Arc;
+            if (arc) {
+                m_arcMiddle[nodes[2]] = element;
+            }
             for (std::size_t k = 0; k < (arc ? 2U : nodes.size()); ++k) {
                 m_tables.nodeDofs[static_cast<std::size_t>(nodes[k])] |= dofsOf(kind);
             }
@@ -573,6 +578,12 @@ private:
     bool checkNode(const std::string& label, NodeIndex node, DofType dof)
     {
         const DofMask dofs = m_tables.nodeDofs[static_cast<std::size_t>(node)];
+        if (const auto arc = m_arcMiddle.find(node); arc != m_arcMiddle.end() && dofs == 0) {
+            add(label + ": the " + nodeName(node) + " is the middle node of the arc of the " +
+                elementName(arc->second) +
+                ", which only shapes it: it takes no supports nor loads.");
+            return false;
+        }
         if (dofs == 0) {
             add(label + ": the " + nodeName(node) + " is not connected to any bar.");
             return false;
@@ -591,6 +602,21 @@ private:
         add(label + ": the " + nodeName(node) + " has no dof " + std::string(dofName(dof)) + " (" +
             why + ").");
         return false;
+    }
+
+    // REQ-008b-16: the middle node of an arc belongs to that arc only.
+    void checkArcMiddles()
+    {
+        for (ElementIndex element = 0; element < m_mesh.elementCount(); ++element) {
+            for (const NodeIndex node : m_mesh.elementNodes(element)) {
+                const auto arc = m_arcMiddle.find(node);
+                if (arc != m_arcMiddle.end() && arc->second != element) {
+                    addOnce("The " + nodeName(node) + " is the middle node of the arc of the " +
+                            elementName(arc->second) +
+                            ", which only shapes it: no other element can use it.");
+                }
+            }
+        }
     }
 
     void checkRestraints()
@@ -652,8 +678,9 @@ private:
     ValidationTables m_tables;
     std::vector<ModelIssue> m_issues;
     std::set<std::string, std::less<>> m_said;
-    std::vector<bool> m_valid;      // per assignment: material and section usable
-    std::vector<double> m_flexible; // per element: flexible length of a valid beam
+    std::vector<bool> m_valid;                     // per assignment: material and section usable
+    std::vector<double> m_flexible;                // per element: flexible length of a valid beam
+    std::map<NodeIndex, ElementIndex> m_arcMiddle; // the middle nodes of the arcs
 };
 
 } // namespace

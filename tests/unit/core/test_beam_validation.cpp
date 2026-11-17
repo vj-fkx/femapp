@@ -16,7 +16,10 @@
 
 #include <Eigen/Core>
 #include <algorithm>
+#include <array>
+#include <cmath>
 #include <memory>
+#include <numbers>
 #include <string>
 #include <vector>
 
@@ -372,4 +375,140 @@ TEST_CASE("a mechanism of rotation names the node", "[core][analysis][beam]")
     // Restrained, it is a Gerber beam that stands.
     model.restraints.push_back({.nodes = NodeIds{{2}}, .dof = DofType::RZ, .value = 0.0});
     CHECK(fem::core::runLinearStatic(model).has_value());
+}
+
+namespace {
+
+// Beams on 3-node lines: each entry has the ends and the middle node (ids:
+// ends 2i+1, 2i+2; middles 101+i); plus Line2 bars given by node ids.
+Model curvedModel(const std::vector<std::array<Eigen::Vector3d, 3>>& lines,
+                  fem::core::CurvedFormulation formulation,
+                  const std::vector<std::array<fem::core::ExternalId, 2>>& bars = {})
+{
+    fem::core::MeshBuilder builder;
+    for (std::size_t i = 0; i < lines.size(); ++i) {
+        const auto base = static_cast<fem::core::ExternalId>(2 * i);
+        REQUIRE(builder.addNode(base + 1, lines[i][0]).has_value());
+        REQUIRE(builder.addNode(base + 2, lines[i][1]).has_value());
+        REQUIRE(
+            builder.addNode(static_cast<fem::core::ExternalId>(101 + i), lines[i][2]).has_value());
+    }
+    ElementIds all;
+    for (std::size_t i = 0; i < lines.size(); ++i) {
+        const auto base = static_cast<fem::core::ExternalId>(2 * i);
+        const std::vector<fem::core::ExternalId> line = {
+            base + 1, base + 2, static_cast<fem::core::ExternalId>(101 + i)};
+        const auto id = static_cast<fem::core::ExternalId>(i + 1);
+        REQUIRE(builder.addElement(fem::core::ElementType::Line3, id, line).has_value());
+        all.ids.push_back(id);
+    }
+    for (std::size_t j = 0; j < bars.size(); ++j) {
+        const auto id = static_cast<fem::core::ExternalId>(51 + j);
+        const std::vector<fem::core::ExternalId> line = {bars[j][0], bars[j][1]};
+        REQUIRE(builder.addElement(fem::core::ElementType::Line2, id, line).has_value());
+        all.ids.push_back(id);
+    }
+    auto mesh = builder.build();
+    REQUIRE(mesh.has_value());
+    Model model;
+    model.mesh = std::make_shared<const fem::core::Mesh>(std::move(*mesh));
+    model.materials.push_back(fem::core::test::steel());
+    model.sections.push_back(fem::core::test::genericSection());
+    model.assignments.push_back({.elements = all,
+                                 .kind = ElementKind::Beam3D,
+                                 .material = "Steel",
+                                 .section = "S",
+                                 .curved = formulation});
+    return model;
+}
+
+using Vec3 = Eigen::Vector3d;
+
+} // namespace
+
+// REQ-008b-04, 16, 21: the problems of curved beams and of the new sections.
+TEST_CASE("curved beams and new sections are checked", "[core][validation][beam][curved]")
+{
+    using fem::core::CurvedFormulation;
+    const std::array<Vec3, 3> quarter = {Vec3(2, 0, 0), Vec3(0, 2, 0),
+                                         Vec3(std::numbers::sqrt2, std::numbers::sqrt2, 0)};
+    SECTION("an arc with its middle node on an end, or outside the ends on their line")
+    {
+        CHECK(
+            messages(curvedModel({{Vec3(0, 0, 0), Vec3(2, 0, 0), Vec3(0, 0, 0)}},
+                                 CurvedFormulation::Arc)) ==
+            std::vector<std::string>{"The element 1: the middle node coincides with an end node."});
+        CHECK(messages(curvedModel({{Vec3(0, 0, 0), Vec3(2, 0, 0), Vec3(3, 0, 0)}},
+                                   CurvedFormulation::Arc)) ==
+              std::vector<std::string>{
+                  "The element 1: the middle node is not between the end nodes."});
+    }
+    SECTION("a reference parallel to the arc at its start")
+    {
+        Model model = curvedModel({quarter}, CurvedFormulation::Arc);
+        model.assignments.front().reference = Vec3(0, 1, 0); // the tangent at (2, 0, 0)
+        CHECK(messages(model) ==
+              std::vector<std::string>{
+                  "The element 1: the reference vector is parallel to the bar."});
+    }
+    SECTION("an isoparametric curve that folds on itself")
+    {
+        CHECK(messages(curvedModel({{Vec3(0, 0, 0), Vec3(1, 0, 0), Vec3(0.9, 0, 0)}},
+                                   CurvedFormulation::Isoparametric)) ==
+              std::vector<std::string>{"The element 1: the curve of the element folds on itself."});
+        // The same nodes as an arc are only a straight bar.
+        CHECK(messages(curvedModel({{Vec3(0, 0, 0), Vec3(1, 0, 0), Vec3(0.9, 0, 0)}},
+                                   CurvedFormulation::Arc))
+                  .empty());
+    }
+    SECTION("the middle node of an arc takes no support, load nor other element")
+    {
+        Model model = curvedModel({quarter}, CurvedFormulation::Arc);
+        fem::core::test::restrain(model, {101}, {DofType::U});
+        model.nodalForces.push_back({.nodes = NodeIds{{101}}, .force = Vec3(1, 0, 0)});
+        CHECK(messages(model) ==
+              std::vector<std::string>{
+                  "Restraint 1: the node 101 is the middle node of the arc of the element 1, "
+                  "which only shapes it: it takes no supports nor loads.",
+                  "Nodal force 1: the node 101 is the middle node of the arc of the element 1, "
+                  "which only shapes it: it takes no supports nor loads."});
+        const Model shared = curvedModel({quarter}, CurvedFormulation::Arc, {{1, 101}});
+        CHECK(messages(shared) ==
+              std::vector<std::string>{"The node 101 is the middle node of the arc of the element "
+                                       "1, which only shapes it: no other element can use it."});
+        // The middle node of an isoparametric beam has dofs.
+        Model iso = curvedModel({quarter}, CurvedFormulation::Isoparametric);
+        fem::core::test::restrain(iso, {101}, {DofType::U});
+        CHECK(messages(iso).empty());
+    }
+    SECTION("an invalid thin-walled or polygon section")
+    {
+        Model model = curvedModel({quarter}, CurvedFormulation::Arc);
+        model.sections.front() = fem::core::Section{
+            .name = "S",
+            .shape = fem::core::ThinWalled{
+                .points = {Eigen::Vector2d(0, 0), Eigen::Vector2d(0, 0.1)},
+                .walls = {fem::core::ThinWalled::Wall{.from = 0, .to = 0, .t = 0.01}}}};
+        CHECK(messages(model) ==
+              std::vector<std::string>{"Section \"S\": the wall 0 has zero length."});
+        model.sections.front() = fem::core::Section{
+            .name = "S",
+            .shape = fem::core::SolidPolygon{
+                .regions = {
+                    {.outline = {Eigen::Vector2d(0, 0), Eigen::Vector2d(1, 0)}, .holes = {}}}}};
+        CHECK(messages(model) ==
+              std::vector<std::string>{
+                  "Section \"S\": the outline of the region 0 has fewer than three vertices."});
+    }
+    SECTION("several problems together")
+    {
+        Model model = curvedModel({{Vec3(0, 0, 0), Vec3(2, 0, 0), Vec3(0, 0, 0)}, quarter},
+                                  CurvedFormulation::Arc);
+        fem::core::test::restrain(model, {102}, {DofType::V});
+        CHECK(messages(model) ==
+              std::vector<std::string>{
+                  "The element 1: the middle node coincides with an end node.",
+                  "Restraint 1: the node 102 is the middle node of the arc of the element 2, "
+                  "which only shapes it: it takes no supports nor loads."});
+    }
 }
