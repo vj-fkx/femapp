@@ -3,13 +3,18 @@
 
 #include "beam_models.hpp"
 
+#include <fem/core/mesh_builder.hpp>
 #include <fem/core/stability_analysis.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
 #include <cmath>
+#include <memory>
 #include <numbers>
+#include <optional>
 #include <string>
+#include <utility>
+#include <vector>
 
 using fem::core::ElementKind;
 using fem::core::test::kE;
@@ -276,5 +281,116 @@ TEST_CASE("second-order failures", "[core][second-order]")
         // Below its critical load it is fine.
         model.nodalForces.front().force = Vec(0, -0.9 * euler, 0);
         CHECK(fem::core::runSecondOrderStatic(model).has_value());
+    }
+}
+
+namespace {
+
+// A two-hinged half circle of radius r from (-r, 0) over the top to (r, 0):
+// n Line3 elements (ends 1 .. n + 1, middles from 1001) with `curved`, or,
+// without it, n straight Line2 bars on the chords. Timoshenko, the generic
+// section; the crown is the node n / 2 + 1.
+fem::core::Model arch(double r, int n, std::optional<fem::core::CurvedFormulation> curved)
+{
+    const double pi = std::numbers::pi;
+    const auto point = [r](double a) { return Vec(r * std::cos(a), r * std::sin(a), 0.0); };
+    fem::core::MeshBuilder builder;
+    for (int k = 0; k <= n; ++k) {
+        REQUIRE(builder.addNode(k + 1, point(pi - pi * k / n)).has_value());
+    }
+    if (curved) {
+        for (int k = 0; k < n; ++k) {
+            REQUIRE(builder.addNode(1001 + k, point(pi - pi * (k + 0.5) / n)).has_value());
+        }
+    }
+    fem::core::ElementIds all;
+    for (int k = 0; k < n; ++k) {
+        const auto id = static_cast<fem::core::ExternalId>(k) + 1;
+        if (curved) {
+            const std::vector<fem::core::ExternalId> line = {id, id + 1, 1001 + id - 1};
+            REQUIRE(builder.addElement(fem::core::ElementType::Line3, id, line).has_value());
+        } else {
+            const std::vector<fem::core::ExternalId> line = {id, id + 1};
+            REQUIRE(builder.addElement(fem::core::ElementType::Line2, id, line).has_value());
+        }
+        all.ids.push_back(id);
+    }
+    auto mesh = builder.build();
+    REQUIRE(mesh.has_value());
+    fem::core::Model model;
+    model.mesh = std::make_shared<const fem::core::Mesh>(std::move(*mesh));
+    model.materials.push_back(fem::core::test::steel());
+    model.sections.push_back(fem::core::test::genericSection());
+    fem::core::Assignment assignment{.elements = all,
+                                     .kind = ElementKind::Beam2D,
+                                     .material = "Steel",
+                                     .section = "S",
+                                     .theory = fem::core::BeamTheory::Timoshenko};
+    if (curved) {
+        assignment.curved = *curved;
+    }
+    model.assignments.push_back(assignment);
+    fem::core::test::restrain(model, {1, static_cast<fem::core::ExternalId>(n) + 1},
+                              {fem::core::DofType::U, fem::core::DofType::V});
+    return model;
+}
+
+// The vertical deflection of the crown in second order, with a load p
+// there or a load q per length of arc, both downwards.
+double crown(fem::core::Model model, int n, double p, double q)
+{
+    const auto top = static_cast<fem::core::ExternalId>(n / 2) + 1;
+    if (p != 0.0) {
+        model.nodalForces.push_back({.nodes = fem::core::NodeIds{{top}}, .force = Vec(0, -p, 0)});
+    }
+    if (q != 0.0) {
+        model.distributedLoads.push_back({.elements = model.assignments.front().elements,
+                                          .axes = fem::core::Axes::Global,
+                                          .startValue = Vec(0, -q, 0),
+                                          .endValue = Vec(0, -q, 0)});
+    }
+    return second(model).result.displacements[static_cast<std::size_t>(top) - 1].y();
+}
+
+} // namespace
+
+// REQ-008c-04, AC-6: a two-hinged half circle arch in second order: the arc,
+// the isoparametric beam and a fine chain of straight bars agree.
+TEST_CASE("second order of a curved arch", "[core][second-order][arc]")
+{
+    using fem::core::CurvedFormulation;
+    const double r = 5.0;
+    for (const auto& [p, q] : {std::pair{1.5e6, 0.0}, std::pair{0.0, 3e5}}) {
+        const double arc = crown(arch(r, 2, CurvedFormulation::Arc), 2, p, q);
+        const double arc4 = crown(arch(r, 4, CurvedFormulation::Arc), 4, p, q);
+        const double coarse = crown(arch(r, 64, std::nullopt), 64, p, q);
+        const double fine = crown(arch(r, 128, std::nullopt), 128, p, q);
+        const double chain = (4.0 * fine - coarse) / 3.0;
+        std::vector<double> iso;
+        for (const int n : {8, 16, 32}) {
+            iso.push_back(crown(arch(r, n, CurvedFormulation::Isoparametric), n, p, q));
+        }
+        const double linear = [&] {
+            fem::core::Model model = arch(r, 2, CurvedFormulation::Arc);
+            model.nodalForces.push_back({.nodes = fem::core::NodeIds{{2}}, .force = Vec(0, -p, 0)});
+            if (q != 0.0) {
+                model.distributedLoads.push_back({.elements = model.assignments.front().elements,
+                                                  .axes = fem::core::Axes::Global,
+                                                  .startValue = Vec(0, -q, 0),
+                                                  .endValue = Vec(0, -q, 0)});
+            }
+            return fem::core::test::solve(model).displacements[1].y();
+        }();
+        INFO("p " << p << " q " << q << ": linear " << linear << ", arc " << arc << ", arc4 "
+                  << arc4 << ", chain " << chain << " (" << coarse << ", " << fine << "), iso "
+                  << iso[0] << " " << iso[1] << " " << iso[2]);
+        CHECK(std::abs(arc / linear - 1.0) > 1e-3); // the second order matters
+        CHECK(near(arc4, arc, 1e-6));
+        CHECK(near(chain, arc, 1e-6));
+        // The isoparametric beam converges with h^4 (design 008b §5.5).
+        for (std::size_t i = 0; i + 1 < iso.size(); ++i) {
+            CHECK(std::log2(std::abs(iso[i] - arc) / std::abs(iso[i + 1] - arc)) >= 3.5);
+        }
+        CHECK(near(iso[2], arc, 2e-5));
     }
 }

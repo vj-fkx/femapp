@@ -111,7 +111,7 @@ Regras:
   passarem — arquivos:
   `stability_analysis.hpp`, `second_order.cpp`, `src/core/CMakeLists.txt` —
   cobre: 01, 05, 06, 07, 08, 13
-- [ ] **T17** Segunda ordem com vigas curvas (AC-6): arco biarticulado
+- [x] **T17** Segunda ordem com vigas curvas (AC-6): arco biarticulado
   semicircular com carga no topo e distribuída, arco e isoparamétrica
   convergindo um para o outro e para a cadeia de barras retas — arquivo:
   `test_second_order_analysis.cpp` — cobre: 04
@@ -269,3 +269,12 @@ Regras:
   com a subdivisão: as barras são exatas na T04 (funções de estabilidade
   em 1e−10). Falhas: acima da crítica (nó e direção), limite de iterações,
   pilar biarticulado além da sua crítica ("inside the element 1").
+- T17: arco biarticulado semicircular (R = 5 m, Timoshenko) em segunda
+  ordem, carga no topo e carga distribuída global por comprimento de arco
+  (a segunda ordem muda a flecha do topo em 15% e 33%): o arco com 2 ou 4
+  elementos dá o mesmo resultado; a cadeia de 64 e 128 barras retas exatas
+  extrapolada por Richardson bate com o arco em 1e−6; a isoparamétrica
+  converge para ele com taxa 4 (8, 16 e 32 elementos: 2,0e−3, 1,3e−4,
+  7,7e−6 na carga no topo; 3,6e−3, 2,3e−4, 1,4e−5 na distribuída).
+  Tolerâncias documentadas das vigas curvas na segunda ordem: 1e−6 para o
+  arco, taxa ≥ 3,5 para a isoparamétrica.
