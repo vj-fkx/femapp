@@ -14,10 +14,16 @@
 //   K = (kx, My / EIy, Mz / EIz),
 // plus the imposed strains, and the foundation adds k u to F' and k_t rx
 // to Mx'. Euler-Bernoulli drops the shear compliance.
+// Feature 008c (design 008c §5.1): with the axial force N of the reference
+// state, the slope of the centroid axis is, by Engesser,
+//   sl = (-e1 x theta + F_perp / G As) / (1 + N / G As)
+// (in Gamma, without the twist about the shear centre), and the moment
+// equation gains M' -= sl x (N e1), the equilibrium on the deformed axis.
 
 #include <fem/core/beam_state.hpp>
 
 #include <Eigen/Cholesky>
+#include <Eigen/Eigenvalues>
 #include <Eigen/LU>
 #include <algorithm>
 #include <array>
@@ -25,6 +31,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <initializer_list>
+#include <numbers>
 #include <unsupported/Eigen/MatrixFunctions>
 #include <vector>
 
@@ -85,7 +92,13 @@ Plan planFor(const BeamData& beam, bool planar)
     return plan;
 }
 
-FullMatrix systemMatrix(const BeamData& beam)
+// 1 / (1 + N / G As): the Engesser factor of one plane (1 without shear).
+double engesser(double n, double shear)
+{
+    return shear > 0.0 ? 1.0 / (1.0 + n / shear) : 1.0;
+}
+
+FullMatrix systemMatrix(const BeamData& beam, double n)
 {
     FullMatrix a = FullMatrix::Zero();
     const Mat3 omega = skew(beam.curvature);
@@ -103,14 +116,16 @@ FullMatrix systemMatrix(const BeamData& beam)
     }
     // u' = -Omega x u - e1 x theta + Gamma.
     a.block<3, 3>(U, U) = -omega;
-    a(V, RZ) += 1.0;
-    a(W, RY) -= 1.0;
+    const double fy = engesser(n, beam.shearY);
+    const double fz = engesser(n, beam.shearZ);
+    a(V, RZ) += fy;
+    a(W, RY) -= fz;
     a(U, N) += 1.0 / beam.axial;
     if (beam.shearY > 0.0) {
-        a(V, VY) += 1.0 / beam.shearY;
+        a(V, VY) += fy / beam.shearY;
     }
     if (beam.shearZ > 0.0) {
-        a(W, VZ) += 1.0 / beam.shearZ;
+        a(W, VZ) += fz / beam.shearZ;
     }
     a.row(V) += ez * twist;
     a.row(W) -= ey * twist;
@@ -141,6 +156,17 @@ FullMatrix systemMatrix(const BeamData& beam)
     a(MY, VZ) += 1.0;
     a(MZ, VY) -= 1.0;
     a(MX, RX) += beam.foundation(3);
+    // Second order: My' -= N sl_w, Mz' += N sl_v (design 008c §5.1).
+    if (n != 0.0) {
+        a(MZ, RZ) += n * fy;
+        a(MY, RY) += n * fz;
+        if (beam.shearY > 0.0) {
+            a(MZ, VY) += n * fy / beam.shearY;
+        }
+        if (beam.shearZ > 0.0) {
+            a(MY, VZ) -= n * fz / beam.shearZ;
+        }
+    }
     return a;
 }
 
@@ -194,6 +220,9 @@ double growthRate(const BeamData& beam)
     if (beam.warpingStiffness > 0.0) {
         rate = std::max(rate, quartic(beam.foundation(3), beam.warpingStiffness));
     }
+    // Feature 008c: a tension N grows as e^(sqrt(N / EI) x).
+    const double tension = beam.axialForce.scaled(-1.0).largestCompression();
+    rate = std::max({rate, square(tension, beam.bendingY), square(tension, beam.bendingZ)});
     return rate;
 }
 
@@ -430,9 +459,59 @@ int stateDofs(const BeamData& beam, bool planar)
 
 namespace {
 
+// The smallest positive of two stiffnesses (0 when neither is).
+double smallestPositive(double a, double b)
+{
+    if (a > 0.0 && b > 0.0) {
+        return std::min(a, b);
+    }
+    return std::max(a, b);
+}
+
+// Feature 008c (design 008c §5.1): the longest part whose clamped critical
+// load (Engesser) stays above kMargin times the largest compression c, so
+// that no part buckles on its own; 0 when the compression needs none, and
+// < 0 when it is beyond the reach of any part (|N| near G As).
+constexpr double kCriticalMargin = 4.0;
+double longestPart(const BeamData& beam)
+{
+    const double c = beam.axialForce.largestCompression();
+    const double ei = smallestPositive(beam.bendingY, beam.bendingZ);
+    if (!(c > 0.0) || !(ei > 0.0)) {
+        return 0.0;
+    }
+    const double ga = smallestPositive(beam.shearY, beam.shearZ);
+    double margin = kCriticalMargin;
+    if (ga > 0.0 && margin * c >= ga) {
+        margin = 1.25;
+        if (margin * c >= ga) {
+            return -1.0;
+        }
+    }
+    const double shear = ga > 0.0 ? 1.0 - margin * c / ga : 1.0;
+    return 2.0 * std::numbers::pi * std::sqrt(ei * shear / (margin * c));
+}
+
 int partCount(const BeamData& beam, double length)
 {
-    return std::max(1, static_cast<int>(std::ceil(growthRate(beam) * length / kGrowthPerPart)));
+    int parts =
+        std::max(1, static_cast<int>(std::ceil(growthRate(beam) * length / kGrowthPerPart)));
+    const double longest = longestPart(beam);
+    if (longest > 0.0) {
+        parts = std::max(parts, static_cast<int>(std::ceil(length / longest)));
+    }
+    // The parts of the profile of N are split evenly.
+    const int profile = beam.axialForce.parts();
+    if (profile > 1) {
+        parts = profile * ((parts + profile - 1) / profile);
+    }
+    return parts;
+}
+
+// The axial force of a part (design 008c §5.2): constant along it.
+double partAxialForce(const BeamData& beam, double length, double from, double to)
+{
+    return beam.axialForce.at((from + to) / 2.0, length);
 }
 
 // Integrates the part from `from` up to `until`, segment by segment between
@@ -503,15 +582,17 @@ StateBarMatrices stateBarMatrices(const BeamData& beam, double length, const Spa
                                   bool planar)
 {
     const Plan plan = planFor(beam, planar);
-    const FullMatrix full = systemMatrix(beam);
     const Eigen::Index d = plan.dofs;
     const int parts = partCount(beam, length);
+    const bool second = beam.axialForce.active();
+    int negative = longestPart(beam) < 0.0 ? kUnstableBar : 0;
 
     PartMatrix total;
     PartVector totalLoads;
     for (int k = 0; k < parts; ++k) {
         const double from = length * k / parts;
         const double to = k + 1 == parts ? length : length * (k + 1) / parts;
+        const FullMatrix full = systemMatrix(beam, partAxialForce(beam, length, from, to));
         Part part(beam, plan, full, from, to);
         walk(part, beam, loads, length, from, to, k == 0, k + 1 == parts);
         PartMatrix kp;
@@ -528,8 +609,23 @@ StateBarMatrices stateBarMatrices(const BeamData& beam, double length, const Spa
         PartMatrix coupling = PartMatrix::Zero(2 * d, d); // (start, next) x junction
         coupling.topRows(d) = total.topRightCorner(d, d);
         coupling.bottomRows(d) = kp.bottomLeftCorner(d, d);
-        const Eigen::LDLT<PartMatrix> ldlt(kjj);
-        const PartMatrix solved = ldlt.solve(coupling.transpose()); // junction x (start, next)
+        PartMatrix solved; // junction x (start, next)
+        PartVector junction;
+        if (second) {
+            // May be indefinite: its negative eigenvalues count the
+            // buckling loads of the clamped bar below N (design 008c §5.4).
+            const Eigen::SelfAdjointEigenSolver<PartMatrix> eigen(kjj);
+            const auto& values = eigen.eigenvalues();
+            negative += static_cast<int>((values.array() < 0.0).count());
+            const PartMatrix inverse = eigen.eigenvectors() * values.cwiseInverse().asDiagonal() *
+                                       eigen.eigenvectors().transpose();
+            solved = inverse * coupling.transpose();
+            junction = inverse * rj;
+        } else {
+            const Eigen::LDLT<PartMatrix> ldlt(kjj);
+            solved = ldlt.solve(coupling.transpose());
+            junction = ldlt.solve(rj);
+        }
         PartMatrix next = PartMatrix::Zero(2 * d, 2 * d);
         next.topLeftCorner(d, d) = total.topLeftCorner(d, d);
         next.bottomRightCorner(d, d) = kp.bottomRightCorner(d, d);
@@ -537,13 +633,14 @@ StateBarMatrices stateBarMatrices(const BeamData& beam, double length, const Spa
         PartVector nextLoads(2 * d);
         nextLoads.head(d) = totalLoads.head(d);
         nextLoads.tail(d) = rp.tail(d);
-        nextLoads -= coupling * ldlt.solve(rj);
+        nextLoads -= coupling * junction;
         total = (next + next.transpose()) / 2.0;
         totalLoads = nextLoads;
     }
     StateBarMatrices out;
     out.stiffness = total;
     out.loads = -totalLoads; // equivalent nodal loads
+    out.negativePivots = negative;
     return out;
 }
 
@@ -551,14 +648,17 @@ BarState stateAt(const BeamData& beam, double length, const SpanLoads& loads, bo
                  const StateBarVector& ends, double s, Side side)
 {
     const Plan plan = planFor(beam, planar);
-    const FullMatrix full = systemMatrix(beam);
     const Eigen::Index d = plan.dofs;
     const int parts = partCount(beam, length);
     const auto bound = [length, parts](int k) { return k >= parts ? length : length * k / parts; };
+    const auto fullOf = [&](int k) {
+        return systemMatrix(beam, partAxialForce(beam, length, bound(k), bound(k + 1)));
+    };
     // The stiffness of every part, then the displacements of the junctions.
     std::vector<PartMatrix> stiffness(static_cast<std::size_t>(parts));
     std::vector<PartVector> forces(static_cast<std::size_t>(parts));
     for (int k = 0; k < parts; ++k) {
+        const FullMatrix full = fullOf(k);
         Part part(beam, plan, full, bound(k), bound(k + 1));
         walk(part, beam, loads, length, bound(k), bound(k + 1), k == 0, k + 1 == parts);
         part.stiffness(stiffness[static_cast<std::size_t>(k)], forces[static_cast<std::size_t>(k)]);
@@ -594,7 +694,9 @@ BarState stateAt(const BeamData& beam, double length, const SpanLoads& loads, bo
                 }
             }
         }
-        junctions = kii.ldlt().solve(rhs);
+        // With an axial force the junctions may be indefinite.
+        junctions = beam.axialForce.active() ? Eigen::VectorXd(kii.partialPivLu().solve(rhs))
+                                             : Eigen::VectorXd(kii.ldlt().solve(rhs));
     }
     // The part that holds s and the displacements of its ends.
     const double x = std::clamp(s, 0.0, length);
@@ -623,6 +725,7 @@ BarState stateAt(const BeamData& beam, double length, const SpanLoads& loads, bo
     StateBarVector start(2 * d);
     start.head(d) = dk.head(d);
     start.tail(d) = -p.head(d);
+    const FullMatrix full = fullOf(k);
     Part part(beam, plan, full, bound(k), bound(k + 1));
     walk(part, beam, loads, length, bound(k), x, k == 0, side == Side::After);
     const StateBarVector state = part.transfer() * start + part.particular();

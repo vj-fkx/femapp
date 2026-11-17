@@ -38,12 +38,12 @@ Regras:
 
 ## Fase 2 — A barra exata com esforço normal
 
-- [ ] **T04** Testes do motor com N constante (deve falhar): rigidez da
+- [x] **T04** Testes do motor com N constante (deve falhar): rigidez da
   barra reta contra as funções de estabilidade fechadas (2D e 3D,
   compressão e tração, Euler-Bernoulli e Engesser), barra subdividida igual
   à inteira, N → 0 igual à 008b; cargas equivalentes da carga uniforme
   contra a forma fechada — arquivo: `test_beam_second_order.cpp` — cobre: 02
-- [ ] **T05** Implementar o termo de N em `systemMatrix` (equilíbrio na
+- [x] **T05** Implementar o termo de N em `systemMatrix` (equilíbrio na
   geometria deformada e cortante de Engesser, design §5.1) e a regra de
   partes por N (crítica biengastada da parte acima de 4|N|; crescimento em
   tração) até a T04 passar; N ≤ −G As informado como instável — arquivos:
@@ -202,3 +202,17 @@ Regras:
   flambagem com 15 fatorações 15,8× (meta 6×). O mantenedor aprovou
   reaproveitar fatorações (design §5.5 a 5.7 e ADR 0007 alterados em
   2026-11-17), com as mesmas metas.
+
+**Fase 2 — A barra exata com esforço normal (T04 a T08):**
+
+- T04/T05: as funções de estabilidade (s, c), o balanço de Euler-Bernoulli
+  e de Engesser, a barra cortada e condensada e o momento de engastamento
+  da carga uniforme batem em 1e−10 já com o termo de N em A. As junções das
+  partes com N usam a decomposição de autovalores (inércia e solução de
+  blocos indefinidos). Compressão acima de 0,8 G As (nenhuma parte cabe)
+  devolve `kUnstableBar`.
+- Ambiente: o MSVC local em português perdia as dependências de cabeçalho
+  no Ninja conforme a página de código do console (objetos com "#deps 0"
+  não eram recompilados, e o construtor implícito antigo de `BeamData`
+  ficava no executável). Resolvido com `VSLANG=1033` antes de configurar
+  (`--fresh`) e uma recompilação completa; o CI não é afetado.
