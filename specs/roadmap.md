@@ -91,7 +91,7 @@ cargas, resolver e ver diagramas de esforços.
 
 | Nº | Feature | Entrega | Depende de | Status |
 |----|---------|---------|------------|--------|
-| 008d | beam-warping | Torção com empenamento (7º GDL, Vlasov) em vigas retas e curvas: condições por ponta, bimomento, tensões de empenamento; parte do núcleo já existe da 008b (Iw, ω e o motor exato). Também a flexo-torção (instabilidade lateral com torção) e o termo de Wagner na segunda ordem e na flambagem, vindos da 008c | 008b, 008c | design |
+| 008d | beam-warping | Torção com empenamento (7º GDL, Vlasov) em vigas retas e curvas: condições por ponta, bimomento, tensões de empenamento; parte do núcleo já existe da 008b (Iw, ω e o motor exato). Também a flexo-torção (instabilidade lateral com torção) e o termo de Wagner na segunda ordem e na flambagem, vindos da 008c | 008b, 008c | tarefas |
 
 ## v0.9 — Placas e cascas
 
