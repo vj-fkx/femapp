@@ -12,13 +12,6 @@
 
 namespace fem::core {
 
-// The warping at one end of an exact bar with warping (design 008b §5.4;
-// kept in the core for the version with warping, 008d).
-enum class WarpingCondition : std::uint8_t {
-    Free,      // no bimoment
-    Restrained // no warping
-};
-
 // A rigid connection in BeamData::springs.
 inline constexpr double kRigid = std::numeric_limits<double>::infinity();
 
@@ -85,14 +78,16 @@ struct BeamData
     // Loads of the flexible length held at both ends, local dofs at the
     // centroid: the equivalent loads of design 008 §5.5.
     BeamVector fixedEndLoads = BeamVector::Zero();
-    // Feature 008b: E Iw (0: no warping; not set by the model since the
-    // warping was deferred to 008d) and, for an arc, the turn rate of
+    // Feature 008b: E Iw (0: no warping) and, for an arc, the turn rate of
     // the local frame along it, in the principal local axes (design 008b
     // §5.2, 5.3).
     double warpingStiffness = 0.0;
     Eigen::Vector3d curvature = Eigen::Vector3d::Zero();
-    // The warping condition of each end, resolved (design 008b §5.4).
-    std::array<WarpingCondition, 2> warpingEnds{WarpingCondition::Free, WarpingCondition::Free};
+    // REQ-008d-03: the warping of each end, resolved (design 008d §5.2):
+    // a continuous end uses the warping dof of its node; the others have
+    // a bimoment spring, kRigid (restrained), 0 (free) or a value.
+    std::array<double, 2> warpingSprings{0.0, 0.0};
+    std::array<bool, 2> warpingContinuous{false, false};
     // The principal local axes at the end of the flexible length (columns,
     // global): the same as `axes` for a straight bar, turned along an arc.
     Eigen::Matrix3d endAxes = Eigen::Matrix3d::Identity();

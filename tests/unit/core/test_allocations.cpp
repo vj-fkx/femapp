@@ -176,7 +176,7 @@ TEST_CASE("the exact beam element does not allocate", "[core][allocations]")
     beam.warpingStiffness = 50.0;
     beam.shearCentre = Eigen::Vector2d(0.01, 0.02);
     beam.springs[1][5] = 0.0;
-    beam.warpingEnds[1] = fem::core::WarpingCondition::Free;
+    beam.warpingSprings[1] = 0.0;
     beam.curvature = Eigen::Vector3d(0.0, 0.1, 0.2);
     std::array<fem::core::SpanLoads, 1> loads{};
     const fem::core::ExactBeamElement element(fem::core::ElementKind::Beam3D, beams, loads);

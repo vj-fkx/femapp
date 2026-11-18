@@ -23,6 +23,12 @@ struct BeamForces
     double t = 0.0;
     double my = 0.0;
     double mz = 0.0;
+    // REQ-008d-07: the bimoment B (sigma_w = B omega / Iw) and the parts of
+    // the torque, t = tsv + tw (Saint-Venant and warping; without warping,
+    // tsv = t).
+    double b = 0.0;
+    double tsv = 0.0;
+    double tw = 0.0;
 };
 
 // Forces, and displacements and rotations of the centroid axis, at a point.
@@ -31,6 +37,7 @@ struct BeamPoint
     BeamForces forces;
     Eigen::Vector3d displacement = Eigen::Vector3d::Zero(); // principal local axes
     Eigen::Vector3d rotation = Eigen::Vector3d::Zero();
+    double warping = 0.0; // REQ-008d-08: the rate of twist, with warping
 };
 
 // At a concentrated load: the value just before or just after it.

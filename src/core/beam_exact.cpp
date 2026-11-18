@@ -60,9 +60,7 @@ Layout layoutOf(const BeamData& beam, ElementKind kind)
             l.externalOf.at(j) = -1;
             l.internalOf.at(j) = -1;
             if (c >= translational) { // the warping
-                const WarpingCondition condition =
-                    beam.warpingEnds.at(static_cast<std::size_t>(end));
-                if (condition == WarpingCondition::Free) {
+                if (beam.warpingSprings.at(static_cast<std::size_t>(end)) != kRigid) {
                     l.internalOf.at(j) = l.internal++;
                 }
                 continue;

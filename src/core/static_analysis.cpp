@@ -634,8 +634,17 @@ Expected<StaticResult> StaticProblem::recover(const Eigen::VectorXd& values, boo
     result.reactions.assign(nodeCount, Eigen::Vector3d::Zero());
     result.rotations.assign(nodeCount, Eigen::Vector3d::Zero());
     result.reactionMoments.assign(nodeCount, Eigen::Vector3d::Zero());
+    result.warping.assign(nodeCount, 0.0);
+    result.reactionBimoments.assign(nodeCount, 0.0);
     for (DofIndex d = 0; d < dofs.size(); ++d) {
         const auto node = static_cast<std::size_t>(dofs.nodeOf(d));
+        if (dofs.typeOf(d) == DofType::Warp) {
+            result.warping[node] = values[d];
+            if (dofs.isPrescribed(d)) {
+                result.reactionBimoments[node] = (*forces)[d];
+            }
+            continue;
+        }
         const auto k = static_cast<Eigen::Index>(dofs.typeOf(d));
         const bool rotation = k >= 3;
         (rotation ? result.rotations : result.displacements)[node](k % 3) = values[d];

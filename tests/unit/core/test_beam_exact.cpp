@@ -18,7 +18,6 @@ using fem::core::BeamData;
 using fem::core::ElementKind;
 using fem::core::ExactBeamElement;
 using fem::core::SpanLoads;
-using fem::core::WarpingCondition;
 
 namespace {
 
@@ -122,7 +121,7 @@ TEST_CASE("the warping conditions of the exact element", "[core][beam][exact]")
 
     SECTION("free at both ends: uniform torsion GJ / L")
     {
-        beam.warpingEnds = {WarpingCondition::Free, WarpingCondition::Free};
+        beam.warpingSprings = {0.0, 0.0};
         const Computed e = exact(beam, {}, a, b, 12);
         CHECK(std::abs(e.matrix(3, 3) - beam.torsional / length) <=
               1e-10 * beam.torsional / length);
@@ -131,7 +130,7 @@ TEST_CASE("the warping conditions of the exact element", "[core][beam][exact]")
     }
     SECTION("restrained at both ends: GJ / L mu sinh mu / (mu sinh mu - 2 (cosh mu - 1))")
     {
-        beam.warpingEnds = {WarpingCondition::Restrained, WarpingCondition::Restrained};
+        beam.warpingSprings = {fem::core::kRigid, fem::core::kRigid};
         const Computed e = exact(beam, {}, a, b, 12);
         const double expected = beam.torsional / length * mu * std::sinh(mu) /
                                 (mu * std::sinh(mu) - 2.0 * (std::cosh(mu) - 1.0));

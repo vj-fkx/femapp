@@ -1,6 +1,6 @@
 # Tarefas — 008d beam-warping
 
-Status: aprovado
+Status: em andamento
 Design: [design.md](design.md) · Requisitos: [requirements.md](requirements.md)
 
 Regras:
@@ -19,7 +19,7 @@ Regras:
 
 ## Fase 1 — Empenamento na estática linear
 
-- [ ] **T01** Interfaces do empenamento (design §4): `DofType::Warp`
+- [x] **T01** Interfaces do empenamento (design §4): `DofType::Warp`
   (8 tipos), `Assignment::warping`, `WarpingCondition` (Free, Restrained,
   Elastic, Continuous) e `WarpingEnd` com `stiffness`, `NodalForce::bimoment`,
   `StaticResult::warping` e `reactionBimoments`, `BeamForces::b`, `tsv`, `tw`

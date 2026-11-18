@@ -11,7 +11,7 @@ namespace fem::core {
 std::string_view dofName(DofType type) noexcept
 {
     constexpr std::array<std::string_view, kDofTypeCount> kNames = {"u",  "v",  "w", "rx",
-                                                                    "ry", "rz", "T"};
+                                                                    "ry", "rz", "T", "warp"};
     return kNames.at(static_cast<std::size_t>(type));
 }
 
