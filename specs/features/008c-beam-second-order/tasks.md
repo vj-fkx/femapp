@@ -1,6 +1,6 @@
 # Tarefas — 008c beam-second-order
 
-Status: em andamento
+Status: concluído
 Design: [design.md](design.md) · Requisitos: [requirements.md](requirements.md)
 
 Regras:
@@ -167,14 +167,14 @@ Regras:
 
 ## Fase 9 — Fechamento
 
-- [ ] **T90** [M] Build e testes verdes nos jobs do CI, incluindo o de
+- [x] **T90** [M] Build e testes verdes nos jobs do CI, incluindo o de
   cobertura com `core` ≥ 80% (push com sua confirmação). Conferir também o
   job do macOS, que não rodou no commit e0cad92 da 008b por falta de
   runner — cobre: N03
-- [ ] **T91** `clang-format` e `clang-tidy` sem pendências (também o do
+- [x] **T91** `clang-format` e `clang-tidy` sem pendências (também o do
   Linux, pelo CI); `core` sem headers Qt — cobre: 15
-- [ ] **T92** Conferir os oito critérios de aceite de `requirements.md`
-- [ ] **T93** Atualizar `specs/roadmap.md` para `concluída`
+- [x] **T92** Conferir os oito critérios de aceite de `requirements.md`
+- [x] **T93** Atualizar `specs/roadmap.md` para `concluída`
 
 ## Matriz de rastreabilidade
 
@@ -373,3 +373,15 @@ Regras:
   local e desiste quando λ sai de [λ₀/2, 2λ₀]; as partes de uma barra são
   no máximo 8192 (32 × 256), sem estouro de `int`, e uma compressão que
   pede mais marca a barra instável (fora do alcance da busca).
+- T90, resultado: run 44348055232 (6120c7e) verde nos seis jobs; o macOS,
+  sem runner na primeira tentativa, passou na segunda (311 testes em
+  12,7 s; flambagem de 0,02 a 0,06 s). Cobre também a pendência do macOS
+  da 008b (e0cad92). Cobertura de `core` ≥ 80% (gcovr `--fail-under-line
+  80` no CI).
+- T91: format e clang-tidy 19 do linux-clang verdes; `check_no_qt_includes`
+  passa.
+- T92: AC-1 em `test_beam_second_order.cpp` e `test_second_order_analysis.cpp`;
+  AC-2, AC-3 e AC-7 (segunda ordem) em `test_second_order_analysis.cpp`;
+  AC-4, AC-5 e AC-7 (flambagem) em `test_buckling.cpp`; AC-6 nos testes de
+  arco dos dois arquivos; AC-8 pelo CI, pela cobertura e pelo benchmark da
+  T23.

@@ -84,39 +84,39 @@ features anteriores, tudo é exercitado por testes; nada muda na interface.
 
 ## 5. Critérios de aceite
 
-- [ ] **AC-1** (REQ-008c-02, 06, NFR-008c-01) Barra isolada em segunda
+- [x] **AC-1** (REQ-008c-02, 06, NFR-008c-01) Barra isolada em segunda
   ordem, um elemento: viga-coluna biapoiada com carga transversal uniforme e
   concentrada sob compressão e sob tração (deslocamento e momento no meio
   contra as fórmulas fechadas de Timoshenko-Gere); balanço com força lateral
   e compressão na ponta; momentos ao longo da barra por `at(x)`; Timoshenko
   contra a fórmula fechada da formulação escolhida.
-- [ ] **AC-2** (REQ-008c-01, 05, 06) Pórtico: pórtico plano de um andar com
+- [x] **AC-2** (REQ-008c-01, 05, 06) Pórtico: pórtico plano de um andar com
   carga lateral e cargas verticais nos pilares, contra a solução exata por
   funções de estabilidade; o fator de amplificação aproximado
   1/(1 − P/Pcr) confere a ordem de grandeza; o número de iterações e a
   variação final aparecem no resultado.
-- [ ] **AC-3** (REQ-008c-03, 05) Treliça: barra articulada tracionada que
+- [x] **AC-3** (REQ-008c-03, 05) Treliça: barra articulada tracionada que
   enrijece sob carga transversal no nó (corda tensa), contra a solução
   analítica linearizada; treliça plana comprimida com P-Δ global.
-- [ ] **AC-4** (REQ-008c-09, 10, 11, NFR-008c-01) Flambagem de barras, um
+- [x] **AC-4** (REQ-008c-09, 10, 11, NFR-008c-01) Flambagem de barras, um
   elemento por vão: Euler nos quatro casos clássicos de apoio (comprimentos
   de flambagem 2L, L, 0,7L e 0,5L), em 2D e 3D, nas duas teorias; barra com
   mola rotacional na ponta e com liberação; barra sobre base elástica
   (Hetényi, com o número de semiondas certo); modos normalizados e a
   deformada ao longo da barra igual à senoide de Euler.
-- [ ] **AC-5** (REQ-008c-09, 10) Flambagem de pórticos: pórtico plano de um
+- [x] **AC-5** (REQ-008c-09, 10) Flambagem de pórticos: pórtico plano de um
   andar, deslocável e indeslocável, contra o fator exato por funções de
   estabilidade; os primeiros fatores em ordem crescente; pilar com
   excentricidade nas pontas.
-- [ ] **AC-6** (REQ-008c-04, 10) Vigas curvas: arco biarticulado
+- [x] **AC-6** (REQ-008c-04, 10) Vigas curvas: arco biarticulado
   semicircular sob carga concentrada no topo e sob carga distribuída, em
   segunda ordem e em flambagem, com a formulação em arco e a isoparamétrica
   convergindo uma para a outra e para a referência documentada no design.
-- [ ] **AC-7** (REQ-008c-08, 12) Falhas: carga acima da crítica numa
+- [x] **AC-7** (REQ-008c-08, 12) Falhas: carga acima da crítica numa
   segunda ordem recusada com a mensagem da instabilidade; limite de
   iterações baixo recusado com a mensagem de não convergência; caso de carga
   só com tração na flambagem informado.
-- [ ] **AC-8** (REQ-008c-13, 14, 15, NFR-008c-02, 03) Os testes da 007, da
+- [x] **AC-8** (REQ-008c-13, 14, 15, NFR-008c-02, 03) Os testes da 007, da
   008 e da 008b passam sem alteração de resultado; `core` segue sem Qt;
   benchmark da segunda ordem e da flambagem registrado em `tasks.md`; CI
   verde nas quatro plataformas, com a cobertura de `core` ≥ 80%.
