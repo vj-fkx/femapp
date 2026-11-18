@@ -56,6 +56,7 @@ constexpr double kInsideMargin = 1e-7; // about a factor inside a bar
 constexpr int kBisections = 200;
 constexpr double kBisectionPrecision = 1e-13;
 constexpr int kDoublings = 60;
+constexpr double kRefinementReach = 2.0; // of the starting lambda: a local search
 
 Eigen::VectorXd times(const SparseMatrix& lower, const Eigen::VectorXd& x)
 {
@@ -136,6 +137,9 @@ Expected<bool> refine(Pencil& pencil, const SparseCholesky& shifted, const Spars
                       double& lambda, SparseMatrix& kOut)
 {
     x.normalize();
+    // A Newton step from a poor vector can throw lambda far away, where the
+    // bars need many parts: the search is local and gives up there.
+    const double origin = lambda;
     // Each width again, centred on the last lambda, until lambda stays
     // inside its bracket: outside, the interpolation extrapolates.
     std::size_t stage = 0;
@@ -163,6 +167,12 @@ Expected<bool> refine(Pencil& pencil, const SparseCholesky& shifted, const Spars
                 derivative != 0.0 ? lambda - x.dot(product(lambda, x)) / derivative : lambda;
             const double change = std::abs(next - lambda);
             lambda = next;
+            // Written so that a NaN lambda also gives up.
+            const bool local =
+                lambda > origin / kRefinementReach && lambda < origin * kRefinementReach;
+            if (!local) {
+                return false;
+            }
             // A vector that vanished (no mode in the nodal dofs, as a bar
             // buckling with its nodes held) never converges: the count finds
             // that factor.

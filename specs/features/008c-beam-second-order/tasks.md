@@ -356,3 +356,20 @@ Regras:
   subespaço é a próxima alavanca, se for preciso (feature 038).
 - T24: `architecture.md` §3 com a segunda ordem, a flambagem, a
   fatoração indefinida e a nota sobre o Spectra (ADR 0007).
+
+**Fechamento (T90 a T93):**
+
+- T90, CI: o GCC acusou valor possivelmente não inicializado no
+  `SelfAdjointEigenSolver` dos blocos de tamanho fixo; a inércia deles
+  passou a Jacobi cíclico (`negativeEigenvalues`). O clang-tidy 19 conta
+  também `.value()` como acesso não checado: testes e bench usam funções
+  que lançam quando o `optional` está vazio.
+- T90, macOS: três testes de modos internos levavam 20 a 40 min no macOS
+  (0,05 s nos demais). Um branch de diagnóstico mostrou a causa: no
+  `refine` do vetor do fator bissectado, o Newton em λ, partindo de um
+  vetor aleatório (a `uniform_real_distribution` da libc++ dá outros
+  números), saltava para λ enorme, e as montagens ali pediam milhões de
+  partes por barra (147 milhões de exponenciais). Correções: o `refine` é
+  local e desiste quando λ sai de [λ₀/2, 2λ₀]; as partes de uma barra são
+  no máximo 8192 (32 × 256), sem estouro de `int`, e uma compressão que
+  pede mais marca a barra instável (fora do alcance da busca).

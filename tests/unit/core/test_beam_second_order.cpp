@@ -211,6 +211,13 @@ TEST_CASE("the exact bar with an axial force", "[core][beam][second-order]")
             fem::core::stateBarMatrices(bar(-0.9 * 4e7, true), l, none, false);
         CHECK(m.negativePivots >= fem::core::kUnstableBar);
     }
+    SECTION("a compression that needs more parts than a bar allows: unstable, and bounded")
+    {
+        // Far beyond 8192 parts (and int): a search that tries such a load
+        // factor gets an answer at once (macOS spent minutes there).
+        const StateBarMatrices m = fem::core::stateBarMatrices(bar(-1e30), l, none, false);
+        CHECK(m.negativePivots >= fem::core::kUnstableBar);
+    }
     SECTION("the fixed-end moment of a uniform load")
     {
         const double q = 2e3;

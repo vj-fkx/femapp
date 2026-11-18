@@ -540,13 +540,31 @@ double longestPart(const BeamData& beam)
     return 2.0 * std::numbers::pi * std::sqrt(ei * shear / (margin * c));
 }
 
+// At most kMaxParts parts: a compression that needs more is beyond the reach
+// of the bar (the count marks it unstable), and the parts stay bounded when
+// a search tries a far load factor.
+constexpr int kMaxParts = 8192; // kMaxAxialParts x kMaxVaryingPieces
+
+// ceil(count) for a part count, saturated above kMaxParts (also for NaN):
+// never an overflow of int.
+int partsFor(double count)
+{
+    return count <= kMaxParts ? std::max(1, static_cast<int>(std::ceil(count))) : kMaxParts + 1;
+}
+
+// Whether the compression needs more parts than kMaxParts.
+bool beyondParts(const BeamData& beam, double length)
+{
+    const double longest = longestPart(beam);
+    return longest > 0.0 && partsFor(length / longest) > kMaxParts;
+}
+
 int partCount(const BeamData& beam, double length)
 {
-    int parts =
-        std::max(1, static_cast<int>(std::ceil(growthRate(beam) * length / kGrowthPerPart)));
+    int parts = partsFor(growthRate(beam) * length / kGrowthPerPart);
     const double longest = longestPart(beam);
     if (longest > 0.0) {
-        parts = std::max(parts, static_cast<int>(std::ceil(length / longest)));
+        parts = std::max(parts, partsFor(length / longest));
     }
     // The parts of the profile of N are split evenly and, when N varies,
     // so that each piece changes (k h)^2 by at most kVaryingChange: the
@@ -561,11 +579,11 @@ int partCount(const BeamData& beam, double length)
             const double low = beam.axialForce.values.at(2 * static_cast<std::size_t>(part));
             const double high = beam.axialForce.values.at(2 * static_cast<std::size_t>(part) + 1);
             const double change = std::abs(high - low) / (kGaussHigh - kGaussLow) * h * h / ei;
-            pieces =
-                std::max(pieces, static_cast<int>(std::ceil(std::cbrt(change / kVaryingChange))));
+            pieces = std::max(pieces, partsFor(std::cbrt(change / kVaryingChange)));
         }
         parts = std::max(parts, profile * std::min(pieces, kMaxVaryingPieces));
     }
+    parts = std::min(parts, kMaxParts);
     parts = profile * ((parts + profile - 1) / profile);
     return parts;
 }
@@ -641,7 +659,7 @@ StateBarMatrices stateBarMatrices(const BeamData& beam, double length, const Spa
     const Eigen::Index d = plan.dofs;
     const int parts = partCount(beam, length);
     const bool second = beam.axialForce.active();
-    int negative = longestPart(beam) < 0.0 ? kUnstableBar : 0;
+    int negative = longestPart(beam) < 0.0 || beyondParts(beam, length) ? kUnstableBar : 0;
 
     PartMatrix total;
     PartVector totalLoads;

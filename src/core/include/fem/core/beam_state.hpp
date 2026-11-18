@@ -40,7 +40,8 @@ using StateMatrix =
 // Feature 008c: with the axial force of `beam.axialForce`, the second-order
 // bar (design 008c §5.1), and the negative pivots met when condensing its
 // parts, for the Sturm count (§5.4); kUnstableBar when the compression is
-// beyond the shear buckling of any part (|N| near G As).
+// beyond the shear buckling of any part (|N| near G As) or needs more
+// parts than the bar allows.
 inline constexpr int kUnstableBar = 1 << 20;
 struct StateBarMatrices
 {
