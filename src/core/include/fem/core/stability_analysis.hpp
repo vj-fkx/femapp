@@ -14,7 +14,7 @@ namespace fem::core {
 // REQ-008c-05, 13: the options of the second-order analysis.
 struct SecondOrderOptions
 {
-    StaticOptions base;
+    StaticOptions base{};
     double tolerance = 1e-8; // relative change of displacements and axial forces
     int maxIterations = 50;
 };
@@ -40,7 +40,7 @@ runSecondOrderStatic(const Model& model, const SecondOrderOptions& options = {})
 // REQ-008c-09, 13: the options of the linear buckling analysis.
 struct BucklingOptions
 {
-    StaticOptions base;
+    StaticOptions base{};
     int count = 1;            // the factors wanted
     double tolerance = 1e-10; // relative, on the factors
 };

@@ -141,7 +141,7 @@ public:
         }
         if (ni > 0 && m_indefinite) {
             m_lu.compute(m_kii);
-            const Eigen::SelfAdjointEigenSolver<SystemMatrix> eigen(m_kii, Eigen::EigenvaluesOnly);
+            const Eigen::SelfAdjointEigenSolver<SystemMatrix> eigen(m_kii);
             m_negative = static_cast<int>((eigen.eigenvalues().array() < 0.0).count());
         } else if (ni > 0) {
             m_ldlt.compute(m_kii);

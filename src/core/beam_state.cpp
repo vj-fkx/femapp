@@ -669,7 +669,7 @@ StateBarMatrices stateBarMatrices(const BeamData& beam, double length, const Spa
         if (second) {
             // May be indefinite: its negative eigenvalues count the
             // buckling loads of the clamped bar below N (design 008c §5.4).
-            const Eigen::SelfAdjointEigenSolver<PartMatrix> eigen(kjj, Eigen::EigenvaluesOnly);
+            const Eigen::SelfAdjointEigenSolver<PartMatrix> eigen(kjj);
             negative += static_cast<int>((eigen.eigenvalues().array() < 0.0).count());
             const Eigen::PartialPivLU<PartMatrix> lu(kjj);
             solved = lu.solve(coupling.transpose());
