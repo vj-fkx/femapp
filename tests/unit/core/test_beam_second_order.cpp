@@ -11,6 +11,7 @@
 #include <Eigen/Cholesky>
 #include <Eigen/Eigenvalues>
 #include <Eigen/LU>
+#include <Eigen/QR>
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -709,4 +710,27 @@ TEST_CASE("the arc with an axial force", "[core][beam][second-order][arc]")
     CHECK((extrapolated - exact).norm() <= 1e-6 * exact.norm());
     // The extrapolation improves on the finer chain.
     CHECK((fine - exact).norm() > (extrapolated - exact).norm());
+}
+
+// REQ-008c-10: the inertia of the small blocks, by Jacobi rotations.
+TEST_CASE("negative eigenvalues of a small symmetric matrix", "[core][beam][second-order]")
+{
+    using fem::core::StateBarMatrix;
+    StateBarMatrix diagonal = StateBarMatrix::Zero(5, 5);
+    diagonal.diagonal() << 3.0, -1.0, 2e6, -4e-3, 7.0;
+    CHECK(fem::core::negativeEigenvalues(diagonal) == 2);
+    // A rotated one: Q D Q^T with eigenvalues -2, -1, 0.5, 3, 4, 1e5, -7.
+    Eigen::Matrix<double, 7, 7> random;
+    for (int i = 0; i < 7; ++i) {
+        for (int j = 0; j < 7; ++j) {
+            random(i, j) = std::sin(1.0 + 3.0 * i + 7.0 * j);
+        }
+    }
+    const Eigen::HouseholderQR<Eigen::Matrix<double, 7, 7>> qr(random);
+    const Eigen::Matrix<double, 7, 7> q = qr.householderQ();
+    Eigen::Matrix<double, 7, 1> values;
+    values << -2.0, -1.0, 0.5, 3.0, 4.0, 1e5, -7.0;
+    const StateBarMatrix rotated = q * values.asDiagonal() * q.transpose();
+    CHECK(fem::core::negativeEigenvalues(rotated) == 3);
+    CHECK(fem::core::negativeEigenvalues(StateBarMatrix::Zero(0, 0)) == 0);
 }

@@ -55,6 +55,10 @@ femapp_add_test(core SOURCES
     test_truss_element.cpp
     test_truss_verification.cpp)
 target_compile_definitions(test_core PRIVATE FEMAPP_EXPECTED_VERSION="${PROJECT_VERSION}")
+# The test files of the beams instantiate many Eigen and Catch2 templates.
+if(MSVC)
+    target_compile_options(test_core PRIVATE /bigobj)
+endif()
 
 # REQ-006-05: replaces the global operator new to count allocations, so it is
 # an executable of its own.

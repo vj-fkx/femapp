@@ -71,6 +71,11 @@ struct BarState
                                bool planar, const StateBarVector& ends, double s,
                                Side side = Side::After, std::span<const double> junctions = {});
 
+// Feature 008c (design 008c §5.4): the negative eigenvalues of a small
+// symmetric matrix (its inertia), by cyclic Jacobi rotations, without
+// allocating. Used for the Sturm count of the parts and the connections.
+[[nodiscard]] int negativeEigenvalues(const StateBarMatrix& matrix);
+
 // Feature 008c: the stiffness of each part of the engine, without loads,
 // in order along the bar (the dofs of both ends of each part).
 [[nodiscard]] std::vector<StateBarMatrix> partStiffnesses(const BeamData& beam, double length,

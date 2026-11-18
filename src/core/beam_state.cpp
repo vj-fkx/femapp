@@ -669,8 +669,7 @@ StateBarMatrices stateBarMatrices(const BeamData& beam, double length, const Spa
         if (second) {
             // May be indefinite: its negative eigenvalues count the
             // buckling loads of the clamped bar below N (design 008c §5.4).
-            const Eigen::SelfAdjointEigenSolver<PartMatrix> eigen(kjj);
-            negative += static_cast<int>((eigen.eigenvalues().array() < 0.0).count());
+            negative += negativeEigenvalues(kjj);
             const Eigen::PartialPivLU<PartMatrix> lu(kjj);
             solved = lu.solve(coupling.transpose());
             junction = lu.solve(rj);
@@ -695,6 +694,54 @@ StateBarMatrices stateBarMatrices(const BeamData& beam, double length, const Spa
     out.loads = -totalLoads; // equivalent nodal loads
     out.negativePivots = negative;
     return out;
+}
+
+int negativeEigenvalues(const StateBarMatrix& matrix)
+{
+    StateBarMatrix a = (matrix + matrix.transpose()) / 2.0;
+    const Eigen::Index n = a.rows();
+    const double size = a.norm();
+    if (n == 0 || !(size > 0.0)) {
+        return 0;
+    }
+    constexpr int kSweeps = 50;
+    for (int sweep = 0; sweep < kSweeps; ++sweep) {
+        double off = 0.0;
+        for (Eigen::Index p = 0; p < n; ++p) {
+            for (Eigen::Index q = p + 1; q < n; ++q) {
+                off += a(p, q) * a(p, q);
+            }
+        }
+        if (std::sqrt(off) <= 1e-15 * size) {
+            break;
+        }
+        for (Eigen::Index p = 0; p < n; ++p) {
+            for (Eigen::Index q = p + 1; q < n; ++q) {
+                if (a(p, q) == 0.0) {
+                    continue;
+                }
+                // The rotation that zeroes a(p, q) (Golub and Van Loan 8.5).
+                const double theta = (a(q, q) - a(p, p)) / (2.0 * a(p, q));
+                const double t = (theta >= 0.0 ? 1.0 : -1.0) /
+                                 (std::abs(theta) + std::sqrt(theta * theta + 1.0));
+                const double c = 1.0 / std::sqrt(t * t + 1.0);
+                const double s = t * c;
+                for (Eigen::Index k = 0; k < n; ++k) {
+                    const double akp = a(k, p);
+                    const double akq = a(k, q);
+                    a(k, p) = c * akp - s * akq;
+                    a(k, q) = s * akp + c * akq;
+                }
+                for (Eigen::Index k = 0; k < n; ++k) {
+                    const double apk = a(p, k);
+                    const double aqk = a(q, k);
+                    a(p, k) = c * apk - s * aqk;
+                    a(q, k) = s * apk + c * aqk;
+                }
+            }
+        }
+    }
+    return static_cast<int>((a.diagonal().array() < 0.0).count());
 }
 
 std::vector<StateBarMatrix> partStiffnesses(const BeamData& beam, double length, bool planar)
