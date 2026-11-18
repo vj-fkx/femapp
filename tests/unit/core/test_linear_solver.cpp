@@ -97,7 +97,7 @@ TEST_CASE("the indefinite factorization gives the inertia", "[core][solver]")
         const auto result = solver.factorizeIndefinite(diagonal({1.0, -2.0, 0.0, 3.0}));
         REQUIRE_FALSE(result.has_value());
         REQUIRE(solver.singularEquation().has_value());
-        CHECK(*solver.singularEquation() == 2);
+        CHECK(solver.singularEquation().value_or(-1) == 2);
         CHECK_FALSE(solver.solve(Eigen::VectorXd::Ones(4)).has_value());
     }
     SECTION("the positive definite factorization still refuses indefinite matrices")

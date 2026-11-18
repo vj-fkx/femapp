@@ -169,7 +169,7 @@ int cost(const fem::core::Model& model, double linear)
         }
         for (const ExternalId id :
              std::get<fem::core::ElementIds>(model.assignments[a].elements).ids) {
-            const fem::core::ElementIndex element = *mesh.findElement(id);
+            const fem::core::ElementIndex element = mesh.findElement(id).value();
             const auto nodes = mesh.elementNodes(element);
             const Eigen::Vector3d x1 = mesh.nodeCoordinates(nodes[0]);
             const Eigen::Vector3d x2 = mesh.nodeCoordinates(nodes[1]);
@@ -187,7 +187,8 @@ int cost(const fem::core::Model& model, double linear)
             // A constant compression of 1 MN: the second order of 008c.
             beam.axialForce = fem::core::AxialProfile::constant(-1e6);
             const fem::core::SpanFrame frame{.principalAxes = *axes};
-            const Eigen::Vector3d weight = density * section->area * *model.gravity;
+            const Eigen::Vector3d weight =
+                density * section->area * model.gravity.value_or(Eigen::Vector3d::Zero());
             fem::core::addDistributed(loads.at(static_cast<std::size_t>(element)), frame,
                                       fem::core::Axes::Global, weight, weight, 0.0,
                                       (x2 - x1).norm());
@@ -200,14 +201,14 @@ int cost(const fem::core::Model& model, double linear)
     fem::core::DofMap dofs = fem::core::DofMap::build(mesh, sets);
     for (const auto& restraint : model.restraints) {
         for (const ExternalId id : std::get<fem::core::NodeIds>(restraint.nodes).ids) {
-            if (!dofs.prescribe(*mesh.findNode(id), restraint.dof, 0.0)) {
+            if (!dofs.prescribe(mesh.findNode(id).value(), restraint.dof, 0.0)) {
                 throw std::runtime_error("cannot prescribe a support");
             }
         }
     }
     std::vector<fem::core::NodalLoad> nodal;
     for (const ExternalId id : std::get<fem::core::NodeIds>(model.nodalForces.front().nodes).ids) {
-        nodal.push_back({.node = *mesh.findNode(id),
+        nodal.push_back({.node = mesh.findNode(id).value(),
                          .type = fem::core::DofType::U,
                          .value = model.nodalForces.front().force.x()});
     }

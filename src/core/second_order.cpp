@@ -132,7 +132,7 @@ public:
     Eigen::VectorXd next(const Eigen::VectorXd& x, const Eigen::VectorXd& g)
     {
         const Eigen::VectorXd f = g - x;
-        if (m_previousF) {
+        if (m_previousF && m_previousG) {
             m_df.emplace_back(f - *m_previousF);
             m_dg.emplace_back(g - *m_previousG);
             if (m_df.size() > kAndersonDepth) {
