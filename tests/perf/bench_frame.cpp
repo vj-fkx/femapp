@@ -31,6 +31,7 @@
 #include <cstdlib>
 #include <exception>
 #include <memory>
+#include <optional>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -40,6 +41,16 @@ namespace {
 
 using Clock = std::chrono::steady_clock;
 using fem::core::ExternalId;
+
+// The index of an id the model is known to have.
+template <typename T>
+T found(const std::optional<T>& index)
+{
+    if (!index) {
+        throw std::runtime_error("an id of the frame is missing");
+    }
+    return *index;
+}
 
 double secondsSince(Clock::time_point start)
 {
@@ -169,7 +180,7 @@ int cost(const fem::core::Model& model, double linear)
         }
         for (const ExternalId id :
              std::get<fem::core::ElementIds>(model.assignments[a].elements).ids) {
-            const fem::core::ElementIndex element = mesh.findElement(id).value();
+            const fem::core::ElementIndex element = found(mesh.findElement(id));
             const auto nodes = mesh.elementNodes(element);
             const Eigen::Vector3d x1 = mesh.nodeCoordinates(nodes[0]);
             const Eigen::Vector3d x2 = mesh.nodeCoordinates(nodes[1]);
@@ -201,14 +212,14 @@ int cost(const fem::core::Model& model, double linear)
     fem::core::DofMap dofs = fem::core::DofMap::build(mesh, sets);
     for (const auto& restraint : model.restraints) {
         for (const ExternalId id : std::get<fem::core::NodeIds>(restraint.nodes).ids) {
-            if (!dofs.prescribe(mesh.findNode(id).value(), restraint.dof, 0.0)) {
+            if (!dofs.prescribe(found(mesh.findNode(id)), restraint.dof, 0.0)) {
                 throw std::runtime_error("cannot prescribe a support");
             }
         }
     }
     std::vector<fem::core::NodalLoad> nodal;
     for (const ExternalId id : std::get<fem::core::NodeIds>(model.nodalForces.front().nodes).ids) {
-        nodal.push_back({.node = mesh.findNode(id).value(),
+        nodal.push_back({.node = found(mesh.findNode(id)),
                          .type = fem::core::DofType::U,
                          .value = model.nodalForces.front().force.x()});
     }

@@ -10,9 +10,11 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <memory>
 #include <numbers>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -65,6 +67,16 @@ fem::core::Model column(int n, ElementKind kind = ElementKind::Beam2D,
 constexpr double kFixedPinned = 4.493409457909064;
 
 constexpr double kEi = kE * kIz;
+
+// The shape of a mode along a bar, which the test requires.
+const fem::core::BeamResult& beamOf(const fem::core::BucklingMode& mode, std::size_t element)
+{
+    const std::optional<fem::core::BeamResult>& beam = mode.beams.at(element);
+    if (!beam) {
+        throw std::logic_error("the mode has no shape along the bar");
+    }
+    return *beam;
+}
 
 } // namespace
 
@@ -203,8 +215,7 @@ TEST_CASE("buckling modes", "[core][buckling]")
         // The nodes do not move sideways: normalized by the rotation.
         CHECK(near(std::abs(mode.rotations[0].z()), 1.0, 1e-8));
         CHECK(near(mode.rotations[1].z(), -mode.rotations[0].z(), 1e-8));
-        REQUIRE(mode.beams.at(0).has_value());
-        const fem::core::BeamResult& beam = mode.beams.at(0).value();
+        const fem::core::BeamResult& beam = beamOf(mode, 0);
         const double amplitude = kL / kPi; // a slope of 1 at the ends
         CHECK(near(std::abs(beam.at(kL / 2).displacement.y()), amplitude, 1e-8));
         CHECK(
@@ -416,8 +427,7 @@ TEST_CASE("modes inside a bar", "[core][buckling]")
         const auto& mode = result.modes.at(0);
         CHECK(mode.displacements[1].isZero());
         CHECK(result.note.find("inside the bars") != std::string::npos);
-        REQUIRE(mode.beams.at(0).has_value());
-        const fem::core::BeamResult& beam = mode.beams.at(0).value();
+        const fem::core::BeamResult& beam = beamOf(mode, 0);
         for (const double x : {kL / 8, kL / 4, kL / 2, 0.7 * kL}) {
             const double expected = (1.0 - std::cos(2.0 * kPi * x / kL)) / 2.0;
             CHECK(near(std::abs(beam.at(x).displacement.y()), expected, 1e-8, 1.0));
@@ -434,8 +444,7 @@ TEST_CASE("modes inside a bar", "[core][buckling]")
         model.endConnections.push_back(hinge);
         const auto result = buckle(model);
         const auto& mode = result.modes.at(0);
-        REQUIRE(mode.beams.at(0).has_value());
-        const fem::core::BeamResult& beam = mode.beams.at(0).value();
+        const fem::core::BeamResult& beam = beamOf(mode, 0);
         const double k = kFixedPinned / kL;
         const auto shape = [k](double x) {
             return std::sin(k * x) - k * kL * std::cos(k * x) - k * x + k * kL;
