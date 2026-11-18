@@ -98,7 +98,7 @@ removidos da 008b em 2026-11-16, com os ajustes desta feature.
 | ID | Requisito | Como medir |
 |----|-----------|------------|
 | NFR-008d-01 | Os resultados exatos (REQ-008d-02, o arco do REQ-008d-06 e o REQ-008d-11) DEVEM reproduzir as soluções analíticas dos casos de verificação com erro relativo ≤ 1e−8 em deslocamentos, rotações, empenamentos, reações, esforços, bimomentos, tensões, fatores críticos e momentos críticos. Os casos com referência tabelada ou numérica (momentos variáveis, arcos, isoparamétrica) usam a tolerância documentada no design. | Testes automatizados |
-| NFR-008d-02 | O design DEVE medir o pórtico espacial do benchmark da 008 com empenamento em todas as vigas, na análise linear, na segunda ordem e na flambagem com 5 fatores, e propor as metas de tempo para aprovação. Sem empenamento, as metas da 008b (NFR-008b-03) e da 008c (NFR-008c-02) DEVEM continuar valendo. As medidas são em Release, na máquina do mantenedor. | Benchmark |
+| NFR-008d-02 | O design DEVE medir a análise linear com empenamento em todas as vigas no pórtico espacial do benchmark da 008 e propor as metas da linear, da segunda ordem e da flambagem com 5 fatores; a tarefa de custo as confirma antes da flexo-torção completa *(ajustado no design, 2026-11-18)*. Sem empenamento, as metas da 008b (NFR-008b-03) e da 008c (NFR-008c-02) DEVEM continuar valendo. As medidas são em Release, na máquina do mantenedor. | Benchmark |
 | NFR-008d-03 | A cobertura de linhas de `core` DEVE continuar em pelo menos 80% (constituição §6.5). | Job de cobertura no CI |
 
 ## 5. Critérios de aceite
