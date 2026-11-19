@@ -124,8 +124,11 @@ removidos da 008b em 2026-11-16, com os ajustes desta feature.
   - arco de perfil I em planta com raio grande, igual à viga reta com
     empenamento;
   - arco e isoparamétrica concordando com o refinamento;
-  - caso de referência da literatura documentado no design (por exemplo,
-    viga curva em planta de Yang e Kuo, 1987).
+  - viga curva em planta biengastada, com o empenamento impedido nas
+    pontas e carga vertical uniforme, contra a integração independente das
+    equações de Vlasov da viga curva (tiro com Runge-Kutta, no teste),
+    1e−8 *(ajustado em 2026-11-18: os valores de Yang e Kuo, 1987, não
+    estão abertos; decidido pelo mantenedor)*.
 - [ ] **AC-4** (REQ-008d-09) Tensões de empenamento: σw e τw nos pontos
   característicos de perfis I e U e nos pontos da seção de paredes finas,
   contra as fórmulas.

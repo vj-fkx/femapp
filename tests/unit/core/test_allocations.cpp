@@ -215,22 +215,34 @@ TEST_CASE("the isoparametric beam element does not allocate", "[core][allocation
                                       .endValue = Eigen::Vector3d(0.0, 2.0, 0.0),
                                       .from = 0.1,
                                       .to = 1.0});
-    const fem::core::IsoBeamElement element(fem::core::ElementKind::Beam3D, beams);
     fem::core::ElementNodes nodes;
     nodes.type = fem::core::ElementType::Line3;
     nodes.count = 3;
     nodes.x[0] = Eigen::Vector3d(0.0, 0.0, 0.0);
     nodes.x[1] = Eigen::Vector3d(2.0, 1.0, 0.0);
     nodes.x[2] = Eigen::Vector3d(1.1, 0.8, 0.0);
-    Eigen::MatrixXd matrix = Eigen::MatrixXd::Zero(18, 18);
-    Eigen::VectorXd vector = Eigen::VectorXd::Zero(18);
-    // The first call prepares the tables of the shape functions.
-    REQUIRE(element.compute(nodes, 0, matrix, vector).has_value());
+    // Feature 008d: also with warping, a spring at one end and the other
+    // continuous (20 dofs: 7 at the middle and the continuous end).
+    for (const bool warping : {false, true}) {
+        INFO("warping " << warping);
+        if (warping) {
+            data.beam.warpingStiffness = 50.0;
+            data.beam.warpingSprings = {30.0, 0.0};
+            data.beam.warpingContinuous = {false, true};
+        }
+        const fem::core::IsoBeamElement element(fem::core::ElementKind::Beam3D, beams, warping,
+                                                {false, warping});
+        const Eigen::Index size = warping ? 20 : 18;
+        Eigen::MatrixXd matrix = Eigen::MatrixXd::Zero(size, size);
+        Eigen::VectorXd vector = Eigen::VectorXd::Zero(size);
+        // The first call prepares the tables of the shape functions.
+        REQUIRE(element.compute(nodes, 0, matrix, vector).has_value());
 
-    gAllocations = 0;
-    gCounting = true;
-    const bool computed = element.compute(nodes, 0, matrix, vector).has_value();
-    gCounting = false;
-    CHECK(computed);
-    CHECK(gAllocations == 0);
+        gAllocations = 0;
+        gCounting = true;
+        const bool computed = element.compute(nodes, 0, matrix, vector).has_value();
+        gCounting = false;
+        CHECK(computed);
+        CHECK(gAllocations == 0);
+    }
 }

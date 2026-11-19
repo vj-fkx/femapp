@@ -78,12 +78,15 @@ Regras:
 - [x] **T08** Arco com empenamento (elemento exato em `Line3`): raio
   grande igual à reta com empenamento (1e−6); condições do §5.2 no arco —
   arquivos: `test_beam_curved.cpp` — cobre: 06, 08
-- [ ] **T09** Isoparamétrica com empenamento (design §5.3): ψ quadrático com
+- [x] **T09** Isoparamétrica com empenamento (design §5.3): ψ quadrático com
   GDL `Warp` nos três nós, penalidade k_ψ = 1e6·EIw/ℓ² com 2 pontos e mola
   nas pontas. Testes (AC-3):
   - arco e isoparamétrica concordando com o refinamento (1e−6, taxa
     ≥ 3,5);
-  - viga curva em planta de perfil I de Yang e Kuo (1987), 1%;
+  - viga curva em planta biengastada com empenamento impedido e carga
+    vertical uniforme, contra a integração independente das equações de
+    Vlasov por tiro com Runge-Kutta no teste, 1e−8 (no lugar de Yang e
+    Kuo, 1987, cujos valores não estão abertos; decidido em 2026-11-18);
   - zero alocações em `compute`.
   Arquivos: `beam_iso.hpp/.cpp`, `test_beam_curved.cpp`,
   `test_allocations.cpp`. Cobre: 06, 08
@@ -284,4 +287,14 @@ Regras:
 
 ## Notas de implementação
 
-*(preenchidas durante a implementação)*
+- T09: o mantenedor forneceu Yang e Kuo (1987), "Effect of Curvature on
+  Stability of Curved Beams", J. Struct. Eng. 113(6). O artigo só tem
+  exemplos de flambagem, nenhum estático; a T09 usa a referência
+  independente (tiro com Runge-Kutta). Para a T23 ele dá, de forma
+  fechada, o momento crítico de uma viga circular biarticulada sob My
+  uniforme (fora do plano): C1·M² + C2·M + C3 = 0 (Eqs. 34 e 35, n = 1), com
+  a seção de Yoo (1982): E = 29 000 ksi, G = 11 200 ksi, A = 14,4 in²,
+  Iz = 273 in⁴, Iy = 93 in⁴, Cw = 2 070 in⁶, J = 1,414 in⁴, r = 5,042 in,
+  L = 403,32 in, β de 0 a 180° (Figs. 6 e 7). A teoria deles inclui o
+  jacobiano e as tensões radiais; a diferença para a nossa fica medida
+  na T23 (tolerância de 1% do design).

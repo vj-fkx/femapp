@@ -11,6 +11,7 @@
 
 #include <Eigen/Core>
 #include <Eigen/Geometry>
+#include <Eigen/LU>
 #include <array>
 #include <cmath>
 #include <functional>
@@ -1283,4 +1284,133 @@ TEST_CASE("the isoparametric beam with warping converges to the arc",
         CHECK(std::log2(errors[i] / errors[i + 1]) >= 3.5);
     }
     CHECK(errors.back() <= 1e-4);
+}
+
+namespace {
+
+// REQ-008d-06 (AC-3): an independent reference for a curved beam in plan
+// with warping, built in the test from Vlasov's equations of design 008b
+// §5.3 (Euler-Bernoulli, shear centre at the centroid), integrated by
+// classical Runge-Kutta in the moving frame of the arc, with
+// s = (u, theta, psi | F, M, Q) and Q = E Iw psi':
+//   u' = -Omega x u - e1 x theta + (N / EA, 0, 0)
+//   theta' = -Omega x theta + (psi, My / EIy, Mz / EIz),  psi' = Q / E Iw
+//   F' = -Omega x F - q,  M' = -Omega x M - e1 x F,  Q' = GJ psi - Mx.
+// Both ends clamped with their warping restrained: the seven forces at the
+// start are found by shooting (superposition of the linear system).
+struct CurvedReference
+{
+    double ea = 0.0, gj = 0.0, eiy = 0.0, eiz = 0.0, eiw = 0.0;
+    Vec omega = Vec::Zero(); // turn rate of the frame, local
+    Vec q = Vec::Zero();     // load per length, local
+    double length = 0.0;
+
+    using State = Eigen::Matrix<double, 14, 1>;
+
+    [[nodiscard]] State rate(const State& s, bool loaded) const
+    {
+        const Vec u = s.segment<3>(0);
+        const Vec theta = s.segment<3>(3);
+        const double psi = s(6);
+        const Vec f = s.segment<3>(7);
+        const Vec m = s.segment<3>(10);
+        const double bq = s(13);
+        const Vec e1 = Vec::UnitX();
+        State d;
+        d.segment<3>(0) = -omega.cross(u) - e1.cross(theta) + Vec(f.x() / ea, 0.0, 0.0);
+        const double twist = eiw > 0.0 ? psi : m.x() / gj;
+        d.segment<3>(3) = -omega.cross(theta) + Vec(twist, m.y() / eiy, m.z() / eiz);
+        d(6) = eiw > 0.0 ? bq / eiw : 0.0;
+        d.segment<3>(7) = -omega.cross(f) - (loaded ? q : Vec::Zero());
+        d.segment<3>(10) = -omega.cross(m) - e1.cross(f);
+        d(13) = eiw > 0.0 ? gj * psi - m.x() : 0.0;
+        return d;
+    }
+
+    // Classical Runge-Kutta from 0 to `to`.
+    [[nodiscard]] State integrate(State s, double to, bool loaded) const
+    {
+        constexpr int kSteps = 20000;
+        const double h = to / kSteps;
+        for (int i = 0; i < kSteps; ++i) {
+            const State k1 = rate(s, loaded);
+            const State k2 = rate(s + h / 2 * k1, loaded);
+            const State k3 = rate(s + h / 2 * k2, loaded);
+            const State k4 = rate(s + h * k3, loaded);
+            s += h / 6 * (k1 + 2 * k2 + 2 * k3 + k4);
+        }
+        return s;
+    }
+
+    // The state at s for both ends clamped and their warping restrained.
+    [[nodiscard]] State at(double s) const
+    {
+        // Without warping: six forces and six conditions.
+        const int n = eiw > 0.0 ? 7 : 6;
+        Eigen::MatrixXd a(n, n);
+        const State particular = integrate(State::Zero(), length, true);
+        for (int k = 0; k < n; ++k) {
+            State unit = State::Zero();
+            unit(7 + k) = 1.0;
+            a.col(k) = integrate(unit, length, false).head(n);
+        }
+        const Eigen::VectorXd forces = a.lu().solve(-particular.head(n));
+        State start = State::Zero();
+        start.segment(7, n) = forces;
+        return integrate(start, s, true);
+    }
+};
+
+} // namespace
+
+// REQ-008d-06, 08 (AC-3): a curved beam in plan of 90 degrees with warping,
+// both ends clamped and their warping restrained, a uniform vertical load:
+// the exact arc (two elements, the warping continuous over the middle) is
+// the independent integration of Vlasov's equations, in the twist and the
+// deflection at the middle and the bimoment at the ends (1e-8). It replaces
+// the case of Yang and Kuo (1987), whose paper only has buckling examples.
+TEST_CASE("a curved beam in plan with warping against Vlasov's equations",
+          "[core][beam][curved][warping]")
+{
+    using namespace fem::core::test;
+    const double r = 10.0;
+    const double half = std::numbers::pi / 4;
+    // kL about 3: the shooting stays well conditioned (e^(kL) is small).
+    const double iw = 3.0e-4;
+    const double q = 4.0e3;
+    const auto on = [&](double a) { return Vec(r * std::cos(a), r * std::sin(a), 0.0); };
+    fem::core::Model model = isoModel({on(-half), on(0.0), on(half)}, {on(-half / 2), on(half / 2)},
+                                      fem::core::ElementKind::Beam3D);
+    model.assignments.front().curved = fem::core::CurvedFormulation::Arc;
+    model.assignments.front().theory = fem::core::BeamTheory::EulerBernoulli;
+    model.assignments.front().warping = true;
+    model.sections.front().warpingConstant = iw;
+    fixAll(model, {1, 3}, fem::core::ElementKind::Beam3D);
+    model.warpingEnds.push_back({.elements = fem::core::ElementIds{{1}},
+                                 .end = fem::core::BarEnd::Start,
+                                 .condition = fem::core::WarpingCondition::Restrained});
+    model.warpingEnds.push_back({.elements = fem::core::ElementIds{{2}},
+                                 .end = fem::core::BarEnd::End,
+                                 .condition = fem::core::WarpingCondition::Restrained});
+    model.distributedLoads.push_back({.elements = fem::core::ElementIds{{1, 2}},
+                                      .axes = fem::core::Axes::Local,
+                                      .startValue = Vec(0.0, -q, 0.0),
+                                      .endValue = Vec(0.0, -q, 0.0)});
+    const fem::core::StaticResult result = solve(model);
+    // The local frame: x along the arc, y the reference (global Z), z = x x y;
+    // the frame turns about y at 1 / R, and the load is -q along y.
+    const CurvedReference reference{.ea = kE * kArea,
+                                    .gj = kG * kJ,
+                                    .eiy = kE * kIy,
+                                    .eiz = kE * kIz,
+                                    .eiw = kE * iw,
+                                    .omega = Vec(0.0, 1.0 / r, 0.0),
+                                    .q = Vec(0.0, -q, 0.0),
+                                    .length = 2.0 * half * r};
+    const auto middle = reference.at(half * r);
+    const auto start = reference.at(0.0);
+    // At the middle the tangent is global Y and local y is global Z.
+    CHECK(relative(result.displacements[1].z(), middle(1)) <= 1e-8);
+    CHECK(relative(result.rotations[1].y(), middle(3)) <= 1e-8);
+    CHECK(relative(beamOf(result, 0).start().b, -start(13)) <= 1e-8);
 }
