@@ -512,3 +512,105 @@ TEST_CASE("curved beams and new sections are checked", "[core][validation][beam]
                   "which only shapes it: it takes no supports nor loads."});
     }
 }
+
+// REQ-008d-17 (AC-9): the problems of warping, each naming its item, and
+// several at once.
+TEST_CASE("the problems of warping are listed", "[core][validation][beam][warping]")
+{
+    SECTION("warping in a 2D beam")
+    {
+        Model model = rowModel(ElementKind::Beam2D);
+        model.assignments.front().warping = true;
+        CHECK(has(messages(model),
+                  "Assignment 1: warping (torsion with Vlasov's theory) is only for 3D beams."));
+    }
+    SECTION("a generic section without Iw")
+    {
+        Model model = rowModel(ElementKind::Beam3D);
+        model.assignments.front().warping = true;
+        CHECK(has(messages(model), "Assignment 1: warping needs the warping constant Iw of "
+                                   "section \"S\", given and positive."));
+        model.sections.front().warpingConstant = 0.0;
+        CHECK(has(messages(model), "Assignment 1: warping needs the warping constant Iw of "
+                                   "section \"S\", given and positive."));
+    }
+    SECTION("a shape that does not warp")
+    {
+        Model model = rowModel(ElementKind::Beam3D);
+        model.sections.push_back(
+            {.name = "L", .shape = fem::core::Angle{.b = 0.1, .h = 0.15, .t = 0.01}});
+        model.assignments.front().section = "L";
+        model.assignments.front().warping = true;
+        CHECK(has(messages(model), "Assignment 1: section \"L\" does not warp (its warping "
+                                   "constant Iw is zero): it cannot have warping."));
+    }
+    SECTION("warping items where there is no warping, and a negative spring")
+    {
+        Model model = rowModel(ElementKind::Beam3D);
+        model.sections.front().warpingConstant = 2.0e-7;
+        model.assignments.front().elements = ElementIds{{1}};
+        model.assignments.front().warping = true;
+        model.assignments.push_back({.elements = ElementIds{{2}},
+                                     .kind = ElementKind::Beam3D,
+                                     .material = "Steel",
+                                     .section = "S"});
+        model.warpingEnds.push_back({.elements = ElementIds{{1}},
+                                     .end = fem::core::BarEnd::End,
+                                     .condition = fem::core::WarpingCondition::Elastic,
+                                     .stiffness = -1.0});
+        model.warpingEnds.push_back({.elements = ElementIds{{2}}});
+        model.restraints.push_back({.nodes = NodeIds{{3}}, .dof = DofType::Warp, .value = 0.0});
+        model.nodalForces.push_back({.nodes = NodeIds{{3}}, .bimoment = 1.0});
+        const auto list = messages(model);
+        CHECK(list.size() == 4);
+        CHECK(has(list, "Warping end 1: the stiffness must not be negative."));
+        CHECK(has(list, "Warping end 2: the element 2 has no warping."));
+        CHECK(has(list, "Restraint 7: the node 3 has no dof warp (it belongs to no beam with "
+                        "warping)."));
+        CHECK(has(list, "Nodal force 1: the node 3 has no dof warp (it belongs to no beam with "
+                        "warping)."));
+    }
+}
+
+// REQ-008d-18 (AC-9): a twist that only warping could hold, with the
+// warping free at every end (J nearly zero): the node, the direction and
+// the hint. A warping dof without stiffness is named "warp".
+TEST_CASE("a mechanism of warping names the node", "[core][analysis][beam][warping]")
+{
+    SECTION("a twist without stiffness where the warping is free")
+    {
+        TrussSpec spec;
+        spec.nodes = {{0.0, 0.0, 0.0}, {2.0, 0.0, 0.0}};
+        spec.bars = {{0, 1}};
+        Model model = fem::core::test::beamModel(spec, ElementKind::Beam3D);
+        fem::core::test::fixAll(model, {1}, ElementKind::Beam3D);
+        model.sections.front().torsionConstant = 1e-30;
+        model.sections.front().warpingConstant = 2.0e-7;
+        model.assignments.front().warping = true;
+        model.warpingEnds.push_back(
+            {.elements = ElementIds{{1}}, .condition = fem::core::WarpingCondition::Free});
+        const auto result = fem::core::runLinearStatic(model);
+        REQUIRE_FALSE(result.has_value());
+        CHECK(result.error().message ==
+              "The structure is unstable: no bar gives stiffness to\n- the node 2 in rx\n"
+              "(A twist without stiffness where the warping of every beam is free: restrain "
+              "the warping at an end, as an end plate does, or make it continuous.)");
+        // With an end plate at the root, the warping holds the twist.
+        model.warpingEnds.front().end = fem::core::BarEnd::End;
+        model.warpingEnds.push_back({.elements = ElementIds{{1}},
+                                     .end = fem::core::BarEnd::Start,
+                                     .condition = fem::core::WarpingCondition::Restrained});
+        CHECK(fem::core::runLinearStatic(model).has_value());
+    }
+    SECTION("a warping dof without stiffness")
+    {
+        // Both J and Iw nearly zero: nothing holds the shared warping.
+        Model model = rowModel(ElementKind::Beam3D);
+        model.sections.front().torsionConstant = 1e-30;
+        model.sections.front().warpingConstant = 1e-30;
+        model.assignments.front().warping = true;
+        const auto result = fem::core::runLinearStatic(model);
+        REQUIRE_FALSE(result.has_value());
+        CHECK(result.error().message.find("- the node 2 in warp") != std::string::npos);
+    }
+}

@@ -471,12 +471,47 @@ Expected<void> StaticProblem::checkDiagonal(const SparseMatrix& matrix) const
     if (list.empty()) {
         return {};
     }
-    if (list.find(" in r") != std::string::npos) {
+    if (const std::string hint = warpingHint(diagonal, largest); !hint.empty()) {
+        list += hint;
+    } else if (list.find(" in r") != std::string::npos) {
         // REQ-008-25: often every beam at the node releases that moment.
         list += "\n(A rotation without stiffness: restrain it, or keep one beam at the node "
                 "connected.)";
     }
     return makeError("The structure is unstable: no bar gives stiffness to" + list);
+}
+
+std::string StaticProblem::warpingHint(const Eigen::VectorXd& diagonal, double largest) const
+{
+    // REQ-008d-18: the nodes where beams with warping end and every such end
+    // is free (no continuity, no spring, not restrained).
+    const Mesh& mesh = this->mesh();
+    std::vector<int> state(static_cast<std::size_t>(mesh.nodeCount()), 0); // 1 free, 2 held
+    for (std::size_t e = 0; e < m_beams.data.size(); ++e) {
+        const BeamData& beam = m_beams.data[e];
+        if (!(beam.warpingStiffness > 0.0) || !m_beams.exact[e]) {
+            continue;
+        }
+        const auto nodes = mesh.elementNodes(static_cast<ElementIndex>(e));
+        for (std::size_t end = 0; end < 2; ++end) {
+            int& s = state[static_cast<std::size_t>(nodes[end])];
+            const bool free = !beam.warpingContinuous.at(end) && beam.warpingSprings.at(end) == 0.0;
+            s = std::max(s, free ? 1 : 2);
+        }
+    }
+    for (Eigen::Index eq = 0; eq < diagonal.size(); ++eq) {
+        if (diagonal[eq] > kNoStiffness * largest) {
+            continue;
+        }
+        const DofIndex dof = m_dofOfEquation[static_cast<std::size_t>(eq)];
+        if (m_dofs.typeOf(dof) == DofType::RX &&
+            state[static_cast<std::size_t>(m_dofs.nodeOf(dof))] == 1) {
+            return "\n(A twist without stiffness where the warping of every beam is free: "
+                   "restrain the warping at an end, as an end plate does, or make it "
+                   "continuous.)";
+        }
+    }
+    return {};
 }
 
 std::string StaticProblem::equationLabel(std::int32_t equation) const

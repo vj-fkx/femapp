@@ -57,7 +57,7 @@ Regras:
   - liberação de torção e excentricidade com empenamento;
   - base elástica de torção contra a solução analítica.
   Arquivo: `test_beam_warping.cpp`. Cobre: 03, 05
-- [ ] **T06** [P] Validação e mecanismo (AC-9, parte do empenamento), cada
+- [x] **T06** [P] Validação e mecanismo (AC-9, parte do empenamento), cada
   um com o item citado e vários juntos:
   - empenamento em viga 2D;
   - Iw ausente ou ≤ 0, com a mensagem da forma que não empena;

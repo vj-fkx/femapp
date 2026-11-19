@@ -70,6 +70,7 @@ public:
         checkConnections();
         checkOffsets();
         checkFoundations();
+        checkWarpingEnds();
         checkBars();
         checkArcMiddles();
         checkThermal();
@@ -205,6 +206,34 @@ private:
         return valid;
     }
 
+    // REQ-008d-17: warping is for 3D beams whose section warps.
+    bool checkWarping(const std::string& label, const Section& section,
+                      const Assignment& assignment)
+    {
+        if (!assignment.warping) {
+            return true;
+        }
+        if (assignment.kind != ElementKind::Beam3D) {
+            add(label + ": warping (torsion with Vlasov's theory) is only for 3D beams.");
+            return false;
+        }
+        const auto index = static_cast<std::size_t>(&section - m_model.sections.data());
+        const auto& solved = m_tables.sections.at(index);
+        const double iw =
+            solved ? solved->properties().warpingConstant : section.warpingConstant.value_or(0.0);
+        if (iw > 0.0) {
+            return true;
+        }
+        if (section.shape) {
+            add(label + ": section " + quoted(section.name) +
+                " does not warp (its warping constant Iw is zero): it cannot have warping.");
+        } else {
+            add(label + ": warping needs the warping constant Iw of section " +
+                quoted(section.name) + ", given and positive.");
+        }
+        return false;
+    }
+
     void checkAssignments()
     {
         const auto& assignments = m_model.assignments;
@@ -220,6 +249,7 @@ private:
             }
             if (const Section* section = m_model.findSection(assignment.section)) {
                 valid = checkSection(*section, assignment) && valid;
+                valid = checkWarping(label, *section, assignment) && valid;
             } else {
                 add(label + ": section " + quoted(assignment.section) + " does not exist.");
                 valid = false;
@@ -355,6 +385,28 @@ private:
             for (const ElementIndex element : beamsOf(label, foundation.elements)) {
                 claim(m_tables.foundationOf[static_cast<std::size_t>(element)], i, element,
                       "elastic foundations");
+            }
+        }
+    }
+
+    // REQ-008d-17: warping conditions of beams with warping, springs not
+    // negative.
+    void checkWarpingEnds()
+    {
+        const auto& ends = m_model.warpingEnds;
+        for (std::size_t i = 0; i < ends.size(); ++i) {
+            const std::string label = itemLabel("Warping end", i);
+            const WarpingEnd& end = ends[i];
+            // Written so that a NaN stiffness is also refused.
+            const bool usable = end.stiffness >= 0.0 && std::isfinite(end.stiffness);
+            if (end.condition == WarpingCondition::Elastic && !usable) {
+                add(label + ": the stiffness must not be negative.");
+            }
+            for (const ElementIndex element : beamsOf(label, end.elements)) {
+                const Assignment* assignment = assignmentOf(element);
+                if (assignment->kind != ElementKind::Beam3D || !assignment->warping) {
+                    add(label + ": the " + elementName(element) + " has no warping.");
+                }
             }
         }
     }
@@ -600,7 +652,9 @@ private:
         const bool rotates = (dofs & mask(DofType::RZ)) != 0;
         const bool rotation = dof == DofType::RX || dof == DofType::RY || dof == DofType::RZ;
         std::string why;
-        if (rotation && !rotates) {
+        if (dof == DofType::Warp) {
+            why = "it belongs to no beam with warping";
+        } else if (rotation && !rotates) {
             why = "it belongs to no beam";
         } else {
             why = rotates ? "it only belongs to 2D bars" : "it only belongs to 2D trusses";

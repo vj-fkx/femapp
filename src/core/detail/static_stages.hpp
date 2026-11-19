@@ -67,6 +67,9 @@ public:
     [[nodiscard]] Expected<AssembledSystem> assemble() const;
     // REQ-007-15: free dofs without stiffness, all of them.
     [[nodiscard]] Expected<void> checkDiagonal(const SparseMatrix& matrix) const;
+    // REQ-008d-18: the hint for a twist without stiffness at a node where
+    // the warping of every beam with warping is free, or empty.
+    [[nodiscard]] std::string warpingHint(const Eigen::VectorXd& diagonal, double largest) const;
     // "the node 12 in v" for an equation of the system.
     [[nodiscard]] std::string equationLabel(std::int32_t equation) const;
     // The values of all dofs from those of the free ones; the prescribed
