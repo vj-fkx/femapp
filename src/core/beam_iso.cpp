@@ -7,7 +7,10 @@
 // terms are integrated with 2 points and the curvature terms with 3
 // (Stolarski and Belytschko, 1983; Prathap, 1993), free of shear and
 // membrane locking. Feature 008c: the reference axial force adds its
-// geometric stiffness, integrated with 3 points.
+// geometric stiffness, integrated with 3 points. Feature 008d (design 008d
+// §5.3): with warping, psi is quadratic on its own at the three nodes
+// (flexible dofs 18 to 20), E Iw psi'^2 integrated with 3 points and
+// Vlasov's psi = kappa_x by a penalty k_psi = 1e6 E Iw / l^2 with 2.
 
 #include <fem/core/beam_iso.hpp>
 #include <fem/core/shape_functions.hpp>
@@ -24,17 +27,19 @@ namespace fem::core {
 namespace {
 
 constexpr int kNodeDofs = 6;
-constexpr int kDofs = 18;
+constexpr int kDofs = 18;           // without warping
+constexpr int kMaxDofs = 21;        // with warping: psi at the three nodes
+constexpr int kWarp = 18;           // the first flexible warping dof
 constexpr double kPenalty = 1e6;    // Euler-Bernoulli: G As = kPenalty EI / l^2
 constexpr double kSingular = 1e-12; // pivot of the internal dofs, of the largest
-constexpr int kMaxInternal = 12;
+constexpr int kMaxInternal = 14;
 
-using Mat18 = Eigen::Matrix<double, kDofs, kDofs>;
-using Vec18 = Eigen::Matrix<double, kDofs, 1>;
+using Mat18 = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, kMaxDofs, kMaxDofs>;
+using Vec18 = Eigen::Matrix<double, Eigen::Dynamic, 1, 0, kMaxDofs, 1>;
 using Mat6 = Eigen::Matrix<double, 6, 6>;
 using Vec6 = Eigen::Matrix<double, 6, 1>;
 using Strain = Eigen::Matrix<double, 6, kDofs>;
-using Coupling = Eigen::Matrix<double, kDofs, Eigen::Dynamic, 0, kDofs, kMaxInternal>;
+using Coupling = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, kMaxDofs, kMaxInternal>;
 using Internal =
     Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, kMaxInternal, kMaxInternal>;
 using InternalVector = Eigen::Matrix<double, Eigen::Dynamic, 1, 0, kMaxInternal, 1>;
@@ -60,6 +65,17 @@ constexpr Eigen::Index at(int node)
 bool planarKind(ElementKind kind)
 {
     return kind == ElementKind::Beam2D;
+}
+
+// Feature 008d: whether the beam has warping, and its flexible dofs.
+bool warps(const BeamData& beam, ElementKind kind)
+{
+    return !planarKind(kind) && beam.warpingStiffness > 0.0;
+}
+
+int flexibleDofs(const BeamData& beam, ElementKind kind)
+{
+    return warps(beam, kind) ? kMaxDofs : kDofs;
 }
 
 Eigen::Matrix3d cross(const Eigen::Vector3d& r)
@@ -178,8 +194,8 @@ Strain strainAt(const Point& p)
 
 struct Flexible
 {
-    Mat18 k = Mat18::Zero();
-    Vec18 f = Vec18::Zero(); // equivalent nodal loads
+    Mat18 k;
+    Vec18 f; // equivalent nodal loads
 };
 
 // The flexible curve on its own, global components at its three points.
@@ -191,7 +207,11 @@ Expected<Flexible> flexible(const IsoBeamData& data, ElementKind kind, const Iso
     Vec6 imposed = Vec6::Zero();
     imposed << data.loads.imposedStrain, 0.0, 0.0, 0.0, data.loads.curvatureY,
         data.loads.curvatureZ;
-    Flexible out;
+    const int size = flexibleDofs(beam, kind);
+    const bool warping = size == kMaxDofs;
+    Flexible out{.k = Mat18::Zero(size, size), .f = Vec18::Zero(size)};
+    auto k18 = out.k.topLeftCorner(kDofs, kDofs);
+    auto f18 = out.f.head(kDofs);
     // Curvature terms: 3 points.
     for (std::size_t g = 0; g < kGauss3.size(); ++g) {
         auto p = pointAt(x, data, kind, kGauss3.at(g));
@@ -201,20 +221,30 @@ Expected<Flexible> flexible(const IsoBeamData& data, ElementKind kind, const Iso
         const Strain b = strainAt(*p);
         const double w = kWeights3.at(g) * p->j;
         const auto bk = b.bottomRows<3>();
-        out.k.noalias() += w * bk.transpose() * d.bottomRightCorner<3, 3>() * bk;
-        out.f.noalias() += w * bk.transpose() * d.bottomRightCorner<3, 3>() * imposed.tail<3>();
+        k18.noalias() += w * bk.transpose() * d.bottomRightCorner<3, 3>() * bk;
+        f18.noalias() += w * bk.transpose() * d.bottomRightCorner<3, 3>() * imposed.tail<3>();
+        // Feature 008d: E Iw psi'^2.
+        if (warping) {
+            for (int i = 0; i < 3; ++i) {
+                for (int jn = 0; jn < 3; ++jn) {
+                    out.k(kWarp + i, kWarp + jn) +=
+                        w * beam.warpingStiffness * p->shape.dn.at(static_cast<std::size_t>(i)) *
+                        p->shape.dn.at(static_cast<std::size_t>(jn)) / (p->j * p->j);
+                }
+            }
+        }
         // Feature 008c (design 008c §5.3): the geometric stiffness of the
         // reference axial force on the transverse slope of the centroid,
         // N (I - t t^T) on u' (the total slope, as Engesser).
         if (beam.axialForce.active()) {
-            const double n = beam.axialForce.at(arcLength(x, kGauss3.at(g)), length);
+            const double axial = beam.axialForce.at(arcLength(x, kGauss3.at(g)), length);
             const Eigen::Matrix3d transverse =
                 Eigen::Matrix3d::Identity() - p->t * p->t.transpose();
             for (int i = 0; i < 3; ++i) {
                 for (int jn = 0; jn < 3; ++jn) {
                     const double dd = p->shape.dn.at(static_cast<std::size_t>(i)) *
                                       p->shape.dn.at(static_cast<std::size_t>(jn)) / (p->j * p->j);
-                    out.k.block<3, 3>(at(i), at(jn)) += w * n * dd * transverse;
+                    out.k.block<3, 3>(at(i), at(jn)) += w * axial * dd * transverse;
                 }
             }
         }
@@ -245,11 +275,21 @@ Expected<Flexible> flexible(const IsoBeamData& data, ElementKind kind, const Iso
         const auto bk = b.bottomRows<3>();
         const Eigen::Matrix3d dgg = d.topLeftCorner<3, 3>();
         const Eigen::Matrix3d dgk = d.topRightCorner<3, 3>();
-        out.k.noalias() += w * (bg.transpose() * dgg * bg + bg.transpose() * dgk * bk +
-                                bk.transpose() * dgk.transpose() * bg);
-        out.f.noalias() +=
-            w * (bg.transpose() * (dgg * imposed.head<3>() + dgk * imposed.tail<3>()) +
-                 bk.transpose() * dgk.transpose() * imposed.head<3>());
+        k18.noalias() += w * (bg.transpose() * dgg * bg + bg.transpose() * dgk * bk +
+                              bk.transpose() * dgk.transpose() * bg);
+        f18.noalias() += w * (bg.transpose() * (dgg * imposed.head<3>() + dgk * imposed.tail<3>()) +
+                              bk.transpose() * dgk.transpose() * imposed.head<3>());
+        // Feature 008d: Vlasov's psi = kappa_x, by a penalty.
+        if (warping) {
+            const double penalty = kPenalty * beam.warpingStiffness / (length * length);
+            Eigen::Matrix<double, 1, Eigen::Dynamic, Eigen::RowMajor, 1, kMaxDofs> r =
+                Eigen::Matrix<double, 1, Eigen::Dynamic, Eigen::RowMajor, 1, kMaxDofs>::Zero(size);
+            r.head(kDofs) = -b.row(3);
+            for (int i = 0; i < 3; ++i) {
+                r(kWarp + i) = p->shape.n.at(static_cast<std::size_t>(i));
+            }
+            out.k.noalias() += w * penalty * r.transpose() * r;
+        }
     }
     // Distributed loads, per length of the curve.
     for (const IsoLoads::Distributed& load : data.loads.distributed) {
@@ -307,8 +347,13 @@ public:
                    const Flexible& f)
     {
         const BeamData& beam = data.beam;
+        const int n = static_cast<int>(f.k.rows());
+        m_internal.fill(-1);
+        m_held.fill(false);
+        m_kee = Mat18::Zero(n, n);
+        m_fe = Vec18::Zero(n);
         // Flexible dofs in the local axes of the ends.
-        m_local = Mat18::Identity();
+        m_local = Mat18::Identity(n, n);
         const std::array<const Point*, 2> ends = {&start, &end};
         for (int e = 0; e < 2; ++e) {
             const Eigen::Matrix3d& axes = ends.at(static_cast<std::size_t>(e))->axes;
@@ -318,7 +363,26 @@ public:
         }
         const Mat18 k = m_local.transpose() * f.k * m_local;
         const Vec18 loads = m_local.transpose() * f.f;
-        for (int j = 0; j < kDofs; ++j) {
+        for (int j = 0; j < n; ++j) {
+            // Feature 008d (design 008d §5.2): the warping of a non-continuous
+            // end is internal with its bimoment spring, or held at zero; the
+            // middle node's warping is always external.
+            if (j >= kWarp) {
+                const int node = j - kWarp;
+                if (node == 2 || beam.warpingContinuous.at(static_cast<std::size_t>(node))) {
+                    continue;
+                }
+                const double spring = beam.warpingSprings.at(static_cast<std::size_t>(node));
+                if (spring == kRigid) {
+                    m_held.at(static_cast<std::size_t>(j)) = true;
+                    continue;
+                }
+                m_internal.at(static_cast<std::size_t>(j)) = m_count;
+                m_spring.at(static_cast<std::size_t>(m_count)) = spring;
+                m_external.at(static_cast<std::size_t>(m_count)) = -1; // to the ground
+                ++m_count;
+                continue;
+            }
             const int node = j / kNodeDofs;
             const int component = j % kNodeDofs;
             // In the plane only N, Vy and Mz have connections.
@@ -334,13 +398,19 @@ public:
                 ++m_count;
             }
         }
-        m_kei = Coupling::Zero(kDofs, m_count);
+        m_kei = Coupling::Zero(n, m_count);
         m_kii = Internal::Zero(m_count, m_count);
         m_fi = InternalVector::Zero(m_count);
-        for (int a = 0; a < kDofs; ++a) {
+        for (int a = 0; a < n; ++a) {
             const int ia = m_internal.at(static_cast<std::size_t>(a));
-            for (int b = 0; b < kDofs; ++b) {
+            if (m_held.at(static_cast<std::size_t>(a))) {
+                continue;
+            }
+            for (int b = 0; b < n; ++b) {
                 const int ib = m_internal.at(static_cast<std::size_t>(b));
+                if (m_held.at(static_cast<std::size_t>(b))) {
+                    continue;
+                }
                 if (ia < 0 && ib < 0) {
                     m_kee(a, b) += k(a, b);
                 } else if (ia < 0) {
@@ -354,9 +424,11 @@ public:
         for (int i = 0; i < m_count; ++i) {
             const int e = m_external.at(static_cast<std::size_t>(i));
             const double s = m_spring.at(static_cast<std::size_t>(i));
-            m_kee(e, e) += s;
             m_kii(i, i) += s;
-            m_kei(e, i) -= s;
+            if (e >= 0) {
+                m_kee(e, e) += s;
+                m_kei(e, i) -= s;
+            }
         }
         if (m_count > 0) {
             m_ldlt.compute(m_kii);
@@ -392,33 +464,41 @@ public:
         Vec18 d = external;
         if (m_count > 0) {
             const InternalVector internal = m_ldlt.solve(m_fi - m_kei.transpose() * external);
-            for (int i = 0; i < m_count; ++i) {
-                d(m_external.at(static_cast<std::size_t>(i))) = internal(i);
+            for (int j = 0; j < d.size(); ++j) {
+                if (const int i = m_internal.at(static_cast<std::size_t>(j)); i >= 0) {
+                    d(j) = internal(i);
+                }
+            }
+        }
+        for (int j = 0; j < d.size(); ++j) {
+            if (m_held.at(static_cast<std::size_t>(j))) {
+                d(j) = 0.0;
             }
         }
         return m_local * d;
     }
 
 private:
-    Mat18 m_local = Mat18::Identity();
+    Mat18 m_local;
     int m_count = 0;
-    std::array<int, kDofs> m_internal{-1, -1, -1, -1, -1, -1, -1, -1, -1,
-                                      -1, -1, -1, -1, -1, -1, -1, -1, -1};
-    std::array<int, kMaxInternal> m_external{};
+    std::array<int, kMaxDofs> m_internal{};
+    std::array<bool, kMaxDofs> m_held{};        // feature 008d: a restrained warping
+    std::array<int, kMaxInternal> m_external{}; // -1: a spring to the ground
     std::array<double, kMaxInternal> m_spring{};
-    Mat18 m_kee = Mat18::Zero();
+    Mat18 m_kee;
     Coupling m_kei;
     Internal m_kii;
-    Vec18 m_fe = Vec18::Zero();
+    Vec18 m_fe;
     InternalVector m_fi;
     Eigen::LDLT<Internal> m_ldlt;
 };
 
-// External local dofs from the global nodal dofs (6 per node): offsets and
-// the axes of each end; the middle node as it is.
-Mat18 nodesToExternal(const BeamData& beam, const Point& start, const Point& end)
+// External local dofs from the global nodal dofs (6 per node, then the
+// warping of the three nodes): offsets and the axes of each end; the middle
+// node and the warping as they are.
+Mat18 nodesToExternal(const BeamData& beam, int n, const Point& start, const Point& end)
 {
-    Mat18 a = Mat18::Identity();
+    Mat18 a = Mat18::Identity(n, n);
     const std::array<const Point*, 2> ends = {&start, &end};
     for (int e = 0; e < 2; ++e) {
         const Eigen::Matrix3d r = ends.at(static_cast<std::size_t>(e))->axes.transpose();
@@ -456,18 +536,58 @@ double isoParameter(const IsoNodes& x, double s)
     return xi;
 }
 
-IsoBeamElement::IsoBeamElement(ElementKind kind, std::span<const IsoBeamData> beams)
+IsoBeamElement::IsoBeamElement(ElementKind kind, std::span<const IsoBeamData> beams, bool warping,
+                               std::array<bool, 2> continuous)
     : m_kind(kind)
     , m_beams(beams)
+    , m_warping(warping)
+    , m_continuous(continuous)
 {}
 
-DofMask IsoBeamElement::dofsAt(ElementType /*type*/, int /*localNode*/) const
+DofMask IsoBeamElement::dofsAt(ElementType /*type*/, int localNode) const
 {
     const DofMask plane = mask(DofType::U) | mask(DofType::V) | mask(DofType::RZ);
-    return planarKind(m_kind) ? plane
-                              : static_cast<DofMask>(plane | mask(DofType::W) | mask(DofType::RX) |
-                                                     mask(DofType::RY));
+    if (planarKind(m_kind)) {
+        return plane;
+    }
+    auto dofs =
+        static_cast<DofMask>(plane | mask(DofType::W) | mask(DofType::RX) | mask(DofType::RY));
+    // Feature 008d: the warping at the middle node and at the continuous ends.
+    if (m_warping &&
+        (localNode == 2 || m_continuous.at(static_cast<std::size_t>(localNode == 0 ? 0 : 1)))) {
+        dofs = static_cast<DofMask>(dofs | mask(DofType::Warp));
+    }
+    return dofs;
 }
+
+namespace {
+
+// The flexible dofs of the element's dofs, node by node in its order: per
+// node its 6 (or 3 in the plane) components, then its warping when it has
+// the dof (design 008d §5.3).
+std::array<int, kMaxDofs> elementOrder(const BeamData& beam, ElementKind kind, int& count)
+{
+    std::array<int, kMaxDofs> order{};
+    count = 0;
+    const bool warping = warps(beam, kind);
+    for (int node = 0; node < 3; ++node) {
+        if (planarKind(kind)) {
+            for (const int c : kPlanar) {
+                order.at(static_cast<std::size_t>(count++)) = kNodeDofs * node + c;
+            }
+            continue;
+        }
+        for (int c = 0; c < kNodeDofs; ++c) {
+            order.at(static_cast<std::size_t>(count++)) = kNodeDofs * node + c;
+        }
+        if (warping && (node == 2 || beam.warpingContinuous.at(static_cast<std::size_t>(node)))) {
+            order.at(static_cast<std::size_t>(count++)) = kWarp + node;
+        }
+    }
+    return order;
+}
+
+} // namespace
 
 Expected<void> IsoBeamElement::compute(const ElementNodes& nodes, ElementIndex element,
                                        Eigen::Ref<Eigen::MatrixXd> matrix,
@@ -488,21 +608,17 @@ Expected<void> IsoBeamElement::compute(const ElementNodes& nodes, ElementIndex e
     Mat18 k;
     Vec18 v;
     connections.condense(k, v);
-    const Mat18 a = nodesToExternal(data.beam, *start, *end);
+    const Mat18 a = nodesToExternal(data.beam, static_cast<int>(k.rows()), *start, *end);
     const Mat18 kg = a.transpose() * k * a;
     const Vec18 fg = a.transpose() * v;
-    if (planarKind(m_kind)) {
-        for (int i = 0; i < 9; ++i) {
-            const int fi = kNodeDofs * (i / 3) + kPlanar.at(static_cast<std::size_t>(i % 3));
-            vector(i) = fg(fi);
-            for (int j = 0; j < 9; ++j) {
-                const int fj = kNodeDofs * (j / 3) + kPlanar.at(static_cast<std::size_t>(j % 3));
-                matrix(i, j) = kg(fi, fj);
-            }
+    int count = 0;
+    const auto order = elementOrder(data.beam, m_kind, count);
+    for (int i = 0; i < count; ++i) {
+        const int fi = order.at(static_cast<std::size_t>(i));
+        vector(i) = fg(fi);
+        for (int j = 0; j < count; ++j) {
+            matrix(i, j) = kg(fi, order.at(static_cast<std::size_t>(j)));
         }
-    } else {
-        matrix = kg;
-        vector = fg;
     }
     return {};
 }
@@ -519,19 +635,16 @@ BeamPoint isoBeamAt(const IsoBeamData& data, ElementKind kind, const ElementNode
     if (!f || !start || !end || !here) {
         return out;
     }
-    Vec18 values = Vec18::Zero();
-    if (planarKind(kind)) {
-        for (int i = 0; i < 9; ++i) {
-            values(kNodeDofs * (i / 3) + kPlanar.at(static_cast<std::size_t>(i % 3))) =
-                nodeValues[static_cast<std::size_t>(i)];
-        }
-    } else {
-        for (int i = 0; i < kDofs; ++i) {
-            values(i) = nodeValues[static_cast<std::size_t>(i)];
-        }
+    const auto size = f->k.rows();
+    Vec18 values = Vec18::Zero(size);
+    int count = 0;
+    const auto order = elementOrder(data.beam, kind, count);
+    for (int i = 0; i < count; ++i) {
+        values(order.at(static_cast<std::size_t>(i))) = nodeValues[static_cast<std::size_t>(i)];
     }
     const IsoConnections connections(data, kind, *start, *end, *f);
-    const Vec18 q = connections.flexibleGlobal(nodesToExternal(data.beam, *start, *end) * values);
+    const Vec18 q = connections.flexibleGlobal(
+        nodesToExternal(data.beam, static_cast<int>(size), *start, *end) * values);
     Eigen::Vector3d u = Eigen::Vector3d::Zero();
     Eigen::Vector3d theta = Eigen::Vector3d::Zero();
     for (int i = 0; i < 3; ++i) {
@@ -548,14 +661,15 @@ BeamPoint isoBeamAt(const IsoBeamData& data, ElementKind kind, const ElementNode
         data.loads.curvatureZ;
     // Curvatures here; normal and shear strains from the reduced points,
     // extrapolated linearly in xi.
-    Vec6 strain = strainAt(*here) * q - imposed;
+    const auto q18 = q.head(kDofs);
+    Vec6 strain = strainAt(*here) * q18 - imposed;
     std::array<Vec6, 2> reduced{};
     for (std::size_t g = 0; g < 2; ++g) {
         const auto p = pointAt(x, data, kind, kGauss2.at(g));
         if (!p) {
             return out;
         }
-        reduced.at(g) = strainAt(*p) * q - imposed;
+        reduced.at(g) = strainAt(*p) * q18 - imposed;
     }
     const double xi = isoParameter(x, s);
     const double slope = (xi - kGauss2[0]) / (kGauss2[1] - kGauss2[0]);
@@ -568,6 +682,27 @@ BeamPoint isoBeamAt(const IsoBeamData& data, ElementKind kind, const ElementNode
     bf.t = forces(3) + beam.shearCentre.y() * forces(1) - beam.shearCentre.x() * forces(2);
     bf.my = forces(4);
     bf.mz = forces(5);
+    bf.tsv = bf.t;
+    // Feature 008d: psi and its derivatives by the shape functions;
+    // B = -E Iw psi', Tw = -B' = E Iw psi'', and Tsv = G J kappa_x.
+    if (size == kMaxDofs) {
+        double psi = 0.0;
+        double dpsi = 0.0;
+        double ddpsi = 0.0;
+        // d/ds = (1 / j) d/dxi; the second derivative of the quadratic in xi
+        // over the arc, neglecting the change of j along it.
+        const std::array<double, 3> second = {1.0, 1.0, -2.0};
+        for (int i = 0; i < 3; ++i) {
+            const auto k = static_cast<std::size_t>(i);
+            psi += here->shape.n.at(k) * q(kWarp + i);
+            dpsi += here->shape.dn.at(k) / here->j * q(kWarp + i);
+            ddpsi += second.at(k) / (here->j * here->j) * q(kWarp + i);
+        }
+        out.warping = psi;
+        bf.b = -beam.warpingStiffness * dpsi;
+        bf.tw = beam.warpingStiffness * ddpsi;
+        bf.t += bf.tw;
+    }
     return out;
 }
 

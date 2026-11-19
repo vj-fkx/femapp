@@ -1229,3 +1229,58 @@ TEST_CASE("arcs with warping of a large radius are the straight beam",
     CHECK(relative(root.at(1.0).warping, fem::core::test::beamOf(straight, 0).at(1.0).warping) <=
           1e-6);
 }
+
+// REQ-008d-06, 08 (AC-3): a quarter ring with warping in cantilever, its
+// warping restrained at the root and a force out of its plane at the tip
+// (bending, torsion and warping coupled by the curvature): the
+// isoparametric beam converges to the exact arc with rate about 4 (from 8
+// elements on), and the arc of n elements is the arc of one.
+TEST_CASE("the isoparametric beam with warping converges to the arc",
+          "[core][beam][curved][iso][warping]")
+{
+    const double r = 2.0;
+    const double iw = 4.0e-7;
+    const Vec force(0.0, 0.0, -2.0e3);
+    const auto withWarping = [&](fem::core::Model model) {
+        model.assignments.front().warping = true;
+        model.sections.front().warpingConstant = iw;
+        fem::core::test::fixAll(model, {1}, fem::core::ElementKind::Beam3D);
+        // The quadratic curves kink slightly at the shared nodes (about
+        // 1e-4 with 8 elements), above the tolerance of the default
+        // continuity (design 008d §5.2): the chain says it.
+        model.warpingEnds.push_back({.elements = model.assignments.front().elements,
+                                     .condition = fem::core::WarpingCondition::Continuous});
+        model.warpingEnds.push_back({.elements = fem::core::ElementIds{{1}},
+                                     .end = fem::core::BarEnd::Start,
+                                     .condition = fem::core::WarpingCondition::Restrained});
+        return model;
+    };
+    const auto tip = [&](fem::core::Model model, int n) {
+        model.nodalForces.push_back(
+            {.nodes = fem::core::NodeIds{{static_cast<fem::core::ExternalId>(n + 1)}},
+             .force = force});
+        const fem::core::StaticResult result = fem::core::test::solve(model);
+        const auto last = static_cast<std::size_t>(n);
+        return std::array<double, 2>{result.displacements[last].z(), result.rotations[last].y()};
+    };
+    // The exact arc: one element, and four.
+    const auto arcRing = [&](int n) {
+        fem::core::Model model = isoRing(r, n, fem::core::ElementKind::Beam3D);
+        model.assignments.front().curved = fem::core::CurvedFormulation::Arc;
+        return withWarping(model);
+    };
+    const auto exact = tip(arcRing(1), 1);
+    const auto four = tip(arcRing(4), 4);
+    CHECK(relative(four[0], exact[0]) <= 1e-8);
+    CHECK(relative(four[1], exact[1]) <= 1e-8);
+    std::vector<double> errors;
+    for (const int n : {8, 16, 32}) {
+        const auto iso = tip(withWarping(isoRing(r, n, fem::core::ElementKind::Beam3D)), n);
+        errors.push_back(std::max(relative(iso[0], exact[0]), relative(iso[1], exact[1])));
+    }
+    INFO("errors " << errors[0] << " " << errors[1] << " " << errors[2]);
+    for (std::size_t i = 0; i + 1 < errors.size(); ++i) {
+        CHECK(std::log2(errors[i] / errors[i + 1]) >= 3.5);
+    }
+    CHECK(errors.back() <= 1e-4);
+}

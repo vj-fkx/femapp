@@ -94,8 +94,19 @@ void resolveWarping(const Model& model, Beams& beams)
     const Mesh& mesh = *model.mesh;
     const auto count = beams.data.size();
     const auto warps = [&beams](std::size_t e) { return beams.data[e].warpingStiffness > 0.0; };
-    const auto tangent = [&beams](std::size_t e, int end) {
+    const auto tangent = [&](std::size_t e, int end) {
         const BeamData& beam = beams.data[e];
+        if (beams.isIso[e]) {
+            // dx/dxi of the quadratic curve at xi = -1 and 1 (Gmsh order:
+            // the ends, then the middle).
+            const auto nodes = mesh.elementNodes(static_cast<ElementIndex>(e));
+            const Eigen::Vector3d p = mesh.nodeCoordinates(nodes[0]) + beam.offsets[0];
+            const Eigen::Vector3d q = mesh.nodeCoordinates(nodes[1]) + beam.offsets[1];
+            const Eigen::Vector3d m = mesh.nodeCoordinates(nodes[2]);
+            const Eigen::Vector3d d = end == 0 ? Eigen::Vector3d(-1.5 * p - 0.5 * q + 2.0 * m)
+                                               : Eigen::Vector3d(0.5 * p + 1.5 * q - 2.0 * m);
+            return Eigen::Vector3d(d.normalized());
+        }
         return Eigen::Vector3d((end == 0 ? beam.axes : beam.endAxes).col(0));
     };
     std::vector<std::vector<std::pair<std::size_t, int>>> atNode(
@@ -148,6 +159,13 @@ void resolveWarping(const Model& model, Beams& beams)
                     break;
                 }
             }
+        }
+    }
+    // The isoparametric beams keep a copy of their data.
+    for (std::size_t e = 0; e < count; ++e) {
+        if (beams.isIso[e] && warps(e)) {
+            beams.iso[e].beam.warpingSprings = beams.data[e].warpingSprings;
+            beams.iso[e].beam.warpingContinuous = beams.data[e].warpingContinuous;
         }
     }
 }
@@ -361,8 +379,16 @@ StaticProblem::prepare(const Model& model, const StaticOptions& options, bool se
     p.m_negative.assign(elementCount, 0);
     p.m_kindOf.assign(elementCount, ElementKind::Truss3D);
     // The exact beams (design 008b §5.3, 008d §5.2): a set per kind and pair
-    // of continuous warping ends, since the ends decide the dofs.
+    // of continuous warping ends, since the ends decide the dofs. The same
+    // for the isoparametric ones, with or without warping (design 008d §5.3).
     std::map<int, std::vector<ElementIndex>> exactMembers;
+    std::map<int, std::vector<ElementIndex>> isoMembers;
+    const auto isoKey = [&p](ElementKind kind, std::size_t e) {
+        const BeamData& beam = p.m_beams.data[e];
+        const auto& continuous = beam.warpingContinuous;
+        return 8 * static_cast<int>(kind) + 4 * (beam.warpingStiffness > 0.0 ? 1 : 0) +
+               2 * (continuous[0] ? 1 : 0) + (continuous[1] ? 1 : 0);
+    };
     const auto exactKey = [&p](ElementKind kind, std::size_t e) {
         const auto& continuous = p.m_beams.data[e].warpingContinuous;
         return 4 * static_cast<int>(kind) + 2 * (continuous[0] ? 1 : 0) + (continuous[1] ? 1 : 0);
@@ -374,7 +400,7 @@ StaticProblem::prepare(const Model& model, const StaticOptions& options, bool se
             const auto kind = model.assignments[static_cast<std::size_t>(owner)].kind;
             p.m_kindOf[e] = kind;
             if (p.m_beams.isIso[e]) {
-                p.m_isoMembers.at(kind == ElementKind::Beam2D ? 0 : 1).push_back(element);
+                isoMembers[isoKey(kind, e)].push_back(element);
             } else if (p.m_beams.exact[e]) {
                 exactMembers[exactKey(kind, e)].push_back(element);
             } else {
@@ -392,13 +418,14 @@ StaticProblem::prepare(const Model& model, const StaticOptions& options, bool se
                 {.elements = p.m_members.at(k), .formulation = p.m_formulations.at(k).get()});
         }
     }
-    for (std::size_t k = 0; k < p.m_isoMembers.size(); ++k) {
+    p.m_isoMembers.reserve(isoMembers.size());
+    for (auto& [key, elements] : isoMembers) {
+        p.m_isoMembers.push_back(std::move(elements));
+        const std::array<bool, 2> continuous = {(key / 2) % 2 == 1, key % 2 == 1};
         p.m_formulations.push_back(std::make_unique<IsoBeamElement>(
-            k == 0 ? ElementKind::Beam2D : ElementKind::Beam3D, p.m_beams.iso));
-        if (!p.m_isoMembers.at(k).empty()) {
-            p.m_sets.push_back(
-                {.elements = p.m_isoMembers.at(k), .formulation = p.m_formulations.back().get()});
-        }
+            static_cast<ElementKind>(key / 8), p.m_beams.iso, (key / 4) % 2 == 1, continuous));
+        p.m_sets.push_back(
+            {.elements = p.m_isoMembers.back(), .formulation = p.m_formulations.back().get()});
     }
     p.m_exactMembers.reserve(exactMembers.size());
     for (auto& [key, elements] : exactMembers) {
@@ -562,8 +589,9 @@ std::vector<double> StaticProblem::nodeValues(ElementIndex element, int nodes,
         // an exact beam (design 008d §5.2).
         DofMask used = dofsOf(m_kindOf[e]);
         const BeamData& beam = m_beams.data[e];
-        if (m_beams.exact[e] && k < 2 && beam.warpingStiffness > 0.0 &&
-            beam.warpingContinuous.at(static_cast<std::size_t>(k))) {
+        const bool continuous = k < 2 && beam.warpingContinuous.at(static_cast<std::size_t>(k));
+        const bool middle = k == 2 && m_beams.isIso[e]; // the isoparametric middle node
+        if (beam.warpingStiffness > 0.0 && (continuous || middle)) {
             used = static_cast<DofMask>(used | mask(DofType::Warp));
         }
         for (int t = 0; t < kDofTypeCount; ++t) {
@@ -791,18 +819,11 @@ Expected<StaticResult> StaticProblem::recover(const Eigen::VectorXd& values, boo
             ElementNodes elementNodes;
             elementNodes.type = ElementType::Line3;
             elementNodes.count = 3;
-            std::vector<double> nodeValues;
-            const DofMask used = detail::dofsOf(kindOf[e]);
             for (std::size_t k = 0; k < 3; ++k) {
                 elementNodes.x.at(k) = mesh.nodeCoordinates(nodes[k]);
-                for (int t = 0; t < kDofTypeCount; ++t) {
-                    const auto type = static_cast<DofType>(t);
-                    if ((used & mask(type)) != 0) {
-                        const auto dof = dofs.find(nodes[k], type);
-                        nodeValues.push_back(dof ? values[*dof] : 0.0);
-                    }
-                }
             }
+            std::vector<double> nodeValues =
+                this->nodeValues(static_cast<ElementIndex>(e), 3, values);
             BeamResult::Data data;
             data.length = beams.length[e];
             data.axes = beams.data[e].axes;

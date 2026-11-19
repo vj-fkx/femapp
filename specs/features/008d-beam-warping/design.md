@@ -272,7 +272,12 @@ móvel. Muda só o acesso, a partir de `c19d42b`:
 1. **Por ponta**, a do `WarpingEnd`, se houver. Senão, o padrão da 008b
    §5.4: entre as pontas de vigas com empenamento que chegam a um nó, as de
    tangentes colineares (|t₁ × t₂| < 1e−6) são `Continuous`; as demais,
-   `Free`.
+   `Free`. Na isoparamétrica, a tangente é a da curva quadrática, que
+   quebra levemente entre elementos que aproximam uma curva suave (3,7e−3
+   com 4 elementos num quarto de anel): a tolerância continua 1e−6, e
+   quem quer continuidade numa cadeia isoparamétrica declara
+   `WarpingEnd Continuous` *(decidido pelo mantenedor em 2026-11-18, na
+   T09)*.
 2. **GDL do nó**: o nó tem `DofType::Warp` se ao menos uma ponta nele for
    `Continuous`. A restrição e o bimomento nodal agem nesse GDL.
 3. **No elemento**:

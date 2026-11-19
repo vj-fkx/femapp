@@ -113,7 +113,7 @@ private:
     std::vector<ElementKind> m_kindOf;
     std::array<std::vector<ElementIndex>, 4> m_members; // in ElementKind order
     std::vector<std::vector<ElementIndex>> m_exactMembers;
-    std::array<std::vector<ElementIndex>, 2> m_isoMembers; // 2D, 3D
+    std::vector<std::vector<ElementIndex>> m_isoMembers;
     std::vector<std::unique_ptr<ElementFormulation>> m_formulations;
     std::vector<ElementSet> m_sets;
     DofMap m_dofs;

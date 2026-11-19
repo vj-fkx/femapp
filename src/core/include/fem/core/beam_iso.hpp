@@ -72,7 +72,11 @@ class IsoBeamElement final : public ElementFormulation
 {
 public:
     // `beams` is indexed by ElementIndex and must outlive the formulation.
-    IsoBeamElement(ElementKind kind, std::span<const IsoBeamData> beams);
+    // Feature 008d (design 008d §5.3): with `warping`, the warping dof at the
+    // middle node and at the ends that `continuous` says; all the beams of
+    // the formulation agree with their BeamData.
+    IsoBeamElement(ElementKind kind, std::span<const IsoBeamData> beams, bool warping = false,
+                   std::array<bool, 2> continuous = {false, false});
 
     [[nodiscard]] DofMask dofsAt(ElementType type, int localNode) const override;
     [[nodiscard]] Expected<void> compute(const ElementNodes& nodes, ElementIndex element,
@@ -82,6 +86,8 @@ public:
 private:
     ElementKind m_kind;
     std::span<const IsoBeamData> m_beams;
+    bool m_warping = false;
+    std::array<bool, 2> m_continuous{false, false};
 };
 
 // REQ-008b-19: a point of an isoparametric beam at the arc length s, from
