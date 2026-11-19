@@ -236,8 +236,8 @@ Expected<Flexible> flexible(const IsoBeamData& data, ElementKind kind, const Iso
         // Feature 008c (design 008c §5.3): the geometric stiffness of the
         // reference axial force on the transverse slope of the centroid,
         // N (I - t t^T) on u' (the total slope, as Engesser).
-        if (beam.axialForce.active()) {
-            const double axial = beam.axialForce.at(arcLength(x, kGauss3.at(g)), length);
+        if (referenceOf(beam).active()) {
+            const double axial = referenceOf(beam).axialAt(arcLength(x, kGauss3.at(g)), length);
             const Eigen::Matrix3d transverse =
                 Eigen::Matrix3d::Identity() - p->t * p->t.transpose();
             for (int i = 0; i < 3; ++i) {

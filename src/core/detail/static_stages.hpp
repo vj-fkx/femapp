@@ -86,11 +86,11 @@ public:
     [[nodiscard]] std::int64_t negativePivots() const;
     [[nodiscard]] ElementIndex unstableElement() const;
 
-    // Feature 008c (design 008c §5.2): the axial force of every bar of the
-    // solution `values`, per element (inactive for the others), and the
-    // reference axial forces of the next assemblies.
-    [[nodiscard]] std::vector<AxialProfile> profilesOf(const Eigen::VectorXd& values) const;
-    void setAxialForces(const std::vector<AxialProfile>& profiles);
+    // Features 008c, 008d (design 008c §5.2, 008d §5.4): the internal forces
+    // of every bar of the solution `values`, per element (inactive for the
+    // others), and the reference state of the next assemblies.
+    [[nodiscard]] std::vector<ReferenceProfile> profilesOf(const Eigen::VectorXd& values) const;
+    void setReference(const std::vector<ReferenceProfile>& profiles);
 
     // Feature 008c: the negative pivots of each element in the last
     // assembly, and the shape of an exact bar buckling with its nodes held

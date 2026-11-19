@@ -38,7 +38,7 @@ struct Flat
     std::vector<int> count; // per element
 };
 
-Eigen::VectorXd flatten(const std::vector<AxialProfile>& profiles, Flat& flat)
+Eigen::VectorXd flatten(const std::vector<ReferenceProfile>& profiles, Flat& flat)
 {
     flat.count.resize(profiles.size());
     Eigen::Index size = 0;
@@ -48,22 +48,24 @@ Eigen::VectorXd flatten(const std::vector<AxialProfile>& profiles, Flat& flat)
     }
     Eigen::VectorXd x(size);
     Eigen::Index i = 0;
-    for (const AxialProfile& profile : profiles) {
+    for (const ReferenceProfile& profile : profiles) {
         for (int k = 0; k < profile.count; ++k) {
-            x(i++) = profile.values.at(static_cast<std::size_t>(k));
+            // Feature 008d: the axial forces only, for now (T21 iterates
+            // all the forces).
+            x(i++) = profile.values.at(static_cast<std::size_t>(k)).n;
         }
     }
     return x;
 }
 
-std::vector<AxialProfile> unflatten(const Eigen::VectorXd& x, const Flat& flat)
+std::vector<ReferenceProfile> unflatten(const Eigen::VectorXd& x, const Flat& flat)
 {
-    std::vector<AxialProfile> profiles(flat.count.size());
+    std::vector<ReferenceProfile> profiles(flat.count.size());
     Eigen::Index i = 0;
     for (std::size_t e = 0; e < profiles.size(); ++e) {
         profiles[e].count = flat.count[e];
         for (int k = 0; k < flat.count[e]; ++k) {
-            profiles[e].values.at(static_cast<std::size_t>(k)) = x(i++);
+            profiles[e].values.at(static_cast<std::size_t>(k)).n = x(i++);
         }
     }
     return profiles;
@@ -240,7 +242,7 @@ Expected<SecondOrderResult> runSecondOrderStatic(const Model& model,
     int halvings = 0;
     double change = 0.0;
     for (int k = 1; k <= options.maxIterations; ++k) {
-        problem.setAxialForces(unflatten(x, flat));
+        problem.setReference(unflatten(x, flat));
         system = problem.assemble();
         if (!system) {
             return tl::unexpected(system.error());

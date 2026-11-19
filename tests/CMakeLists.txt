@@ -55,6 +55,9 @@ femapp_add_test(core SOURCES
     test_static_validation.cpp
     test_truss_element.cpp
     test_truss_verification.cpp)
+# Feature 008d: the stages of the analysis (detail/static_stages.hpp) are tested
+# directly, as test_io and test_render test their sources.
+target_include_directories(test_core PRIVATE "${PROJECT_SOURCE_DIR}/src/core")
 target_compile_definitions(test_core PRIVATE FEMAPP_EXPECTED_VERSION="${PROJECT_VERSION}")
 # The test files of the beams instantiate many Eigen and Catch2 templates.
 if(MSVC)

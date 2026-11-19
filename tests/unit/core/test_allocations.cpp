@@ -19,6 +19,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdlib>
+#include <memory>
 #include <new>
 
 namespace {
@@ -178,6 +179,15 @@ TEST_CASE("the exact beam element does not allocate", "[core][allocations]")
     beam.springs[1][5] = 0.0;
     beam.warpingSprings[1] = 0.0;
     beam.curvature = Eigen::Vector3d(0.0, 0.1, 0.2);
+    // Feature 008d: a full reference profile, varying, read through its
+    // shared pointer (made before the counting).
+    fem::core::ReferenceProfile profile;
+    profile.count = 2 * fem::core::kMaxReferenceParts;
+    for (int i = 0; i < profile.count; ++i) {
+        profile.values.at(static_cast<std::size_t>(i)) = {
+            .n = -10.0 - i, .vy = 1.0, .vz = 2.0, .t = 3.0, .my = 4.0 + i, .mz = 5.0 - i};
+    }
+    beam.reference = std::make_shared<const fem::core::ReferenceProfile>(profile);
     std::array<fem::core::SpanLoads, 1> loads{};
     const fem::core::ExactBeamElement element(fem::core::ElementKind::Beam3D, beams, loads);
     fem::core::ElementNodes nodes;

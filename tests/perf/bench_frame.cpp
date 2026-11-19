@@ -208,7 +208,8 @@ int cost(const fem::core::Model& model, double linear)
             beam.axes = *axes;
             beam.endAxes = *axes;
             // A constant compression of 1 MN: the second order of 008c.
-            beam.axialForce = fem::core::AxialProfile::constant(-1e6);
+            beam.reference = std::make_shared<const fem::core::ReferenceProfile>(
+                fem::core::ReferenceProfile::constant(-1e6));
             const fem::core::SpanFrame frame{.principalAxes = *axes};
             const Eigen::Vector3d weight =
                 density * section->area * model.gravity.value_or(Eigen::Vector3d::Zero());

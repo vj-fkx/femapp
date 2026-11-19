@@ -221,7 +221,7 @@ double growthRate(const BeamData& beam)
         rate = std::max(rate, quartic(beam.foundation(3), beam.warpingStiffness));
     }
     // Feature 008c: a tension N grows as e^(sqrt(N / EI) x).
-    const double tension = beam.axialForce.scaled(-1.0).largestCompression();
+    const double tension = referenceOf(beam).scaled(-1.0).largestCompression();
     rate = std::max({rate, square(tension, beam.bendingY), square(tension, beam.bendingZ)});
     return rate;
 }
@@ -249,11 +249,11 @@ public:
         : m_plan(plan)
         , m_beam(beam)
         , m_length(length)
-        , m_varying(beam.axialForce.count > 1)
+        , m_varying(referenceOf(beam).axialVaries())
         , m_omega(skew(beam.curvature))
     {
         const int n = plan.count;
-        m_a = reduced(systemMatrix(beam, beam.axialForce.at((from + to) / 2.0, length)));
+        m_a = reduced(systemMatrix(beam, referenceOf(beam).axialAt((from + to) / 2.0, length)));
         // Scales: lengths h, rotations 1, warping 1/h, forces S/h^2,
         // moments S/h, Q S, with S a bending stiffness.
         const double h = to - from;
@@ -445,7 +445,8 @@ private:
             return generator(m_a);
         }
         const auto at = [&](double xi) {
-            return reduced(systemMatrix(m_beam, m_beam.axialForce.at(x0 + xi * l, m_length)));
+            return reduced(
+                systemMatrix(m_beam, referenceOf(m_beam).axialAt(x0 + xi * l, m_length)));
         };
         const StateMatrix g1 = generator(at(kGaussLow));
         const StateMatrix g2 = generator(at(kGaussHigh));
@@ -544,7 +545,7 @@ constexpr double kVaryingChange = 5e-5;
 constexpr int kMaxVaryingPieces = 256;
 double longestPart(const BeamData& beam)
 {
-    const double c = beam.axialForce.largestCompression();
+    const double c = referenceOf(beam).largestCompression();
     const double ei = smallestPositive(beam.bendingY, beam.bendingZ);
     if (!(c > 0.0) || !(ei > 0.0)) {
         return 0.0;
@@ -591,14 +592,15 @@ int partCount(const BeamData& beam, double length)
     // so that each piece changes (k h)^2 by at most kVaryingChange: the
     // error of the fourth-order Magnus integrator (design 008c §5.2,
     // calibrated on Greenhill's column for 1e-8).
-    const int profile = beam.axialForce.parts();
+    const ReferenceProfile& reference = referenceOf(beam);
+    const int profile = reference.axialVaries() ? reference.parts() : 1;
     const double ei = smallestPositive(beam.bendingY, beam.bendingZ);
-    if (beam.axialForce.count > 1 && ei > 0.0) {
+    if (reference.axialVaries() && ei > 0.0) {
         const double h = length / profile;
         int pieces = 1;
         for (int part = 0; part < profile; ++part) {
-            const double low = beam.axialForce.values.at(2 * static_cast<std::size_t>(part));
-            const double high = beam.axialForce.values.at(2 * static_cast<std::size_t>(part) + 1);
+            const double low = reference.values.at(2 * static_cast<std::size_t>(part)).n;
+            const double high = reference.values.at(2 * static_cast<std::size_t>(part) + 1).n;
             const double change = std::abs(high - low) / (kGaussHigh - kGaussLow) * h * h / ei;
             pieces = std::max(pieces, partsFor(std::cbrt(change / kVaryingChange)));
         }
@@ -676,7 +678,7 @@ StateBarMatrices stateBarMatrices(const BeamData& beam, double length, const Spa
     const Plan plan = planFor(beam, planar);
     const Eigen::Index d = plan.dofs;
     const int parts = partCount(beam, length);
-    const bool second = beam.axialForce.active();
+    const bool second = referenceOf(beam).active();
     int negative = longestPart(beam) < 0.0 || beyondParts(beam, length) ? kUnstableBar : 0;
 
     PartMatrix total;
@@ -848,8 +850,8 @@ BarState stateAt(const BeamData& beam, double length, const SpanLoads& loads, bo
             }
         }
         // With an axial force the junctions may be indefinite.
-        junctions = beam.axialForce.active() ? Eigen::VectorXd(kii.partialPivLu().solve(rhs))
-                                             : Eigen::VectorXd(kii.ldlt().solve(rhs));
+        junctions = referenceOf(beam).active() ? Eigen::VectorXd(kii.partialPivLu().solve(rhs))
+                                               : Eigen::VectorXd(kii.ldlt().solve(rhs));
     }
     // The part that holds s and the displacements of its ends.
     const double x = std::clamp(s, 0.0, length);

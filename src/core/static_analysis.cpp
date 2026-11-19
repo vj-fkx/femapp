@@ -308,36 +308,59 @@ Beams beamData(const Model& model, const detail::ValidationTables& tables, bool 
     return beams;
 }
 
-// Feature 008c: whether the span loads of a straight bar have axial
-// components, and their integral from 0 to s (design 008c §5.2).
-bool hasAxialSpanLoad(const SpanLoads& loads)
+// Feature 008d (design 008d §5.4): the internal forces at s of a straight
+// bar from those at its start and its span loads, by statics (the state
+// equations with no curvature): F' = -q, Mx' = -(mx about the centroid),
+// My' = Fz, Mz' = -Fy, the concentrated loads as jumps.
+ReferencePoint straightStatics(const BeamData& beam, const SpanLoads& loads,
+                               const BeamForces& start, double s)
 {
-    const auto axial = [](const SpanPiece& piece) {
-        return piece.start(0) != 0.0 || piece.end(0) != 0.0;
-    };
-    const auto point = [](const SpanPoint& p) { return p.force.x() != 0.0; };
-    return std::ranges::any_of(loads.pieces, axial) || std::ranges::any_of(loads.points, point);
-}
-
-double axialLoadBefore(const SpanLoads& loads, double s)
-{
-    double total = 0.0;
+    const double ey = beam.shearCentre.x();
+    const double ez = beam.shearCentre.y();
+    Eigen::Vector3d f(start.n, start.vy, start.vz);
+    double mx = start.t - (ez * start.vy - ey * start.vz); // about the centroid
+    double my = start.my + f.z() * s;
+    double mz = start.mz - f.y() * s;
     for (const SpanPiece& piece : loads.pieces) {
-        const double a = piece.from;
-        const double b = std::min(piece.to, s);
-        if (!(b > a)) {
+        const double span = piece.to - piece.from;
+        const double e = std::min(piece.to, s);
+        if (!(span > 0.0) || !(e > piece.from)) {
             continue;
         }
-        const double span = piece.to - piece.from;
-        const double slope = span > 0.0 ? (piece.end(0) - piece.start(0)) / span : 0.0;
-        total += piece.start(0) * (b - a) + 0.5 * slope * (b - a) * (b - a);
+        const double l = e - piece.from;
+        const double d = s - piece.from;
+        const Eigen::Vector4d c0 = piece.start;
+        const Eigen::Vector4d c1 = (piece.end - piece.start) / span;
+        // The integral of q, and of (s - x) q, over [from, e].
+        const Eigen::Vector4d once = c0 * l + c1 * (l * l / 2.0);
+        const Eigen::Vector4d moment =
+            c0 * (d * l - l * l / 2.0) + c1 * (d * l * l / 2.0 - l * l * l / 3.0);
+        f -= once.head<3>();
+        mx -= once(3) - (ez * once(1) - ey * once(2));
+        my -= moment(2);
+        mz += moment(1);
     }
     for (const SpanPoint& point : loads.points) {
-        if (point.at < s) {
-            total += point.force.x();
+        if (!(point.at < s)) {
+            continue;
         }
+        const double d = s - point.at;
+        f -= point.force;
+        mx -= point.moment.x() - (ez * point.force.y() - ey * point.force.z());
+        my -= point.moment.y() + point.force.z() * d;
+        mz -= point.moment.z() - point.force.y() * d;
     }
-    return total;
+    return {.n = f.x(),
+            .vy = f.y(),
+            .vz = f.z(),
+            .t = mx + ez * f.y() - ey * f.z(),
+            .my = my,
+            .mz = mz};
+}
+
+ReferencePoint pointOf(const BeamForces& f)
+{
+    return {.n = f.n, .vy = f.vy, .vz = f.vz, .t = f.t, .my = f.my, .mz = f.mz};
 }
 
 std::string issueList(const std::vector<ModelIssue>& issues)
@@ -617,11 +640,11 @@ std::vector<double> StaticProblem::nodeValues(ElementIndex element, int nodes,
     return out;
 }
 
-std::vector<AxialProfile> StaticProblem::profilesOf(const Eigen::VectorXd& values) const
+std::vector<ReferenceProfile> StaticProblem::profilesOf(const Eigen::VectorXd& values) const
 {
     const Mesh& mesh = this->mesh();
     const auto count = static_cast<std::size_t>(mesh.elementCount());
-    std::vector<AxialProfile> profiles(count);
+    std::vector<ReferenceProfile> profiles(count);
     const auto translation = [&](NodeIndex node) {
         Eigen::Vector3d u = Eigen::Vector3d::Zero();
         for (int k = 0; k < 3; ++k) {
@@ -641,11 +664,24 @@ std::vector<AxialProfile> StaticProblem::profilesOf(const Eigen::VectorXd& value
         const Eigen::Vector3d x2 = mesh.nodeCoordinates(ids[1]);
         const ElementKind kind = m_kindOf[e];
         if (!isBeam(kind)) {
-            profiles[e] = AxialProfile::constant(
+            profiles[e] = ReferenceProfile::constant(
                 axialForce(m_bars[e], x1, x2, translation(ids[0]), translation(ids[1])));
             return;
         }
         const BeamData& beam = m_beams.data[e];
+        // The forces at the two Gauss points of `parts` equal parts.
+        const auto sampled = [](int parts, double length, const auto& forcesAt) {
+            ReferenceProfile profile;
+            profile.count = 2 * parts;
+            for (int part = 0; part < parts; ++part) {
+                const auto points = ReferenceProfile::gaussPoints(part, parts, length);
+                for (std::size_t k = 0; k < 2; ++k) {
+                    profile.values.at(2 * static_cast<std::size_t>(part) + k) =
+                        forcesAt(points.at(k));
+                }
+            }
+            return profile;
+        };
         if (m_beams.isIso[e]) {
             ElementNodes nodes;
             nodes.type = ElementType::Line3;
@@ -654,18 +690,12 @@ std::vector<AxialProfile> StaticProblem::profilesOf(const Eigen::VectorXd& value
                 nodes.x.at(k) = mesh.nodeCoordinates(ids[k]);
             }
             const std::vector<double> local = nodeValues(element, 3, values);
-            const double length = m_beams.length[e];
-            const auto points = AxialProfile::gaussPoints(0, 1, length);
-            AxialProfile profile;
-            profile.count = 2;
-            for (std::size_t k = 0; k < 2; ++k) {
-                profile.values.at(k) =
-                    isoBeamAt(m_beams.iso[e], kind, nodes, local, points.at(k)).forces.n;
-            }
-            profiles[e] = profile;
+            profiles[e] = sampled(1, m_beams.length[e], [&](double s) {
+                return pointOf(isoBeamAt(m_beams.iso[e], kind, nodes, local, s).forces);
+            });
             return;
         }
-        // The exact beam: its ends, then N along it.
+        // The exact beam: its ends, then the forces along it.
         const std::vector<double> local = nodeValues(element, 2, values);
         const SpanLoads& loads = m_beams.loads[e];
         const bool planar = kind == ElementKind::Beam2D;
@@ -676,38 +706,37 @@ std::vector<AxialProfile> StaticProblem::profilesOf(const Eigen::VectorXd& value
         exactEndForces(beam, planar, ends, endLoads, start, end);
         const double length = exactLength(beam, x1, x2);
         if (beam.arcLength > 0.0) {
-            // An arc: N turns with the frame (design 008c §5.2).
+            // An arc: the forces turn with the frame (design 008c §5.2).
             const double angle = beam.arcLength * beam.curvature.norm();
-            const int parts = std::clamp(
-                static_cast<int>(std::ceil(angle / (std::numbers::pi / 16.0))), 1, kMaxAxialParts);
-            AxialProfile profile;
-            profile.count = 2 * parts;
-            for (int part = 0; part < parts; ++part) {
-                const auto points = AxialProfile::gaussPoints(part, parts, length);
-                for (std::size_t k = 0; k < 2; ++k) {
-                    profile.values.at(2 * static_cast<std::size_t>(part) + k) =
-                        stateAt(beam, length, loads, planar, ends, points.at(k)).force.x();
-                }
-            }
-            profiles[e] = profile;
+            const int parts =
+                std::clamp(static_cast<int>(std::ceil(angle / (std::numbers::pi / 16.0))), 1,
+                           kMaxReferenceParts);
+            const double ey = beam.shearCentre.x();
+            const double ez = beam.shearCentre.y();
+            profiles[e] = sampled(parts, length, [&](double s) {
+                const BarState state = stateAt(beam, length, loads, planar, ends, s);
+                return ReferencePoint{.n = state.force.x(),
+                                      .vy = state.force.y(),
+                                      .vz = state.force.z(),
+                                      .t = state.moment.x() + ez * state.force.y() -
+                                           ey * state.force.z(),
+                                      .my = state.moment.y(),
+                                      .mz = state.moment.z()};
+            });
             return;
         }
-        if (!hasAxialSpanLoad(loads)) {
-            profiles[e] = AxialProfile::constant(start.n);
+        if (loads.pieces.empty() && loads.points.empty()) {
+            // No span loads: N, V and T constant, the moments linear (one
+            // part, the same count in every iteration).
+            profiles[e] = sampled(1, length,
+                                  [&](double s) { return straightStatics(beam, loads, start, s); });
             return;
         }
-        // A straight bar with axial span loads: N(s) = N(0) - their integral.
+        // A straight bar with span loads: by statics, in 4 parts (design
+        // 008c §5.2, 008d §5.4).
         constexpr int kParts = 4;
-        AxialProfile profile;
-        profile.count = 2 * kParts;
-        for (int part = 0; part < kParts; ++part) {
-            const auto points = AxialProfile::gaussPoints(part, kParts, length);
-            for (std::size_t k = 0; k < 2; ++k) {
-                profile.values.at(2 * static_cast<std::size_t>(part) + k) =
-                    start.n - axialLoadBefore(loads, points.at(k));
-            }
-        }
-        profiles[e] = profile;
+        profiles[e] = sampled(kParts, length,
+                              [&](double s) { return straightStatics(beam, loads, start, s); });
     };
     tbb::task_arena arena(m_options.threads > 0 ? m_options.threads : tbb::task_arena::automatic);
     arena.execute([&] {
@@ -761,12 +790,16 @@ std::optional<BeamResult> StaticProblem::internalMode(ElementIndex element) cons
     return BeamResult(std::move(data));
 }
 
-void StaticProblem::setAxialForces(const std::vector<AxialProfile>& profiles)
+void StaticProblem::setReference(const std::vector<ReferenceProfile>& profiles)
 {
     for (std::size_t e = 0; e < profiles.size(); ++e) {
-        m_beams.data[e].axialForce = profiles[e];
-        m_beams.iso[e].beam.axialForce = profiles[e];
-        m_bars[e].axialForce = profiles[e].at(0.0, 1.0);
+        std::shared_ptr<const ReferenceProfile> reference;
+        if (profiles[e].active()) {
+            reference = std::make_shared<const ReferenceProfile>(profiles[e]);
+        }
+        m_beams.data[e].reference = reference;
+        m_beams.iso[e].beam.reference = reference;
+        m_bars[e].axialForce = profiles[e].axialAt(0.0, 1.0);
     }
 }
 

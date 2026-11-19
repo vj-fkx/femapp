@@ -1,9 +1,13 @@
 // REQ-008c-02 to 04: the bars with the axial force of the reference state
 // (design 008c §5.1 to 5.4).
 
+#include "beam_models.hpp"
+#include "detail/static_stages.hpp"
+
 #include <fem/core/beam_element.hpp>
 #include <fem/core/beam_iso.hpp>
 #include <fem/core/beam_state.hpp>
+#include <fem/core/linear_solver.hpp>
 #include <fem/core/truss_element.hpp>
 
 #include <catch2/catch_test_macros.hpp>
@@ -15,6 +19,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <memory>
 #include <numbers>
 #include <optional>
 #include <utility>
@@ -32,38 +37,38 @@ bool near(double value, double reference, double tolerance)
 // REQ-008c-02, 04: the profile of the axial force along the bar.
 TEST_CASE("the axial force profile", "[core][beam][second-order]")
 {
-    using fem::core::AxialProfile;
+    using fem::core::ReferenceProfile;
     const double length = 4.0;
     SECTION("inactive and constant")
     {
-        const AxialProfile none;
+        const ReferenceProfile none;
         CHECK_FALSE(none.active());
-        CHECK(none.at(1.0, length) == 0.0);
+        CHECK(none.axialAt(1.0, length) == 0.0);
         CHECK(none.largestCompression() == 0.0);
-        const AxialProfile constant = AxialProfile::constant(-3e4);
+        const ReferenceProfile constant = ReferenceProfile::constant(-3e4);
         CHECK(constant.active());
         CHECK(constant.parts() == 1);
-        CHECK(constant.at(2.7, length) == -3e4);
+        CHECK(constant.axialAt(2.7, length) == -3e4);
         CHECK(constant.largestCompression() == 3e4);
-        CHECK(AxialProfile::constant(5.0).largestCompression() == 0.0);
-        CHECK(constant.scaled(2.0).at(0.0, length) == -6e4);
+        CHECK(ReferenceProfile::constant(5.0).largestCompression() == 0.0);
+        CHECK(constant.scaled(2.0).axialAt(0.0, length) == -6e4);
     }
     SECTION("linear within each part, from its Gauss points")
     {
         // N(s) = -1000 + 300 s sampled at the Gauss points of 3 parts: exact.
         const auto n = [](double s) { return -1000.0 + 300.0 * s; };
-        AxialProfile profile;
+        ReferenceProfile profile;
         profile.count = 6;
         for (int part = 0; part < 3; ++part) {
-            const auto points = AxialProfile::gaussPoints(part, 3, length);
+            const auto points = ReferenceProfile::gaussPoints(part, 3, length);
             CHECK(points[0] > part * length / 3);
             CHECK(points[1] < (part + 1) * length / 3);
-            profile.values.at(2 * static_cast<std::size_t>(part)) = n(points[0]);
-            profile.values.at(2 * static_cast<std::size_t>(part) + 1) = n(points[1]);
+            profile.values.at(2 * static_cast<std::size_t>(part)).n = n(points[0]);
+            profile.values.at(2 * static_cast<std::size_t>(part) + 1).n = n(points[1]);
         }
         CHECK(profile.parts() == 3);
         for (const double s : {0.0, 0.4, 1.33, 2.0, 3.1, length}) {
-            CHECK(near(profile.at(s, length), n(s), 1e-12));
+            CHECK(near(profile.axialAt(s, length), n(s), 1e-12));
         }
         // The largest compression is at the start, beyond the first point.
         CHECK(near(profile.largestCompression(), 1000.0, 1e-12));
@@ -85,7 +90,8 @@ fem::core::BeamData bar(double n, bool timoshenko = false)
     if (timoshenko) {
         beam.shearY = beam.shearZ = 4e7;
     }
-    beam.axialForce = fem::core::AxialProfile::constant(n);
+    beam.reference = std::make_shared<const fem::core::ReferenceProfile>(
+        fem::core::ReferenceProfile::constant(n));
     return beam;
 }
 
@@ -135,7 +141,7 @@ TEST_CASE("the exact bar with an axial force", "[core][beam][second-order]")
     SECTION("no axial force is the bar of the 008b")
     {
         fem::core::BeamData first = bar(0.0);
-        first.axialForce = {};
+        first.reference = nullptr;
         const StateBarMatrices linear = fem::core::stateBarMatrices(first, l, none, false);
         const StateBarMatrices zero = fem::core::stateBarMatrices(bar(0.0), l, none, false);
         CHECK((zero.stiffness - linear.stiffness).norm() <= 1e-12 * linear.stiffness.norm());
@@ -355,16 +361,16 @@ namespace {
 
 // A profile of `parts` parts sampled from n(s) at the Gauss points.
 template <typename F>
-fem::core::AxialProfile sampled(const F& n, int parts, double length)
+std::shared_ptr<const fem::core::ReferenceProfile> sampled(const F& n, int parts, double length)
 {
-    fem::core::AxialProfile profile;
+    fem::core::ReferenceProfile profile;
     profile.count = 2 * parts;
     for (int part = 0; part < parts; ++part) {
-        const auto points = fem::core::AxialProfile::gaussPoints(part, parts, length);
-        profile.values.at(2 * static_cast<std::size_t>(part)) = n(points[0]);
-        profile.values.at(2 * static_cast<std::size_t>(part) + 1) = n(points[1]);
+        const auto points = fem::core::ReferenceProfile::gaussPoints(part, parts, length);
+        profile.values.at(2 * static_cast<std::size_t>(part)).n = n(points[0]);
+        profile.values.at(2 * static_cast<std::size_t>(part) + 1).n = n(points[1]);
     }
-    return profile;
+    return std::make_shared<const fem::core::ReferenceProfile>(profile);
 }
 
 // Greenhill's column (a cantilever under its own weight q per length):
@@ -401,7 +407,7 @@ TEST_CASE("an axial force that varies along the bar", "[core][beam][second-order
     SECTION("equal values are the constant profile")
     {
         fem::core::BeamData varying = bar(0.0, true);
-        varying.axialForce = sampled([](double) { return -4e5; }, 3, l);
+        varying.reference = sampled([](double) { return -4e5; }, 3, l);
         const StateBarMatrices a = fem::core::stateBarMatrices(varying, l, none, false);
         const StateBarMatrices b = fem::core::stateBarMatrices(bar(-4e5, true), l, none, false);
         CHECK((a.stiffness - b.stiffness).norm() <= 1e-10 * b.stiffness.norm());
@@ -410,9 +416,9 @@ TEST_CASE("an axial force that varies along the bar", "[core][beam][second-order
     {
         const auto n = [l](double s) { return -6e5 + 2e5 * s / l; };
         fem::core::BeamData one = bar(0.0);
-        one.axialForce = sampled(n, 1, l);
+        one.reference = sampled(n, 1, l);
         fem::core::BeamData three = bar(0.0);
-        three.axialForce = sampled(n, 3, l);
+        three.reference = sampled(n, 3, l);
         const StateBarMatrices a = fem::core::stateBarMatrices(one, l, none, true);
         const StateBarMatrices b = fem::core::stateBarMatrices(three, l, none, true);
         CHECK((a.stiffness - b.stiffness).norm() <= 1e-8 * b.stiffness.norm());
@@ -426,7 +432,7 @@ TEST_CASE("an axial force that varies along the bar", "[core][beam][second-order
         const auto unstable = [&](double beta) {
             const double q = beta * ei / (l * l * l);
             fem::core::BeamData beam = bar(0.0);
-            beam.axialForce = sampled([&](double s) { return -q * (l - s); }, 1, l);
+            beam.reference = sampled([&](double s) { return -q * (l - s); }, 1, l);
             const StateBarMatrices m = fem::core::stateBarMatrices(beam, l, none, true);
             const Eigen::Matrix3d k22 = m.stiffness.bottomRightCorner(3, 3);
             const Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> eigen(k22);
@@ -703,7 +709,7 @@ TEST_CASE("the arc with an axial force", "[core][beam][second-order][arc]")
     const double length = r * std::numbers::pi / 2;
     const auto n = [length](double s) { return -2e5 * (1.0 + 0.5 * s / length); };
     fem::core::BeamData arc = bar(0.0);
-    arc.axialForce = sampled(n, 8, length);
+    arc.reference = sampled(n, 8, length);
     arc.curvature = Eigen::Vector3d(0.0, 0.0, 1.0 / r);
     arc.arcLength = length;
     arc.endAxes = turned(std::numbers::pi / 2);
@@ -740,4 +746,60 @@ TEST_CASE("negative eigenvalues of a small symmetric matrix", "[core][beam][seco
     const StateBarMatrix rotated = q * values.asDiagonal() * q.transpose();
     CHECK(fem::core::negativeEigenvalues(rotated) == 3);
     CHECK(fem::core::negativeEigenvalues(StateBarMatrix::Zero(0, 0)) == 0);
+}
+
+// REQ-008d-10 (design 008d §5.4): the reference state of a straight
+// cantilever along x under a uniform load q (local -y), a tip force P
+// (local z) and a tip torque T, from the linear solution: the six forces
+// at the Gauss points of its parts against the equilibrium of the free part
+// [s, L] (BeamForces: the forces on the face of normal +x).
+TEST_CASE("the reference state has the six forces", "[core][beam][second-order]")
+{
+    using fem::core::test::beamModel;
+    using fem::core::test::fixAll;
+    using fem::core::test::TrussSpec;
+    const double l = 4.0;
+    const double q = 2.0e3;
+    const double p = 1.5e3;
+    const double torque = 7.0e2;
+    TrussSpec spec;
+    spec.nodes = {{0.0, 0.0, 0.0}, {l, 0.0, 0.0}};
+    spec.bars = {{0, 1}};
+    fem::core::Model model = beamModel(spec, fem::core::ElementKind::Beam3D);
+    fixAll(model, {1}, fem::core::ElementKind::Beam3D);
+    model.distributedLoads.push_back({.elements = fem::core::ElementIds{{1}},
+                                      .axes = fem::core::Axes::Local,
+                                      .startValue = Eigen::Vector3d(0.0, -q, 0.0),
+                                      .endValue = Eigen::Vector3d(0.0, -q, 0.0)});
+    model.nodalForces.push_back({.nodes = fem::core::NodeIds{{2}},
+                                 .force = Eigen::Vector3d(0.0, -p, 0.0),
+                                 .moment = Eigen::Vector3d(torque, 0.0, 0.0)});
+    auto prepared = fem::core::detail::StaticProblem::prepare(model, {}, true);
+    REQUIRE(prepared.has_value());
+    const fem::core::detail::StaticProblem& problem = **prepared;
+    auto system = problem.assemble();
+    REQUIRE(system.has_value());
+    fem::core::SparseCholesky solver;
+    REQUIRE(solver.factorize(system->matrix).has_value());
+    const auto free = solver.solve(system->rhs);
+    REQUIRE(free.has_value());
+    const auto profiles = problem.profilesOf(problem.valuesOf(*free));
+    const fem::core::ReferenceProfile& profile = profiles.at(0);
+    REQUIRE(profile.count == 8); // 4 parts: a span load
+    // The local axes of a bar along x: y = global Z, z = -global Y. The
+    // free part [s, L] carries q (L - s) along -y and P along +z (the force
+    // -P along global Y) and T: the forces on the face are their resultant,
+    // the moments their moment about the section.
+    for (int part = 0; part < 4; ++part) {
+        for (const double s : fem::core::ReferenceProfile::gaussPoints(part, 4, l)) {
+            const fem::core::ReferencePoint f = profile.at(s, l);
+            const double a = l - s;
+            CHECK(std::abs(f.n) <= 1e-9 * q * l);
+            CHECK(near(f.vy, -q * a, 1e-10));
+            CHECK(near(f.vz, p, 1e-10));
+            CHECK(near(f.t, torque, 1e-10));
+            CHECK(near(f.my, -p * a, 1e-10));
+            CHECK(near(f.mz, -q * a * a / 2.0, 1e-10));
+        }
+    }
 }

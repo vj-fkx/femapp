@@ -7,6 +7,7 @@
 #include <array>
 #include <cstddef>
 #include <limits>
+#include <memory>
 #include <optional>
 #include <span>
 
@@ -31,29 +32,60 @@ using StateBarMatrix =
     Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, kMaxStateDofs, kMaxStateDofs>;
 using StateBarVector = Eigen::Matrix<double, Eigen::Dynamic, 1, 0, kMaxStateDofs, 1>;
 
-// REQ-008c-02, 04: the axial force of the reference state along the
-// flexible length, tension positive (design 008c §5.2). count 0: none
-// (first order); 1: constant; otherwise 2 per part of parts() equal parts,
-// at the two Gauss points of each, and N linear within a part.
-inline constexpr int kMaxAxialParts = 32;
-struct AxialProfile
+// Feature 008d (design 008d §5.4): the internal forces of the reference
+// state at a point, in the convention of BeamForces (N tension positive,
+// T about the shear centre).
+struct ReferencePoint
+{
+    double n = 0.0;
+    double vy = 0.0;
+    double vz = 0.0;
+    double t = 0.0;
+    double my = 0.0;
+    double mz = 0.0;
+
+    [[nodiscard]] ReferencePoint operator*(double factor) const
+    {
+        return {.n = n * factor,
+                .vy = vy * factor,
+                .vz = vz * factor,
+                .t = t * factor,
+                .my = my * factor,
+                .mz = mz * factor};
+    }
+};
+
+// REQ-008c-02, 04, 008d-10: the reference state along the flexible length
+// (design 008c §5.2, 008d §5.4). count 0: none (first order); 1: constant;
+// otherwise 2 per part of parts() equal parts, at the two Gauss points of
+// each, every force linear within a part. loadFactor multiplies the span
+// loads in the terms of the second order (1 in the second order, lambda in
+// the buckling).
+inline constexpr int kMaxReferenceParts = 32;
+struct ReferenceProfile
 {
     int count = 0;
-    std::array<double, std::size_t{2} * kMaxAxialParts> values{};
+    std::array<ReferencePoint, std::size_t{2} * kMaxReferenceParts> values{};
+    double loadFactor = 0.0;
 
-    [[nodiscard]] static AxialProfile constant(double n);
+    [[nodiscard]] static ReferenceProfile constant(double n);
+    [[nodiscard]] static ReferenceProfile constant(const ReferencePoint& point);
     // The two Gauss points of part `part` of `parts` equal parts of
     // [0, length].
     [[nodiscard]] static std::array<double, 2> gaussPoints(int part, int parts, double length);
 
     [[nodiscard]] bool active() const { return count > 0; }
     [[nodiscard]] int parts() const { return count > 1 ? count / 2 : 1; }
-    // N at s in [0, length]; 0 when inactive.
-    [[nodiscard]] double at(double s, double length) const;
+    // The forces at s in [0, length]; zero when inactive.
+    [[nodiscard]] ReferencePoint at(double s, double length) const;
+    [[nodiscard]] double axialAt(double s, double length) const { return at(s, length).n; }
+    // Whether N changes along the bar (the other forces may vary with N
+    // constant: a beam whose moments vary).
+    [[nodiscard]] bool axialVaries() const;
     // The largest compression, >= 0, including the ends of the parts.
     [[nodiscard]] double largestCompression() const;
-    // The same profile with every value times `factor`.
-    [[nodiscard]] AxialProfile scaled(double factor) const;
+    // The same profile with every force (and the load factor) times `factor`.
+    [[nodiscard]] ReferenceProfile scaled(double factor) const;
 };
 
 // What a beam needs, resolved from the model (design 008 §5.3, 5.4). All in
@@ -93,10 +125,14 @@ struct BeamData
     Eigen::Matrix3d endAxes = Eigen::Matrix3d::Identity();
     // > 0: the flexible length along an arc (design 008b §5.2).
     double arcLength = 0.0;
-    // Feature 008c: the axial force of the reference state, for the second
-    // order and the buckling (design 008c §5.1, 5.2).
-    AxialProfile axialForce;
+    // Features 008c, 008d: the reference state, for the second order and the
+    // buckling (design 008c §5.1, 5.2, 008d §5.4); null: first order. Shared:
+    // the copies of the data (results, modes) do not repeat it.
+    std::shared_ptr<const ReferenceProfile> reference;
 };
+
+// The reference state of a beam, or an inactive one.
+[[nodiscard]] const ReferenceProfile& referenceOf(const BeamData& beam);
 
 // REQ-008-09, 10: local axes of a bar from x1 to x2, as columns (x, y, z).
 // 3D: y is the part of the reference normal to the bar (default global Z,

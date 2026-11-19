@@ -18,24 +18,29 @@ constexpr double kGaussHigh = 0.5 + 0.28867513459481288225;
 
 } // namespace
 
-AxialProfile AxialProfile::constant(double n)
+ReferenceProfile ReferenceProfile::constant(double n)
 {
-    AxialProfile profile;
+    return constant(ReferencePoint{.n = n});
+}
+
+ReferenceProfile ReferenceProfile::constant(const ReferencePoint& point)
+{
+    ReferenceProfile profile;
     profile.count = 1;
-    profile.values[0] = n;
+    profile.values[0] = point;
     return profile;
 }
 
-std::array<double, 2> AxialProfile::gaussPoints(int part, int parts, double length)
+std::array<double, 2> ReferenceProfile::gaussPoints(int part, int parts, double length)
 {
     const double h = length / parts;
     return {(part + kGaussLow) * h, (part + kGaussHigh) * h};
 }
 
-double AxialProfile::at(double s, double length) const
+ReferencePoint ReferenceProfile::at(double s, double length) const
 {
     if (count == 0) {
-        return 0.0;
+        return {};
     }
     if (count == 1) {
         return values[0];
@@ -44,33 +49,57 @@ double AxialProfile::at(double s, double length) const
     const double h = length / n;
     const int part = std::clamp(static_cast<int>(std::floor(s / h)), 0, n - 1);
     const double xi = s / h - part;
-    const double low = values.at(2 * static_cast<std::size_t>(part));
-    const double high = values.at(2 * static_cast<std::size_t>(part) + 1);
-    return low + (high - low) * (xi - kGaussLow) / (kGaussHigh - kGaussLow);
+    const ReferencePoint& low = values.at(2 * static_cast<std::size_t>(part));
+    const ReferencePoint& high = values.at(2 * static_cast<std::size_t>(part) + 1);
+    const double w = (xi - kGaussLow) / (kGaussHigh - kGaussLow);
+    return {.n = low.n + (high.n - low.n) * w,
+            .vy = low.vy + (high.vy - low.vy) * w,
+            .vz = low.vz + (high.vz - low.vz) * w,
+            .t = low.t + (high.t - low.t) * w,
+            .my = low.my + (high.my - low.my) * w,
+            .mz = low.mz + (high.mz - low.mz) * w};
 }
 
-double AxialProfile::largestCompression() const
+double ReferenceProfile::largestCompression() const
 {
     double smallest = 0.0;
     if (count == 1) {
-        smallest = values[0];
+        smallest = values[0].n;
     }
     for (int part = 0; count > 1 && part < parts(); ++part) {
-        const double low = values.at(2 * static_cast<std::size_t>(part));
-        const double high = values.at(2 * static_cast<std::size_t>(part) + 1);
+        const double low = values.at(2 * static_cast<std::size_t>(part)).n;
+        const double high = values.at(2 * static_cast<std::size_t>(part) + 1).n;
         const double slope = (high - low) / (kGaussHigh - kGaussLow);
         smallest = std::min({smallest, low - slope * kGaussLow, low + slope * (1.0 - kGaussLow)});
     }
     return std::max(0.0, -smallest);
 }
 
-AxialProfile AxialProfile::scaled(double factor) const
+ReferenceProfile ReferenceProfile::scaled(double factor) const
 {
-    AxialProfile out = *this;
+    ReferenceProfile out = *this;
     for (int i = 0; i < count; ++i) {
-        out.values.at(static_cast<std::size_t>(i)) *= factor;
+        out.values.at(static_cast<std::size_t>(i)) =
+            values.at(static_cast<std::size_t>(i)) * factor;
     }
+    out.loadFactor = loadFactor * factor;
     return out;
+}
+
+bool ReferenceProfile::axialVaries() const
+{
+    for (int i = 1; i < count; ++i) {
+        if (values.at(static_cast<std::size_t>(i)).n != values[0].n) {
+            return true;
+        }
+    }
+    return false;
+}
+
+const ReferenceProfile& referenceOf(const BeamData& beam)
+{
+    static const ReferenceProfile kNone{};
+    return beam.reference ? *beam.reference : kNone;
 }
 
 namespace {

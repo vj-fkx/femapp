@@ -68,18 +68,18 @@ Eigen::VectorXd times(const SparseMatrix& lower, const Eigen::VectorXd& x)
 class Pencil
 {
 public:
-    Pencil(StaticProblem& problem, std::vector<AxialProfile> reference)
+    Pencil(StaticProblem& problem, std::vector<ReferenceProfile> reference)
         : m_problem(problem)
         , m_reference(std::move(reference))
     {}
 
     [[nodiscard]] Expected<SparseMatrix> at(double lambda, std::int64_t* internal = nullptr)
     {
-        std::vector<AxialProfile> scaled(m_reference.size());
+        std::vector<ReferenceProfile> scaled(m_reference.size());
         for (std::size_t e = 0; e < scaled.size(); ++e) {
             scaled[e] = m_reference[e].scaled(lambda);
         }
-        m_problem.setAxialForces(scaled);
+        m_problem.setReference(scaled);
         auto system = m_problem.assemble();
         if (!system) {
             return tl::unexpected(system.error());
@@ -92,7 +92,7 @@ public:
 
 private:
     StaticProblem& m_problem;
-    std::vector<AxialProfile> m_reference;
+    std::vector<ReferenceProfile> m_reference;
 };
 
 // J(lambda): the factors below lambda (design 008c §5.4); the factorization
@@ -257,10 +257,10 @@ Expected<BucklingResult> runLinearBuckling(const Model& model, const BucklingOpt
     if (!linear) {
         return tl::unexpected(linear.error());
     }
-    std::vector<AxialProfile> reference = problem.profilesOf(problem.valuesOf(*linear));
+    std::vector<ReferenceProfile> reference = problem.profilesOf(problem.valuesOf(*linear));
     // REQ-008c-12: no compression, no buckling.
-    if (std::ranges::none_of(reference,
-                             [](const AxialProfile& p) { return p.largestCompression() > 0.0; })) {
+    if (std::ranges::none_of(
+            reference, [](const ReferenceProfile& p) { return p.largestCompression() > 0.0; })) {
         return makeError("No bar is compressed by these loads: there is no buckling factor.");
     }
     Pencil pencil(problem, reference);
@@ -531,11 +531,11 @@ Expected<BucklingResult> runLinearBuckling(const Model& model, const BucklingOpt
         if (scale != 0.0) {
             values /= scale;
         }
-        std::vector<AxialProfile> scaled(reference.size());
+        std::vector<ReferenceProfile> scaled(reference.size());
         for (std::size_t e = 0; e < scaled.size(); ++e) {
             scaled[e] = reference[e].scaled(factor.lambda);
         }
-        problem.setAxialForces(scaled);
+        problem.setReference(scaled);
         auto shape = problem.recover(values, false);
         if (!shape) {
             return tl::unexpected(shape.error());

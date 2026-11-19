@@ -37,7 +37,7 @@ using StateMatrix =
 // for a straight bar without warping nor foundation). A curved bar has the
 // constant turn rate BeamData::curvature; the dofs of each end are in the
 // local axes at that end.
-// Feature 008c: with the axial force of `beam.axialForce`, the second-order
+// Feature 008c: with the axial force of `beam.reference`, the second-order
 // bar (design 008c §5.1), and the negative pivots met when condensing its
 // parts, for the Sturm count (§5.4); kUnstableBar when the compression is
 // beyond the shear buckling of any part (|N| near G As) or needs more

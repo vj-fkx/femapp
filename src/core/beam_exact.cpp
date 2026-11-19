@@ -282,7 +282,7 @@ void addOffsetGeometry(const BeamData& beam, ElementKind kind, double length,
             continue;
         }
         const Eigen::Vector3d axis = (end == 0 ? beam.axes : beam.endAxes).col(0);
-        const double n = beam.axialForce.at(end == 0 ? 0.0 : length, length);
+        const double n = referenceOf(beam).axialAt(end == 0 ? 0.0 : length, length);
         const Eigen::Vector3d force = (end == 0 ? n : -n) * axis;
         const Eigen::Matrix3d g = force.dot(e) * Eigen::Matrix3d::Identity() -
                                   0.5 * (force * e.transpose() + e * force.transpose());
@@ -344,7 +344,7 @@ Expected<void> ExactBeamElement::compute(const ElementNodes& nodes, ElementIndex
     }
     const StateBarMatrices bar = stateBarMatrices(beam, length, m_loads[index], planarKind(m_kind));
     const Layout layout = layoutOf(beam, m_kind);
-    const bool second = beam.axialForce.active();
+    const bool second = referenceOf(beam).active();
     const ExactConnections connections(layout, bar.stiffness, bar.loads, second);
     SystemMatrix k;
     SystemVector f;
@@ -368,7 +368,8 @@ StateBarVector exactBeamEnds(const BeamData& beam, ElementKind kind, const SpanL
     const double length = exactLength(beam, x1, x2);
     const StateBarMatrices bar = stateBarMatrices(beam, length, loads, planarKind(kind));
     const Layout layout = layoutOf(beam, kind);
-    const ExactConnections connections(layout, bar.stiffness, bar.loads, beam.axialForce.active());
+    const ExactConnections connections(layout, bar.stiffness, bar.loads,
+                                       referenceOf(beam).active());
     const SystemMatrix t = nodesToExternal(beam, kind, layout);
     SystemVector values(t.cols());
     for (Eigen::Index i = 0; i < t.cols(); ++i) {

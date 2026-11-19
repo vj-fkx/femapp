@@ -117,7 +117,7 @@ Regras:
 
 ## Fase 3 — Perfil de referência completo
 
-- [ ] **T13** `ReferenceProfile` (design §5.4) no lugar do `AxialProfile`:
+- [x] **T13** `ReferenceProfile` (design §5.4) no lugar do `AxialProfile`:
   - seis esforços nos pontos de Gauss das partes, mais o `loadFactor`;
   - num `shared_ptr<const>` em `BeamData`;
   - `profilesOf` com os seis esforços (estática exata na reta, `stateAt`
@@ -320,3 +320,11 @@ Regras:
   design, ajustado). As forças fixas no espaço sobre arcos entram no motor
   por grupos de mesmo ponto, cada um com o torque P × c nos estados
   aumentados.
+- T13: o perfil de referência guarda os seis esforços; o motor só usa N, e
+  só trata N como variável onde ele varia (`axialVaries`), para que vigas
+  com momento variável e N constante continuem no caminho constante da
+  008c. Na reta, os esforços saem da estática exata (esforços de ponta e
+  integrais das cargas), sem `stateAt`; sem cargas no vão, uma parte (M
+  linear), com cargas, 4. A segunda ordem ainda itera só N (a T21 itera
+  os seis). Os testes do `core` passam a ver `src/core` (os estágios da
+  análise em `detail/`), como os do `io` e do `render`.
