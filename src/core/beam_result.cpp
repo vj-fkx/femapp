@@ -429,7 +429,19 @@ std::vector<PointStress> sectionStresses(const SectionSolution& solution, const 
             stress.shear +=
                 std::abs(forces.vz) * point.firstMomentZ / (p.inertiaY * point.thicknessZ);
         }
-        stress.shear += std::abs(forces.t) * point.torsionFactor;
+        // REQ-008d-09: with warping, the Saint-Venant part of the torque
+        // twists the walls and the warping part shears them.
+        const bool warps = forces.b != 0.0 || forces.tw != 0.0;
+        stress.shear += std::abs(warps ? forces.tsv : forces.t) * point.torsionFactor;
+        if (p.warpingConstant > 0.0) {
+            stress.warpingNormal = forces.b * point.sectorial / p.warpingConstant;
+            stress.normal += stress.warpingNormal;
+            if (point.sectorialThickness > 0.0) {
+                stress.warpingShear = std::abs(forces.tw) * point.sectorialMoment /
+                                      (p.warpingConstant * point.sectorialThickness);
+                stress.shear += stress.warpingShear;
+            }
+        }
         stress.vonMises =
             std::sqrt(stress.normal * stress.normal + 3.0 * stress.shear * stress.shear);
         stresses.push_back(std::move(stress));

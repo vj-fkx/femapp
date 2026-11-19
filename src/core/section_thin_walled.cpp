@@ -77,6 +77,13 @@ public:
         const double theta = principalAngle(m_geometry.iy, m_geometry.iz, m_geometry.iyz);
         out.shearAreaY = shearArea(theta, true, out.shearFlowY);
         out.shearAreaZ = shearArea(theta, false, out.shearFlowZ);
+        // REQ-008d-09: the warping flow of a unit warping torque, from omega
+        // and Iw as the shear flow is from y' and Iz.
+        if (m_warping > 0.0) {
+            (void)flows(m_omega, m_warping, out.warpingFlow);
+        } else {
+            out.warpingFlow.assign(wallCount(), {0.0, 0.0});
+        }
         out.torsionFlow = m_wallTorsionFlow;
         out.inCell = m_inCell;
         return out;
@@ -394,6 +401,18 @@ private:
         if (!(inertia > 1e-14 * m_geometry.area * m_geometry.area)) {
             return 0.0; // no inertia across a straight section: no shear area
         }
+        return 1.0 / flows(f, inertia, endFlows);
+    }
+
+    // The flow of a unit force for the field f linear along each wall
+    // (a principal coordinate, or omega) and its "inertia" (integral of
+    // f^2 t ds): open on the tree with the cell walls cut at their `to`
+    // end, closed by circulating flows of no twist. Returns the integral of
+    // q^2 / t ds.
+    [[nodiscard]] double flows(const std::vector<double>& f, double inertia,
+                               std::vector<std::array<double, 2>>& endFlows) const
+    {
+        endFlows.assign(wallCount(), {0.0, 0.0});
         // Open flows, toward the inner end of each wall: q(s) = q_outer -
         // (t / I) integral of f ds from the outer end.
         std::vector<std::size_t> outer(wallCount());
@@ -455,7 +474,7 @@ private:
             }
             energy += integral * length(w) / thickness(w);
         }
-        return 1.0 / energy;
+        return energy;
     }
 
     const ThinWalled& m_shape;

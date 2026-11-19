@@ -4,7 +4,9 @@
 
 #include "beam_models.hpp"
 
+#include <fem/core/beam_result.hpp>
 #include <fem/core/model.hpp>
+#include <fem/core/section.hpp>
 #include <fem/core/static_analysis.hpp>
 
 #include <catch2/catch_test_macros.hpp>
@@ -449,5 +451,46 @@ TEST_CASE("warping on a torsional foundation", "[core][beam][warping]")
                                   ? fem::core::test::beamOf(result, 0).at(length / 2.0).rotation.x()
                                   : result.rotations[1].x();
         CHECK(near(middle, expected, 1e-8));
+    }
+}
+
+// REQ-008d-09 (AC-4): the stresses at the root of an I cantilever with its
+// warping restrained there and a torque T at the tip: B(0) = -T tanh(kL) / k
+// gives sigma_w = B h0 bf / (4 Iw) at the flange tips, and all the torque is
+// warping torque, tau_w = 1.5 T / (h0 bf tf) at the flange centres.
+TEST_CASE("the warping stresses at the root of an I cantilever", "[core][beam][warping]")
+{
+    const double h = 0.3;
+    const double bf = 0.15;
+    const double tf = 0.012;
+    const double tw = 0.008;
+    const double h0 = h - tf;
+    const double length = 2.0;
+    const double torque = 1.0e3;
+    Model model = warpingBeam(1, length, 1.0);
+    model.sections.front() = {.name = "S",
+                              .shape = fem::core::ISection{.h = h, .bf = bf, .tf = tf, .tw = tw}};
+    fem::core::test::fixAll(model, {1}, ElementKind::Beam3D);
+    model.warpingEnds.push_back({.elements = ElementIds{{1}},
+                                 .end = BarEnd::Start,
+                                 .condition = WarpingCondition::Restrained});
+    model.nodalForces.push_back(
+        {.nodes = NodeIds{{2}}, .moment = Eigen::Vector3d(torque, 0.0, 0.0)});
+    const auto properties = fem::core::sectionProperties(model.sections.front());
+    REQUIRE(properties.has_value());
+    const double iw = properties->warpingConstant;
+    const double k = std::sqrt(kG * properties->torsionConstant / (kE * iw));
+    const fem::core::StaticResult result = fem::core::test::solve(model);
+    const fem::core::BeamForces root = fem::core::test::beamOf(result, 0).start();
+    const double b0 = -torque * std::tanh(k * length) / k;
+    CHECK(near(root.b, b0, 1e-8));
+    for (const auto& s : fem::core::sectionStresses(model.sections.front(), root)) {
+        INFO(s.name);
+        if (s.name.starts_with("corner")) {
+            CHECK(near(std::abs(s.warpingNormal), std::abs(b0) * h0 * bf / (4 * iw), 1e-8));
+        }
+        if (s.name == "top flange centre") {
+            CHECK(near(s.warpingShear, 1.5 * torque / (h0 * bf * tf), 1e-8));
+        }
     }
 }

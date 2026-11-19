@@ -49,6 +49,8 @@ struct ThinWalledData
     // flow of a unit shear force along y' and along z' (REQ-008b-06).
     std::vector<std::array<double, 2>> shearFlowY;
     std::vector<std::array<double, 2>> shearFlowZ;
+    // REQ-008d-09: the same for a unit warping torque Tw (S_omega / Iw).
+    std::vector<std::array<double, 2>> warpingFlow;
     // Per wall: the torsion flow of the cells for a unit twist rate and G = 1
     // (0 on the open branches), and whether the wall is in a cell.
     std::vector<double> torsionFlow;

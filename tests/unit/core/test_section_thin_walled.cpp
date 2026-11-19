@@ -374,3 +374,81 @@ TEST_CASE("stresses of thin-walled sections", "[core][section][thin]")
     CHECK(near(stressNamed(tube, torque, "wall 2 start, face -").shear,
                50.0 / (2 * 0.29 * 0.19 * 0.01), 1e-12));
 }
+
+// REQ-008d-09 (AC-4): the stresses of warping, sigma_w = B omega / Iw and
+// tau_w = Tw S_omega / (Iw t), in the parametric I and channel and in the
+// thin-walled I, against the flange formulas: with the flange shear force
+// Vf = Tw / h0, tau_w at the centre of an I flange is 1.5 Vf / (bf tf), and
+// sigma_w at its tips B h0 bf / (4 Iw).
+TEST_CASE("warping stresses of open sections", "[core][section][thin][warping]")
+{
+    const double bf = 0.2;
+    const double h0 = 0.4;
+    const double tf = 0.015;
+    const double tw = 0.01;
+    const double bimoment = 3.0e3;
+    const double warpingTorque = 2.0e3;
+    const fem::core::BeamForces forces{
+        .t = warpingTorque, .b = bimoment, .tsv = 0.0, .tw = warpingTorque};
+    const auto largest = [](const std::vector<fem::core::PointStress>& stresses, bool normal) {
+        double value = 0.0;
+        for (const auto& s : stresses) {
+            value = std::max(value, std::abs(normal ? s.warpingNormal : s.warpingShear));
+        }
+        return value;
+    };
+    SECTION("the parametric I")
+    {
+        const Section section{
+            .name = "I", .shape = fem::core::ISection{.h = h0 + tf, .bf = bf, .tf = tf, .tw = tw}};
+        const double iw = tf * std::pow(bf, 3) * h0 * h0 / 24;
+        const auto stresses = fem::core::sectionStresses(section, forces);
+        for (const auto& s : stresses) {
+            INFO(s.name);
+            if (s.name.starts_with("corner")) {
+                CHECK(near(std::abs(s.warpingNormal), bimoment * h0 * bf / (4 * iw), 1e-10));
+            }
+            if (s.name == "top flange centre") {
+                CHECK(near(s.warpingShear, 1.5 * warpingTorque / (h0 * bf * tf), 1e-10));
+                CHECK(std::abs(s.warpingNormal) <= 1e-10 * bimoment * h0 * bf / iw);
+            }
+            if (s.name == "web centre") {
+                CHECK(std::abs(s.warpingShear) <= 1e-10 * warpingTorque / (h0 * bf * tf));
+            }
+        }
+    }
+    SECTION("the thin-walled I")
+    {
+        const ThinWalled i{
+            .points = {Vec(h0 / 2, -bf / 2), Vec(h0 / 2, 0.0), Vec(h0 / 2, bf / 2),
+                       Vec(-h0 / 2, -bf / 2), Vec(-h0 / 2, 0.0), Vec(-h0 / 2, bf / 2)},
+            .walls = {Wall{.from = 0, .to = 1, .t = tf}, Wall{.from = 1, .to = 2, .t = tf},
+                      Wall{.from = 3, .to = 4, .t = tf}, Wall{.from = 4, .to = 5, .t = tf},
+                      Wall{.from = 1, .to = 4, .t = tw}}};
+        const double iw = of(i).warpingConstant;
+        const auto stresses = fem::core::sectionStresses(Section{.name = "T", .shape = i}, forces);
+        CHECK(near(largest(stresses, false), 1.5 * warpingTorque / (h0 * bf * tf), 1e-10));
+        CHECK(near(largest(stresses, true), bimoment * h0 * bf / (4 * iw), 1e-10));
+    }
+    SECTION("the channel: parametric and thin-walled agree at the web")
+    {
+        const double b = 0.07;
+        const double h = 0.19;
+        const auto points = fem::core::stressPoints(
+            fem::core::Channel{.h = h + tf, .bf = b + tw / 2, .tf = tf, .tw = tw});
+        const auto thin = fem::core::stressPoints(channel(b, h, tf, tw));
+        double atWeb = 0.0;
+        for (const auto& point : points) {
+            if (point.name == "web back +y") {
+                atWeb = point.sectorialMoment;
+            }
+        }
+        double largestThin = 0.0;
+        for (const auto& point : thin) {
+            largestThin = std::max(largestThin, point.sectorialMoment);
+        }
+        const double e = 3 * b * b * tf / (6 * b * tf + h * tw);
+        CHECK(near(atWeb, tf * b * h * (b - 2 * e) / 4, 1e-12));
+        CHECK(near(largestThin, atWeb, 1e-10));
+    }
+}

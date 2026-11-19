@@ -168,6 +168,11 @@ struct StressPoint
     // normalised (integral of omega dA = 0), with d omega = y dz - z dy along
     // the mid-line; the warping displacement is -omega theta'.
     double sectorial = 0.0;
+    // REQ-008d-09: the sectorial first moment S_omega (the integral of
+    // omega t ds from a free end) and the wall thickness there, for the
+    // shear of the warping torque, tau_w = Tw S_omega / (Iw t).
+    double sectorialMoment = 0.0;
+    double sectorialThickness = 0.0;
 };
 
 namespace detail {

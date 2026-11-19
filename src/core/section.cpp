@@ -562,6 +562,9 @@ public:
         add("web centre", 0.0, 0.0, qy, s.tw, 0.0, 0.0, s.tw / j);
         add("top flange centre", s.h / 2 - s.tf / 2, 0.0, 0.0, 0.0, s.tf * s.bf * s.bf / 8, s.tf,
             s.tf / j);
+        // The warping flow of a flange is largest at its centre:
+        // S_omega = tf bf^2 h0 / 16 (zero at the tips and in the web).
+        warpingShear(s.tf * s.bf * s.bf * (s.h - s.tf) / 16.0, s.tf);
         return std::move(m_points);
     }
 
@@ -588,9 +591,14 @@ public:
             add("flange tip " + side, y, s.bf, 0.0, 0.0, 0.0, 0.0, s.tf / j,
                 sign * (b - e) * h0 / 2);
             add("web back " + side, y, 0.0, 0.0, 0.0, 0.0, 0.0, s.tw / j, -sign * e * h0 / 2);
+            // From the tip, omega goes linearly from (b - e) h0 / 2 to
+            // -e h0 / 2 along the flange.
+            warpingShear(s.tf * b * h0 * (b - 2.0 * e) / 4.0, s.tw);
         }
         const double qy = s.bf * s.tf * (s.h - s.tf) / 2 + s.tw * std::pow(s.h / 2 - s.tf, 2) / 2;
         add("web centre", 0.0, s.tw / 2, qy, s.tw, 0.0, 0.0, s.tw / j);
+        // Then down the web to its centre, where omega is 0.
+        warpingShear(s.tf * b * h0 * (b - 2.0 * e) / 4.0 - s.tw * e * h0 * h0 / 8.0, s.tw);
         return std::move(m_points);
     }
 
@@ -623,6 +631,7 @@ public:
                         q.x(), q.y(), std::abs(thin->shearFlowY[w].at(e)) * m_p.inertiaZ, wall.t,
                         std::abs(thin->shearFlowZ[w].at(e)) * m_p.inertiaY, wall.t, torsion,
                         thin->sectorial[point]);
+                    warpingShear(thin->warpingFlow[w].at(e) * m_p.warpingConstant, wall.t);
                 }
             }
         }
@@ -681,6 +690,13 @@ private:
              .thicknessZ = tz,
              .torsionFactor = torsion,
              .sectorial = sectorial});
+    }
+
+    // REQ-008d-09: the sectorial first moment and thickness of the last point.
+    void warpingShear(double moment, double thickness)
+    {
+        m_points.back().sectorialMoment = std::abs(moment);
+        m_points.back().sectorialThickness = thickness;
     }
 
     // The four corners of a centred box; omega is +sectorial where y z > 0.

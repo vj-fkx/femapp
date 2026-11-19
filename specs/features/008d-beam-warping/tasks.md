@@ -68,7 +68,7 @@ Regras:
     livres.
   Arquivos: `model_validation.cpp`, `static_analysis.cpp`,
   `test_beam_validation.cpp`. Cobre: 17, 18
-- [ ] **T07** [P] Tensões de empenamento (AC-4): `StressPoint::
+- [x] **T07** [P] Tensões de empenamento (AC-4): `StressPoint::
   sectorialMoment` e `sectorialThickness` nas formas I e U e nos pontos de
   paredes finas; `PointStress::warpingNormal` (σw = B·ω/Iw) e
   `warpingShear` (τw = Tw·Sω/(Iw·t)), somadas a `normal` e `shear`. Testes

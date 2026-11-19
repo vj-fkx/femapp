@@ -98,6 +98,10 @@ struct PointStress
     double normal = 0.0;                                // N/A - Mz y'/Iz + My z'/Iy
     double shear = 0.0;    // |tau_V| + |tau_T|: the sum is on the safe side
     double vonMises = 0.0; // sqrt(sigma^2 + 3 tau^2)
+    // REQ-008d-09: the parts of warping, included in `normal` and `shear`:
+    // sigma_w = B omega / Iw and |tau_w| = |Tw| S_omega / (Iw t).
+    double warpingNormal = 0.0;
+    double warpingShear = 0.0;
 };
 
 // At the stress points of the shape of `section`; empty for a generic
