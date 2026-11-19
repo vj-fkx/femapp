@@ -710,7 +710,7 @@ double smallestPositive(double a, double b)
 constexpr double kCriticalMargin = 4.0;
 constexpr double kVaryingChange = 5e-5;
 constexpr int kMaxVaryingPieces = 256;
-double longestPart(const BeamData& beam)
+double longestPart(const BeamData& beam, const SpanLoads& loads)
 {
     // Feature 008d (design 008d §5.6): without warping, the torsion buckles
     // along the whole bar at once when Wagner's term cancels G J, whatever
@@ -751,6 +751,44 @@ double longestPart(const BeamData& beam)
             eiw > 0.0 ? (-gj + std::sqrt(gj * gj + 4.0 * eiw * target)) / (2.0 * eiw) : target / gj;
         limit(twoPi / std::sqrt(x));
     }
+    // Feature 008d: the loads at a height, a torsional foundation of
+    // lambda (q . d) and point springs of lambda (P . d), destabilizing where
+    // negative: the part clamped at both ends kept stable with the same
+    // margin, x = (2 pi / l)^2 with E Iw x^2 + G' x >= margin |k| for the
+    // foundation, and 4 G' / l or 192 E Iw / l^3 >= margin |k| for a spring.
+    double foundation = 0.0;
+    for (const SpanPiece& piece : loads.pieces) {
+        foundation = std::max({foundation, -heightOf(beam, piece.point, piece.start.head<3>()),
+                               -heightOf(beam, piece.point, piece.end.head<3>())});
+    }
+    double spring = 0.0;
+    for (const SpanPoint& point : loads.points) {
+        spring = std::max(spring, -heightOf(beam, point.point, point.force));
+    }
+    const double torsion = beam.torsional - softening; // G', the least along the bar
+    if (foundation > 0.0) {
+        const double target = kCriticalMargin * foundation;
+        if (eiw > 0.0) {
+            const double x =
+                (-torsion + std::sqrt(torsion * torsion + 4.0 * eiw * target)) / (2.0 * eiw);
+            limit(twoPi / std::sqrt(x));
+        } else if (torsion > 0.0) {
+            limit(twoPi * std::sqrt(torsion / target));
+        }
+    }
+    if (spring > 0.0) {
+        const double target = kCriticalMargin * spring;
+        double allowed = 0.0;
+        if (torsion > 0.0) {
+            allowed = 4.0 * torsion / target;
+        }
+        if (eiw > 0.0) {
+            allowed = std::max(allowed, std::cbrt(192.0 * eiw / target));
+        }
+        if (allowed > 0.0) {
+            limit(allowed);
+        }
+    }
     const double c = reference.largestCompression();
     if (!(c > 0.0) || !(ei > 0.0)) {
         return longest;
@@ -781,16 +819,16 @@ int partsFor(double count)
 }
 
 // Whether the compression needs more parts than kMaxParts.
-bool beyondParts(const BeamData& beam, double length)
+bool beyondParts(const BeamData& beam, double length, const SpanLoads& loads)
 {
-    const double longest = longestPart(beam);
+    const double longest = longestPart(beam, loads);
     return longest > 0.0 && partsFor(length / longest) > kMaxParts;
 }
 
-int partCount(const BeamData& beam, double length)
+int partCount(const BeamData& beam, double length, const SpanLoads& loads)
 {
     int parts = partsFor(growthRate(beam) * length / kGrowthPerPart);
-    const double longest = longestPart(beam);
+    const double longest = longestPart(beam, loads);
     if (longest > 0.0) {
         parts = std::max(parts, partsFor(length / longest));
     }
@@ -895,9 +933,10 @@ StateBarMatrices stateBarMatrices(const BeamData& beam, double length, const Spa
 {
     const Plan plan = planFor(beam, planar);
     const Eigen::Index d = plan.dofs;
-    const int parts = partCount(beam, length);
+    const int parts = partCount(beam, length, loads);
     const bool second = referenceOf(beam).active();
-    int negative = longestPart(beam) < 0.0 || beyondParts(beam, length) ? kUnstableBar : 0;
+    int negative =
+        longestPart(beam, loads) < 0.0 || beyondParts(beam, length, loads) ? kUnstableBar : 0;
 
     PartMatrix total;
     PartVector totalLoads;
@@ -1004,7 +1043,7 @@ std::vector<StateBarMatrix> partStiffnesses(const BeamData& beam, double length,
                                             const SpanLoads& loads)
 {
     const Plan plan = planFor(beam, planar);
-    const int parts = partCount(beam, length);
+    const int parts = partCount(beam, length, loads);
     std::vector<StateBarMatrix> out(static_cast<std::size_t>(parts));
     for (int k = 0; k < parts; ++k) {
         const double from = length * k / parts;
@@ -1023,7 +1062,7 @@ BarState stateAt(const BeamData& beam, double length, const SpanLoads& loads, bo
 {
     const Plan plan = planFor(beam, planar);
     const Eigen::Index d = plan.dofs;
-    const int parts = partCount(beam, length);
+    const int parts = partCount(beam, length, loads);
     const auto bound = [length, parts](int k) { return k >= parts ? length : length * k / parts; };
     // The stiffness of every part, then the displacements of the junctions.
     std::vector<PartMatrix> stiffness(static_cast<std::size_t>(parts));

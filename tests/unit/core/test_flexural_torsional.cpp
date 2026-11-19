@@ -518,3 +518,107 @@ TEST_CASE("the height of the load in lateral-torsional buckling",
         }
     }
 }
+
+namespace {
+
+// The fork beam of `bars` equal bars along x (the inner nodes free).
+fem::core::Model forkChain(const Props& p, double l, int bars)
+{
+    fem::core::Model model = forkBeam(p, l);
+    fem::core::test::TrussSpec spec;
+    for (int i = 0; i <= bars; ++i) {
+        spec.nodes.emplace_back(l * i / bars, 0.0, 0.0);
+    }
+    for (int i = 0; i < bars; ++i) {
+        spec.bars.push_back({i, i + 1});
+    }
+    fem::core::Model chain = fem::core::test::beamModel(spec, fem::core::ElementKind::Beam3D);
+    chain.sections = model.sections;
+    chain.assignments.front().warping = model.assignments.front().warping;
+    using fem::core::DofType;
+    const auto last = static_cast<fem::core::ExternalId>(bars) + 1;
+    fem::core::test::restrain(chain, {1}, {DofType::U, DofType::V, DofType::W, DofType::RX});
+    fem::core::test::restrain(chain, {last}, {DofType::V, DofType::W, DofType::RX});
+    return chain;
+}
+
+double firstFactor(const fem::core::Model& model)
+{
+    const auto result = fem::core::runLinearBuckling(model);
+    if (!result) {
+        INFO(result.error().message);
+        REQUIRE(result.has_value());
+    }
+    REQUIRE_FALSE(result->modes.empty());
+    return result->modes.front().factor;
+}
+
+} // namespace
+
+// T17 (design 008d §5.6): the parts of a bar stay short enough not to
+// buckle on their own, so the count of the bar is right whatever its
+// subdivision: one bar or three give the same factor, for a uniform load
+// on the top flange (lateral torsion with the load height) and for the
+// torsional buckling of a column (a mode inside the bar).
+TEST_CASE("the same factor with one bar or three", "[core][beam][flexural-torsional][buckling]")
+{
+    const double l = 6.0;
+    SECTION("a uniform load on the top flange")
+    {
+        const Props p;
+        const auto loaded = [&](int bars) {
+            fem::core::Model model = forkChain(p, l, bars);
+            fem::core::ElementIds all;
+            for (int i = 1; i <= bars; ++i) {
+                all.ids.push_back(i);
+            }
+            model.distributedLoads.push_back({.elements = all,
+                                              .startValue = Eigen::Vector3d(0.0, 0.0, -1e3),
+                                              .endValue = Eigen::Vector3d(0.0, 0.0, -1e3),
+                                              .point = Eigen::Vector2d(0.15, 0.0)});
+            return model;
+        };
+        CHECK(relative(firstFactor(loaded(3)), firstFactor(loaded(1))) <= 1e-8);
+    }
+    SECTION("the torsional buckling of a column")
+    {
+        Props p;
+        p.area = 4e-3;
+        p.iy = p.iz = 4e-5;
+        p.j = 1e-7;
+        p.iw = 1e-9;
+        const auto pushed = [&](int bars) {
+            fem::core::Model model = forkChain(p, l, bars);
+            model.nodalForces.push_back(
+                {.nodes = fem::core::NodeIds{{static_cast<fem::core::ExternalId>(bars) + 1}},
+                 .force = Eigen::Vector3d(-1e4, 0.0, 0.0)});
+            return model;
+        };
+        CHECK(relative(firstFactor(pushed(2)), firstFactor(pushed(1))) <= 1e-8);
+    }
+}
+
+// T17: a bar beyond the reach of its parts is unstable (kUnstableBar) and
+// its parts stay bounded: without warping, Wagner's term past G J; with
+// warping, a moment so large that the parts would be too many.
+TEST_CASE("a bar beyond the reach of its parts is unstable", "[core][beam][flexural-torsional]")
+{
+    const double l = 4.0;
+    const SpanLoads none;
+    SECTION("no warping: the torsion buckles along the whole bar")
+    {
+        BeamData beam = sample(false);
+        beam.reference = std::make_shared<const ReferenceProfile>(
+            ReferenceProfile::constant(-1.1 * beam.torsional / beam.polarRadius2));
+        CHECK(fem::core::stateBarMatrices(beam, l, none, false).negativePivots >=
+              fem::core::kUnstableBar);
+    }
+    SECTION("warping: a moment beyond the parts")
+    {
+        BeamData beam = sample(true);
+        beam.reference = std::make_shared<const ReferenceProfile>(
+            ReferenceProfile::constant(ReferencePoint{.mz = 1e15}));
+        CHECK(fem::core::stateBarMatrices(beam, l, none, false).negativePivots >=
+              fem::core::kUnstableBar);
+    }
+}

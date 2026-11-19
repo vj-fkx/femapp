@@ -161,7 +161,7 @@ Regras:
   - K simétrica com a altura (1e−12).
   Arquivos: `beam_state.cpp`, `beam_loads.cpp`,
   `test_flexural_torsional.cpp`. Cobre: 13
-- [ ] **T17** Regra de partes ampliada (design §5.6): limites de torção, de
+- [x] **T17** Regra de partes ampliada (design §5.6): limites de torção, de
   flexo-torção e da altura da carga; `kUnstableBar` além de `kMaxParts`.
   Testes: contagem igual com subdivisão extra; barra além das partes
   instável e limitada — arquivos: `beam_state.cpp`,
@@ -370,3 +370,10 @@ Regras:
   (`ReferenceProfile::statics`), em vez de interpolar. A segunda ordem
   ainda itera só N, sem a estática exata (T21). As cargas globais sobre
   arcos (forças fixas no espaço) ainda não têm o termo da altura.
+- T17: os limites de torção e de flexo-torção vieram na T15; aqui entra
+  o da altura da carga, a parte biengastada estável com a base de torção
+  λ·(q·d) e as molas pontuais λ·(P·d) negativas (EIw·x² + G'·x ≥ 4|k|, e
+  4G'/l ou 192EIw/l³ ≥ 4|k|). Uma barra ou três dão o mesmo fator (1e−8)
+  com a carga na mesa superior e na torção de um pilar; sem empenamento
+  com Wagner além de G·J, ou com um momento que pediria mais de 8192
+  partes, a barra fica instável.
