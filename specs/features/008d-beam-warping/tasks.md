@@ -75,7 +75,7 @@ Regras:
   contra as fórmulas, 1e−8 — arquivos: `section.hpp/.cpp`,
   `section_thin_walled.cpp`, `beam_result.cpp`,
   `test_section_thin_walled.cpp`, `test_beam_warping.cpp` — cobre: 09
-- [ ] **T08** Arco com empenamento (elemento exato em `Line3`): raio
+- [x] **T08** Arco com empenamento (elemento exato em `Line3`): raio
   grande igual à reta com empenamento (1e−6); condições do §5.2 no arco —
   arquivos: `test_beam_curved.cpp` — cobre: 06, 08
 - [ ] **T09** Isoparamétrica com empenamento (design §5.3): ψ quadrático com

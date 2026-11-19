@@ -1175,3 +1175,57 @@ TEST_CASE("convergence of the isoparametric beam", "[core][beam][curved][iso]")
         CHECK(near(result.reactions[0].y(), weight, 1e-9));
     }
 }
+
+// REQ-008d-06, 08 (AC-3): a cantilever of two arcs of the same circle with
+// warping, restrained at the root, a torque at the tip: with a large radius
+// it is the straight cantilever with warping, and the warping is continuous
+// over the middle node (collinear tangents), as on the straight one.
+TEST_CASE("arcs with warping of a large radius are the straight beam",
+          "[core][beam][curved][warping]")
+{
+    const double length = 3.0; // each arc
+    const double iw = 2.0e-7;
+    const double torque = 1.0e3;
+    const auto cantilever = [&](double radius) {
+        // Nodes on the circle of centre (L, -R) or, with radius 0, on x.
+        const auto at = [&](double s) {
+            if (radius == 0.0) {
+                return Vec(length + s, 0.0, 0.0);
+            }
+            const double phi = s / radius;
+            return Vec(length + radius * std::sin(phi), radius * std::cos(phi) - radius, 0.0);
+        };
+        fem::core::Model model =
+            isoModel({at(-length), at(0.0), at(length)}, {at(-length / 2), at(length / 2)},
+                     fem::core::ElementKind::Beam3D);
+        model.assignments.front().curved = fem::core::CurvedFormulation::Arc;
+        model.assignments.front().theory = fem::core::BeamTheory::EulerBernoulli;
+        model.assignments.front().warping = true;
+        model.sections.front().warpingConstant = iw;
+        fem::core::test::fixAll(model, {1}, fem::core::ElementKind::Beam3D);
+        model.warpingEnds.push_back({.elements = fem::core::ElementIds{{1}},
+                                     .end = fem::core::BarEnd::Start,
+                                     .condition = fem::core::WarpingCondition::Restrained});
+        // The torque about the tangent at the tip.
+        const Vec tangent = (at(length + 1e-3) - at(length - 1e-3)).normalized();
+        model.nodalForces.push_back({.nodes = fem::core::NodeIds{{3}}, .moment = torque * tangent});
+        return fem::core::test::solve(model);
+    };
+    const fem::core::StaticResult straight = cantilever(0.0);
+    const fem::core::StaticResult curved = cantilever(1.0e4 * length);
+    // The twist about the tangent at the tip, and the warping of the nodes.
+    const double gj = fem::core::test::kG * fem::core::test::kJ;
+    const double k = std::sqrt(gj / (fem::core::test::kE * iw));
+    const double l = 2.0 * length;
+    const double tip = torque / (gj * k) * (k * l - std::tanh(k * l));
+    CHECK(relative(straight.rotations[2].x(), tip) <= 1e-8);
+    CHECK(relative(curved.rotations[2].norm(), tip) <= 1e-6);
+    CHECK(relative(curved.warping[1], straight.warping[1]) <= 1e-6);
+    // The tip is free: no warping dof at node 3, the bar gives it.
+    CHECK(relative(fem::core::test::beamOf(curved, 1).at(length).warping,
+                   fem::core::test::beamOf(straight, 1).at(length).warping) <= 1e-6);
+    const fem::core::BeamResult& root = fem::core::test::beamOf(curved, 0);
+    CHECK(relative(root.start().b, fem::core::test::beamOf(straight, 0).start().b) <= 1e-6);
+    CHECK(relative(root.at(1.0).warping, fem::core::test::beamOf(straight, 0).at(1.0).warping) <=
+          1e-6);
+}
