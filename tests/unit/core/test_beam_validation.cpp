@@ -614,3 +614,21 @@ TEST_CASE("a mechanism of warping names the node", "[core][analysis][beam][warpi
         CHECK(result.error().message.find("- the node 2 in warp") != std::string::npos);
     }
 }
+
+// REQ-008d-17 (AC-9): the point of a load in the section is for 3D beams.
+TEST_CASE("the point of a load in a 2D beam is refused", "[core][validation][beam]")
+{
+    Model model = rowModel(ElementKind::Beam2D);
+    model.distributedLoads.push_back({.elements = ElementIds{{1}},
+                                      .startValue = Eigen::Vector3d(0.0, -1.0, 0.0),
+                                      .endValue = Eigen::Vector3d(0.0, -1.0, 0.0),
+                                      .point = Eigen::Vector2d(0.1, 0.0)});
+    model.concentratedLoads.push_back({.elements = ElementIds{{2}},
+                                       .force = Eigen::Vector3d(0.0, -1.0, 0.0),
+                                       .point = Eigen::Vector2d(0.1, 0.0)});
+    const auto list = messages(model);
+    CHECK(has(list, "Distributed load 1: the point of the section where it acts is only for 3D "
+                    "beams."));
+    CHECK(has(list, "Concentrated load 1: the point of the section where it acts is only for 3D "
+                    "beams."));
+}

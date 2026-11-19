@@ -261,11 +261,20 @@ Beams beamData(const Model& model, const detail::ValidationTables& tables, bool 
             beams.iso[e].loads.curvatureZ += curvatures.curvatureZ;
         });
     }
+    // REQ-008d-13: the point of the section where a load acts, from the
+    // local axes of the user to the principal ones.
+    const auto principalPoint = [&frames](std::size_t e, const Eigen::Vector2d& point) {
+        const double c = std::cos(frames[e].principalAngle);
+        const double s = std::sin(frames[e].principalAngle);
+        return Eigen::Vector2d(c * point.x() + s * point.y(), -s * point.x() + c * point.y());
+    };
     for (const DistributedLoad& load : model.distributedLoads) {
         forBeams(load.elements, [&](std::size_t e) {
+            const Eigen::Vector2d point = load.point.value_or(Eigen::Vector2d::Zero());
             addDistributed(beams.loads[e], frames[e], load.axes, load.startValue, load.endValue,
                            positionOn(load.from, beams.length[e]),
-                           positionOn(load.to, beams.length[e]), load.startTorque, load.endTorque);
+                           positionOn(load.to, beams.length[e]), load.startTorque, load.endTorque,
+                           point);
             beams.iso[e].loads.distributed.push_back(
                 {.axes = load.axes,
                  .startValue = load.startValue,
@@ -273,17 +282,20 @@ Beams beamData(const Model& model, const detail::ValidationTables& tables, bool 
                  .from = positionOn(load.from, beams.length[e]),
                  .to = positionOn(load.to, beams.length[e]),
                  .startTorque = load.startTorque,
-                 .endTorque = load.endTorque});
+                 .endTorque = load.endTorque,
+                 .point = principalPoint(e, point)});
         });
     }
     for (const ConcentratedLoad& load : model.concentratedLoads) {
         forBeams(load.elements, [&](std::size_t e) {
+            const Eigen::Vector2d point = load.point.value_or(Eigen::Vector2d::Zero());
             addConcentrated(beams.loads[e], frames[e], load.axes, load.force, load.moment,
-                            positionOn(load.at, beams.length[e]));
+                            positionOn(load.at, beams.length[e]), point);
             beams.iso[e].loads.concentrated.push_back({.axes = load.axes,
                                                        .force = load.force,
                                                        .moment = load.moment,
-                                                       .at = positionOn(load.at, beams.length[e])});
+                                                       .at = positionOn(load.at, beams.length[e]),
+                                                       .point = principalPoint(e, point)});
         });
     }
     for (std::size_t e = 0; e < count; ++e) {

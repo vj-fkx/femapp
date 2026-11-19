@@ -106,7 +106,7 @@ Regras:
   Arquivos: `section.hpp/.cpp`, `section_thin_walled.cpp`,
   `section_solid.cpp`, `test_section_thin_walled.cpp`,
   `test_section_solid.cpp`. Cobre: 12
-- [ ] **T12** [P] Ponto de aplicação das cargas no vão (design §4):
+- [x] **T12** [P] Ponto de aplicação das cargas no vão (design §4):
   - `point` em `DistributedLoad` e `ConcentratedLoad`, levado aos eixos
     principais e ao centro de cisalhamento em `SpanPiece` e `SpanPoint`;
   - na linear, só o torque muda. Teste: igual a um torque explícito, 1e−8;
@@ -311,3 +311,12 @@ Regras:
   medidas): linear sem empenamento 3,16 e 3,37 s; com empenamento em todas
   as vigas (pilares em I) 5,29 e 5,31 s, 1,57 a 1,67 vez (meta 2,2); o
   maior deslocamento, 0,1435, é o do `c19d42b`.
+- T11: βz < 0 num I com a mesa maior em cima, com y para cima (o termo
+  −2ys domina); o sinal de β no funcional fica para os casos fechados da
+  T15. Na poligonal, βy de um tê sai 1,8e−7 (−2zs com o centro de
+  cisalhamento numérico), não zero.
+- T12: o ponto de aplicação fica nas cargas do vão em eixos principais a
+  partir do centroide (não do centro de cisalhamento, como dizia o §4 do
+  design, ajustado). As forças fixas no espaço sobre arcos entram no motor
+  por grupos de mesmo ponto, cada um com o torque P × c nos estados
+  aumentados.

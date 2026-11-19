@@ -28,11 +28,23 @@ Eigen::Vector3d toPrincipal(const SpanFrame& frame, Axes axes, const Eigen::Vect
     return {v.x(), c * v.y() + s * v.z(), -s * v.y() + c * v.z()};
 }
 
-// The torque about the shear centre of a force on the centroid:
-// (C - S) x F, with C - S = -(ey, ez).
-double leverTorque(const SpanFrame& frame, const Eigen::Vector3d& force)
+// The torque about the shear centre of a force at the point P of the
+// section (principal, from the centroid): (P - S) x F, with S = (ey, ez);
+// P = 0 is the centroid of the 008.
+double leverTorque(const SpanFrame& frame, const Eigen::Vector3d& force,
+                   const Eigen::Vector2d& point = Eigen::Vector2d::Zero())
 {
-    return frame.shearCentre.y() * force.y() - frame.shearCentre.x() * force.z();
+    const Eigen::Vector2d r = point - frame.shearCentre;
+    return r.x() * force.z() - r.y() * force.y();
+}
+
+// REQ-008d-13: a point of the section from the local axes of the user to
+// the principal ones (a turn about x).
+Eigen::Vector2d pointToPrincipal(const SpanFrame& frame, const Eigen::Vector2d& point)
+{
+    const double c = std::cos(frame.principalAngle);
+    const double s = std::sin(frame.principalAngle);
+    return {c * point.x() + s * point.y(), -s * point.x() + c * point.y()};
 }
 
 // Adds to `f` (on the shear centre) a force and a moment at xi.
@@ -64,13 +76,14 @@ double positionOn(const BarPosition& position, double length)
 
 void addDistributed(SpanLoads& loads, const SpanFrame& frame, Axes axes,
                     const Eigen::Vector3d& startValue, const Eigen::Vector3d& endValue, double from,
-                    double to, double startTorque, double endTorque)
+                    double to, double startTorque, double endTorque, const Eigen::Vector2d& point)
 {
     const Eigen::Vector3d q0 = toPrincipal(frame, axes, startValue);
     const Eigen::Vector3d q1 = toPrincipal(frame, axes, endValue);
+    const Eigen::Vector2d at = pointToPrincipal(frame, point);
     if (axes == Axes::Global && !frame.curvature.isZero()) {
         // Fixed in space along the arc, by its components at the start.
-        loads.fixedPieces.push_back({.from = from, .to = to, .start = q0, .end = q1});
+        loads.fixedPieces.push_back({.from = from, .to = to, .start = q0, .end = q1, .point = at});
         if (startTorque != 0.0 || endTorque != 0.0) {
             SpanPiece torque;
             torque.from = from;
@@ -84,13 +97,15 @@ void addDistributed(SpanLoads& loads, const SpanFrame& frame, Axes axes,
     SpanPiece piece;
     piece.from = from;
     piece.to = to;
-    piece.start << q0, leverTorque(frame, q0) + startTorque;
-    piece.end << q1, leverTorque(frame, q1) + endTorque;
+    piece.start << q0, leverTorque(frame, q0, at) + startTorque;
+    piece.end << q1, leverTorque(frame, q1, at) + endTorque;
+    piece.point = at;
     loads.pieces.push_back(piece);
 }
 
 void addConcentrated(SpanLoads& loads, const SpanFrame& frame, Axes axes,
-                     const Eigen::Vector3d& force, const Eigen::Vector3d& moment, double at)
+                     const Eigen::Vector3d& force, const Eigen::Vector3d& moment, double at,
+                     const Eigen::Vector2d& where)
 {
     SpanPoint point;
     point.at = at;
@@ -100,7 +115,8 @@ void addConcentrated(SpanLoads& loads, const SpanFrame& frame, Axes axes,
     }
     point.force = toPrincipal(here, axes, force);
     point.moment = toPrincipal(here, axes, moment);
-    point.moment.x() += leverTorque(frame, point.force);
+    point.point = pointToPrincipal(frame, where);
+    point.moment.x() += leverTorque(frame, point.force, point.point);
     loads.points.push_back(point);
 }
 

@@ -594,6 +594,7 @@ private:
         for (std::size_t i = 0; i < loads.size(); ++i) {
             const std::string label = itemLabel("Distributed load", i);
             for (const ElementIndex element : beamsOf(label, loads[i].elements)) {
+                checkLoadPoint(label, loads[i].point, element);
                 const auto length = flexibleOf(element);
                 if (!length) {
                     continue;
@@ -612,12 +613,23 @@ private:
         }
     }
 
+    // REQ-008d-17: the point of a load in the section is for 3D beams.
+    void checkLoadPoint(const std::string& label, const std::optional<Eigen::Vector2d>& point,
+                        ElementIndex element)
+    {
+        const Assignment* assignment = assignmentOf(element);
+        if (point && assignment != nullptr && assignment->kind == ElementKind::Beam2D) {
+            addOnce(label + ": the point of the section where it acts is only for 3D beams.");
+        }
+    }
+
     void checkConcentratedLoads()
     {
         const auto& loads = m_model.concentratedLoads;
         for (std::size_t i = 0; i < loads.size(); ++i) {
             const std::string label = itemLabel("Concentrated load", i);
             for (const ElementIndex element : beamsOf(label, loads[i].elements)) {
+                checkLoadPoint(label, loads[i].point, element);
                 const auto length = flexibleOf(element);
                 if (!length) {
                     continue;

@@ -162,6 +162,10 @@ struct DistributedLoad
     // REQ-008b-17: torque per length about the local x axis, 3D beams.
     double startTorque = 0.0;
     double endTorque = 0.0;
+    // REQ-008d-13: where the forces act in the section, local (y, z) of the
+    // bar as the user sees them, from the centroid; empty: the centroid.
+    // 3D beams only.
+    std::optional<Eigen::Vector2d> point = std::nullopt;
 };
 
 // REQ-008-16: a force and a moment at a point of the span.
@@ -172,6 +176,7 @@ struct ConcentratedLoad
     Eigen::Vector3d force = Eigen::Vector3d::Zero();
     Eigen::Vector3d moment = Eigen::Vector3d::Zero();
     BarPosition at{.value = 0.5, .fraction = true};
+    std::optional<Eigen::Vector2d> point = std::nullopt; // REQ-008d-13, as DistributedLoad
 };
 
 // REQ-008-16: temperature gradients across the section, local axes, uniform

@@ -1414,3 +1414,76 @@ TEST_CASE("a curved beam in plan with warping against Vlasov's equations",
     CHECK(relative(result.rotations[1].y(), middle(3)) <= 1e-8);
     CHECK(relative(beamOf(result, 0).start().b, -start(13)) <= 1e-8);
 }
+
+// REQ-008d-13: on a curved beam in plan, a vertical load at a point of the
+// section: in global axes (a force fixed in space, with its torque about
+// the centroid in the engine) it is the same load in local axes, and that
+// one is the load at the centroid with its torque given; the same on the
+// isoparametric beam.
+TEST_CASE("the point of the section where a load acts on curved beams",
+          "[core][beam][curved][loads]")
+{
+    using namespace fem::core::test;
+    const double r = 6.0;
+    const double half = std::numbers::pi / 6;
+    const double q = 3.0e3;
+    const Eigen::Vector2d point(0.0, 0.08); // local z (radial), from the centroid
+    const auto on = [&](double a) { return Vec(r * std::cos(a), r * std::sin(a), 0.0); };
+    const auto arc = [&](fem::core::CurvedFormulation formulation, int n) {
+        std::vector<Vec> ends;
+        std::vector<Vec> middles;
+        ends.reserve(static_cast<std::size_t>(n) + 1);
+        middles.reserve(static_cast<std::size_t>(n));
+        for (int i = 0; i <= n; ++i) {
+            ends.push_back(on(-half + 2.0 * half * i / n));
+        }
+        for (int i = 0; i < n; ++i) {
+            middles.push_back(on(-half + 2.0 * half * (i + 0.5) / n));
+        }
+        fem::core::Model model = isoModel(ends, middles, fem::core::ElementKind::Beam3D);
+        model.assignments.front().curved = formulation;
+        fixAll(model, {1, static_cast<fem::core::ExternalId>(n + 1)},
+               fem::core::ElementKind::Beam3D);
+        return model;
+    };
+    const auto all = [](int n) {
+        fem::core::ElementIds ids;
+        for (int i = 1; i <= n; ++i) {
+            ids.ids.push_back(i);
+        }
+        return ids;
+    };
+    // Local y is global Z: the load is -q along y; its torque about the
+    // centroid -Pz (-q).
+    const fem::core::DistributedLoad local{.elements = all(2),
+                                           .axes = fem::core::Axes::Local,
+                                           .startValue = Vec(0.0, -q, 0.0),
+                                           .endValue = Vec(0.0, -q, 0.0),
+                                           .point = point};
+    fem::core::DistributedLoad global = local;
+    global.axes = fem::core::Axes::Global;
+    global.startValue = global.endValue = Vec(0.0, 0.0, -q);
+    fem::core::DistributedLoad torque = local;
+    torque.point.reset();
+    torque.startTorque = torque.endTorque = point.y() * q;
+    const auto middle = [&](fem::core::CurvedFormulation formulation, int n,
+                            const fem::core::DistributedLoad& load) {
+        fem::core::Model model = arc(formulation, n);
+        fem::core::DistributedLoad l = load;
+        l.elements = all(n);
+        model.distributedLoads.push_back(l);
+        const auto result = solve(model);
+        const auto node = static_cast<std::size_t>(n / 2);
+        return std::array<Vec, 2>{result.displacements[node], result.rotations[node]};
+    };
+    const auto same = [](const std::array<Vec, 2>& a, const std::array<Vec, 2>& b, double tol) {
+        CHECK((a[0] - b[0]).norm() <= tol * b[0].norm());
+        CHECK((a[1] - b[1]).norm() <= tol * b[1].norm());
+    };
+    using fem::core::CurvedFormulation;
+    const auto byTorque = middle(CurvedFormulation::Arc, 2, torque);
+    same(middle(CurvedFormulation::Arc, 2, local), byTorque, 1e-10);
+    same(middle(CurvedFormulation::Arc, 2, global), byTorque, 1e-8);
+    same(middle(CurvedFormulation::Isoparametric, 4, local),
+         middle(CurvedFormulation::Isoparametric, 4, torque), 1e-10);
+}

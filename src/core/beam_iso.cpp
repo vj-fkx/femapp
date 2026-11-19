@@ -310,7 +310,10 @@ Expected<Flexible> flexible(const IsoBeamData& data, ElementKind kind, const Iso
             if (load.axes == Axes::Local) {
                 q = p->axes * q;
             }
-            const double m = (1.0 - fraction) * load.startTorque + fraction * load.endTorque;
+            double m = (1.0 - fraction) * load.startTorque + fraction * load.endTorque;
+            // REQ-008d-13: the torque about the centroid of forces at a point.
+            const Eigen::Vector3d local = p->axes.transpose() * q;
+            m += load.point.x() * local.z() - load.point.y() * local.y();
             const double w = kWeights8.at(g) * (c - a) / 2.0 * p->j;
             for (int i = 0; i < 3; ++i) {
                 const double n = p->shape.n.at(static_cast<std::size_t>(i)) * w;
@@ -326,8 +329,11 @@ Expected<Flexible> flexible(const IsoBeamData& data, ElementKind kind, const Iso
         }
         const Eigen::Vector3d force =
             load.axes == Axes::Local ? Eigen::Vector3d(p->axes * load.force) : load.force;
-        const Eigen::Vector3d moment =
+        Eigen::Vector3d moment =
             load.axes == Axes::Local ? Eigen::Vector3d(p->axes * load.moment) : load.moment;
+        // REQ-008d-13: the torque about the centroid of a force at a point.
+        const Eigen::Vector3d local = p->axes.transpose() * force;
+        moment += (load.point.x() * local.z() - load.point.y() * local.y()) * p->t;
         for (int i = 0; i < 3; ++i) {
             const double n = p->shape.n.at(static_cast<std::size_t>(i));
             out.f.segment<3>(at(i)) += n * force;

@@ -479,3 +479,63 @@ TEST_CASE("temperature and weight on beams", "[core][beam][loads]")
         CHECK(near(beam.start().n, -weight * std::sin(angle), 1e-10));
     }
 }
+
+// REQ-008d-13: a load at a point of the section is, in the linear analysis,
+// the same load at the centroid plus its torque about it, (P x F)_x =
+// Py Fz - Pz Fy: on a straight beam with its shear centre off the
+// centroid, distributed and concentrated, in local and global axes.
+TEST_CASE("the point of the section where a load acts", "[core][beam][loads]")
+{
+    using namespace fem::core::test;
+    TrussSpec spec;
+    spec.nodes = {{0.0, 0.0, 0.0}, {4.0, 0.0, 0.0}};
+    spec.bars = {{0, 1}};
+    fem::core::Model base = beamModel(spec, fem::core::ElementKind::Beam3D);
+    base.sections.front().shearCentre = Eigen::Vector2d(0.02, -0.01);
+    fixAll(base, {1}, fem::core::ElementKind::Beam3D);
+    const Eigen::Vector2d point(0.1, 0.05);
+    const double q = 2.0e3;
+    const double force = 5.0e3;
+    const auto compare = [](const fem::core::Model& a, const fem::core::Model& b) {
+        const auto ra = solve(a);
+        const auto rb = solve(b);
+        CHECK((ra.displacements[1] - rb.displacements[1]).norm() <=
+              1e-10 * rb.displacements[1].norm());
+        CHECK((ra.rotations[1] - rb.rotations[1]).norm() <= 1e-10 * rb.rotations[1].norm());
+    };
+    SECTION("distributed, local axes")
+    {
+        fem::core::Model atPoint = base;
+        atPoint.distributedLoads.push_back({.elements = fem::core::ElementIds{{1}},
+                                            .axes = Axes::Local,
+                                            .startValue = Eigen::Vector3d(0.0, -q, q / 2),
+                                            .endValue = Eigen::Vector3d(0.0, -q, q / 2),
+                                            .point = point});
+        fem::core::Model withTorque = base;
+        const double torque = point.x() * q / 2 - point.y() * (-q);
+        withTorque.distributedLoads.push_back({.elements = fem::core::ElementIds{{1}},
+                                               .axes = Axes::Local,
+                                               .startValue = Eigen::Vector3d(0.0, -q, q / 2),
+                                               .endValue = Eigen::Vector3d(0.0, -q, q / 2),
+                                               .startTorque = torque,
+                                               .endTorque = torque});
+        compare(atPoint, withTorque);
+    }
+    SECTION("concentrated, global axes")
+    {
+        // The local axes of a bar along x: y = global Z, z = -global Y; the
+        // force is -F along y, its torque -Pz (-F).
+        fem::core::Model atPoint = base;
+        atPoint.concentratedLoads.push_back({.elements = fem::core::ElementIds{{1}},
+                                             .axes = Axes::Global,
+                                             .force = Eigen::Vector3d(0.0, 0.0, -force),
+                                             .point = point});
+        fem::core::Model withTorque = base;
+        withTorque.concentratedLoads.push_back(
+            {.elements = fem::core::ElementIds{{1}},
+             .axes = Axes::Global,
+             .force = Eigen::Vector3d(0.0, 0.0, -force),
+             .moment = Eigen::Vector3d(-point.y() * (-force), 0.0, 0.0)});
+        compare(atPoint, withTorque);
+    }
+}

@@ -26,6 +26,8 @@ struct IsoLoads
         double to = 0.0;
         double startTorque = 0.0; // about the local x
         double endTorque = 0.0;
+        // REQ-008d-13: where the forces act, principal, from the centroid.
+        Eigen::Vector2d point = Eigen::Vector2d::Zero();
     };
     struct Concentrated
     {
@@ -33,6 +35,7 @@ struct IsoLoads
         Eigen::Vector3d force = Eigen::Vector3d::Zero();
         Eigen::Vector3d moment = Eigen::Vector3d::Zero();
         double at = 0.0;
+        Eigen::Vector2d point = Eigen::Vector2d::Zero(); // REQ-008d-13
     };
     std::vector<Distributed> distributed;
     std::vector<Concentrated> concentrated;

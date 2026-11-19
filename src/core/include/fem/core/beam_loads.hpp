@@ -20,6 +20,9 @@ struct SpanPiece
     double to = 0.0;
     Eigen::Vector4d start = Eigen::Vector4d::Zero();
     Eigen::Vector4d end = Eigen::Vector4d::Zero();
+    // REQ-008d-13: where the forces act in the section, principal, from the
+    // centroid (their torque about the shear centre is already in mx).
+    Eigen::Vector2d point = Eigen::Vector2d::Zero();
 };
 
 // A force and a moment at one point.
@@ -28,6 +31,7 @@ struct SpanPoint
     double at = 0.0;
     Eigen::Vector3d force = Eigen::Vector3d::Zero();
     Eigen::Vector3d moment = Eigen::Vector3d::Zero();
+    Eigen::Vector2d point = Eigen::Vector2d::Zero(); // REQ-008d-13, as SpanPiece
 };
 
 // REQ-008b-15: a force per length fixed in space (a global load, the weight)
@@ -40,6 +44,9 @@ struct SpanFixedPiece
     double to = 0.0;
     Eigen::Vector3d start = Eigen::Vector3d::Zero();
     Eigen::Vector3d end = Eigen::Vector3d::Zero();
+    // REQ-008d-13: where it acts in the section, principal, from the
+    // centroid; the engine adds its torque about the centroid.
+    Eigen::Vector2d point = Eigen::Vector2d::Zero();
 };
 
 struct SpanLoads
@@ -69,12 +76,15 @@ struct SpanFrame
 [[nodiscard]] double positionOn(const BarPosition& position, double length);
 
 // startTorque and endTorque: a torque per length about the local x
-// (REQ-008b-17), with the forces.
+// (REQ-008b-17), with the forces. `point` (REQ-008d-13): where the forces
+// act, local (y, z) of the user from the centroid.
 void addDistributed(SpanLoads& loads, const SpanFrame& frame, Axes axes,
                     const Eigen::Vector3d& startValue, const Eigen::Vector3d& endValue, double from,
-                    double to, double startTorque = 0.0, double endTorque = 0.0);
+                    double to, double startTorque = 0.0, double endTorque = 0.0,
+                    const Eigen::Vector2d& point = Eigen::Vector2d::Zero());
 void addConcentrated(SpanLoads& loads, const SpanFrame& frame, Axes axes,
-                     const Eigen::Vector3d& force, const Eigen::Vector3d& moment, double at);
+                     const Eigen::Vector3d& force, const Eigen::Vector3d& moment, double at,
+                     const Eigen::Vector2d& point = Eigen::Vector2d::Zero());
 // The gradients dT/dy, dT/dz of the local axes, as imposed curvatures.
 void addGradient(SpanLoads& loads, const SpanFrame& frame, double alpha, double alongY,
                  double alongZ);

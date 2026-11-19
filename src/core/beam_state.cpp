@@ -227,6 +227,9 @@ double growthRate(const BeamData& beam)
 }
 
 using PartMatrix = StateBarMatrix;
+
+bool fixedOn(const BeamData& beam, const SpanLoads& loads, double x0, double x1,
+             const Eigen::Vector2d& point, Vec3& c0, Vec3& d0);
 using PartVector = StateBarVector;
 
 // The two Gauss points of [0, 1] and the weight of the commutator of the
@@ -293,8 +296,8 @@ public:
     // Integrates over [x0, x1] inside the part with the load b0 + b1 (x - x0)
     // and, when `fixed`, a force fixed in space whose local components are
     // c0 + d0 (x - x0) at x0 and turn with the frame.
-    void segment(double x0, double x1, const FullVector& b0, const FullVector& b1, bool fixed,
-                 const Vec3& c0, const Vec3& d0)
+    void segment(double x0, double x1, const FullVector& b0, const FullVector& b1,
+                 const BeamData& beam, const SpanLoads& loads)
     {
         const int n = m_plan.count;
         const double l = x1 - x0;
@@ -322,8 +325,19 @@ public:
             }
             p(i) = m_scale(i) * e(i, n + 1);
         }
-        if (fixed) {
-            p += fixedParticular(x0, l, c0, d0);
+        // The forces fixed in space, grouped by their point in the section
+        // (feature 008d): each group adds its torque about the centroid.
+        const auto& fixed = loads.fixedPieces;
+        for (std::size_t k = 0; k < fixed.size(); ++k) {
+            const Eigen::Vector2d& point = fixed[k].point;
+            const bool seen =
+                std::any_of(fixed.begin(), fixed.begin() + static_cast<std::ptrdiff_t>(k),
+                            [&point](const SpanFixedPiece& other) { return other.point == point; });
+            Vec3 c0;
+            Vec3 d0;
+            if (!seen && fixedOn(beam, loads, x0, x1, point, c0, d0)) {
+                p += fixedParticular(x0, l, c0, d0, point);
+            }
         }
         m_t = t * m_t;
         m_p = t * m_p + p;
@@ -333,7 +347,7 @@ public:
     // length l: c' = -Omega x c + d, d' = -Omega x d, F' gets -c (augmented
     // states c and l d, design 008b §5.3).
     [[nodiscard]] StateBarVector fixedParticular(double x0, double l, const Vec3& c0,
-                                                 const Vec3& d0) const
+                                                 const Vec3& d0, const Eigen::Vector2d& point) const
     {
         const int n = m_plan.count;
         const auto generator = [&](const StateMatrix& a) {
@@ -345,6 +359,11 @@ public:
                 const int s = state(i);
                 if (s == N || s == VY || s == VZ) {
                     m(i, n + (s - N)) = -l / m_scale(i);
+                }
+                // REQ-008d-13: Mx' gets -(P x c)_x = -(Py cz - Pz cy).
+                if (s == MX) {
+                    m(i, n + 1) = l * point.y() / m_scale(i);
+                    m(i, n + 2) = -l * point.x() / m_scale(i);
                 }
             }
             for (int i = 0; i < 3; ++i) {
@@ -444,9 +463,11 @@ private:
     StateBarVector m_p;
 };
 
-// The forces fixed in space on [x0, x1]: their local components c0 + d0 (x - x0)
-// at x0, turned from the start of the bar; false when there are none.
-bool fixedOn(const BeamData& beam, const SpanLoads& loads, double x0, double x1, Vec3& c0, Vec3& d0)
+// The forces fixed in space on [x0, x1] acting at `point` of the section:
+// their local components c0 + d0 (x - x0) at x0, turned from the start of
+// the bar; false when there are none.
+bool fixedOn(const BeamData& beam, const SpanLoads& loads, double x0, double x1,
+             const Eigen::Vector2d& point, Vec3& c0, Vec3& d0)
 {
     c0.setZero();
     d0.setZero();
@@ -454,7 +475,7 @@ bool fixedOn(const BeamData& beam, const SpanLoads& loads, double x0, double x1,
     const double middle = (x0 + x1) / 2.0;
     for (const SpanFixedPiece& piece : loads.fixedPieces) {
         const double span = piece.to - piece.from;
-        if (!(span > 0.0) || middle < piece.from || middle > piece.to) {
+        if (!(span > 0.0) || middle < piece.from || middle > piece.to || piece.point != point) {
             continue;
         }
         const Vec3 slope = (piece.end - piece.start) / span;
@@ -630,10 +651,7 @@ void walk(Part& part, const BeamData& beam, const SpanLoads& loads, double lengt
         FullVector b0;
         FullVector b1;
         loadsOn(beam, loads, x0, x1, b0, b1);
-        Vec3 c0;
-        Vec3 d0;
-        const bool fixed = fixedOn(beam, loads, x0, x1, c0, d0);
-        part.segment(x0, x1, b0, b1, fixed, c0, d0);
+        part.segment(x0, x1, b0, b1, beam, loads);
         x0 = x1;
     }
     if (!jumpAtUntil) {

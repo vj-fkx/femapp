@@ -207,9 +207,10 @@ struct BeamData
     std::shared_ptr<const ReferenceProfile> reference; // null: first order
 };
 
-// beam_loads.hpp — REQ-008d-13: SpanPiece and SpanPoint gain the point of
-// the section, principal, from the shear centre (the lever of the
-// torque, and the load-height term in the second order and buckling).
+// beam_loads.hpp — REQ-008d-13: SpanPiece, SpanPoint and SpanFixedPiece gain
+// the point of the section, principal, from the centroid (the lever of the
+// torque about the shear centre, and the load-height term d = point - S in
+// the second order and buckling) *(from the centroid: adjusted in T12)*.
 Eigen::Vector2d point = Eigen::Vector2d::Zero(); // set from the load or the centroid
 
 // static_analysis.hpp — REQ-008d-07
