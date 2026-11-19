@@ -90,7 +90,7 @@ Regras:
   - zero alocações em `compute`.
   Arquivos: `beam_iso.hpp/.cpp`, `test_beam_curved.cpp`,
   `test_allocations.cpp`. Cobre: 06, 08
-- [ ] **T10** [M] `bench_frame --warping` (pilares abertos, como em
+- [x] **T10** [M] `bench_frame --warping` (pilares abertos, como em
   `c19d42b`), linear: registrar contra a meta de 2,2 vezes a linear sem
   empenamento (design §5.9). Se passar da meta, parar e propor — arquivos:
   `tests/perf/bench_frame.cpp` — cobre: N02
@@ -298,3 +298,16 @@ Regras:
   L = 403,32 in, β de 0 a 180° (Figs. 6 e 7). A teoria deles inclui o
   jacobiano e as tensões radiais; a diferença para a nossa fica medida
   na T23 (tolerância de 1% do design).
+- T09: na isoparamétrica, a tangente da curva quadrática quebra entre
+  elementos (3,7e−3 com 4 elementos num quarto de anel), acima da
+  tolerância de 1e−6 da continuidade padrão; o mantenedor manteve 1e−6, e
+  a cadeia isoparamétrica declara `WarpingEnd Continuous` (design §5.2).
+  Com isso, um quarto de anel com empenamento converge para o arco exato
+  com taxa ≥ 3,5 a partir de 8 elementos (erro 2e−5 com 32). A referência
+  independente do arco com empenamento (tiro com Runge-Kutta) precisa de
+  kL pequeno (cerca de 3): com kL = 38 o tiro perde a precisão
+  (e^(kL) ≈ 1e16) e deu uma falsa diferença de 7%.
+- T10 (`bench_frame --warping`, Release, máquina do mantenedor, duas
+  medidas): linear sem empenamento 3,16 e 3,37 s; com empenamento em todas
+  as vigas (pilares em I) 5,29 e 5,31 s, 1,57 a 1,67 vez (meta 2,2); o
+  maior deslocamento, 0,1435, é o do `c19d42b`.

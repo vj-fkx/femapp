@@ -2,6 +2,7 @@
 // Release build.
 //
 // Usage: bench_frame [bays] [storeys] [--cost] [--second-order] [--buckling n]
+//                    [--warping]
 //   A space frame building of (bays + 1)^2 columns and `storeys` storeys
 //   (default 10 x 10 bays and 40 storeys: 4 961 nodes, about 29 000 free
 //   dofs): columns between the levels, beams along x and y at each level,
@@ -12,6 +13,9 @@
 //   --second-order, --buckling n (NFR-008c-02): the second-order analysis
 //   and the n first buckling factors of the same load case, against the
 //   linear analysis.
+//   --warping (NFR-008d-02): every bar has torsion with warping, and the
+//   columns are open I sections instead of tubes (Vlasov's warping is for
+//   open sections; a closed tube barely warps), as in commit c19d42b.
 
 #include <fem/core/beam_state.hpp>
 #include <fem/core/dof_map.hpp>
@@ -57,7 +61,7 @@ double secondsSince(Clock::time_point start)
     return std::chrono::duration<double>(Clock::now() - start).count();
 }
 
-fem::core::Model building(int bays, int storeys)
+fem::core::Model building(int bays, int storeys, bool warping)
 {
     const double bay = 6.0;
     const double storey = 3.5;
@@ -108,19 +112,27 @@ fem::core::Model building(int bays, int storeys)
                                .thermalExpansion = 1.2e-5,
                                .conductivity = {},
                                .specificHeat = {}});
-    model.sections.push_back(
-        {.name = "Column", .shape = fem::core::RectangularTube{.b = 0.4, .h = 0.4, .t = 0.02}});
+    if (warping) {
+        model.sections.push_back(
+            {.name = "Column",
+             .shape = fem::core::ISection{.h = 0.4, .bf = 0.3, .tf = 0.024, .tw = 0.0135}});
+    } else {
+        model.sections.push_back(
+            {.name = "Column", .shape = fem::core::RectangularTube{.b = 0.4, .h = 0.4, .t = 0.02}});
+    }
     model.sections.push_back(
         {.name = "Beam",
          .shape = fem::core::ISection{.h = 0.5, .bf = 0.2, .tf = 0.016, .tw = 0.01}});
     model.assignments.push_back({.elements = fem::core::ElementIds{columns},
                                  .kind = fem::core::ElementKind::Beam3D,
                                  .material = "Steel",
-                                 .section = "Column"});
+                                 .section = "Column",
+                                 .warping = warping});
     model.assignments.push_back({.elements = fem::core::ElementIds{beams},
                                  .kind = fem::core::ElementKind::Beam3D,
                                  .material = "Steel",
-                                 .section = "Beam"});
+                                 .section = "Beam",
+                                 .warping = warping});
     fem::core::NodeIds base;
     fem::core::NodeIds top;
     for (int j = 0; j < side; ++j) {
@@ -274,6 +286,7 @@ int run(int argc, char** argv)
     std::vector<std::string> args(argv, argv + argc);
     const bool costs = std::erase(args, std::string("--cost")) > 0;
     const bool second = std::erase(args, std::string("--second-order")) > 0;
+    const bool warping = std::erase(args, std::string("--warping")) > 0;
     int buckling = 0;
     if (const auto at = std::ranges::find(args, std::string("--buckling")); at != args.end()) {
         if (at + 1 == args.end()) {
@@ -290,7 +303,7 @@ int run(int argc, char** argv)
         return EXIT_FAILURE;
     }
     auto start = Clock::now();
-    const fem::core::Model model = building(bays, storeys);
+    const fem::core::Model model = building(bays, storeys, warping);
     std::printf("%d nodes, %d bars; model built in %.3f s\n", model.mesh->nodeCount(),
                 model.mesh->elementCount(), secondsSince(start));
 
@@ -310,9 +323,9 @@ int run(int argc, char** argv)
         largest = std::max(largest, u.norm());
     }
     const int side = bays + 1;
-    std::printf("analysis, %d free dofs: %.3f s (validation, assembly, solution, "
+    std::printf("analysis, %d free dofs%s: %.3f s (validation, assembly, solution, "
                 "reactions and end forces); largest displacement %.4g\n",
-                6 * side * side * storeys, total, largest);
+                6 * side * side * storeys, warping ? " plus the warping ones" : "", total, largest);
     if (second) {
         start = Clock::now();
         const auto r = fem::core::runSecondOrderStatic(model);
