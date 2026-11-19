@@ -9,6 +9,7 @@
 #include <Eigen/Core>
 #include <Eigen/LU>
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <numbers>
 #include <string>
@@ -442,5 +443,85 @@ TEST_CASE("warping constants and sectorial coordinates of the shapes", "[core][s
         generic.warpingConstant = 2.5e-6;
         CHECK(fem::core::sectionProperties(generic).value_or(SectionProperties{}).warpingConstant ==
               2.5e-6);
+    }
+}
+
+namespace {
+
+// The integrals of y (y^2 + z^2) and z (y^2 + z^2) over the rectangle
+// [y0, y1] x [z0, z1], exactly.
+std::array<double, 2> cubicOfRectangle(double y0, double y1, double z0, double z1)
+{
+    const auto p = [](double a, double b, int n) { return (std::pow(b, n) - std::pow(a, n)) / n; };
+    return {p(y0, y1, 4) * p(z0, z1, 1) + p(y0, y1, 2) * p(z0, z1, 3),
+            p(y0, y1, 1) * p(z0, z1, 4) + p(y0, y1, 3) * p(z0, z1, 2)};
+}
+
+} // namespace
+
+// REQ-008d-12: r0^2 and the monosymmetry coefficients beta_y and beta_z
+// (design 008d §5.7), exact by the integrals of the rectangles of the
+// shapes; zero for the doubly symmetric ones.
+TEST_CASE("polar radius and monosymmetry of the shapes", "[core][section]")
+{
+    SECTION("doubly symmetric shapes: beta = 0")
+    {
+        for (const SectionShape& shape : std::vector<SectionShape>{
+                 fem::core::Rectangle{.b = 0.2, .h = 0.5}, fem::core::Circle{.d = 0.3},
+                 fem::core::RectangularTube{.b = 0.3, .h = 0.4, .t = 0.02},
+                 fem::core::ISection{.h = 0.4, .bf = 0.2, .tf = 0.02, .tw = 0.01}}) {
+            const SectionProperties p = of(shape);
+            const double scale = std::sqrt(p.inertiaZ / p.area);
+            CHECK(std::abs(p.monosymmetryY) <= 1e-12 * scale);
+            CHECK(std::abs(p.monosymmetryZ) <= 1e-12 * scale);
+            CHECK(near(p.polarRadius2, (p.inertiaY + p.inertiaZ) / p.area, 1e-12));
+        }
+    }
+    SECTION("tee: beta_z from its two rectangles")
+    {
+        const double h = 0.3;
+        const double bf = 0.2;
+        const double tf = 0.02;
+        const double tw = 0.012;
+        const SectionProperties p = of(fem::core::Tee{.h = h, .bf = bf, .tf = tf, .tw = tw});
+        const double yc = p.centroid.x();
+        const auto flange = cubicOfRectangle(h - tf - yc, h - yc, -bf / 2, bf / 2);
+        const auto stem = cubicOfRectangle(-yc, h - tf - yc, -tw / 2, tw / 2);
+        const double ys = p.shearCentre.x();
+        CHECK(near(p.monosymmetryZ, (flange[0] + stem[0]) / p.inertiaZ - 2.0 * ys, 1e-10));
+        CHECK(std::abs(p.monosymmetryY) <= 1e-12 * h);
+        CHECK(near(p.polarRadius2, (p.inertiaY + p.inertiaZ) / p.area + ys * ys, 1e-12));
+    }
+    SECTION("channel: beta_y from its three rectangles, beta_z = 0")
+    {
+        const double h = 0.3;
+        const double bf = 0.1;
+        const double tf = 0.015;
+        const double tw = 0.01;
+        const SectionProperties p = of(fem::core::Channel{.h = h, .bf = bf, .tf = tf, .tw = tw});
+        const double zc = p.centroid.y();
+        const auto web = cubicOfRectangle(-h / 2, h / 2, -zc, tw - zc);
+        const auto top = cubicOfRectangle(h / 2 - tf, h / 2, tw - zc, bf - zc);
+        const auto bottom = cubicOfRectangle(-h / 2, -h / 2 + tf, tw - zc, bf - zc);
+        const double zs = p.shearCentre.y();
+        CHECK(near(p.monosymmetryY, (web[1] + top[1] + bottom[1]) / p.inertiaY - 2.0 * zs, 1e-10));
+        CHECK(std::abs(p.monosymmetryZ) <= 1e-12 * h);
+    }
+    SECTION("a generic section takes beta as given, or zero")
+    {
+        Section generic{.name = "G", .area = 1e-2};
+        generic.inertiaY = 2e-5;
+        generic.inertiaZ = 8e-5;
+        generic.torsionConstant = 1e-6;
+        generic.shearCentre = Eigen::Vector2d(0.03, 0.0);
+        const auto plain = fem::core::sectionProperties(generic);
+        REQUIRE(plain.has_value());
+        CHECK(plain->monosymmetryY == 0.0);
+        CHECK(plain->monosymmetryZ == 0.0);
+        CHECK(near(plain->polarRadius2, (2e-5 + 8e-5) / 1e-2 + 0.03 * 0.03, 1e-12));
+        generic.monosymmetryZ = 0.12;
+        const auto given = fem::core::sectionProperties(generic);
+        REQUIRE(given.has_value());
+        CHECK(given->monosymmetryZ == 0.12);
     }
 }

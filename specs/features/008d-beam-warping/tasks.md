@@ -97,7 +97,7 @@ Regras:
 
 ## Fase 2 — Seções e ponto de aplicação das cargas
 
-- [ ] **T11** r0², βy e βz (design §5.7). Testes:
+- [x] **T11** r0², βy e βz (design §5.7). Testes:
   - formas por integrais de polígono, 1e−10 contra as fórmulas fechadas
     (Trahair); β = 0 nas duplamente simétricas;
   - paredes finas (I de mesas desiguais, U, T);

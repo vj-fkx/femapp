@@ -127,6 +127,11 @@ struct Section
     std::optional<SectionShape> shape = std::nullopt;
     // REQ-008b-01: Iw about the shear centre, for beams with warping.
     std::optional<double> warpingConstant = std::nullopt;
+    // REQ-008d-12: the monosymmetry coefficients beta_y and beta_z of
+    // SectionProperties, in the principal axes. A generic section without
+    // them is taken as doubly symmetric (both zero).
+    std::optional<double> monosymmetryY = std::nullopt;
+    std::optional<double> monosymmetryZ = std::nullopt;
 };
 
 // Everything a beam needs from its section, about the principal axes
@@ -144,6 +149,15 @@ struct SectionProperties
     std::optional<double> shearAreaY = std::nullopt;
     std::optional<double> shearAreaZ = std::nullopt;
     double warpingConstant = 0.0; // REQ-008b-01: Iw, about the shear centre
+    // REQ-008d-12 (design 008d §5.7), principal axes from the centroid with
+    // (ys, zs) the shear centre: r0^2 = (Iy + Iz) / A + ys^2 + zs^2, the
+    // polar radius about the shear centre, squared, and the monosymmetry
+    // coefficients (Trahair's beta, zero for doubly symmetric sections)
+    // beta_y = integral of z (y^2 + z^2) dA / Iy - 2 zs and
+    // beta_z = integral of y (y^2 + z^2) dA / Iz - 2 ys.
+    double polarRadius2 = 0.0;
+    double monosymmetryY = 0.0;
+    double monosymmetryZ = 0.0;
 };
 
 // REQ-008-03, 04, 05: computed for a shape, rotated to the principal axes

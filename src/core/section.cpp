@@ -5,11 +5,13 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstddef>
 #include <memory>
 #include <numbers>
 #include <string>
 #include <string_view>
 #include <utility>
+#include <variant>
 #include <vector>
 
 namespace fem::core {
@@ -457,6 +459,108 @@ SectionProperties principal(const Geometric& g, double torsion, const Eigen::Vec
     return p;
 }
 
+// REQ-008d-12 (design 008d §5.7): the cubic moments of a section about its
+// centroid in the principal axes, exact: polygons by the triangles of a fan
+// with Strang and Fix's degree-3 rule, thin walls on their mid-line by the
+// 2-point Gauss rule (both exact for cubics).
+struct Cubic
+{
+    double y = 0.0; // integral of y (y^2 + z^2) dA
+    double z = 0.0; // integral of z (y^2 + z^2) dA
+
+    void addPoint(const Eigen::Vector2d& p, double weight)
+    {
+        const double rr = p.squaredNorm();
+        y += weight * p.x() * rr;
+        z += weight * p.y() * rr;
+    }
+
+    // A ring of the drawing, its signed area taken as `sign` times positive.
+    void addRing(const std::vector<Eigen::Vector2d>& ring, double sign,
+                 const Eigen::Vector2d& centroid, double theta)
+    {
+        if (ring.size() < 3) {
+            return;
+        }
+        std::vector<Eigen::Vector2d> q;
+        q.reserve(ring.size());
+        for (const Eigen::Vector2d& v : ring) {
+            q.push_back(toPrincipal(v - centroid, theta));
+        }
+        double area = 0.0;
+        for (std::size_t i = 0; i < q.size(); ++i) {
+            const Eigen::Vector2d& a = q[i];
+            const Eigen::Vector2d& b = q[(i + 1) % q.size()];
+            area += a.x() * b.y() - b.x() * a.y();
+        }
+        const double orientation = area >= 0.0 ? sign : -sign;
+        for (std::size_t i = 1; i + 1 < q.size(); ++i) {
+            const Eigen::Vector2d& a = q[0];
+            const Eigen::Vector2d& b = q[i];
+            const Eigen::Vector2d& c = q[i + 1];
+            const double t =
+                orientation * 0.5 *
+                ((b.x() - a.x()) * (c.y() - a.y()) - (c.x() - a.x()) * (b.y() - a.y()));
+            // Strang and Fix: -27/48 at the centroid, 25/48 at (3, 1, 1)/5.
+            addPoint((a + b + c) / 3.0, -27.0 / 48.0 * t);
+            addPoint((3.0 * a + b + c) / 5.0, 25.0 / 48.0 * t);
+            addPoint((a + 3.0 * b + c) / 5.0, 25.0 / 48.0 * t);
+            addPoint((a + b + 3.0 * c) / 5.0, 25.0 / 48.0 * t);
+        }
+    }
+
+    // A wall from a to b of thickness t, on its mid-line.
+    void addWall(const Eigen::Vector2d& a, const Eigen::Vector2d& b, double thickness,
+                 const Eigen::Vector2d& centroid, double theta)
+    {
+        const Eigen::Vector2d p = toPrincipal(a - centroid, theta);
+        const Eigen::Vector2d q = toPrincipal(b - centroid, theta);
+        const double w = 0.5 * (b - a).norm() * thickness;
+        constexpr double kG = 0.28867513459481288225; // 1 / (2 sqrt 3)
+        addPoint(0.5 * (p + q) + kG * (q - p), w);
+        addPoint(0.5 * (p + q) - kG * (q - p), w);
+    }
+};
+
+// The cubic moments of a shape (zero for the circular ones, symmetric).
+Cubic cubicOf(const SectionShape& shape, const std::vector<Part>& parts,
+              const Eigen::Vector2d& centroid, double theta)
+{
+    Cubic cubic;
+    if (const auto* thin = std::get_if<ThinWalled>(&shape)) {
+        for (const ThinWalled::Wall& wall : thin->walls) {
+            cubic.addWall(thin->points[static_cast<std::size_t>(wall.from)],
+                          thin->points[static_cast<std::size_t>(wall.to)], wall.t, centroid, theta);
+        }
+        return cubic;
+    }
+    if (const auto* solid = std::get_if<SolidPolygon>(&shape)) {
+        for (const SolidPolygon::Region& region : solid->regions) {
+            cubic.addRing(region.outline, 1.0, centroid, theta);
+            for (const auto& hole : region.holes) {
+                cubic.addRing(hole, -1.0, centroid, theta);
+            }
+        }
+        return cubic;
+    }
+    for (const Part& part : parts) {
+        const std::vector<Eigen::Vector2d> ring = {
+            {part.y0, part.z0}, {part.y1, part.z0}, {part.y1, part.z1}, {part.y0, part.z1}};
+        cubic.addRing(ring, part.sign, centroid, theta);
+    }
+    return cubic;
+}
+
+// REQ-008d-12: r0^2, and beta_y and beta_z from the cubic moments.
+void addMonosymmetry(SectionProperties& p, const Cubic& cubic)
+{
+    const double ys = p.shearCentre.x();
+    const double zs = p.shearCentre.y();
+    p.polarRadius2 = p.area > 0.0 ? (p.inertiaY + p.inertiaZ) / p.area + ys * ys + zs * zs : 0.0;
+    p.monosymmetryY = p.inertiaY > 0.0 ? cubic.z / p.inertiaY - 2.0 * zs : 0.0;
+    p.monosymmetryZ = p.inertiaZ > 0.0 ? cubic.y / p.inertiaZ - 2.0 * ys : 0.0;
+}
+
 } // namespace
 
 namespace {
@@ -476,11 +580,15 @@ Expected<Solved> solve(const Section& section)
         g.iy = section.inertiaY.value_or(0.0);
         g.iz = section.inertiaZ.value_or(0.0);
         g.iyz = section.productOfInertia.value_or(0.0);
-        return Solved{.properties = principal(g, section.torsionConstant.value_or(0.0),
-                                              section.shearCentre.value_or(Eigen::Vector2d::Zero()),
-                                              section.shearAreaY, section.shearAreaZ,
-                                              section.warpingConstant.value_or(0.0)),
-                      .field = nullptr};
+        SectionProperties p =
+            principal(g, section.torsionConstant.value_or(0.0),
+                      section.shearCentre.value_or(Eigen::Vector2d::Zero()), section.shearAreaY,
+                      section.shearAreaZ, section.warpingConstant.value_or(0.0));
+        // REQ-008d-12: beta as given, or zero (doubly symmetric).
+        addMonosymmetry(p, Cubic{});
+        p.monosymmetryY = section.monosymmetryY.value_or(0.0);
+        p.monosymmetryZ = section.monosymmetryZ.value_or(0.0);
+        return Solved{.properties = p, .field = nullptr};
     }
     const auto data = std::visit(ShapeBuilder(section.name), *section.shape);
     if (!data) {
@@ -497,6 +605,7 @@ Expected<Solved> solve(const Section& section)
         p.shearAreaY = data->shearAreaY;
         p.shearAreaZ = data->shearAreaZ;
     }
+    addMonosymmetry(p, cubicOf(*section.shape, data->parts, g.centroid, p.principalAngle));
     return Solved{.properties = p, .field = data->field};
 }
 

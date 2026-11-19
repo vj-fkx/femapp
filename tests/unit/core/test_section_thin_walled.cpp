@@ -452,3 +452,33 @@ TEST_CASE("warping stresses of open sections", "[core][section][thin][warping]")
         CHECK(near(largestThin, atWeb, 1e-10));
     }
 }
+
+// REQ-008d-12: beta_z of a monosymmetric I on its mid-lines (flanges b1 t1
+// at y = a above the centroid and b2 t2 at y = -c below, web tw):
+// integral of y (y^2 + z^2) dA = b1 t1 (a^3 + a b1^2 / 12)
+// - b2 t2 (c^3 + c b2^2 / 12) + tw (a^4 - c^4) / 4.
+TEST_CASE("monosymmetry of a thin-walled I", "[core][section][thin]")
+{
+    const double b1 = 0.3;
+    const double t1 = 0.02;
+    const double b2 = 0.15;
+    const double t2 = 0.012;
+    const double tw = 0.01;
+    const double h0 = 0.5; // between the flange mid-lines
+    const ThinWalled shape{
+        .points = {Vec(h0, -b1 / 2), Vec(h0, 0.0), Vec(h0, b1 / 2), Vec(0.0, -b2 / 2),
+                   Vec(0.0, 0.0), Vec(0.0, b2 / 2)},
+        .walls = {Wall{.from = 0, .to = 1, .t = t1}, Wall{.from = 1, .to = 2, .t = t1},
+                  Wall{.from = 3, .to = 4, .t = t2}, Wall{.from = 4, .to = 5, .t = t2},
+                  Wall{.from = 1, .to = 4, .t = tw}}};
+    const SectionProperties p = of(shape);
+    const double a = h0 - p.centroid.x();
+    const double c = p.centroid.x();
+    const double cubic = b1 * t1 * (std::pow(a, 3) + a * b1 * b1 / 12) -
+                         b2 * t2 * (std::pow(c, 3) + c * b2 * b2 / 12) +
+                         tw * (std::pow(a, 4) - std::pow(c, 4)) / 4;
+    const double ys = p.shearCentre.x();
+    CHECK(near(p.monosymmetryZ, cubic / p.inertiaZ - 2.0 * ys, 1e-10));
+    CHECK(std::abs(p.monosymmetryY) <= 1e-12 * h0);
+    CHECK(near(p.polarRadius2, (p.inertiaY + p.inertiaZ) / p.area + ys * ys, 1e-12));
+}

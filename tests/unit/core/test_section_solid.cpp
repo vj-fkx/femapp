@@ -251,3 +251,31 @@ TEST_CASE("stresses of solid polygons", "[core][section][solid]")
         CHECK(stresses.front().name == "vertex 0 of the outline of the region 0");
     }
 }
+
+// REQ-008d-12: the cubic moment of a solid polygon is exact: a tee drawn as
+// a polygon (and as a rectangle with a notch removed as two holes would
+// not be simpler) gives the integral of y (y^2 + z^2) of the parametric
+// tee, beta_z + 2 ys times Iz (their shear centres differ: numerical
+// against the mid-lines).
+TEST_CASE("monosymmetry of a solid polygon", "[core][section][solid]")
+{
+    const double h = 0.3;
+    const double bf = 0.2;
+    const double tf = 0.02;
+    const double tw = 0.012;
+    const SectionProperties parametric = of(fem::core::Tee{.h = h, .bf = bf, .tf = tf, .tw = tw});
+    const Ring tee = {Vec(0.0, -tw / 2),   Vec(h - tf, -tw / 2), Vec(h - tf, -bf / 2),
+                      Vec(h, -bf / 2),     Vec(h, bf / 2),       Vec(h - tf, bf / 2),
+                      Vec(h - tf, tw / 2), Vec(0.0, tw / 2)};
+    const SectionProperties polygon = of(solid(tee));
+    const auto cubic = [](const SectionProperties& p) {
+        return (p.monosymmetryZ + 2.0 * p.shearCentre.x()) * p.inertiaZ;
+    };
+    CHECK(near(cubic(polygon), cubic(parametric), 1e-10));
+    // -2 zs with the numerical shear centre (zero by symmetry).
+    CHECK(std::abs(polygon.monosymmetryY) <= 1e-6 * h);
+    CHECK(near(polygon.polarRadius2,
+               (polygon.inertiaY + polygon.inertiaZ) / polygon.area +
+                   polygon.shearCentre.squaredNorm(),
+               1e-12));
+}
