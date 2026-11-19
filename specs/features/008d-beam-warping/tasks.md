@@ -132,12 +132,12 @@ Regras:
 
 ## Fase 4 — Flexo-torção no motor exato
 
-- [ ] **T14** Testes de consistência (deve falhar), 1e−12:
+- [x] **T14** Testes de consistência (deve falhar), 1e−12:
   - K da barra reta simétrica com N, momentos, cortantes e empenamento;
   - só com N, igual à 008c;
   - barra cortada em duas e condensada igual à inteira.
   Arquivo: `tests/unit/core/test_flexural_torsional.cpp`. Cobre: 10, 11
-- [ ] **T15** Funcional de flexo-torção em `systemMatrix` (design §5.5,
+- [x] **T15** Funcional de flexo-torção em `systemMatrix` (design §5.5,
   ADR 0008): Wagner (G·J + K), excentricidade do centro de cisalhamento na
   inclinação e acoplamento flexão-torção. Os sinais saem dos casos fechados,
   um elemento por vão, 1e−8:
@@ -328,3 +328,30 @@ Regras:
   linear), com cargas, 4. A segunda ordem ainda itera só N (a T21 itera
   os seis). Os testes do `core` passam a ver `src/core` (os estágios da
   análise em `detail/`), como os do `io` e do `render`.
+- T14: "só com N, igual à 008c" vale para os planos de flexão; a torção
+  ganha o termo de Wagner N·r0² mesmo em seção duplamente simétrica
+  (G·J → G·J + N·r0²), e o teste confere isso. O termo de Wagner usa r0²
+  inteiro (em relação ao centro de cisalhamento): a inclinação do
+  centroide dá N·κx·(ez·θz + ey·θy) e o resto vem em K. A regra de partes
+  também passou a subdividir onde os momentos variam (mudança de
+  M·h/√(EI·GJ), como a de N), senão o Magnus de uma parte só não fecha a
+  barra cortada em duas.
+- T15: os termos de flexo-torção entram em `systemMatrix` pelo ponto de
+  referência: Wagner G·J + K (K = N·r0² + βy·My − βz·Mz); a inclinação do
+  centroide com o giro (N·ez·κx, N·ey·κx); e os momentos na seção girada,
+  m = M − θ×M0 no giro, na flexibilidade de flexão, com o conjugado na
+  torção. Os casos fechados passam em 1e−8 com o sinal de θ×M0 tal como
+  escrito. Na flambagem, três mudanças, achadas nos casos fechados e
+  antecipadas da T17 e da T19:
+  - a regra de partes tem os limites de torção (com empenamento) e de
+    flexo-torção, e uma barra sem empenamento cujo K anula G·J fica
+    instável (`kUnstableBar`): sem empenamento, a torção flamba em todo
+    comprimento de uma vez;
+  - com momento uniforme, K(λ) é par em λ (±M flambam igual) e o pencil
+    linear K0·φ = μ·G·φ não tem estimativas (G nulo, ou só arredondamento,
+    que dava estimativas absurdas): abaixo de |G| ≤ 1e−12·|K0|, só a
+    contagem acha os fatores;
+  - a bissecção dos fatores que os vetores perderam agora procura abaixo
+    do fator achado (muitos fatores de torção dentro da barra abaixo do
+    de Euler), limitada a 64 e parando no salto de uma barra além do
+    alcance; a recusa da flambagem olha também os momentos (T19).

@@ -96,6 +96,19 @@ bool ReferenceProfile::axialVaries() const
     return false;
 }
 
+bool ReferenceProfile::varies() const
+{
+    const ReferencePoint& a = values[0];
+    for (int i = 1; i < count; ++i) {
+        const ReferencePoint& b = values.at(static_cast<std::size_t>(i));
+        if (b.n != a.n || b.vy != a.vy || b.vz != a.vz || b.t != a.t || b.my != a.my ||
+            b.mz != a.mz) {
+            return true;
+        }
+    }
+    return false;
+}
+
 const ReferenceProfile& referenceOf(const BeamData& beam)
 {
     static const ReferenceProfile kNone{};

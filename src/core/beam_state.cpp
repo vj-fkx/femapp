@@ -98,21 +98,40 @@ double engesser(double n, double shear)
     return shear > 0.0 ? 1.0 / (1.0 + n / shear) : 1.0;
 }
 
-FullMatrix systemMatrix(const BeamData& beam, double n)
+// Feature 008d (design 008d §5.5, ADR 0008): Wagner's term of the torsion,
+// N r0^2 + beta_y My - beta_z Mz (the integral of sigma r^2 about the shear
+// centre, with sigma = N / A - Mz y / Iz + My z / Iy). With the slope of the
+// centroid, (theta + e kappa_x), the energy of N is 1/2 N |theta|^2 +
+// N kappa_x (ez theta_z + ey theta_y) + 1/2 N r0^2 kappa_x^2.
+double wagner(const BeamData& beam, const ReferencePoint& r)
+{
+    return r.n * beam.polarRadius2 + beam.monosymmetryY * r.my - beam.monosymmetryZ * r.mz;
+}
+
+FullMatrix systemMatrix(const BeamData& beam, const ReferencePoint& r)
 {
     FullMatrix a = FullMatrix::Zero();
     const Mat3 omega = skew(beam.curvature);
     const double ey = beam.shearCentre.x();
     const double ez = beam.shearCentre.y();
     const bool warping = beam.warpingStiffness > 0.0;
-    // The twist rate as a row over the states.
+    const double n = r.n;
+    // Feature 008d: the Saint-Venant stiffness with Wagner's term.
+    const double torsional = beam.torsional + wagner(beam, r);
+    // The twist rate as a row over the states. Feature 008d: without
+    // warping, kappa_x = (T_S - N (ez theta_z + ey theta_y)) / (GJ + K), the
+    // conjugate of T_S in the complementary energy of design 008d §5.5.
     Eigen::Matrix<double, 1, kFull> twist = Eigen::Matrix<double, 1, kFull>::Zero();
     if (warping) {
         twist(PSI) = 1.0;
-    } else if (beam.torsional > 0.0) {
-        twist(MX) = 1.0 / beam.torsional;
-        twist(VY) = ez / beam.torsional;
-        twist(VZ) = -ey / beam.torsional;
+    } else if (torsional != 0.0) {
+        // Negative beyond the torsional buckling of a bar without warping
+        // (the count marks it unstable, longestPart); only zero is left out.
+        twist(MX) = 1.0 / torsional;
+        twist(VY) = ez / torsional;
+        twist(VZ) = -ey / torsional;
+        twist(RZ) = -n * ez / torsional;
+        twist(RY) = -n * ey / torsional;
     }
     // u' = -Omega x u - e1 x theta + Gamma.
     a.block<3, 3>(U, U) = -omega;
@@ -138,13 +157,16 @@ FullMatrix systemMatrix(const BeamData& beam, double n)
     if (beam.bendingZ > 0.0) {
         a(RZ, MZ) += 1.0 / beam.bendingZ;
     }
-    // Warping: psi' = Q / E Iw, Q' = G J psi - T_S.
+    // Warping: psi' = Q / E Iw, Q' = (G J + K) psi + N (ez theta_z + ey
+    // theta_y) - T_S (feature 008d).
     if (warping) {
         a(PSI, Q) = 1.0 / beam.warpingStiffness;
-        a(Q, PSI) = beam.torsional;
+        a(Q, PSI) = torsional;
         a(Q, MX) = -1.0;
         a(Q, VY) = -ez;
         a(Q, VZ) = ey;
+        a(Q, RZ) += n * ez;
+        a(Q, RY) += n * ey;
     }
     // F' = -Omega x F - q, with the foundation q = -k u.
     a.block<3, 3>(N, N) = -omega;
@@ -165,6 +187,25 @@ FullMatrix systemMatrix(const BeamData& beam, double n)
         }
         if (beam.shearZ > 0.0) {
             a(MY, VZ) -= n * fz / beam.shearZ;
+        }
+        // Feature 008d: the twist about the shear centre in the slope of
+        // the centroid, ez kappa_x and -ey kappa_x.
+        a.row(MZ) += n * ez * twist;
+        a.row(MY) += n * ey * twist;
+    }
+    // Feature 008d (design 008d §5.5, ADR 0008): the bending moments in the
+    // twisted section, m = M - theta x M0 on its twist: My + theta_x Mz0 and
+    // Mz - theta_x My0 in the curvatures, and their conjugate in the torque.
+    if (r.my != 0.0 || r.mz != 0.0) {
+        if (beam.bendingY > 0.0) {
+            a(RY, RX) += r.mz / beam.bendingY;
+            a(MX, MY) -= r.mz / beam.bendingY;
+            a(MX, RX) -= r.mz * r.mz / beam.bendingY;
+        }
+        if (beam.bendingZ > 0.0) {
+            a(RZ, RX) -= r.my / beam.bendingZ;
+            a(MX, MZ) += r.my / beam.bendingZ;
+            a(MX, RX) -= r.my * r.my / beam.bendingZ;
         }
     }
     return a;
@@ -249,11 +290,11 @@ public:
         : m_plan(plan)
         , m_beam(beam)
         , m_length(length)
-        , m_varying(referenceOf(beam).axialVaries())
+        , m_varying(referenceOf(beam).varies())
         , m_omega(skew(beam.curvature))
     {
         const int n = plan.count;
-        m_a = reduced(systemMatrix(beam, referenceOf(beam).axialAt((from + to) / 2.0, length)));
+        m_a = reduced(systemMatrix(beam, referenceOf(beam).at((from + to) / 2.0, length)));
         // Scales: lengths h, rotations 1, warping 1/h, forces S/h^2,
         // moments S/h, Q S, with S a bending stiffness.
         const double h = to - from;
@@ -445,8 +486,7 @@ private:
             return generator(m_a);
         }
         const auto at = [&](double xi) {
-            return reduced(
-                systemMatrix(m_beam, referenceOf(m_beam).axialAt(x0 + xi * l, m_length)));
+            return reduced(systemMatrix(m_beam, referenceOf(m_beam).at(x0 + xi * l, m_length)));
         };
         const StateMatrix g1 = generator(at(kGaussLow));
         const StateMatrix g2 = generator(at(kGaussHigh));
@@ -545,10 +585,48 @@ constexpr double kVaryingChange = 5e-5;
 constexpr int kMaxVaryingPieces = 256;
 double longestPart(const BeamData& beam)
 {
-    const double c = referenceOf(beam).largestCompression();
+    // Feature 008d (design 008d §5.6): without warping, the torsion buckles
+    // along the whole bar at once when Wagner's term cancels G J, whatever
+    // the length of the parts: beyond the reach of any part.
+    const ReferenceProfile& reference = referenceOf(beam);
+    if (!(beam.warpingStiffness > 0.0) && beam.torsional > 0.0) {
+        for (int i = 0; i < reference.count; ++i) {
+            if (!(beam.torsional + wagner(beam, reference.values.at(static_cast<std::size_t>(i))) >
+                  0.0)) {
+                return -1.0;
+            }
+        }
+    }
     const double ei = smallestPositive(beam.bendingY, beam.bendingZ);
+    double longest = 0.0; // 0: no limit
+    const auto limit = [&longest](double l) { longest = longest > 0.0 ? std::min(longest, l) : l; };
+    // Feature 008d: with warping, the part clamped at both ends buckles in
+    // torsion when G J + 4 pi^2 E Iw / l^2 + K = 0, and in lateral torsion
+    // when (2 pi / l)^2 EI (G J + 4 pi^2 E Iw / l^2) = M^2: kept above
+    // kCriticalMargin times the largest -K and |M|.
+    double softening = 0.0; // the largest -K
+    double moment = 0.0;    // the largest |M|
+    for (int i = 0; i < reference.count; ++i) {
+        const ReferencePoint& r = reference.values.at(static_cast<std::size_t>(i));
+        softening = std::max(softening, -wagner(beam, r));
+        moment = std::max({moment, std::abs(r.my), std::abs(r.mz)});
+    }
+    const double twoPi = 2.0 * std::numbers::pi;
+    const double eiw = beam.warpingStiffness;
+    if (eiw > 0.0 && kCriticalMargin * softening > beam.torsional) {
+        limit(twoPi * std::sqrt(eiw / (kCriticalMargin * softening - beam.torsional)));
+    }
+    if (moment > 0.0 && ei > 0.0 && (beam.torsional > 0.0 || eiw > 0.0)) {
+        // x = (2 pi / l)^2: EI GJ x + EI EIw x^2 = (margin M)^2.
+        const double target = std::pow(kCriticalMargin * moment, 2) / ei;
+        const double gj = beam.torsional;
+        const double x =
+            eiw > 0.0 ? (-gj + std::sqrt(gj * gj + 4.0 * eiw * target)) / (2.0 * eiw) : target / gj;
+        limit(twoPi / std::sqrt(x));
+    }
+    const double c = reference.largestCompression();
     if (!(c > 0.0) || !(ei > 0.0)) {
-        return 0.0;
+        return longest;
     }
     const double ga = smallestPositive(beam.shearY, beam.shearZ);
     double margin = kCriticalMargin;
@@ -559,7 +637,8 @@ double longestPart(const BeamData& beam)
         }
     }
     const double shear = ga > 0.0 ? 1.0 - margin * c / ga : 1.0;
-    return 2.0 * std::numbers::pi * std::sqrt(ei * shear / (margin * c));
+    limit(twoPi * std::sqrt(ei * shear / (margin * c)));
+    return longest;
 }
 
 // At most kMaxParts parts: a compression that needs more is beyond the reach
@@ -592,16 +671,26 @@ int partCount(const BeamData& beam, double length)
     // so that each piece changes (k h)^2 by at most kVaryingChange: the
     // error of the fourth-order Magnus integrator (design 008c §5.2,
     // calibrated on Greenhill's column for 1e-8).
+    // Feature 008d: the same for the moments, by the change of M h /
+    // sqrt(EI GJ) (the scale of their flexural-torsional terms).
     const ReferenceProfile& reference = referenceOf(beam);
-    const int profile = reference.axialVaries() ? reference.parts() : 1;
+    const int profile = reference.varies() ? reference.parts() : 1;
     const double ei = smallestPositive(beam.bendingY, beam.bendingZ);
-    if (reference.axialVaries() && ei > 0.0) {
+    if (reference.varies() && ei > 0.0) {
         const double h = length / profile;
+        const double scale = beam.torsional > 0.0 ? std::sqrt(ei * beam.torsional) : 0.0;
         int pieces = 1;
         for (int part = 0; part < profile; ++part) {
-            const double low = reference.values.at(2 * static_cast<std::size_t>(part)).n;
-            const double high = reference.values.at(2 * static_cast<std::size_t>(part) + 1).n;
-            const double change = std::abs(high - low) / (kGaussHigh - kGaussLow) * h * h / ei;
+            const ReferencePoint& low = reference.values.at(2 * static_cast<std::size_t>(part));
+            const ReferencePoint& high =
+                reference.values.at(2 * static_cast<std::size_t>(part) + 1);
+            const double step = 1.0 / (kGaussHigh - kGaussLow);
+            double change = std::abs(high.n - low.n) * step * h * h / ei;
+            if (scale > 0.0) {
+                const double moment =
+                    std::max(std::abs(high.my - low.my), std::abs(high.mz - low.mz)) * step;
+                change = std::max(change, moment * h / scale);
+            }
             pieces = std::max(pieces, partsFor(std::cbrt(change / kVaryingChange)));
         }
         parts = std::max(parts, profile * std::min(pieces, kMaxVaryingPieces));

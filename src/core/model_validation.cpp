@@ -883,6 +883,10 @@ Expected<BeamSetup> beamSetup(const Model& model, ElementIndex element,
         beam.shearZ = g * section.shearAreaZ.value_or(0.0);
     }
     beam.shearCentre = section.shearCentre;
+    // REQ-008d-10, 12: the Wagner properties of the section.
+    beam.polarRadius2 = section.polarRadius2;
+    beam.monosymmetryY = section.monosymmetryY;
+    beam.monosymmetryZ = section.monosymmetryZ;
     // REQ-008d-01: torsion with warping, 3D beams.
     if (assignment.warping && assignment.kind == ElementKind::Beam3D) {
         beam.warpingStiffness = e0 * section.warpingConstant;

@@ -82,6 +82,8 @@ struct ReferenceProfile
     // Whether N changes along the bar (the other forces may vary with N
     // constant: a beam whose moments vary).
     [[nodiscard]] bool axialVaries() const;
+    // Whether any force changes along the bar.
+    [[nodiscard]] bool varies() const;
     // The largest compression, >= 0, including the ends of the parts.
     [[nodiscard]] double largestCompression() const;
     // The same profile with every force (and the load factor) times `factor`.
@@ -125,6 +127,12 @@ struct BeamData
     Eigen::Matrix3d endAxes = Eigen::Matrix3d::Identity();
     // > 0: the flexible length along an arc (design 008b §5.2).
     double arcLength = 0.0;
+    // REQ-008d-10, 12: r0^2 about the shear centre and the monosymmetry
+    // coefficients of the section (SectionProperties), for the
+    // flexural-torsional terms.
+    double polarRadius2 = 0.0;
+    double monosymmetryY = 0.0;
+    double monosymmetryZ = 0.0;
     // Features 008c, 008d: the reference state, for the second order and the
     // buckling (design 008c §5.1, 5.2, 008d §5.4); null: first order. Shared:
     // the copies of the data (results, modes) do not repeat it.

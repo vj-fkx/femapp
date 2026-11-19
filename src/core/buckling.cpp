@@ -16,6 +16,7 @@
 
 #include "detail/static_stages.hpp"
 
+#include <fem/core/beam_state.hpp>
 #include <fem/core/linear_solver.hpp>
 #include <fem/core/stability_analysis.hpp>
 
@@ -54,6 +55,7 @@ constexpr double kCountMargin = 1e-6;  // above the last factor
 constexpr double kSameFactor = 1e-7;   // repeated factors
 constexpr double kInsideMargin = 1e-7; // about a factor inside a bar
 constexpr int kBisections = 200;
+constexpr double kNoLinearPart = 1e-12; // |G| / |K0| below it: no linear pencil
 constexpr double kBisectionPrecision = 1e-13;
 constexpr int kDoublings = 60;
 constexpr double kRefinementReach = 2.0; // of the starting lambda: a local search
@@ -258,10 +260,23 @@ Expected<BucklingResult> runLinearBuckling(const Model& model, const BucklingOpt
         return tl::unexpected(linear.error());
     }
     std::vector<ReferenceProfile> reference = problem.profilesOf(problem.valuesOf(*linear));
-    // REQ-008c-12: no compression, no buckling.
-    if (std::ranges::none_of(
-            reference, [](const ReferenceProfile& p) { return p.largestCompression() > 0.0; })) {
-        return makeError("No bar is compressed by these loads: there is no buckling factor.");
+    // REQ-008c-12, 008d-16: no compression and no bending moment, no
+    // buckling (a moment can turn a beam out of its plane).
+    const auto unstable = [](const ReferenceProfile& p) {
+        if (p.largestCompression() > 0.0) {
+            return true;
+        }
+        for (int i = 0; i < p.count; ++i) {
+            const ReferencePoint& r = p.values.at(static_cast<std::size_t>(i));
+            if (r.my != 0.0 || r.mz != 0.0) {
+                return true;
+            }
+        }
+        return false;
+    };
+    if (std::ranges::none_of(reference, unstable)) {
+        return makeError(
+            "No bar is compressed or bent by these loads: there is no buckling factor.");
     }
     Pencil pencil(problem, reference);
     const Eigen::Index n = k0.rows();
@@ -275,6 +290,10 @@ Expected<BucklingResult> runLinearBuckling(const Model& model, const BucklingOpt
         return tl::unexpected(!plus ? plus.error() : minus.error());
     }
     const SparseMatrix g = (*minus - *plus) / (2.0 * kDerivativeStep);
+    // Feature 008d: K(lambda) can be even in lambda (a beam bent by a moment
+    // buckles for +M and -M alike): then G is zero, or only rounding, and the
+    // linear pencil has no estimates; the count alone finds the factors.
+    const bool linearized = g.norm() > kNoLinearPart * k0.norm();
 
     // Estimates: subspace iteration on K0 phi = mu G phi.
     const auto p = static_cast<Eigen::Index>(std::min<Eigen::Index>(wanted + kSubspaceExtra, n));
@@ -286,7 +305,7 @@ Expected<BucklingResult> runLinearBuckling(const Model& model, const BucklingOpt
     }
     std::vector<std::pair<double, Eigen::VectorXd>> estimates;
     std::vector<double> last;
-    for (int iteration = 0; iteration < kSubspaceIterations; ++iteration) {
+    for (int iteration = 0; linearized && iteration < kSubspaceIterations; ++iteration) {
         Eigen::MatrixXd y(n, p);
         for (Eigen::Index c = 0; c < p; ++c) {
             auto solved = base.solve(times(g, x.col(c)));
@@ -438,8 +457,28 @@ Expected<BucklingResult> runLinearBuckling(const Model& model, const BucklingOpt
             break;
         }
     }
-    const std::int64_t target = std::min<std::int64_t>(*total, wanted);
-    while (below(high) < target) {
+    // A count above the factors known below `high` means factors missed
+    // below it: the lowest are bisected one by one; once `wanted` are
+    // known, only the ones below the last wanted matter (feature 008d: many
+    // torsional factors inside the bars can lie below a nodal one).
+    const auto settle = [&]() -> Expected<void> {
+        if (static_cast<int>(found.size()) >= wanted) {
+            high = found[static_cast<std::size_t>(wanted) - 1].lambda * (1.0 + kCountMargin);
+            auto recount = sturmCount(pencil, high);
+            if (!recount) {
+                return tl::unexpected(recount.error());
+            }
+            total = recount;
+        }
+        return {};
+    };
+    if (auto settled = settle(); !settled) {
+        return tl::unexpected(settled.error());
+    }
+    // At most kMaxMissing bisected factors: a bar beyond its reach (the
+    // count of kUnstableBar) is one factor, not a million.
+    constexpr int kMaxMissing = 64;
+    for (int missed = 0; below(high) < *total && missed < kMaxMissing; ++missed) {
         // The first lambda where the count passes the factors known below.
         double low = sigma;
         double top = high;
@@ -491,8 +530,28 @@ Expected<BucklingResult> runLinearBuckling(const Model& model, const BucklingOpt
                 }
             }
         }
+        // A bar beyond its reach (the count jumps by kUnstableBar there) is
+        // one factor: nothing more to find at it.
+        if (missing.x.isZero()) {
+            auto above = sturmCount(pencil, top * (1.0 + kInsideMargin));
+            auto under = sturmCount(pencil, top * (1.0 - kInsideMargin));
+            if (above && under && *above - *under >= kUnstableBar) {
+                const bool again = std::ranges::any_of(found, [&missing](const Factor& f) {
+                    return std::abs(f.lambda - missing.lambda) <= kSameFactor * missing.lambda;
+                });
+                if (again) {
+                    break;
+                }
+            }
+        }
         found.push_back(std::move(missing));
         std::ranges::sort(found, {}, &Factor::lambda);
+        if (static_cast<int>(found.size()) > wanted) {
+            found.resize(static_cast<std::size_t>(wanted));
+        }
+        if (auto settled = settle(); !settled) {
+            return tl::unexpected(settled.error());
+        }
     }
     if (static_cast<int>(found.size()) > wanted) {
         found.resize(static_cast<std::size_t>(wanted));
