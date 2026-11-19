@@ -64,7 +64,9 @@ Layout layoutOf(const BeamData& beam, ElementKind kind)
                 if (beam.warpingContinuous.at(e)) {
                     l.externalOf.at(j) = l.external++;
                 } else if (beam.warpingSprings.at(e) != kRigid) {
+                    // REQ-008d-03: free (0) or a bimoment spring to the ground.
                     l.internalOf.at(j) = l.internal++;
+                    l.spring.at(j) = beam.warpingSprings.at(e);
                 }
                 continue;
             }
@@ -128,16 +130,19 @@ public:
             }
             (ia < 0 ? m_fe(ea) : m_fi(ia)) += f(a);
         }
-        // The springs between the external dof and its internal one.
+        // The springs between the external dof and its internal one, and
+        // the bimoment springs of the warping to the ground (design 008d §5.2).
         for (int a = 0; a < n; ++a) {
             const auto sa = static_cast<std::size_t>(a);
             const int i = layout.internalOf.at(sa);
             const int e = layout.externalOf.at(sa);
+            const double s = layout.spring.at(sa);
             if (i >= 0 && e >= 0) {
-                const double s = layout.spring.at(sa);
                 m_kee(e, e) += s;
                 m_kii(i, i) += s;
                 m_kei(e, i) -= s;
+            } else if (i >= 0) {
+                m_kii(i, i) += s;
             }
         }
         if (ni > 0 && m_indefinite) {

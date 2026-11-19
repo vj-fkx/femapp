@@ -12,6 +12,7 @@
 #include <Eigen/Core>
 #include <cmath>
 #include <cstddef>
+#include <numbers>
 
 using fem::core::BarEnd;
 using fem::core::DofType;
@@ -251,4 +252,202 @@ TEST_CASE("a nodal bimoment and its reaction", "[core][beam][warping]")
     const fem::core::BeamResult& bar = fem::core::test::beamOf(result, 0);
     CHECK(near(bar.end().b, -bimoment, 1e-8));
     CHECK(std::abs(bar.start().t) <= 1e-8 * bimoment / length);
+}
+
+// REQ-008d-03 (AC-2): a bimoment spring kw at the root of a cantilever
+// with a torque T at its free tip. With psi = T / GJ + A cosh kx + C sinh kx,
+// B(L) = 0 and E Iw psi'(0) = kw psi(0): A = -(kw T / GJ) / (kw + E Iw k
+// tanh kL) and theta(L) = T L / GJ + A tanh(kL) / k. kw -> 0 is the free
+// root, kw -> infinity the restrained one.
+TEST_CASE("a warping spring at the root of a cantilever", "[core][beam][warping]")
+{
+    const double length = 3.0;
+    const double iw = 2.5e-7;
+    const double k = kOf(iw);
+    const double torque = 8.0e2;
+    const double scale = kE * iw * k;
+    const auto expected = [&](double kw) {
+        const double a = -(kw * torque / kGJ) / (kw + scale * std::tanh(k * length));
+        return torque * length / kGJ + a * std::tanh(k * length) / k;
+    };
+    const auto tipTwist = [&](WarpingCondition condition, double kw) {
+        Model model = warpingBeam(1, length, iw);
+        fem::core::test::fixAll(model, {1}, ElementKind::Beam3D);
+        model.warpingEnds.push_back({.elements = ElementIds{{1}},
+                                     .end = BarEnd::Start,
+                                     .condition = condition,
+                                     .stiffness = kw});
+        model.nodalForces.push_back(
+            {.nodes = NodeIds{{2}}, .moment = Eigen::Vector3d(torque, 0.0, 0.0)});
+        return fem::core::test::solve(model).rotations[1].x();
+    };
+    const double free = tipTwist(WarpingCondition::Free, 0.0);
+    const double restrained = tipTwist(WarpingCondition::Restrained, 0.0);
+    CHECK(near(free, torque * length / kGJ, 1e-8));
+    CHECK(near(tipTwist(WarpingCondition::Elastic, 0.0), free, 1e-12));
+    CHECK(near(tipTwist(WarpingCondition::Elastic, 1e12 * scale), restrained, 1e-8));
+    for (const double kw : {0.1 * scale, scale, 10.0 * scale}) {
+        INFO("kw / (E Iw k) " << kw / scale);
+        CHECK(near(tipTwist(WarpingCondition::Elastic, kw), expected(kw), 1e-8));
+    }
+}
+
+// REQ-008d-03 (AC-2): two equal spans on fork supports, warping continuous
+// over the middle support, a uniform torque: by symmetry, no warping over
+// the middle, so each span is one bar with its warping restrained there.
+TEST_CASE("two spans with continuous warping are one bar each", "[core][beam][warping]")
+{
+    const double span = 4.0;
+    const double iw = 4.0e-7;
+    const double m = 1.5e3;
+    Model twoSpans = warpingBeam(2, 2.0 * span, iw);
+    fem::core::test::restrain(twoSpans, {1}, {DofType::U});
+    fem::core::test::restrain(twoSpans, {1, 2, 3}, {DofType::V, DofType::W, DofType::RX});
+    twoSpans.distributedLoads.push_back({.elements = ElementIds{{1, 2}},
+                                         .axes = fem::core::Axes::Local,
+                                         .startTorque = m,
+                                         .endTorque = m});
+    Model oneSpan = warpingBeam(1, span, iw);
+    forkSupports(oneSpan, 1);
+    oneSpan.warpingEnds.push_back({.elements = ElementIds{{1}},
+                                   .end = BarEnd::End,
+                                   .condition = WarpingCondition::Restrained});
+    oneSpan.distributedLoads.push_back({.elements = ElementIds{{1}},
+                                        .axes = fem::core::Axes::Local,
+                                        .startTorque = m,
+                                        .endTorque = m});
+    const fem::core::StaticResult two = fem::core::test::solve(twoSpans);
+    const fem::core::StaticResult one = fem::core::test::solve(oneSpan);
+    CHECK(std::abs(two.warping[1]) <=
+          1e-10 * std::abs(fem::core::test::beamOf(two, 0).at(0.0).warping));
+    for (const double x : {0.25 * span, 0.5 * span, 0.8 * span}) {
+        const fem::core::BeamPoint a = fem::core::test::beamOf(two, 0).at(x);
+        const fem::core::BeamPoint b = fem::core::test::beamOf(one, 0).at(x);
+        CHECK(near(a.rotation.x(), b.rotation.x(), 1e-8));
+        CHECK(near(a.forces.b, b.forces.b, 1e-8, std::abs(b.forces.b) + 1.0));
+    }
+}
+
+// REQ-008d-03 (AC-2): at a node of a T, the two collinear bars share the
+// warping and the third one is free; the default gives the same as the
+// conditions given explicitly.
+TEST_CASE("the warping at the node of a T", "[core][beam][warping]")
+{
+    fem::core::test::TrussSpec spec;
+    spec.nodes = {{0.0, 0.0, 0.0}, {3.0, 0.0, 0.0}, {6.0, 0.0, 0.0}, {3.0, 2.0, 0.0}};
+    spec.bars = {{0, 1}, {1, 2}, {1, 3}};
+    Model model = fem::core::test::beamModel(spec, ElementKind::Beam3D);
+    model.sections.front().warpingConstant = 3.0e-7;
+    model.assignments.front().warping = true;
+    fem::core::test::fixAll(model, {1, 3}, ElementKind::Beam3D);
+    model.warpingEnds.push_back({.elements = ElementIds{{1}},
+                                 .end = BarEnd::Start,
+                                 .condition = WarpingCondition::Restrained});
+    model.nodalForces.push_back(
+        {.nodes = NodeIds{{2}}, .moment = Eigen::Vector3d(2.0e3, 5.0e2, 0.0)});
+    model.nodalForces.push_back(
+        {.nodes = NodeIds{{4}}, .force = Eigen::Vector3d(0.0, 0.0, -3.0e3)});
+    Model explicitEnds = model;
+    explicitEnds.warpingEnds.push_back({.elements = ElementIds{{1}},
+                                        .end = BarEnd::End,
+                                        .condition = WarpingCondition::Continuous});
+    explicitEnds.warpingEnds.push_back({.elements = ElementIds{{2}},
+                                        .end = BarEnd::Start,
+                                        .condition = WarpingCondition::Continuous});
+    explicitEnds.warpingEnds.push_back(
+        {.elements = ElementIds{{3}}, .end = BarEnd::Start, .condition = WarpingCondition::Free});
+    const fem::core::StaticResult byDefault = fem::core::test::solve(model);
+    const fem::core::StaticResult bySaying = fem::core::test::solve(explicitEnds);
+    for (std::size_t node = 0; node < 4; ++node) {
+        CHECK((byDefault.rotations[node] - bySaying.rotations[node]).norm() <=
+              1e-12 * byDefault.rotations[1].norm());
+    }
+    // The collinear bars share the warping of the node; the third is free.
+    const double shared = byDefault.warping[1];
+    CHECK(std::abs(shared) > 0.0);
+    CHECK(near(fem::core::test::beamOf(byDefault, 0).at(3.0).warping, shared, 1e-8));
+    CHECK(near(fem::core::test::beamOf(byDefault, 1).at(0.0).warping, shared, 1e-8));
+    CHECK(std::abs(fem::core::test::beamOf(byDefault, 2).start().b) <=
+          1e-10 * std::abs(fem::core::test::beamOf(byDefault, 0).start().b));
+}
+
+// REQ-008d-03, 05 (AC-2): an end plate at the tip of a cantilever whose
+// root warping is restrained, a torque T at the tip: psi(0) = psi(L) = 0,
+// theta(L) = T / GJ (L - 2 tanh(kL/2) / k). A torsion spring kt at the
+// root adds T / kt; a rigid offset along the axis shortens the flexible
+// length. The warping conditions hold at the ends of the flexible length.
+TEST_CASE("end plates, torsion springs and offsets with warping", "[core][beam][warping]")
+{
+    const double length = 3.5;
+    const double iw = 2.0e-7;
+    const double k = kOf(iw);
+    const double torque = 6.0e2;
+    const auto plates = [&](double l) {
+        return torque / kGJ * (l - 2.0 * std::tanh(k * l / 2.0) / k);
+    };
+    const auto cantilever = [&] {
+        Model model = warpingBeam(1, length, iw);
+        fem::core::test::fixAll(model, {1}, ElementKind::Beam3D);
+        outerEnds(model, 1, WarpingCondition::Restrained);
+        model.nodalForces.push_back(
+            {.nodes = NodeIds{{2}}, .moment = Eigen::Vector3d(torque, 0.0, 0.0)});
+        return model;
+    };
+    SECTION("end plates at both ends")
+    {
+        CHECK(near(fem::core::test::solve(cantilever()).rotations[1].x(), plates(length), 1e-8));
+    }
+    SECTION("a torsion spring at the root")
+    {
+        const double kt = 5.0 * kGJ / length;
+        Model model = cantilever();
+        fem::core::EndConnection connection{.elements = ElementIds{{1}}, .end = BarEnd::Start};
+        connection.stiffness[3] = kt;
+        model.endConnections.push_back(connection);
+        CHECK(near(fem::core::test::solve(model).rotations[1].x(), plates(length) + torque / kt,
+                   1e-8));
+    }
+    SECTION("a rigid offset along the axis at the root")
+    {
+        const double offset = 0.5;
+        Model model = cantilever();
+        model.rigidOffsets.push_back({.elements = ElementIds{{1}},
+                                      .start = Eigen::Vector3d(offset, 0.0, 0.0),
+                                      .end = Eigen::Vector3d::Zero()});
+        CHECK(near(fem::core::test::solve(model).rotations[1].x(), plates(length - offset), 1e-8));
+    }
+}
+
+// REQ-008d-05 (AC-2): a torsional elastic foundation kt on a beam on fork
+// supports with free warping, a uniform torque m: theta(x) = sum over odd n
+// of 4 m / (n pi) sin(n pi x / L) / (E Iw a^4 + GJ a^2 + kt), a = n pi / L.
+TEST_CASE("warping on a torsional foundation", "[core][beam][warping]")
+{
+    const double length = 6.0;
+    const double iw = 6.0e-7;
+    const double m = 1.0e3;
+    const double kt = 2.0e4;
+    double expected = 0.0;
+    for (int n = 1; n < 4000; n += 2) {
+        const double a = n * std::numbers::pi / length;
+        expected += 4.0 * m / (n * std::numbers::pi) * std::sin(a * length / 2.0) /
+                    (kE * iw * std::pow(a, 4) + kGJ * a * a + kt);
+    }
+    for (const int bars : {1, 2}) {
+        INFO("bars " << bars);
+        Model model = warpingBeam(bars, length, iw);
+        forkSupports(model, bars);
+        ElementIds all;
+        for (int i = 1; i <= bars; ++i) {
+            all.ids.push_back(i);
+        }
+        model.foundations.push_back({.elements = all, .torsional = kt});
+        model.distributedLoads.push_back(
+            {.elements = all, .axes = fem::core::Axes::Local, .startTorque = m, .endTorque = m});
+        const fem::core::StaticResult result = fem::core::test::solve(model);
+        const double middle = bars == 1
+                                  ? fem::core::test::beamOf(result, 0).at(length / 2.0).rotation.x()
+                                  : result.rotations[1].x();
+        CHECK(near(middle, expected, 1e-8));
+    }
 }

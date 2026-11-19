@@ -44,13 +44,13 @@ Regras:
   Arquivos: `model_validation.cpp`, `detail/model_validation.hpp`,
   `static_analysis.cpp`, `detail/static_stages.hpp`, `beam_result.cpp`,
   `beam_exact.cpp`. Cobre: 01, 02, 04, 07, 08
-- [ ] **T04** Mola de empenamento (design §5.2): a ponta não contínua vira
+- [x] **T04** Mola de empenamento (design §5.2): a ponta não contínua vira
   GDL interno condensado com kw (0 livre, kRigid impedido), inclusive na
   contagem de pivôs. Testes: kw → 0 igual a livre e kw → ∞ igual a
   impedido (1e−8), e um kw intermediário contra a solução analítica do
   balanço com mola de bimomento — arquivos: `beam_exact.cpp`,
   `test_beam_warping.cpp` — cobre: 03
-- [ ] **T05** Condições de empenamento (AC-2), 1e−8:
+- [x] **T05** Condições de empenamento (AC-2), 1e−8:
   - viga contínua de dois vãos com empenamento contínuo igual a uma barra;
   - T de três barras (contínuo nas colineares, livre na terceira);
   - chapa de topo;
