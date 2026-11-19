@@ -60,7 +60,10 @@ Layout layoutOf(const BeamData& beam, ElementKind kind)
             l.externalOf.at(j) = -1;
             l.internalOf.at(j) = -1;
             if (c >= translational) { // the warping
-                if (beam.warpingSprings.at(static_cast<std::size_t>(end)) != kRigid) {
+                const auto e = static_cast<std::size_t>(end);
+                if (beam.warpingContinuous.at(e)) {
+                    l.externalOf.at(j) = l.external++;
+                } else if (beam.warpingSprings.at(e) != kRigid) {
                     l.internalOf.at(j) = l.internal++;
                 }
                 continue;
@@ -265,7 +268,9 @@ void addOffsetGeometry(const BeamData& beam, ElementKind kind, double length,
                        Eigen::Ref<Eigen::MatrixXd> matrix)
 {
     const bool planar = planarKind(kind);
-    const int perNode = planar ? 3 : 6;
+    // The element's dofs: those of the first node (with its warping, when
+    // continuous), then those of the second.
+    const int firstNode = planar ? 3 : (beam.warpingContinuous[0] ? 7 : 6);
     for (std::size_t end = 0; end < 2; ++end) {
         const Eigen::Vector3d& e = beam.offsets.at(end);
         if (e.isZero()) {
@@ -276,7 +281,7 @@ void addOffsetGeometry(const BeamData& beam, ElementKind kind, double length,
         const Eigen::Vector3d force = (end == 0 ? n : -n) * axis;
         const Eigen::Matrix3d g = force.dot(e) * Eigen::Matrix3d::Identity() -
                                   0.5 * (force * e.transpose() + e * force.transpose());
-        const auto first = static_cast<Eigen::Index>(end) * perNode;
+        const Eigen::Index first = end == 0 ? 0 : firstNode;
         if (planar) {
             matrix(first + 2, first + 2) += g(2, 2);
         } else {
@@ -293,11 +298,13 @@ double exactLength(const BeamData& beam, const Eigen::Vector3d& x1, const Eigen:
 }
 
 ExactBeamElement::ExactBeamElement(ElementKind kind, std::span<const BeamData> beams,
-                                   std::span<const SpanLoads> loads, std::span<int> negativePivots)
+                                   std::span<const SpanLoads> loads, std::span<int> negativePivots,
+                                   std::array<bool, 2> continuous)
     : m_kind(kind)
     , m_beams(beams)
     , m_loads(loads)
     , m_negativePivots(negativePivots)
+    , m_continuous(continuous)
 {}
 
 DofMask ExactBeamElement::dofsAt(ElementType type, int localNode) const
@@ -309,7 +316,12 @@ DofMask ExactBeamElement::dofsAt(ElementType type, int localNode) const
     if (planarKind(m_kind)) {
         return plane;
     }
-    return static_cast<DofMask>(plane | mask(DofType::W) | mask(DofType::RX) | mask(DofType::RY));
+    auto dofs =
+        static_cast<DofMask>(plane | mask(DofType::W) | mask(DofType::RX) | mask(DofType::RY));
+    if (m_continuous.at(localNode == 0 ? 0 : 1)) {
+        dofs = static_cast<DofMask>(dofs | mask(DofType::Warp));
+    }
+    return dofs;
 }
 
 Expected<void> ExactBeamElement::compute(const ElementNodes& nodes, ElementIndex element,

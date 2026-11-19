@@ -96,11 +96,12 @@ struct ExactInternalMode
                                                                  const Eigen::Vector3d& x1,
                                                                  const Eigen::Vector3d& x2);
 
-// REQ-008b-07, 09, 11, 13: the exact beam element (design 008b §5.3, 5.4)
-// for a Line3 arc (no dofs at its middle node) and, in the core only, a
-// Line2 with warping: the exact flexible length, then the connections
-// (springs, releases, the free warping of an end condensed, the restrained
-// one removed), the offsets and the rotation of each end.
+// REQ-008b-13, 008d-01, 03: the exact beam element (design 008b §5.3, 5.4)
+// for a Line3 arc (no dofs at its middle node) and a Line2 with warping (or
+// in the second order): the exact flexible length, then the connections
+// (springs, releases, the warping of a non-continuous end condensed with
+// its bimoment spring, a restrained one removed), the offsets and the
+// rotation of each end.
 class ExactBeamElement final : public ElementFormulation
 {
 public:
@@ -108,9 +109,12 @@ public:
     // formulation. Feature 008c: with `negativePivots` (indexed the same),
     // compute() writes the negative pivots of the element's internal
     // condensations, for the Sturm count (design 008c §5.4); each element
-    // writes only its own entry.
+    // writes only its own entry. Feature 008d (design 008d §5.2):
+    // `continuous` says which ends use the warping dof of their node; all
+    // the beams of the formulation agree with BeamData::warpingContinuous.
     ExactBeamElement(ElementKind kind, std::span<const BeamData> beams,
-                     std::span<const SpanLoads> loads, std::span<int> negativePivots = {});
+                     std::span<const SpanLoads> loads, std::span<int> negativePivots = {},
+                     std::array<bool, 2> continuous = {false, false});
 
     [[nodiscard]] DofMask dofsAt(ElementType type, int localNode) const override;
     [[nodiscard]] Expected<void> compute(const ElementNodes& nodes, ElementIndex element,
@@ -122,6 +126,7 @@ private:
     std::span<const BeamData> m_beams;
     std::span<const SpanLoads> m_loads;
     std::span<int> m_negativePivots;
+    std::array<bool, 2> m_continuous;
 };
 
 // The flexible length of an exact beam: along the arc, or between the ends

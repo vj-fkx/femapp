@@ -31,6 +31,7 @@ femapp_add_test(core SOURCES
     test_buckling.cpp
     test_beam_validation.cpp
     test_beam_exact.cpp
+    test_beam_warping.cpp
     test_beam_verification.cpp
     test_core.cpp
     test_dof_map.cpp

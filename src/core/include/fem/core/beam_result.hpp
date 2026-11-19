@@ -128,9 +128,10 @@ struct PointStress
 // that the nodes apply on the bar, on the centroid dofs).
 void endForces(const BeamData& beam, const BeamVector& forces, BeamForces& start, BeamForces& end);
 
-// REQ-008b-19: the same for an exact beam, from the forces that the nodes
-// apply on its flexible length (design 008b §5.3).
-void exactEndForces(const BeamData& beam, bool planar, const StateBarVector& forces,
-                    BeamForces& start, BeamForces& end);
+// REQ-008b-19, 008d-07: the same for an exact beam, from the local dofs of
+// its ends and the forces that the nodes apply on its flexible length
+// (design 008b §5.3).
+void exactEndForces(const BeamData& beam, bool planar, const StateBarVector& ends,
+                    const StateBarVector& forces, BeamForces& start, BeamForces& end);
 
 } // namespace fem::core

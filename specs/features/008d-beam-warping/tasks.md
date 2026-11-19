@@ -28,13 +28,13 @@ Regras:
   as suítes passam sem mudança — arquivos: `dof_map.hpp/.cpp`,
   `model.hpp`, `static_analysis.hpp`, `beam_result.hpp`, `beam_element.hpp`,
   `beam_exact.cpp` — cobre: 01, 03, 04, 07
-- [ ] **T02** Testes da torção com empenamento em viga reta (AC-1, deve
+- [x] **T02** Testes da torção com empenamento em viga reta (AC-1, deve
   falhar): balanço de perfil I com torque na ponta e engaste impedido (giro,
   B, Tsv e Tw ao longo, por `at(x)`); biapoiada com torque distribuído e
   concentrado, pontas livres e impedidas; G·J → 0 e E·Iw → 0; bimomento
   nodal e reação de bimomento. Referência em senh/cosh, 1e−8 — arquivo:
   `tests/unit/core/test_beam_warping.cpp` — cobre: 01, 02, 04, 07, 08, N01
-- [ ] **T03** Caminho da análise com empenamento, a partir de `c19d42b`, até
+- [x] **T03** Caminho da análise com empenamento, a partir de `c19d42b`, até
   a T02 passar:
   - `beamSetup` com E·Iw;
   - condições resolvidas por ponta e GDL `Warp` por nó (design §5.2);

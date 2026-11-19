@@ -418,8 +418,14 @@ private:
             if (arc) {
                 m_arcMiddle[nodes[2]] = element;
             }
+            // REQ-008d-01: a beam with warping may give its nodes the warping
+            // dof (design 008d §5.2).
+            DofMask dofs = dofsOf(kind);
+            if (kind == ElementKind::Beam3D && assignment->warping) {
+                dofs = static_cast<DofMask>(dofs | mask(DofType::Warp));
+            }
             for (std::size_t k = 0; k < (arc ? 2U : nodes.size()); ++k) {
-                m_tables.nodeDofs[static_cast<std::size_t>(nodes[k])] |= dofsOf(kind);
+                m_tables.nodeDofs[static_cast<std::size_t>(nodes[k])] |= dofs;
             }
         }
     }
@@ -663,6 +669,9 @@ private:
                     needed.push_back(rotations.at(k));
                 }
             }
+            if (force.bimoment != 0.0) {
+                needed.push_back(DofType::Warp); // REQ-008d-04
+            }
             for (const NodeIndex node : *nodes) {
                 for (const DofType dof : needed) {
                     if (!checkNode(label, node, dof)) {
@@ -808,6 +817,10 @@ Expected<BeamSetup> beamSetup(const Model& model, ElementIndex element,
         beam.shearZ = g * section.shearAreaZ.value_or(0.0);
     }
     beam.shearCentre = section.shearCentre;
+    // REQ-008d-01: torsion with warping, 3D beams.
+    if (assignment.warping && assignment.kind == ElementKind::Beam3D) {
+        beam.warpingStiffness = e0 * section.warpingConstant;
+    }
     for (int end = 0; end < 2; ++end) {
         const int item = tables.connectionOf[e][static_cast<std::size_t>(end)];
         if (item == kNoItem) {

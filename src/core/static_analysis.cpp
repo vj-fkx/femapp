@@ -85,6 +85,73 @@ std::vector<BarData> barData(const Model& model, const detail::ValidationTables&
 
 using detail::Beams;
 
+// REQ-008d-03 (design 008d §5.2): the warping of each end of the beams with
+// warping. By default continuous between ends whose tangents at a node are
+// collinear, free otherwise; the WarpingEnd items override it.
+void resolveWarping(const Model& model, Beams& beams)
+{
+    constexpr double kCollinear = 1e-6;
+    const Mesh& mesh = *model.mesh;
+    const auto count = beams.data.size();
+    const auto warps = [&beams](std::size_t e) { return beams.data[e].warpingStiffness > 0.0; };
+    const auto tangent = [&beams](std::size_t e, int end) {
+        const BeamData& beam = beams.data[e];
+        return Eigen::Vector3d((end == 0 ? beam.axes : beam.endAxes).col(0));
+    };
+    std::vector<std::vector<std::pair<std::size_t, int>>> atNode(
+        static_cast<std::size_t>(mesh.nodeCount()));
+    for (std::size_t e = 0; e < count; ++e) {
+        if (warps(e)) {
+            const auto nodes = mesh.elementNodes(static_cast<ElementIndex>(e));
+            atNode[static_cast<std::size_t>(nodes[0])].emplace_back(e, 0);
+            atNode[static_cast<std::size_t>(nodes[1])].emplace_back(e, 1);
+        }
+    }
+    for (const auto& ends : atNode) {
+        for (const auto& [e, end] : ends) {
+            bool collinear = false;
+            for (const auto& [other, otherEnd] : ends) {
+                if ((other != e || otherEnd != end) &&
+                    tangent(e, end).cross(tangent(other, otherEnd)).norm() < kCollinear) {
+                    collinear = true;
+                }
+            }
+            BeamData& beam = beams.data[e];
+            beam.warpingContinuous.at(static_cast<std::size_t>(end)) = collinear;
+            beam.warpingSprings.at(static_cast<std::size_t>(end)) = 0.0;
+        }
+    }
+    for (const WarpingEnd& item : model.warpingEnds) {
+        for (const ElementIndex element :
+             resolve(mesh, item.elements).value_or(std::vector<ElementIndex>{})) {
+            const auto e = static_cast<std::size_t>(element);
+            if (!warps(e)) {
+                continue;
+            }
+            for (std::size_t end = 0; end < 2; ++end) {
+                if ((end == 0 && item.end == BarEnd::End) ||
+                    (end == 1 && item.end == BarEnd::Start)) {
+                    continue;
+                }
+                BeamData& beam = beams.data[e];
+                beam.warpingContinuous.at(end) = item.condition == WarpingCondition::Continuous;
+                switch (item.condition) {
+                case WarpingCondition::Free:
+                case WarpingCondition::Continuous:
+                    beam.warpingSprings.at(end) = 0.0;
+                    break;
+                case WarpingCondition::Restrained:
+                    beam.warpingSprings.at(end) = kRigid;
+                    break;
+                case WarpingCondition::Elastic:
+                    beam.warpingSprings.at(end) = item.stiffness;
+                    break;
+                }
+            }
+        }
+    }
+}
+
 // With `secondOrder` (feature 008c) the straight beams use the exact element.
 Beams beamData(const Model& model, const detail::ValidationTables& tables, bool secondOrder)
 {
@@ -207,6 +274,7 @@ Beams beamData(const Model& model, const detail::ValidationTables& tables, bool 
                 equivalentLoads(beams.data[e], beams.length[e], beams.loads[e]);
         }
     }
+    resolveWarping(model, beams);
     return beams;
 }
 
@@ -292,8 +360,13 @@ StaticProblem::prepare(const Model& model, const StaticOptions& options, bool se
     p.m_beams = beamData(model, tables, secondOrder);
     p.m_negative.assign(elementCount, 0);
     p.m_kindOf.assign(elementCount, ElementKind::Truss3D);
-    // The exact beams (design 008b §5.3): a set per kind.
+    // The exact beams (design 008b §5.3, 008d §5.2): a set per kind and pair
+    // of continuous warping ends, since the ends decide the dofs.
     std::map<int, std::vector<ElementIndex>> exactMembers;
+    const auto exactKey = [&p](ElementKind kind, std::size_t e) {
+        const auto& continuous = p.m_beams.data[e].warpingContinuous;
+        return 4 * static_cast<int>(kind) + 2 * (continuous[0] ? 1 : 0) + (continuous[1] ? 1 : 0);
+    };
     for (ElementIndex element = 0; element < mesh.elementCount(); ++element) {
         const auto e = static_cast<std::size_t>(element);
         const int owner = tables.owner[e];
@@ -303,7 +376,7 @@ StaticProblem::prepare(const Model& model, const StaticOptions& options, bool se
             if (p.m_beams.isIso[e]) {
                 p.m_isoMembers.at(kind == ElementKind::Beam2D ? 0 : 1).push_back(element);
             } else if (p.m_beams.exact[e]) {
-                exactMembers[static_cast<int>(kind)].push_back(element);
+                exactMembers[exactKey(kind, e)].push_back(element);
             } else {
                 p.m_members.at(static_cast<std::size_t>(kind)).push_back(element);
             }
@@ -330,8 +403,10 @@ StaticProblem::prepare(const Model& model, const StaticOptions& options, bool se
     p.m_exactMembers.reserve(exactMembers.size());
     for (auto& [key, elements] : exactMembers) {
         p.m_exactMembers.push_back(std::move(elements));
-        p.m_formulations.push_back(std::make_unique<ExactBeamElement>(
-            static_cast<ElementKind>(key), p.m_beams.data, p.m_beams.loads, p.m_negative));
+        const std::array<bool, 2> continuous = {(key / 2) % 2 == 1, key % 2 == 1};
+        p.m_formulations.push_back(
+            std::make_unique<ExactBeamElement>(static_cast<ElementKind>(key / 4), p.m_beams.data,
+                                               p.m_beams.loads, p.m_negative, continuous));
         p.m_sets.push_back(
             {.elements = p.m_exactMembers.back(), .formulation = p.m_formulations.back().get()});
     }
@@ -358,6 +433,10 @@ StaticProblem::prepare(const Model& model, const StaticOptions& options, bool se
                 if (value != 0.0 && p.m_dofs.find(node, kNodeDofs.at(k))) {
                     p.m_loads.push_back({.node = node, .type = kNodeDofs.at(k), .value = value});
                 }
+            }
+            // REQ-008d-04: the bimoment, on the warping dof of the node.
+            if (force.bimoment != 0.0 && p.m_dofs.find(node, DofType::Warp)) {
+                p.m_loads.push_back({.node = node, .type = DofType::Warp, .value = force.bimoment});
             }
         }
     }
@@ -442,9 +521,16 @@ std::vector<double> StaticProblem::nodeValues(ElementIndex element, int nodes,
 {
     const auto e = static_cast<std::size_t>(element);
     const auto ids = mesh().elementNodes(element);
-    const DofMask used = dofsOf(m_kindOf[e]);
     std::vector<double> out;
     for (int k = 0; k < nodes; ++k) {
+        // The dofs of the beam kind, and the warping at a continuous end of
+        // an exact beam (design 008d §5.2).
+        DofMask used = dofsOf(m_kindOf[e]);
+        const BeamData& beam = m_beams.data[e];
+        if (m_beams.exact[e] && k < 2 && beam.warpingStiffness > 0.0 &&
+            beam.warpingContinuous.at(static_cast<std::size_t>(k))) {
+            used = static_cast<DofMask>(used | mask(DofType::Warp));
+        }
         for (int t = 0; t < kDofTypeCount; ++t) {
             const auto type = static_cast<DofType>(t);
             if ((used & mask(type)) != 0) {
@@ -512,7 +598,7 @@ std::vector<AxialProfile> StaticProblem::profilesOf(const Eigen::VectorXd& value
         const StateBarVector ends = exactBeamEnds(beam, kind, loads, x1, x2, local, &endLoads);
         BeamForces start;
         BeamForces end;
-        exactEndForces(beam, planar, endLoads, start, end);
+        exactEndForces(beam, planar, ends, endLoads, start, end);
         const double length = exactLength(beam, x1, x2);
         if (beam.arcLength > 0.0) {
             // An arc: N turns with the frame (design 008c §5.2).
@@ -706,17 +792,8 @@ Expected<StaticResult> StaticProblem::recover(const Eigen::VectorXd& values, boo
         }
         if (detail::isBeam(kindOf[e]) && beams.exact[e]) {
             // The element's nodal values, in the order of its dofs.
-            std::vector<double> nodeValues;
-            for (std::size_t k = 0; k < 2; ++k) {
-                const DofMask used = detail::dofsOf(kindOf[e]);
-                for (int t = 0; t < kDofTypeCount; ++t) {
-                    const auto type = static_cast<DofType>(t);
-                    if ((used & mask(type)) != 0) {
-                        const auto dof = dofs.find(nodes[k], type);
-                        nodeValues.push_back(dof ? values[*dof] : 0.0);
-                    }
-                }
-            }
+            const std::vector<double> nodeValues =
+                this->nodeValues(static_cast<ElementIndex>(e), 2, values);
             const Eigen::Vector3d x1 = mesh.nodeCoordinates(nodes[0]);
             const Eigen::Vector3d x2 = mesh.nodeCoordinates(nodes[1]);
             BeamResult::Data data;
@@ -729,7 +806,7 @@ Expected<StaticResult> StaticProblem::recover(const Eigen::VectorXd& values, boo
             StateBarVector endLoads;
             data.ends =
                 exactBeamEnds(beams.data[e], kindOf[e], data.loads, x1, x2, nodeValues, &endLoads);
-            exactEndForces(beams.data[e], data.planar, endLoads, data.start, data.end);
+            exactEndForces(beams.data[e], data.planar, data.ends, endLoads, data.start, data.end);
             const double n = data.start.n;
             result.beams[e].emplace(std::move(data));
             result.axialForce[e] = n;
