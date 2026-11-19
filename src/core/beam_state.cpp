@@ -108,7 +108,7 @@ double wagner(const BeamData& beam, const ReferencePoint& r)
     return r.n * beam.polarRadius2 + beam.monosymmetryY * r.my - beam.monosymmetryZ * r.mz;
 }
 
-FullMatrix systemMatrix(const BeamData& beam, const ReferencePoint& r)
+FullMatrix systemMatrix(const BeamData& beam, const ReferencePoint& r, double height = 0.0)
 {
     FullMatrix a = FullMatrix::Zero();
     const Mat3 omega = skew(beam.curvature);
@@ -178,6 +178,10 @@ FullMatrix systemMatrix(const BeamData& beam, const ReferencePoint& r)
     a(MY, VZ) += 1.0;
     a(MZ, VY) -= 1.0;
     a(MX, RX) += beam.foundation(3);
+    // Feature 008d (design 008d §5.5): the load at a height d above the
+    // shear centre, lambda (q . d) on the twist, like a torsional
+    // foundation (negative where it destabilizes).
+    a(MX, RX) += height;
     // Second order: My' -= N sl_w, Mz' += N sl_v (design 008c §5.1).
     if (n != 0.0) {
         a(MZ, RZ) += n * fy;
@@ -269,6 +273,44 @@ double growthRate(const BeamData& beam)
 
 using PartMatrix = StateBarMatrix;
 
+// Feature 008d (REQ-008d-13, design 008d §5.5): the load-height stiffness
+// at x, lambda (q . d) of the distributed loads covering it, d from the
+// shear centre to their point; and of a concentrated load, lambda (P . d).
+double heightOf(const BeamData& beam, const Eigen::Vector2d& point, const Vec3& force)
+{
+    const Eigen::Vector2d d = point - beam.shearCentre;
+    return referenceOf(beam).loadFactor * (force.y() * d.x() + force.z() * d.y());
+}
+
+double heightAt(const BeamData& beam, const SpanLoads& loads, double x)
+{
+    if (referenceOf(beam).loadFactor == 0.0) {
+        return 0.0;
+    }
+    double k = 0.0;
+    for (const SpanPiece& piece : loads.pieces) {
+        const double span = piece.to - piece.from;
+        if (!(span > 0.0) || x < piece.from || x > piece.to) {
+            continue;
+        }
+        const Eigen::Vector4d q =
+            piece.start + (piece.end - piece.start) * ((x - piece.from) / span);
+        k += heightOf(beam, piece.point, q.head<3>());
+    }
+    return k;
+}
+
+// Whether the loads have height terms at all.
+bool hasHeight(const BeamData& beam, const SpanLoads& loads)
+{
+    if (referenceOf(beam).loadFactor == 0.0) {
+        return false;
+    }
+    const auto off = [&beam](const Eigen::Vector2d& point) { return point != beam.shearCentre; };
+    return std::ranges::any_of(loads.pieces, [&](const SpanPiece& p) { return off(p.point); }) ||
+           std::ranges::any_of(loads.points, [&](const SpanPoint& p) { return off(p.point); });
+}
+
 bool fixedOn(const BeamData& beam, const SpanLoads& loads, double x0, double x1,
              const Eigen::Vector2d& point, Vec3& c0, Vec3& d0);
 using PartVector = StateBarVector;
@@ -286,15 +328,19 @@ constexpr double kMagnusCommutator = 0.14433756729740644113; // sqrt(3)/12
 class Part
 {
 public:
-    Part(const BeamData& beam, const Plan& plan, double length, double from, double to)
+    Part(const BeamData& beam, const Plan& plan, double length, double from, double to,
+         const SpanLoads& loads)
         : m_plan(plan)
         , m_beam(beam)
+        , m_loads(loads)
         , m_length(length)
-        , m_varying(referenceOf(beam).varies())
+        , m_varying(referenceOf(beam).varies() || hasHeight(beam, loads))
         , m_omega(skew(beam.curvature))
     {
         const int n = plan.count;
-        m_a = reduced(systemMatrix(beam, referenceOf(beam).at((from + to) / 2.0, length)));
+        const double middle = (from + to) / 2.0;
+        m_a = reduced(systemMatrix(beam, referenceAt(beam, loads, middle, length),
+                                   heightAt(beam, loads, middle)));
         // Scales: lengths h, rotations 1, warping 1/h, forces S/h^2,
         // moments S/h, Q S, with S a bending stiffness.
         const double h = to - from;
@@ -436,6 +482,22 @@ public:
         }
     }
 
+    // Feature 008d: a concentrated load at a height, Mx += k theta_x.
+    void kick(double k)
+    {
+        int mx = -1;
+        int rx = -1;
+        for (int i = 0; i < m_plan.count; ++i) {
+            mx = state(i) == MX ? i : mx;
+            rx = state(i) == RX ? i : rx;
+        }
+        if (k == 0.0 || mx < 0 || rx < 0) {
+            return;
+        }
+        m_t.row(mx) += k * m_t.row(rx);
+        m_p(mx) += k * m_p(rx);
+    }
+
     // P = K d + r: the forces the nodes apply on the part.
     void stiffness(PartMatrix& k, PartVector& r) const
     {
@@ -486,7 +548,9 @@ private:
             return generator(m_a);
         }
         const auto at = [&](double xi) {
-            return reduced(systemMatrix(m_beam, referenceOf(m_beam).at(x0 + xi * l, m_length)));
+            const double x = x0 + xi * l;
+            return reduced(systemMatrix(m_beam, referenceAt(m_beam, m_loads, x, m_length),
+                                        heightAt(m_beam, m_loads, x)));
         };
         const StateMatrix g1 = generator(at(kGaussLow));
         const StateMatrix g2 = generator(at(kGaussHigh));
@@ -495,6 +559,7 @@ private:
 
     const Plan& m_plan;
     const BeamData& m_beam;
+    const SpanLoads& m_loads;
     double m_length;
     bool m_varying;
     Mat3 m_omega;
@@ -559,6 +624,68 @@ void loadsOn(const BeamData& beam, const SpanLoads& loads, double x0, double x1,
 }
 
 } // namespace
+
+// Feature 008d (design 008d §5.4): the internal forces at s of a straight
+// bar from those at its start and its span loads, by statics (the state
+// equations with no curvature): F' = -q, Mx' = -(mx about the centroid),
+// My' = Fz, Mz' = -Fy, the concentrated loads as jumps.
+ReferencePoint straightStatics(const BeamData& beam, const SpanLoads& loads,
+                               const ReferencePoint& start, double s, double factor)
+{
+    const double ey = beam.shearCentre.x();
+    const double ez = beam.shearCentre.y();
+    Eigen::Vector3d f(start.n, start.vy, start.vz);
+    // The loads times `factor` (1 in the profiles, lambda in the engine).
+    double mx = start.t - (ez * start.vy - ey * start.vz); // about the centroid
+    double my = start.my + f.z() * s;
+    double mz = start.mz - f.y() * s;
+    for (const SpanPiece& piece : loads.pieces) {
+        const double span = piece.to - piece.from;
+        const double e = std::min(piece.to, s);
+        if (!(span > 0.0) || !(e > piece.from)) {
+            continue;
+        }
+        const double l = e - piece.from;
+        const double d = s - piece.from;
+        const Eigen::Vector4d c0 = factor * piece.start;
+        const Eigen::Vector4d c1 = factor * (piece.end - piece.start) / span;
+        // The integral of q, and of (s - x) q, over [from, e].
+        const Eigen::Vector4d once = c0 * l + c1 * (l * l / 2.0);
+        const Eigen::Vector4d moment =
+            c0 * (d * l - l * l / 2.0) + c1 * (d * l * l / 2.0 - l * l * l / 3.0);
+        f -= once.head<3>();
+        mx -= once(3) - (ez * once(1) - ey * once(2));
+        my -= moment(2);
+        mz += moment(1);
+    }
+    for (const SpanPoint& point : loads.points) {
+        if (!(point.at < s)) {
+            continue;
+        }
+        const double d = s - point.at;
+        const Eigen::Vector3d force = factor * point.force;
+        const Eigen::Vector3d moment = factor * point.moment;
+        f -= force;
+        mx -= moment.x() - (ez * force.y() - ey * force.z());
+        my -= moment.y() + force.z() * d;
+        mz -= moment.z() - force.y() * d;
+    }
+    return {.n = f.x(),
+            .vy = f.y(),
+            .vz = f.z(),
+            .t = mx + ez * f.y() - ey * f.z(),
+            .my = my,
+            .mz = mz};
+}
+
+ReferencePoint referenceAt(const BeamData& beam, const SpanLoads& loads, double s, double length)
+{
+    const ReferenceProfile& reference = referenceOf(beam);
+    if (reference.statics) {
+        return straightStatics(beam, loads, reference.start, s, reference.loadFactor);
+    }
+    return reference.at(s, length);
+}
 
 int stateDofs(const BeamData& beam, bool planar)
 {
@@ -737,6 +864,7 @@ void walk(Part& part, const BeamData& beam, const SpanLoads& loads, double lengt
         for (const SpanPoint& point : loads.points) {
             if (startsAt(point, x0)) {
                 part.jump(pointJump(beam, point));
+                part.kick(heightOf(beam, point.point, point.force));
             }
         }
         FullVector b0;
@@ -755,6 +883,7 @@ void walk(Part& part, const BeamData& beam, const SpanLoads& loads, double lengt
         const bool here = atEnd || (until <= from ? startsAt(point, from) : point.at == until);
         if (here && !acted && (atEnd || point.at < length)) {
             part.jump(pointJump(beam, point));
+            part.kick(heightOf(beam, point.point, point.force));
         }
     }
 }
@@ -775,7 +904,7 @@ StateBarMatrices stateBarMatrices(const BeamData& beam, double length, const Spa
     for (int k = 0; k < parts; ++k) {
         const double from = length * k / parts;
         const double to = k + 1 == parts ? length : length * (k + 1) / parts;
-        Part part(beam, plan, length, from, to);
+        Part part(beam, plan, length, from, to, loads);
         walk(part, beam, loads, length, from, to, k == 0, k + 1 == parts);
         PartMatrix kp;
         PartVector rp;
@@ -871,17 +1000,18 @@ int negativeEigenvalues(const StateBarMatrix& matrix)
     return static_cast<int>((a.diagonal().array() < 0.0).count());
 }
 
-std::vector<StateBarMatrix> partStiffnesses(const BeamData& beam, double length, bool planar)
+std::vector<StateBarMatrix> partStiffnesses(const BeamData& beam, double length, bool planar,
+                                            const SpanLoads& loads)
 {
     const Plan plan = planFor(beam, planar);
     const int parts = partCount(beam, length);
-    const SpanLoads none;
     std::vector<StateBarMatrix> out(static_cast<std::size_t>(parts));
     for (int k = 0; k < parts; ++k) {
         const double from = length * k / parts;
         const double to = k + 1 == parts ? length : length * (k + 1) / parts;
-        Part part(beam, plan, length, from, to);
-        walk(part, beam, none, length, from, to, k == 0, k + 1 == parts);
+        // The loads matter for their heights only (the stiffness).
+        Part part(beam, plan, length, from, to, loads);
+        walk(part, beam, loads, length, from, to, k == 0, k + 1 == parts);
         PartVector r;
         part.stiffness(out[static_cast<std::size_t>(k)], r);
     }
@@ -899,7 +1029,7 @@ BarState stateAt(const BeamData& beam, double length, const SpanLoads& loads, bo
     std::vector<PartMatrix> stiffness(static_cast<std::size_t>(parts));
     std::vector<PartVector> forces(static_cast<std::size_t>(parts));
     for (int k = 0; k < parts; ++k) {
-        Part part(beam, plan, length, bound(k), bound(k + 1));
+        Part part(beam, plan, length, bound(k), bound(k + 1), loads);
         walk(part, beam, loads, length, bound(k), bound(k + 1), k == 0, k + 1 == parts);
         part.stiffness(stiffness[static_cast<std::size_t>(k)], forces[static_cast<std::size_t>(k)]);
     }
@@ -969,7 +1099,7 @@ BarState stateAt(const BeamData& beam, double length, const SpanLoads& loads, bo
     StateBarVector start(2 * d);
     start.head(d) = dk.head(d);
     start.tail(d) = -p.head(d);
-    Part part(beam, plan, length, bound(k), bound(k + 1));
+    Part part(beam, plan, length, bound(k), bound(k + 1), loads);
     walk(part, beam, loads, length, bound(k), x, k == 0, side == Side::After);
     const StateBarVector state = part.transfer() * start + part.particular();
     BarState out;

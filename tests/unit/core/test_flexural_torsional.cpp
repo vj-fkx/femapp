@@ -362,3 +362,159 @@ TEST_CASE("flexural-torsional buckling of a tee column",
         (sum - std::sqrt(sum * sum - 4.0 * ratio * lateral * torsional)) / (2.0 * ratio);
     CHECK(relative(result->modes.front().factor * force, expected) <= 1e-8);
 }
+
+// T16: the bar with loads at a height (a distributed one and a concentrated
+// one) and a reference state with their factor stays symmetric.
+TEST_CASE("the bar with loads at a height is symmetric", "[core][beam][flexural-torsional]")
+{
+    const double l = 5.0;
+    for (const bool warping : {false, true}) {
+        INFO("warping " << warping);
+        BeamData beam = sample(warping);
+        ReferenceProfile profile =
+            *profileOf({.n = -1e5, .vy = 2e4, .vz = 0.0, .t = 0.0, .my = 0.0, .mz = 5e4},
+                       {.n = -1e5, .vy = 2e4, .vz = 0.0, .t = 0.0, .my = 0.0, .mz = -5e4}, 2, l);
+        profile.loadFactor = 3.0;
+        beam.reference = std::make_shared<const ReferenceProfile>(profile);
+        SpanLoads loads;
+        fem::core::SpanPiece piece;
+        piece.from = 0.5;
+        piece.to = 4.0;
+        piece.start << 0.0, -2e3, 5e2, 0.0;
+        piece.end << 0.0, -1e3, 0.0, 0.0;
+        piece.point = Eigen::Vector2d(0.12, 0.02);
+        loads.pieces = {piece};
+        loads.points = {{.at = 2.5,
+                         .force = Eigen::Vector3d(0.0, -4e3, 1e3),
+                         .moment = Eigen::Vector3d::Zero(),
+                         .point = Eigen::Vector2d(-0.1, 0.0)}};
+        const auto bar = fem::core::stateBarMatrices(beam, l, loads, false);
+        CHECK(asymmetry(bar.stiffness) <= 1e-12);
+    }
+}
+
+namespace {
+
+// REQ-008d-13 (AC-5): an independent reference, Rayleigh-Ritz on the
+// functional of Trahair (1993) for a doubly symmetric beam on fork supports
+// (sine series for the lateral displacement w and the twist phi):
+//   1/2 int (E Iy w''^2 + G J phi'^2 + E Iw phi''^2) + lambda int Mz phi w''
+//   - 1/2 lambda (q a int phi^2 + P a phi(L/2)^2),
+// a the height of the load above the shear centre. Uniform load q, or a
+// load P at the middle; lambda for q = 1 or P = 1.
+double ritzFactor(const Props& p, double l, bool uniform, double a)
+{
+    constexpr int kTerms = 120;
+    const int n = 2 * kTerms;
+    Eigen::MatrixXd k = Eigen::MatrixXd::Zero(n, n);
+    Eigen::MatrixXd g = Eigen::MatrixXd::Zero(n, n);
+    const auto wave = [&](int i) { return (i + 1) * std::numbers::pi / l; };
+    for (int i = 0; i < kTerms; ++i) {
+        const double c = wave(i);
+        k(i, i) = kE * p.iy * std::pow(c, 4) * l / 2.0;
+        k(kTerms + i, kTerms + i) = (kG * p.j * c * c + kE * p.iw * std::pow(c, 4)) * l / 2.0;
+    }
+    // Gauss-Legendre on each half (a kink of M at the middle for P).
+    constexpr std::array<double, 8> kX = {
+        -0.9602898564975363, -0.7966664774136267, -0.5255324099163290, -0.1834346424956498,
+        0.1834346424956498,  0.5255324099163290,  0.7966664774136267,  0.9602898564975363};
+    constexpr std::array<double, 8> kW = {
+        0.1012285362903763, 0.2223810344533745, 0.3137066458778873, 0.3626837833783620,
+        0.3626837833783620, 0.3137066458778873, 0.2223810344533745, 0.1012285362903763};
+    constexpr int kSlices = 32;
+    for (int slice = 0; slice < kSlices; ++slice) {
+        const double x0 = l * slice / kSlices;
+        const double h = l / kSlices;
+        for (std::size_t q = 0; q < kX.size(); ++q) {
+            const double x = x0 + h * (kX.at(q) + 1.0) / 2.0;
+            const double w = kW.at(q) * h / 2.0;
+            const double m = uniform ? x * (l - x) / 2.0 : (x < l / 2 ? x / 2.0 : (l - x) / 2.0);
+            for (int i = 0; i < kTerms; ++i) {
+                for (int j = 0; j < kTerms; ++j) {
+                    // M phi_j w_i'' = -c_i^2 M sin_i sin_j.
+                    const double coupling =
+                        -w * m * wave(i) * wave(i) * std::sin(wave(i) * x) * std::sin(wave(j) * x);
+                    g(i, kTerms + j) += coupling;
+                    g(kTerms + j, i) += coupling;
+                    if (uniform) {
+                        g(kTerms + i, kTerms + j) -=
+                            w * a * std::sin(wave(i) * x) * std::sin(wave(j) * x);
+                    }
+                }
+            }
+        }
+    }
+    if (!uniform) {
+        for (int i = 0; i < kTerms; ++i) {
+            for (int j = 0; j < kTerms; ++j) {
+                g(kTerms + i, kTerms + j) -=
+                    a * std::sin(wave(i) * l / 2) * std::sin(wave(j) * l / 2);
+            }
+        }
+    }
+    // (K + lambda G) v = 0: nu = 1 / lambda of (-G) v = nu K v.
+    const Eigen::GeneralizedSelfAdjointEigenSolver<Eigen::MatrixXd> eigen(-g, k);
+    return 1.0 / eigen.eigenvalues().maxCoeff();
+}
+
+// The first buckling factor of the fork beam under a uniform load q (local
+// -y, global -Z) or a load P at the middle, at the height a above the
+// centroid (the shear centre).
+double heightFactor(const Props& p, double l, bool uniform, double a, double load)
+{
+    fem::core::Model model = forkBeam(p, l);
+    if (uniform) {
+        model.distributedLoads.push_back({.elements = fem::core::ElementIds{{1}},
+                                          .startValue = Eigen::Vector3d(0.0, 0.0, -load),
+                                          .endValue = Eigen::Vector3d(0.0, 0.0, -load),
+                                          .point = Eigen::Vector2d(a, 0.0)});
+    } else {
+        model.concentratedLoads.push_back({.elements = fem::core::ElementIds{{1}},
+                                           .force = Eigen::Vector3d(0.0, 0.0, -load),
+                                           .point = Eigen::Vector2d(a, 0.0)});
+    }
+    const auto result = fem::core::runLinearBuckling(model);
+    if (!result) {
+        INFO(result.error().message);
+        REQUIRE(result.has_value());
+    }
+    REQUIRE_FALSE(result->modes.empty());
+    return result->modes.front().factor * load;
+}
+
+} // namespace
+
+// T16 (AC-5): a beam on fork supports under a uniform load and under a
+// load at the middle, applied on the top flange, at the shear centre and
+// on the bottom flange: one element against Rayleigh-Ritz (1e-6), and the
+// critical moment against the tables of C1 and C2 (NCCI SN003: 1.127 and
+// 0.454 for the uniform load, 1.348 and 0.630 for the load at the middle,
+// k = 1), within 1% at the shear centre and 5% at a height.
+TEST_CASE("the height of the load in lateral-torsional buckling",
+          "[core][beam][flexural-torsional][buckling]")
+{
+    const double l = 6.0;
+    const Props p;
+    const double py = std::numbers::pi * std::numbers::pi * kE * p.iy / (l * l);
+    const auto table = [&](double c1, double c2, double zg) {
+        return c1 * py *
+               (std::sqrt(p.iw / p.iy +
+                          l * l * kG * p.j / (std::numbers::pi * std::numbers::pi * kE * p.iy) +
+                          std::pow(c2 * zg, 2)) -
+                c2 * zg);
+    };
+    for (const bool uniform : {true, false}) {
+        for (const double a : {0.15, 0.0, -0.15}) {
+            INFO("uniform " << uniform << ", height " << a);
+            const double load = uniform ? 1.0e3 : 5.0e3;
+            const double engine = heightFactor(p, l, uniform, a, load);
+            CHECK(relative(engine, ritzFactor(p, l, uniform, a)) <= 1e-6);
+            const double mcr = uniform ? engine * l * l / 8.0 : engine * l / 4.0;
+            const double reference = uniform ? table(1.127, 0.454, a) : table(1.348, 0.630, a);
+            // The three-factor formula is approximate with the load at a
+            // height (2.7 to 3.2% here for the load at the middle): 1% at the
+            // shear centre, 5% at a height (maintainer's decision).
+            CHECK(relative(mcr, reference) <= (a == 0.0 ? 1e-2 : 5e-2));
+        }
+    }
+}

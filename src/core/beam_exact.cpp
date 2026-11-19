@@ -391,11 +391,12 @@ StateBarVector exactEndLoads(const BeamData& beam, double length, const SpanLoad
 
 std::optional<ExactInternalMode> exactInternalMode(const BeamData& beam, ElementKind kind,
                                                    const Eigen::Vector3d& x1,
-                                                   const Eigen::Vector3d& x2)
+                                                   const Eigen::Vector3d& x2,
+                                                   const SpanLoads& loads)
 {
     const bool planar = planarKind(kind);
     const double length = exactLength(beam, x1, x2);
-    const std::vector<StateBarMatrix> parts = partStiffnesses(beam, length, planar);
+    const std::vector<StateBarMatrix> parts = partStiffnesses(beam, length, planar, loads);
     const Layout layout = layoutOf(beam, kind);
     const Eigen::Index d = layout.dofs;
     const auto count = static_cast<Eigen::Index>(parts.size());

@@ -27,6 +27,18 @@ using StateMatrix =
 // Eigen's MatrixFunctions module, ADR 0006).
 [[nodiscard]] StateMatrix matrixExponential(const StateMatrix& a);
 
+// Feature 008d (design 008d §5.4): the internal forces at s of a straight
+// bar from those at its start and its span loads times `factor`, by statics
+// (the state equations without curvature, the concentrated loads as jumps).
+[[nodiscard]] ReferencePoint straightStatics(const BeamData& beam, const SpanLoads& loads,
+                                             const ReferencePoint& start, double s,
+                                             double factor = 1.0);
+
+// The reference state at s: by statics from its start on a straight bar
+// (ReferenceProfile::statics), interpolated otherwise.
+[[nodiscard]] ReferencePoint referenceAt(const BeamData& beam, const SpanLoads& loads, double s,
+                                         double length);
+
 // Dofs per end: 3 in the plane, 7 with warping, 6 otherwise.
 [[nodiscard]] int stateDofs(const BeamData& beam, bool planar);
 
@@ -77,10 +89,11 @@ struct BarState
 // allocating. Used for the Sturm count of the parts and the connections.
 [[nodiscard]] int negativeEigenvalues(const StateBarMatrix& matrix);
 
-// Feature 008c: the stiffness of each part of the engine, without loads,
-// in order along the bar (the dofs of both ends of each part).
+// Feature 008c: the stiffness of each part of the engine, in order along
+// the bar (the dofs of both ends of each part). Feature 008d: with the
+// heights of `loads` (their load factor in the reference state).
 [[nodiscard]] std::vector<StateBarMatrix> partStiffnesses(const BeamData& beam, double length,
-                                                          bool planar);
+                                                          bool planar, const SpanLoads& loads = {});
 
 // Feature 008c (design 008c §5.6): the buckling mode of an exact bar with
 // its nodes held, at the axial force of `beam` (a buckling factor where the
@@ -91,10 +104,9 @@ struct ExactInternalMode
     StateBarVector ends;
     std::vector<double> junctions;
 };
-[[nodiscard]] std::optional<ExactInternalMode> exactInternalMode(const BeamData& beam,
-                                                                 ElementKind kind,
-                                                                 const Eigen::Vector3d& x1,
-                                                                 const Eigen::Vector3d& x2);
+[[nodiscard]] std::optional<ExactInternalMode>
+exactInternalMode(const BeamData& beam, ElementKind kind, const Eigen::Vector3d& x1,
+                  const Eigen::Vector3d& x2, const SpanLoads& loads = {});
 
 // REQ-008b-13, 008d-01, 03: the exact beam element (design 008b §5.3, 5.4)
 // for a Line3 arc (no dofs at its middle node) and a Line2 with warping (or

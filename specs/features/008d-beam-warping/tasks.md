@@ -149,12 +149,15 @@ Regras:
   - flexo-torção de pilares U e T (raiz da cúbica).
   Até a T14 também passar. Arquivos: `beam_state.cpp`,
   `test_flexural_torsional.cpp`. Cobre: 10, 11, 12, N01
-- [ ] **T16** Altura da carga (design §5.5): k_q = λ·(q·d) no termo do giro
+- [x] **T16** Altura da carga (design §5.5): k_q = λ·(q·d) no termo do giro
   e salto ΔMx = λ·(P·d)·θx na concentrada; o centroide como padrão em seção
   monossimétrica. Testes:
   - carga uniforme e concentrada na mesa superior, no centro e na mesa
-    inferior: 1e−6 contra a barra subdividida e 1% contra as tabelas de C2
-    (Trahair, 1993; NCCI SN003);
+    inferior: 1e−6 contra um Rayleigh-Ritz independente no teste e, contra
+    as tabelas de C1 e C2 (NCCI SN003), 1% no centro de cisalhamento e 5%
+    com altura *(ajustado em 2026-11-19: a fórmula de três fatores fica
+    2,7 a 3,2% longe com a carga concentrada na mesa; decidido pelo
+    mantenedor)*;
   - K simétrica com a altura (1e−12).
   Arquivos: `beam_state.cpp`, `beam_loads.cpp`,
   `test_flexural_torsional.cpp`. Cobre: 13
@@ -355,3 +358,15 @@ Regras:
     do fator achado (muitos fatores de torção dentro da barra abaixo do
     de Euler), limitada a 64 e parando no salto de uma barra além do
     alcance; a recusa da flambagem olha também os momentos (T19).
+- T16: a carga a uma altura d do centro de cisalhamento entra como
+  λ·(q·d) no termo do giro (distribuída) e como salto ΔMx = λ·(P·d)·θx
+  (concentrada), com λ o `loadFactor` do perfil (1 na segunda ordem).
+  A referência independente é um Rayleigh-Ritz no teste (120 senos), e
+  o motor bate com ele em 1e−6 nas três alturas, com carga uniforme e
+  concentrada no meio. O momento parabólico da carga uniforme pedia mais
+  do que o perfil linear por partes dá (3e−4 com 4 partes; chegar a 1e−8
+  pediria umas 700): na barra reta o motor passou a calcular o estado de
+  referência pela estática exata, dos esforços de ponta e das cargas
+  (`ReferenceProfile::statics`), em vez de interpolar. A segunda ordem
+  ainda itera só N, sem a estática exata (T21). As cargas globais sobre
+  arcos (forças fixas no espaço) ainda não têm o termo da altura.

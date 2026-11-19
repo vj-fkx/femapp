@@ -308,56 +308,6 @@ Beams beamData(const Model& model, const detail::ValidationTables& tables, bool 
     return beams;
 }
 
-// Feature 008d (design 008d §5.4): the internal forces at s of a straight
-// bar from those at its start and its span loads, by statics (the state
-// equations with no curvature): F' = -q, Mx' = -(mx about the centroid),
-// My' = Fz, Mz' = -Fy, the concentrated loads as jumps.
-ReferencePoint straightStatics(const BeamData& beam, const SpanLoads& loads,
-                               const BeamForces& start, double s)
-{
-    const double ey = beam.shearCentre.x();
-    const double ez = beam.shearCentre.y();
-    Eigen::Vector3d f(start.n, start.vy, start.vz);
-    double mx = start.t - (ez * start.vy - ey * start.vz); // about the centroid
-    double my = start.my + f.z() * s;
-    double mz = start.mz - f.y() * s;
-    for (const SpanPiece& piece : loads.pieces) {
-        const double span = piece.to - piece.from;
-        const double e = std::min(piece.to, s);
-        if (!(span > 0.0) || !(e > piece.from)) {
-            continue;
-        }
-        const double l = e - piece.from;
-        const double d = s - piece.from;
-        const Eigen::Vector4d c0 = piece.start;
-        const Eigen::Vector4d c1 = (piece.end - piece.start) / span;
-        // The integral of q, and of (s - x) q, over [from, e].
-        const Eigen::Vector4d once = c0 * l + c1 * (l * l / 2.0);
-        const Eigen::Vector4d moment =
-            c0 * (d * l - l * l / 2.0) + c1 * (d * l * l / 2.0 - l * l * l / 3.0);
-        f -= once.head<3>();
-        mx -= once(3) - (ez * once(1) - ey * once(2));
-        my -= moment(2);
-        mz += moment(1);
-    }
-    for (const SpanPoint& point : loads.points) {
-        if (!(point.at < s)) {
-            continue;
-        }
-        const double d = s - point.at;
-        f -= point.force;
-        mx -= point.moment.x() - (ez * point.force.y() - ey * point.force.z());
-        my -= point.moment.y() + point.force.z() * d;
-        mz -= point.moment.z() - point.force.y() * d;
-    }
-    return {.n = f.x(),
-            .vy = f.y(),
-            .vz = f.z(),
-            .t = mx + ez * f.y() - ey * f.z(),
-            .my = my,
-            .mz = mz};
-}
-
 ReferencePoint pointOf(const BeamForces& f)
 {
     return {.n = f.n, .vy = f.vy, .vz = f.vz, .t = f.t, .my = f.my, .mz = f.mz};
@@ -725,18 +675,15 @@ std::vector<ReferenceProfile> StaticProblem::profilesOf(const Eigen::VectorXd& v
             });
             return;
         }
-        if (loads.pieces.empty() && loads.points.empty()) {
-            // No span loads: N, V and T constant, the moments linear (one
-            // part, the same count in every iteration).
-            profiles[e] = sampled(1, length,
-                                  [&](double s) { return straightStatics(beam, loads, start, s); });
-            return;
-        }
-        // A straight bar with span loads: by statics, in 4 parts (design
-        // 008c §5.2, 008d §5.4).
-        constexpr int kParts = 4;
-        profiles[e] = sampled(kParts, length,
-                              [&](double s) { return straightStatics(beam, loads, start, s); });
+        // A straight bar: by statics, sampled in one part without span loads
+        // (M linear) and in 4 with them (design 008c §5.2, 008d §5.4); the
+        // engine evaluates it exactly from its start (`statics`).
+        const int parts = loads.pieces.empty() && loads.points.empty() ? 1 : 4;
+        const ReferencePoint first = pointOf(start);
+        profiles[e] = sampled(parts, length,
+                              [&](double s) { return straightStatics(beam, loads, first, s); });
+        profiles[e].statics = true;
+        profiles[e].start = first;
     };
     tbb::task_arena arena(m_options.threads > 0 ? m_options.threads : tbb::task_arena::automatic);
     arena.execute([&] {
@@ -747,6 +694,13 @@ std::vector<ReferenceProfile> StaticProblem::profilesOf(const Eigen::VectorXd& v
                               }
                           });
     });
+    // Feature 008d: the reference state is that of the loads as given (their
+    // factor 1), for the terms of their heights.
+    for (std::size_t e = 0; e < count; ++e) {
+        if (isBeam(m_kindOf[e]) && profiles[e].active()) {
+            profiles[e].loadFactor = 1.0;
+        }
+    }
     return profiles;
 }
 
@@ -760,7 +714,7 @@ std::optional<BeamResult> StaticProblem::internalMode(ElementIndex element) cons
     const Eigen::Vector3d x1 = mesh().nodeCoordinates(ids[0]);
     const Eigen::Vector3d x2 = mesh().nodeCoordinates(ids[1]);
     const BeamData& beam = m_beams.data[e];
-    auto mode = exactInternalMode(beam, m_kindOf[e], x1, x2);
+    auto mode = exactInternalMode(beam, m_kindOf[e], x1, x2, m_beams.loads[e]);
     if (!mode) {
         return std::nullopt;
     }

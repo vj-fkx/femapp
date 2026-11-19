@@ -64,6 +64,7 @@ std::vector<ReferenceProfile> unflatten(const Eigen::VectorXd& x, const Flat& fl
     Eigen::Index i = 0;
     for (std::size_t e = 0; e < profiles.size(); ++e) {
         profiles[e].count = flat.count[e];
+        profiles[e].loadFactor = flat.count[e] > 0 ? 1.0 : 0.0; // feature 008d
         for (int k = 0; k < flat.count[e]; ++k) {
             profiles[e].values.at(static_cast<std::size_t>(k)).n = x(i++);
         }

@@ -67,6 +67,11 @@ struct ReferenceProfile
     int count = 0;
     std::array<ReferencePoint, std::size_t{2} * kMaxReferenceParts> values{};
     double loadFactor = 0.0;
+    // Feature 008d: a straight bar whose forces are exact by statics from
+    // `start` and its span loads (times loadFactor); the values above are
+    // their samples (design 008d §5.4).
+    bool statics = false;
+    ReferencePoint start{};
 
     [[nodiscard]] static ReferenceProfile constant(double n);
     [[nodiscard]] static ReferenceProfile constant(const ReferencePoint& point);

@@ -83,6 +83,7 @@ ReferenceProfile ReferenceProfile::scaled(double factor) const
             values.at(static_cast<std::size_t>(i)) * factor;
     }
     out.loadFactor = loadFactor * factor;
+    out.start = start * factor;
     return out;
 }
 
