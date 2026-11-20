@@ -491,14 +491,16 @@ máquina:
 - **linear com empenamento** ≤ 2,2 vezes a linear sem empenamento
   (medido: 1,65 a 1,68; a folga cobre as molas, a continuidade e os
   resultados novos);
-- **segunda ordem com empenamento** ≤ 4 vezes a linear com empenamento (a
-  razão da 008c);
+- **segunda ordem com empenamento** ≤ 6 vezes a linear com empenamento
+  *(ajustado após a T21, 2026-11-20: a proposta era 4×, a razão da 008c;
+  com os seis esforços iterados, cada montagem leva os momentos e divide
+  as barras)*;
 - **flambagem com 5 fatores, com empenamento** ≤ 400 vezes a linear com
   empenamento *(ajustado após a T18b, 2026-11-19: a proposta era 12×, a
   razão da 008c)*;
-- **sem empenamento** continuam a meta da 008b (linear < 5 s) e a da
-  segunda ordem da 008c (4×), agora com a flexo-torção ativa; a da
-  flambagem passa também a ≤ 400×.
+- **sem empenamento** continua a meta da 008b (linear < 5 s); a da
+  segunda ordem passa a ≤ 6× e a da flambagem a ≤ 400×, agora com a
+  flexo-torção ativa.
 
 Por que 12× não fecha (T18b): no benchmark, uma contagem de Sturm (uma
 montagem com os seis esforços e uma fatoração) custa cerca de 3 vezes a

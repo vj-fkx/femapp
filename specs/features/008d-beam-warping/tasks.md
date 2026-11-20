@@ -216,7 +216,7 @@ Regras:
   independente (decisão do mantenedor, 2026-11-19), 1e−6; a literatura
   (±622 N·mm) em 1%. Correção nas pontas da barra em `beam_state.cpp`
   (adendo do ADR 0008).
-- [ ] **T21** Segunda ordem com flexo-torção (design §5.8): o Anderson
+- [x] **T21** Segunda ordem com flexo-torção (design §5.8): o Anderson
   sobre o perfil completo, e a variação com giros, ψ e esforços. Testes
   (AC-7):
   - momento uniforme abaixo do crítico com pequena carga lateral ou torque:
@@ -444,3 +444,18 @@ Regras:
   entre pontas (±T/2 entre as rotações de flexão das duas pontas) contra a
   barra linearizada; a verificar com a viga-coluna sob torque na T21
   (AC-7) e na isoparamétrica na T23.
+- T21: o Anderson itera os seis esforços de cada ponto e, nas barras retas,
+  os esforços do início que alimentam a estática exata. A viga-coluna
+  lateral (torque ou carga lateral no meio, com e sem empenamento) confere
+  com as fórmulas fechadas em 1e−6 com o eixo maior 10⁶ vezes mais rígido;
+  uma barra linearizada independente confirma as fórmulas em 1e−15. Com a
+  seção real a diferença é de 0,9% (torque) a 5,8% (carga lateral) e cai na
+  proporção de E·Iy/E·Iz: é a deformação no plano maior antes do giro
+  (Kirby e Nethercot, 1979), que a segunda ordem inclui e a teoria
+  clássica não. Benchmark (Release): segunda ordem 19,5 s = 5,75× a linear
+  sem empenamento e 26,9 s = 5,14× com (3 iterações; eram 2,34× e 2,24×
+  com só N): cada montagem leva os momentos e divide as barras. O
+  mantenedor mudou a meta para ≤ 6× (NFR-008d-02, design §5.9). O torque
+  de referência nas juntas (nota da T20) fica para uma verificação à
+  parte.
+

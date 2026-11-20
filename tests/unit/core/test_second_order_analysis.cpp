@@ -394,3 +394,186 @@ TEST_CASE("second order of a curved arch", "[core][second-order][arc]")
         CHECK(near(iso[2], arc, 2e-5));
     }
 }
+
+namespace {
+
+// T21 (AC-7, design 008d §5.8): a beam of 2 bars along X, length l, on fork
+// supports (u, v, w and the twist held at the start; v, w and the twist at
+// the end), its major bending in x-Z under the end moments (0, -+m, 0): a
+// uniform moment m. The lateral direction is global Y (local z), the
+// lateral bending E Iy; with iw > 0 the warping is free at the ends and
+// continuous at the middle node 2.
+struct Beam
+{
+    double iy = 4e-6; // lateral
+    double iz = 8e-5; // major
+    double j = 2e-7;
+    double iw = 0.0;
+};
+
+fem::core::Model forkPair(const Beam& b, double l, double m)
+{
+    fem::core::test::TrussSpec spec;
+    spec.nodes = {{0.0, 0.0, 0.0}, {l / 2.0, 0.0, 0.0}, {l, 0.0, 0.0}};
+    spec.bars = {{0, 1}, {1, 2}};
+    fem::core::Model model = fem::core::test::beamModel(spec, ElementKind::Beam3D);
+    fem::core::Section& s = model.sections.front();
+    s.area = 6e-3;
+    s.inertiaY = b.iy;
+    s.inertiaZ = b.iz;
+    s.torsionConstant = b.j;
+    s.shearAreaY.reset();
+    s.shearAreaZ.reset();
+    if (b.iw > 0.0) {
+        s.warpingConstant = b.iw;
+        model.assignments.front().warping = true;
+    }
+    using fem::core::DofType;
+    fem::core::test::restrain(model, {1}, {DofType::U, DofType::V, DofType::W, DofType::RX});
+    fem::core::test::restrain(model, {3}, {DofType::V, DofType::W, DofType::RX});
+    model.nodalForces.push_back({.nodes = fem::core::NodeIds{{1}}, .moment = Vec(0.0, -m, 0.0)});
+    model.nodalForces.push_back({.nodes = fem::core::NodeIds{{3}}, .moment = Vec(0.0, m, 0.0)});
+    return model;
+}
+
+double relative(double value, double reference)
+{
+    return std::abs(value - reference) / std::abs(reference);
+}
+
+} // namespace
+
+// T21 (AC-7): the lateral beam-column (Trahair, 1993, ch. 6): under a
+// uniform moment M below the critical one, a small torque T0 or a small
+// lateral load P at the middle (at the shear centre) twists the beam by an
+// amount the moment amplifies. Without warping, k = M / sqrt(E Iy G J):
+// phi = T0 tan(kL/2) / (2 G J k) and v = (M / E Iy) T0 (kL/2 - tan(kL/2))
+// / (2 G J k^3) for the torque; phi = P (tan(kL/2) - kL/2) / (2 M k) for the
+// load. With warping (torque): phi = A sin(beta x) + B sinh(alpha x) on the
+// first half, alpha^2 and -beta^2 the roots of E Iw r^4 - G J r^2 - M^2 /
+// E Iy = 0, phi' = 0 at the middle and 2 E Iw phi''' = T0 there. These
+// leave out the deflection of the beam in its major plane before the twist,
+// which the second order includes (the effect of the prebuckling
+// deflections, Kirby and Nethercot, 1979): 1e-6 with the major axis 10^6
+// times stiffer (an independent linearized rod confirms the closed forms to
+// 1e-15); with real ones the difference is a few per cent and goes with
+// E Iy / E Iz.
+TEST_CASE("the lateral beam-column", "[core][second-order][flexural-torsional]")
+{
+    const double l = 6.0;
+    Beam bare;
+    bare.iz = 8e1;
+    const double eiy = kE * bare.iy;
+    const double gj = kG * bare.j;
+    const double mcr = std::numbers::pi / l * std::sqrt(eiy * gj);
+    const double m = 0.6 * mcr;
+    const double k = m / std::sqrt(eiy * gj);
+    const double h = k * l / 2.0;
+    SECTION("a torque at the middle")
+    {
+        const double t0 = 1e-2;
+        fem::core::Model model = forkPair(bare, l, m);
+        model.nodalForces.push_back(
+            {.nodes = fem::core::NodeIds{{2}}, .moment = Vec(t0, 0.0, 0.0)});
+        const auto r = second(model).result;
+        const double phi = t0 * std::tan(h) / (2.0 * gj * k);
+        const double v = m / eiy * t0 * (h - std::tan(h)) / (2.0 * gj * k * k * k);
+        CHECK(relative(std::abs(r.rotations[1].x()), phi) <= 1e-6);
+        CHECK(relative(std::abs(r.displacements[1].y()), std::abs(v)) <= 1e-6);
+        // Against the linear twist T0 L / (4 G J): amplified.
+        CHECK(std::abs(r.rotations[1].x()) > t0 * l / (4.0 * gj));
+    }
+    SECTION("the deflection in the major plane: a difference with E Iy / E Iz")
+    {
+        const double t0 = 1e-2;
+        const double phi = t0 * std::tan(h) / (2.0 * gj * k);
+        const auto gap = [&](double iz) {
+            Beam real = bare;
+            real.iz = iz;
+            fem::core::Model model = forkPair(real, l, m);
+            model.nodalForces.push_back(
+                {.nodes = fem::core::NodeIds{{2}}, .moment = Vec(t0, 0.0, 0.0)});
+            return relative(std::abs(second(model).result.rotations[1].x()), phi);
+        };
+        const double real = gap(8e-5);
+        CHECK(real < 0.05);
+        CHECK(real / gap(8e-2) > 900.0);
+        CHECK(real / gap(8e-2) < 1100.0);
+    }
+    SECTION("a lateral load at the middle")
+    {
+        const double p = 1e-2;
+        fem::core::Model model = forkPair(bare, l, m);
+        model.nodalForces.push_back({.nodes = fem::core::NodeIds{{2}}, .force = Vec(0.0, p, 0.0)});
+        const auto r = second(model).result;
+        const double phi = p * (std::tan(h) - h) / (2.0 * m * k);
+        CHECK(relative(std::abs(r.rotations[1].x()), phi) <= 1e-6);
+    }
+    SECTION("a torque at the middle, with warping")
+    {
+        Beam warped = bare;
+        warped.iw = 4e-8;
+        const double eiw = kE * warped.iw;
+        const double mw =
+            0.6 * std::numbers::pi / l *
+            std::sqrt(eiy * (gj + std::numbers::pi * std::numbers::pi * eiw / (l * l)));
+        const double c = mw * mw / eiy;
+        const double root = std::sqrt(gj * gj + 4.0 * eiw * c);
+        const double alpha = std::sqrt((gj + root) / (2.0 * eiw));
+        const double beta = std::sqrt((root - gj) / (2.0 * eiw));
+        const double t0 = 1e-2;
+        // A beta cos(beta h) + B alpha cosh(alpha h) = 0;
+        // -A beta^3 cos(beta h) + B alpha^3 cosh(alpha h) = T0 / (2 E Iw).
+        const double hw = l / 2.0;
+        const double cb = beta * std::cos(beta * hw);
+        const double ca = alpha * std::cosh(alpha * hw);
+        const double b = t0 / (2.0 * eiw) / (alpha * alpha * ca + beta * beta * ca);
+        const double a = -b * ca / cb;
+        const double phi = a * std::sin(beta * hw) + b * std::sinh(alpha * hw);
+        fem::core::Model model = forkPair(warped, l, mw);
+        model.nodalForces.push_back(
+            {.nodes = fem::core::NodeIds{{2}}, .moment = Vec(t0, 0.0, 0.0)});
+        const auto r = second(model).result;
+        CHECK(relative(std::abs(r.rotations[1].x()), std::abs(phi)) <= 1e-6);
+    }
+}
+
+// T21 (AC-7, REQ-008d-13): the height of the load in the second order: a
+// vertical load at the middle of one bar, with a small torque there, twists
+// the beam more on the top flange than at the shear centre, and less on the
+// bottom flange; above the critical moment the analysis refuses.
+TEST_CASE("flexural-torsional second order: load height and refusal",
+          "[core][second-order][flexural-torsional]")
+{
+    const double l = 6.0;
+    const Beam bare;
+    const double mcr = std::numbers::pi / l * std::sqrt(kE * bare.iy * kG * bare.j);
+    SECTION("the height of the load")
+    {
+        const auto twist = [&](double a) {
+            fem::core::Model model = forkPair(bare, l, 0.0);
+            model.nodalForces.clear();
+            model.concentratedLoads.push_back({.elements = fem::core::ElementIds{{1}},
+                                               .force = Vec(0.0, 0.0, -2.0e3),
+                                               .at = {.value = 1.0, .fraction = true},
+                                               .point = Eigen::Vector2d(a, 0.0)});
+            model.nodalForces.push_back(
+                {.nodes = fem::core::NodeIds{{2}}, .moment = Vec(1.0, 0.0, 0.0)});
+            return std::abs(second(model).result.rotations[1].x());
+        };
+        const double top = twist(0.15);
+        const double centre = twist(0.0);
+        const double bottom = twist(-0.15);
+        CHECK(top > centre);
+        CHECK(centre > bottom);
+    }
+    SECTION("above the critical moment")
+    {
+        fem::core::Model model = forkPair(bare, l, 1.05 * mcr);
+        model.nodalForces.push_back(
+            {.nodes = fem::core::NodeIds{{2}}, .moment = Vec(1.0, 0.0, 0.0)});
+        const auto r = fem::core::runSecondOrderStatic(model);
+        REQUIRE_FALSE(r.has_value());
+        CHECK(r.error().message.find("unstable under these loads") != std::string::npos);
+    }
+}

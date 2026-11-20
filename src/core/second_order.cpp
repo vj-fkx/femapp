@@ -1,9 +1,10 @@
 // REQ-008c-01, 05 to 08: the second-order static analysis (design 008c
-// §5.5): the linear solution gives the first axial forces; each iteration
-// assembles the bars with the axial forces of the last one and solves by
+// §5.5): the linear solution gives the first forces of the bars (feature
+// 008d: all six, design 008d §5.8); each iteration assembles the bars with
+// the forces of the last one and solves by
 // conjugate gradients preconditioned with a factorization kept from before
 // (one costs almost a whole linear analysis, T03); Anderson accelerates the
-// iteration on the axial forces; a final factorization checks by its
+// iteration on the forces; a final factorization checks by its
 // inertia that the structure is stable (Sturm count, ADR 0007).
 
 #include "detail/static_stages.hpp"
@@ -32,27 +33,47 @@ constexpr int kHalvings = 5;
 constexpr int kGradientIterations = 100;
 constexpr double kGradientTolerance = 1e-12;
 
-// The values of all profiles in one vector, and back.
+// The values of all profiles in one vector, and back (feature 008d: the six
+// forces of every point, and the forces at the start of a bar whose forces
+// come from statics; the rest of each profile is kept as it was).
 struct Flat
 {
-    std::vector<int> count; // per element
+    std::vector<ReferenceProfile> shape; // per element
 };
+
+constexpr int kForces = 6;
+
+void put(const ReferencePoint& point, Eigen::VectorXd& x, Eigen::Index& i)
+{
+    for (const double value : {point.n, point.vy, point.vz, point.t, point.my, point.mz}) {
+        x(i++) = value;
+    }
+}
+
+ReferencePoint take(const Eigen::VectorXd& x, Eigen::Index& i)
+{
+    ReferencePoint point;
+    for (double* value : {&point.n, &point.vy, &point.vz, &point.t, &point.my, &point.mz}) {
+        *value = x(i++);
+    }
+    return point;
+}
 
 Eigen::VectorXd flatten(const std::vector<ReferenceProfile>& profiles, Flat& flat)
 {
-    flat.count.resize(profiles.size());
+    flat.shape = profiles;
     Eigen::Index size = 0;
-    for (std::size_t e = 0; e < profiles.size(); ++e) {
-        flat.count[e] = profiles[e].count;
-        size += profiles[e].count;
+    for (const ReferenceProfile& profile : profiles) {
+        size += static_cast<Eigen::Index>(kForces) * (profile.count + (profile.statics ? 1 : 0));
     }
     Eigen::VectorXd x(size);
     Eigen::Index i = 0;
     for (const ReferenceProfile& profile : profiles) {
         for (int k = 0; k < profile.count; ++k) {
-            // Feature 008d: the axial forces only, for now (T21 iterates
-            // all the forces).
-            x(i++) = profile.values.at(static_cast<std::size_t>(k)).n;
+            put(profile.values.at(static_cast<std::size_t>(k)), x, i);
+        }
+        if (profile.statics) {
+            put(profile.start, x, i);
         }
     }
     return x;
@@ -60,13 +81,14 @@ Eigen::VectorXd flatten(const std::vector<ReferenceProfile>& profiles, Flat& fla
 
 std::vector<ReferenceProfile> unflatten(const Eigen::VectorXd& x, const Flat& flat)
 {
-    std::vector<ReferenceProfile> profiles(flat.count.size());
+    std::vector<ReferenceProfile> profiles = flat.shape;
     Eigen::Index i = 0;
-    for (std::size_t e = 0; e < profiles.size(); ++e) {
-        profiles[e].count = flat.count[e];
-        profiles[e].loadFactor = flat.count[e] > 0 ? 1.0 : 0.0; // feature 008d
-        for (int k = 0; k < flat.count[e]; ++k) {
-            profiles[e].values.at(static_cast<std::size_t>(k)).n = x(i++);
+    for (ReferenceProfile& profile : profiles) {
+        for (int k = 0; k < profile.count; ++k) {
+            profile.values.at(static_cast<std::size_t>(k)) = take(x, i);
+        }
+        if (profile.statics) {
+            profile.start = take(x, i);
         }
     }
     return profiles;
@@ -255,7 +277,7 @@ Expected<SecondOrderResult> runSecondOrderStatic(const Model& model,
                 conjugateGradient(system->matrix, system->rhs, *preconditioner, next);
             suspect = gradient.negativeCurvature;
             if (!gradient.converged && !suspect) {
-                // A stalled preconditioner: a new one at these axial forces.
+                // A stalled preconditioner: a new one at these forces.
                 auto fresh = std::make_unique<SparseCholesky>();
                 if (!fresh->factorizeIndefinite(system->matrix) || fresh->negativePivots() > 0) {
                     suspect = true;
@@ -271,7 +293,7 @@ Expected<SecondOrderResult> runSecondOrderStatic(const Model& model,
         }
         if (suspect) {
             // Perhaps an accelerated step overshot: back towards the last
-            // stable axial forces, then decide by a factorization.
+            // stable forces, then decide by a factorization.
             if (halvings < kHalvings) {
                 ++halvings;
                 x = 0.5 * (x + stableX);
@@ -296,7 +318,7 @@ Expected<SecondOrderResult> runSecondOrderStatic(const Model& model,
         change = std::max(relativeChange(next, u), relativeChange(g, x));
         u = next;
         if (change <= options.tolerance) {
-            // REQ-008c-08: stable at the converged axial forces (Sturm).
+            // REQ-008c-08: stable at the converged forces (Sturm).
             SparseCholesky check;
             if (!check.factorizeIndefinite(system->matrix) || check.negativePivots() > 0 ||
                 problem.negativePivots() > 0) {
