@@ -209,10 +209,13 @@ Regras:
   - caso só de tração e sem momento sem fator.
   Arquivos: `buckling.cpp`, `stability_analysis.hpp`, `test_buckling.cpp`,
   `test_flexural_torsional.cpp`. Cobre: 10, 11, 15, 16
-- [ ] **T20** [P] Pórtico em L de Argyris (flambagem lateral de pórtico em
+- [x] **T20** [P] Pórtico em L de Argyris (flambagem lateral de pórtico em
   ângulo reto): consistência dos momentos nas juntas (ADR 0008), 1% contra
   Argyris (1979) e Yang e McGuire (1986) — arquivo:
-  `test_flexural_torsional.cpp` — cobre: 10
+  `test_flexural_torsional.cpp` — cobre: 10. Referência: dedução
+  independente (decisão do mantenedor, 2026-11-19), 1e−6; a literatura
+  (±622 N·mm) em 1%. Correção nas pontas da barra em `beam_state.cpp`
+  (adendo do ADR 0008).
 - [ ] **T21** Segunda ordem com flexo-torção (design §5.8): o Anderson
   sobre o perfil completo, e a variação com giros, ψ e esforços. Testes
   (AC-7):
@@ -423,3 +426,21 @@ Regras:
   Rayleigh-Ritz confere em 1e−6 e a tabela fica em 5% (decisão do
   mantenedor). O balanço com carga na ponta confere com γ = 4,012599
   (Timoshenko e Gere; a constante por shooting) em 1e−6.
+- T20: a literatura não traz os apoios do pórtico de Argyris nos textos
+  abertos (só o valor ±622 N·mm, que é o momento crítico de cada barra
+  sozinha). A referência veio de uma dedução independente: cada membro como
+  barra linearizada em vetores globais (dr' = θ×t, θ' = C⁻¹(dm − θ×M0),
+  dm' = −t×dn), todos os vetores contínuos na junta, momentos aplicados
+  semitangenciais; o fator é a raiz do determinante das condições de
+  ponta (script em Python, solução por exponencial de matriz e Brent). Ela
+  reproduz a barra sozinha (622,208) e dá, no pórtico com rótulas em Z
+  (Argyris), ±622,208; com garfos, +176,3477 e −445,8604. O motor dava
+  +397/−315 e ±311,1: a segunda variação da barra trazia, em cada ponta,
+  meio acoplamento a mais entre o giro e as rotações de flexão
+  ((t·wᵀ + w·tᵀ)/2, w = t×M), que se cancela entre barras colineares e
+  partes mas não numa junta em ângulo. Removido em `stateBarMatrices`;
+  nenhum teste anterior mudou (todos de barras retas ou colineares).
+  Pendente: a mesma comparação com torque de referência mostra diferenças
+  entre pontas (±T/2 entre as rotações de flexão das duas pontas) contra a
+  barra linearizada; a verificar com a viga-coluna sob torque na T21
+  (AC-7) e na isoparamétrica na T23.

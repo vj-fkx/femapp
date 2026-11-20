@@ -57,3 +57,19 @@ Rayleigh-Ritz da flambagem.
 - Momentos quase tangenciais com momentos induzidos nas juntas (Yang e
   McGuire, 1986) — também é simétrica, mas pede termos de junta à parte no
   elemento. O semitangencial sai direto do funcional.
+
+## Adendo (2026-11-20, feature 008d, T20)
+
+O pórtico em L de Argyris mostrou que a segunda variação de cada barra,
+sozinha, não equilibra os momentos numa junta de barras em ângulo: em cada
+ponta ela traz meio acoplamento a mais entre o giro da barra e as rotações
+de flexão, (t·wᵀ + w·tᵀ)/2 com w = t×M (M o momento de referência na
+ponta, t o eixo). Entre barras colineares e entre as partes de uma barra o
+termo se cancela, por isso as barras retas não o mostravam. Ele é retirado
+nas duas pontas da barra (`stateBarMatrices`, com o sinal da ponta); a
+rigidez continua simétrica, e os momentos aplicados continuam
+semitangenciais e sem rigidez de carga. A referência é uma barra
+linearizada em vetores globais com todos os vetores contínuos na junta,
+que dá ±622,208 N·mm no pórtico de Argyris sobre rótulas (Argyris et al.,
+1979: ±622 N·mm).
+

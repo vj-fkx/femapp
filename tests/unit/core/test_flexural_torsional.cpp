@@ -821,3 +821,83 @@ TEST_CASE("a beam in tension without moment has no buckling factor",
     REQUIRE_FALSE(result.has_value());
     CHECK(result.error().message.find("compressed or bent") != std::string::npos);
 }
+
+namespace {
+
+// Argyris's right-angle frame (Argyris et al., 1979): A = (0, 0, 0),
+// B = (L, 0, 0), C = (L, L, 0), L = 240 mm, a strip 30 x 0.6 mm (0.6 out
+// of the plane), E = 71240 N/mm^2, nu = 0.31; the moment m about Z at A and
+// -m at C: the support reactions vanish and both members bend under the
+// same uniform in-plane moment. Supports: hinges about Z (Argyris), or forks
+// (no out-of-plane displacement, no twist of the member). `parts` bars per
+// member.
+fem::core::Model argyrisFrame(double m, int parts, bool hinged)
+{
+    constexpr double kLength = 240.0;
+    fem::core::test::TrussSpec spec;
+    for (int i = 0; i <= parts; ++i) {
+        spec.nodes.emplace_back(kLength * i / parts, 0.0, 0.0);
+    }
+    for (int i = 1; i <= parts; ++i) {
+        spec.nodes.emplace_back(kLength, kLength * i / parts, 0.0);
+    }
+    for (int i = 0; i < 2 * parts; ++i) {
+        spec.bars.push_back({i, i + 1});
+    }
+    fem::core::Model model = fem::core::test::beamModel(spec, fem::core::ElementKind::Beam3D);
+    fem::core::Material& material = model.materials.front();
+    material.youngsModulus = 71240.0;
+    material.poissonsRatio = 0.31;
+    fem::core::Section& s = model.sections.front();
+    s.area = 30.0 * 0.6;
+    s.inertiaY = 0.6 * std::pow(30.0, 3) / 12.0; // in the plane
+    s.inertiaZ = 30.0 * std::pow(0.6, 3) / 12.0; // out of the plane (local y = Z)
+    s.torsionConstant = 30.0 * std::pow(0.6, 3) / 3.0;
+    s.shearAreaY.reset();
+    s.shearAreaZ.reset();
+    using fem::core::DofType;
+    const auto c = static_cast<fem::core::ExternalId>(2 * parts) + 1;
+    fem::core::test::restrain(model, {1}, {DofType::U, DofType::V, DofType::W, DofType::RX});
+    fem::core::test::restrain(model, {c}, {DofType::U, DofType::W, DofType::RY});
+    if (hinged) {
+        fem::core::test::restrain(model, {1}, {DofType::RY});
+        fem::core::test::restrain(model, {c}, {DofType::RX});
+    }
+    model.nodalForces.push_back(
+        {.nodes = fem::core::NodeIds{{1}}, .moment = Eigen::Vector3d(0.0, 0.0, m)});
+    model.nodalForces.push_back(
+        {.nodes = fem::core::NodeIds{{c}}, .moment = Eigen::Vector3d(0.0, 0.0, -m)});
+    return model;
+}
+
+} // namespace
+
+// T20 (ADR 0008): the lateral buckling of Argyris's right-angle frame, the
+// test of the moments at a joint of bars at an angle. The reference is an
+// independent derivation (the maintainer's choice, 2026-11-19): each member
+// a linearized rod in global vectors, dr' = theta x t, theta' = C^-1 (dm -
+// theta x M0), dm' = -t x dn, every vector continuous at the joint, the
+// applied moments semitangential; the critical moment is the root of the
+// determinant of the end conditions. On hinges it is the critical moment of
+// each member alone, (pi / L) sqrt(E Iz G J) = 622.208 N mm, for m and -m:
+// Argyris et al. (1979) give +-622 N mm (1%). On forks: +176.3477 and
+// -445.8604 N mm. One bar or two per member.
+TEST_CASE("the lateral buckling of Argyris's right-angle frame",
+          "[core][beam][flexural-torsional][buckling]")
+{
+    const double m = 100.0;
+    const double g = 71240.0 / (2.0 * 1.31);
+    const double alone =
+        std::numbers::pi / 240.0 *
+        std::sqrt(71240.0 * 30.0 * std::pow(0.6, 3) / 12.0 * g * 30.0 * std::pow(0.6, 3) / 3.0);
+    for (const int parts : {1, 2}) {
+        INFO(parts << " bars per member");
+        const double positive = firstFactor(argyrisFrame(m, parts, true)) * m;
+        const double negative = firstFactor(argyrisFrame(-m, parts, true)) * m;
+        CHECK(relative(positive, 622.0) <= 1e-2);
+        CHECK(relative(positive, alone) <= 1e-6);
+        CHECK(relative(negative, alone) <= 1e-6);
+        CHECK(relative(firstFactor(argyrisFrame(m, parts, false)) * m, 176.34772588) <= 1e-6);
+        CHECK(relative(firstFactor(argyrisFrame(-m, parts, false)) * m, 445.86036134) <= 1e-6);
+    }
+}

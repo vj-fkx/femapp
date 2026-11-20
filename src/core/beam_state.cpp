@@ -984,6 +984,24 @@ StateBarMatrices stateBarMatrices(const BeamData& beam, double length, const Spa
         total = (next + next.transpose()) / 2.0;
         totalLoads = nextLoads;
     }
+    // ADR 0008 (T20): the moments at the ends of the bar act on the joint
+    // as semitangential moments. The second variation of the bar gives
+    // them, at each end, half a coupling too many between the twist and the
+    // bending rotations: (t w^T + w t^T) / 2 with w = t x M; it cancels
+    // between collinear bars and parts, not at a joint of bars at an angle
+    // (Argyris's right-angle frame). Removed here, at the two ends.
+    if (second && !planar) {
+        for (int end = 0; end < 2; ++end) {
+            const ReferencePoint m = referenceAt(beam, loads, end == 0 ? 0.0 : length, length);
+            const double sign = end == 0 ? 1.0 : -1.0;
+            const Eigen::Index rx = end * d + 3;
+            // w = x x (T, My, Mz) = (0, -Mz, My) in the local axes.
+            total(rx, rx + 1) -= sign * 0.5 * m.mz;
+            total(rx + 1, rx) -= sign * 0.5 * m.mz;
+            total(rx, rx + 2) += sign * 0.5 * m.my;
+            total(rx + 2, rx) += sign * 0.5 * m.my;
+        }
+    }
     StateBarMatrices out;
     out.stiffness = total;
     out.loads = -totalLoads; // equivalent nodal loads
