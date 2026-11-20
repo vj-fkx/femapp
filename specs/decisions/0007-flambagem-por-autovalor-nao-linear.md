@@ -56,3 +56,25 @@ resolve só problemas lineares e ainda não está no projeto.
   fator.
 - Determinante de K(λ) com busca de raízes — perde raízes múltiplas e muda
   de sinal sem controle em barras com pivôs internos.
+
+## Adendo (2026-11-19, feature 008d, T18b)
+
+Com a flexo-torção, K(λ) deixa de ser quase linear em λ (a flambagem
+lateral vai com λ²: os momentos na seção girada), e as estimativas do
+pencil linear K0 − λG erram os fatores por dezenas de vezes. Duas mudanças:
+
+- **Estimativas pelo pencil quadrático** K0 − λG + λ²K2, usado quando o
+  termo em λ² pesa na primeira estimativa linear: Rayleigh-Ritz na base de
+  K0⁻¹Gx e K0⁻¹K2x, resolvido na forma companheira; K2 é reajustado a cada
+  iteração para que o quadrático passe também por K(λ) na primeira
+  estimativa (as barras exatas não são quadráticas em λ).
+- **Fatores perdidos**: a bissecção na contagem global vai só até 10⁻³;
+  depois, iteração inversa e refinamento a partir da fatoração na ponta de
+  baixo (fator nodal), ou bissecção da contagem interna de uma barra
+  (modo dentro dela), confirmada pela contagem global; só sem nenhum dos
+  dois a bissecção global vai até o fim.
+
+A garantia de Wittrick-Williams continua a mesma: nenhum fator é aceito
+sem a contagem global. A meta de custo da flambagem com flexo-torção
+passou a ≤ 400 vezes a linear (NFR-008d-02): uma contagem custa cerca de
+3 vezes a análise linear no benchmark.

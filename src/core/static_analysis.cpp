@@ -21,6 +21,7 @@
 #include <Eigen/Geometry>
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -742,6 +743,37 @@ std::optional<BeamResult> StaticProblem::internalMode(ElementIndex element) cons
         }
     }
     return BeamResult(std::move(data));
+}
+
+int StaticProblem::internalCount(ElementIndex element, const ReferenceProfile& reference) const
+{
+    const auto e = static_cast<std::size_t>(element);
+    if (!isBeam(m_kindOf[e]) || m_beams.isIso[e] || !m_beams.exact[e]) {
+        return 0;
+    }
+    std::array<BeamData, 1> beam = {m_beams.data[e]};
+    beam[0].reference =
+        reference.active() ? std::make_shared<const ReferenceProfile>(reference) : nullptr;
+    const std::array<SpanLoads, 1> loads = {m_beams.loads[e]};
+    std::array<int, 1> negative{};
+    const ExactBeamElement formulation(m_kindOf[e], beam, loads, negative,
+                                       beam[0].warpingContinuous);
+    const Mesh& mesh = this->mesh();
+    const auto ids = mesh.elementNodes(element);
+    ElementNodes nodes;
+    nodes.type = mesh.elementType(element);
+    nodes.count = static_cast<int>(ids.size());
+    Eigen::Index size = 0;
+    for (std::size_t k = 0; k < ids.size(); ++k) {
+        nodes.x.at(k) = mesh.nodeCoordinates(ids[k]);
+        size += std::popcount(formulation.dofsAt(nodes.type, static_cast<int>(k)));
+    }
+    Eigen::MatrixXd matrix = Eigen::MatrixXd::Zero(size, size);
+    Eigen::VectorXd vector = Eigen::VectorXd::Zero(size);
+    if (!formulation.compute(nodes, 0, matrix, vector)) {
+        return 0;
+    }
+    return negative[0];
 }
 
 void StaticProblem::setReference(const std::vector<ReferenceProfile>& profiles)

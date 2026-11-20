@@ -20,10 +20,14 @@
 #include <fem/core/linear_solver.hpp>
 #include <fem/core/stability_analysis.hpp>
 
+#include <tbb/parallel_for.h>
+
 #include <Eigen/Eigenvalues>
+#include <Eigen/QR>
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <complex>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
@@ -55,8 +59,13 @@ constexpr double kCountMargin = 1e-6;  // above the last factor
 constexpr double kSameFactor = 1e-7;   // repeated factors
 constexpr double kInsideMargin = 1e-7; // about a factor inside a bar
 constexpr int kBisections = 200;
-constexpr double kNoLinearPart = 1e-12; // |G| / |K0| below it: no linear pencil
+constexpr double kNoLinearPart = 1e-12;  // |G| / |K0| below it: no linear pencil
+constexpr double kRealEstimate = 1e-6;   // |Im| / |Re| of an estimate taken as real
+constexpr double kQuadraticWeight = 0.1; // mu^2 x.K2 x / x.K0 x above it: the quadratic pencil
 constexpr double kBisectionPrecision = 1e-13;
+constexpr double kCoarseBracket = 1e-3; // of a missed factor, before its refinement
+constexpr int kInverseSteps = 3;        // inverse iteration before that refinement
+constexpr double kNewtonBracket = 1e-7; // about Newton's lambda, checked by the count
 constexpr int kDoublings = 60;
 constexpr double kRefinementReach = 2.0; // of the starting lambda: a local search
 
@@ -290,12 +299,20 @@ Expected<BucklingResult> runLinearBuckling(const Model& model, const BucklingOpt
         return tl::unexpected(!plus ? plus.error() : minus.error());
     }
     const SparseMatrix g = (*minus - *plus) / (2.0 * kDerivativeStep);
-    // Feature 008d: K(lambda) can be even in lambda (a beam bent by a moment
-    // buckles for +M and -M alike): then G is zero, or only rounding, and the
-    // linear pencil has no estimates; the count alone finds the factors.
+    // Feature 008d (T18b, ADR 0007 addendum): with the flexural-torsional
+    // terms K(lambda) is far from linear in lambda (lateral torsion goes
+    // with lambda^2: the moments in the twisted section), and the linear
+    // pencil misses the factors by tens of times. The estimates come from
+    // the quadratic one, K0 + lambda K1 + lambda^2 K2, with K1 = -G and K2
+    // first from a third assembly at 0 (refitted below).
+    auto centre = pencil.at(0.0);
+    if (!centre) {
+        return tl::unexpected(centre.error());
+    }
+    SparseMatrix k2 = (*plus + *minus - 2.0 * *centre) / (2.0 * kDerivativeStep * kDerivativeStep);
     const bool linearized = g.norm() > kNoLinearPart * k0.norm();
+    const bool quadratic = k2.norm() > kNoLinearPart * k0.norm();
 
-    // Estimates: subspace iteration on K0 phi = mu G phi.
     const auto p = static_cast<Eigen::Index>(std::min<Eigen::Index>(wanted + kSubspaceExtra, n));
     std::mt19937 random(2026);
     std::uniform_real_distribution<double> uniform(-1.0, 1.0);
@@ -304,6 +321,23 @@ Expected<BucklingResult> runLinearBuckling(const Model& model, const BucklingOpt
         x.data()[i] = uniform(random);
     }
     std::vector<std::pair<double, Eigen::VectorXd>> estimates;
+    // Whether a list of estimates settled since the last iteration.
+    const auto settledSince = [wanted](const std::vector<std::pair<double, Eigen::VectorXd>>& now,
+                                       std::vector<double>& last) {
+        bool settled = now.size() == last.size() && !now.empty();
+        const std::size_t check =
+            std::min<std::size_t>(now.size(), static_cast<std::size_t>(wanted));
+        for (std::size_t i = 0; settled && i < check; ++i) {
+            settled = std::abs(now[i].first - last[i]) <= kEstimateSettled * now[i].first;
+        }
+        last.clear();
+        for (const auto& e : now) {
+            last.push_back(e.first);
+        }
+        return settled;
+    };
+
+    // Estimates: subspace iteration on K0 phi = mu G phi (design 008c §5.6).
     std::vector<double> last;
     for (int iteration = 0; linearized && iteration < kSubspaceIterations; ++iteration) {
         Eigen::MatrixXd y(n, p);
@@ -339,26 +373,107 @@ Expected<BucklingResult> runLinearBuckling(const Model& model, const BucklingOpt
                 estimates.emplace_back(1.0 / nu, x.col(c));
             }
         }
-        std::vector<double> now;
-        now.reserve(estimates.size());
-        for (const auto& e : estimates) {
-            now.push_back(e.first);
+        if (settledSince(estimates, last)) {
+            break;
         }
-        const auto settled = [&] {
-            if (now.size() != last.size() || now.empty()) {
-                return false;
+    }
+
+    // Feature 008d (T18b, ADR 0007 addendum): where the lambda^2 part of
+    // K(lambda) weighs on the first estimate (lateral torsion: the moments in
+    // the twisted section), the linear pencil misses the factors by tens of
+    // times. The estimates then come from the quadratic pencil, Rayleigh-Ritz
+    // on the basis of K0^-1 G x and K0^-1 K2 x, its companion form solved,
+    // each real root's vector the null vector of the reduced matrix.
+    bool useQuadratic = quadratic && estimates.empty();
+    if (quadratic && !estimates.empty()) {
+        const double mu = estimates.front().first;
+        const Eigen::VectorXd& v = estimates.front().second;
+        const double weight = mu * mu * std::abs(v.dot(times(k2, v)));
+        useQuadratic = weight > kQuadraticWeight * std::abs(v.dot(times(k0, v)));
+    }
+    last.clear();
+    for (int iteration = 0; useQuadratic && iteration < kSubspaceIterations; ++iteration) {
+        const Eigen::Index columns = std::min<Eigen::Index>(2 * p, n);
+        Eigen::MatrixXd y(n, columns);
+        for (Eigen::Index c = 0; c < columns; ++c) {
+            const Eigen::VectorXd v = c < p ? times(g, x.col(c)) : times(k2, x.col(c - p));
+            auto solved = base.solve(v);
+            if (!solved) {
+                return tl::unexpected(solved.error());
             }
-            const std::size_t check =
-                std::min<std::size_t>(now.size(), static_cast<std::size_t>(wanted));
-            for (std::size_t i = 0; i < check; ++i) {
-                if (std::abs(now[i] - last[i]) > kEstimateSettled * now[i]) {
-                    return false;
-                }
+            y.col(c) = *solved;
+        }
+        const Eigen::ColPivHouseholderQR<Eigen::MatrixXd> qr(y);
+        const Eigen::Index rank = qr.rank();
+        if (rank == 0) {
+            break;
+        }
+        const Eigen::MatrixXd q = Eigen::MatrixXd(qr.householderQ()).leftCols(rank);
+        Eigen::MatrixXd a0(rank, rank);
+        Eigen::MatrixXd a1(rank, rank);
+        Eigen::MatrixXd a2(rank, rank);
+        for (Eigen::Index c = 0; c < rank; ++c) {
+            a0.col(c) = q.transpose() * times(k0, q.col(c));
+            a1.col(c) = -(q.transpose() * times(g, q.col(c)));
+            a2.col(c) = q.transpose() * times(k2, q.col(c));
+        }
+        // (A0 + lambda A1 + lambda^2 A2) v = 0 as [0 I; -A0 -A1] w =
+        // lambda [I 0; 0 A2] w with w = (v, lambda v).
+        const Eigen::Index m = 2 * rank;
+        Eigen::MatrixXd left = Eigen::MatrixXd::Zero(m, m);
+        Eigen::MatrixXd right = Eigen::MatrixXd::Zero(m, m);
+        left.topRightCorner(rank, rank).setIdentity();
+        left.bottomLeftCorner(rank, rank) = -a0;
+        left.bottomRightCorner(rank, rank) = -a1;
+        right.topLeftCorner(rank, rank).setIdentity();
+        right.bottomRightCorner(rank, rank) = a2;
+        const Eigen::GeneralizedEigenSolver<Eigen::MatrixXd> eigen(left, right, false);
+        if (eigen.info() != Eigen::Success) {
+            break;
+        }
+        std::vector<std::pair<double, Eigen::VectorXd>> now;
+        for (Eigen::Index i = 0; i < m; ++i) {
+            const double beta = eigen.betas()(i);
+            if (std::abs(beta) <= 1e-300) {
+                continue; // infinite
             }
-            return true;
-        }();
-        last = now;
-        if (settled) {
+            const std::complex<double> lambda = eigen.alphas()(i) / beta;
+            if (!(lambda.real() > 0.0) ||
+                std::abs(lambda.imag()) > kRealEstimate * std::abs(lambda.real())) {
+                continue;
+            }
+            const double l = lambda.real();
+            // The reduced matrix is symmetric: its null vector is the
+            // eigenvector of the eigenvalue nearest zero.
+            const Eigen::MatrixXd reduced = a0 + l * a1 + l * l * a2;
+            const Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> null(
+                (reduced + reduced.transpose()) / 2.0);
+            Eigen::Index nearest = 0;
+            null.eigenvalues().cwiseAbs().minCoeff(&nearest);
+            Eigen::VectorXd mode = q * null.eigenvectors().col(nearest);
+            mode.normalize();
+            now.emplace_back(l, std::move(mode));
+        }
+        std::ranges::sort(now, {}, &std::pair<double, Eigen::VectorXd>::first);
+        if (static_cast<Eigen::Index>(now.size()) > p) {
+            now.resize(static_cast<std::size_t>(p));
+        }
+        if (now.empty()) {
+            break;
+        }
+        estimates = now;
+        // K2 refitted so that the quadratic also passes through K(s) at the
+        // first estimate s: exact at both ends of the range of the first
+        // factor (the exact bars are not quadratic in lambda, and the
+        // quadratic of the derivatives at 0 falls short of their factors).
+        const double s = estimates.front().first;
+        if (auto at = pencil.at(s); at) {
+            k2 = (*at - *centre + s * g) / (s * s);
+        }
+        for (std::size_t c = 0; c < estimates.size(); ++c) {
+            x.col(static_cast<Eigen::Index>(c)) = estimates[c].second;
+        }
+        if (settledSince(estimates, last)) {
             break;
         }
     }
@@ -480,71 +595,230 @@ Expected<BucklingResult> runLinearBuckling(const Model& model, const BucklingOpt
     constexpr int kMaxMissing = 64;
     for (int missed = 0; below(high) < *total && missed < kMaxMissing; ++missed) {
         // The first lambda where the count passes the factors known below.
+        // Feature 008d (T18b, ADR 0007 addendum): bisected first only to
+        // kCoarseBracket, keeping the factorization at the low end and the
+        // internal counts of the bars at both ends.
         double low = sigma;
         double top = high;
-        for (int b = 0; b < kBisections && top - low > kBisectionPrecision * top; ++b) {
-            const double middle = (low + top) / 2.0;
-            auto count = sturmCount(pencil, middle);
+        std::unique_ptr<SparseCholesky> atLow;
+        std::vector<int> lowPivots;
+        std::vector<int> topPivots;
+        const auto bisect = [&](double width) -> Expected<void> {
+            for (int b = 0; b < kBisections && top - low > width * top; ++b) {
+                const double middle = (low + top) / 2.0;
+                std::unique_ptr<SparseCholesky> kept;
+                auto count = sturmCount(pencil, middle, &kept);
+                if (!count) {
+                    return tl::unexpected(count.error());
+                }
+                if (*count > below(middle)) {
+                    top = middle;
+                    topPivots = problem.elementNegativePivots();
+                } else {
+                    low = middle;
+                    lowPivots = problem.elementNegativePivots();
+                    atLow = std::move(kept);
+                }
+            }
+            return {};
+        };
+        if (auto coarse = bisect(kCoarseBracket); !coarse) {
+            return tl::unexpected(coarse.error());
+        }
+        std::vector<Factor> fresh;
+
+        // A factor that moves the nodes: inverse iteration from the low end,
+        // kept when it lands in the bracket and is not one already found.
+        if (!atLow) {
+            auto count = sturmCount(pencil, low, &atLow);
             if (!count) {
                 return tl::unexpected(count.error());
             }
-            (*count > below(middle)) ? top = middle : low = middle;
+            lowPivots = problem.elementNegativePivots();
         }
-        Factor missing{.lambda = top, .x = {}, .k = {}};
-        // Its vector, when it moves the nodes: from a shift just below it.
-        std::unique_ptr<SparseCholesky> near;
-        auto nearCount = sturmCount(pencil, top * (1.0 - 1e-6), &near);
-        if (!nearCount) {
-            return tl::unexpected(nearCount.error());
-        }
-        Eigen::VectorXd start = Eigen::VectorXd::NullaryExpr(n, [&] { return uniform(random); });
-        double lambda = top;
-        SparseMatrix k;
-        auto converged = refine(pencil, *near, k0, found, options.tolerance, start, lambda, k);
-        if (!converged) {
-            return tl::unexpected(converged.error());
-        }
-        if (*converged && std::abs(lambda - top) <= 1e-6 * top) {
-            missing = {.lambda = lambda, .x = std::move(start), .k = std::move(k)};
-        } else {
-            // Inside a bar: the nodes do not move. The bar is the one whose
-            // count rises across the factor (the next one for a repeated
-            // factor).
-            missing.x = Eigen::VectorXd::Zero(n);
-            std::vector<int> before;
-            if (pencil.at(top * (1.0 - kInsideMargin))) {
-                before = problem.elementNegativePivots();
+        {
+            // Its vector first by inverse iteration at the low end, where the
+            // matrix is nearly singular in that mode: Newton from a random
+            // vector throws lambda far away.
+            Eigen::VectorXd start =
+                Eigen::VectorXd::NullaryExpr(n, [&] { return uniform(random); });
+            for (int step = 0; step < kInverseSteps; ++step) {
+                auto solved = atLow->solve(start);
+                if (!solved) {
+                    return tl::unexpected(solved.error());
+                }
+                start = solved->normalized();
             }
-            if (auto after = pencil.at(top * (1.0 + kInsideMargin)); after) {
-                missing.k = std::move(*after);
+            double lambda = (low + top) / 2.0;
+            SparseMatrix k;
+            auto converged = refine(pencil, *atLow, k0, found, options.tolerance, start, lambda, k);
+            if (!converged) {
+                return tl::unexpected(converged.error());
             }
-            const std::vector<int>& now = problem.elementNegativePivots();
-            const auto taken = std::ranges::count_if(found, [top](const Factor& f) {
-                return f.inside >= 0 && std::abs(f.lambda - top) <= kSameFactor * top;
+            const bool inside =
+                lambda >= low * (1.0 - kInsideMargin) && lambda <= top * (1.0 + kInsideMargin);
+            const bool known = std::ranges::any_of(found, [&](const Factor& f) {
+                return std::abs(f.lambda - lambda) <= kSameFactor * lambda &&
+                       std::abs(f.x.dot(start)) > 0.99;
             });
-            std::int64_t skip = taken;
-            for (std::size_t e = 0; e < now.size() && e < before.size(); ++e) {
-                if (now[e] > before[e] && skip-- == 0) {
-                    missing.inside = static_cast<ElementIndex>(e);
-                    break;
+            if (*converged && inside && !known) {
+                fresh.push_back({.lambda = lambda, .x = std::move(start), .k = std::move(k)});
+            } else if (inside) {
+                // Newton's lambda, short of the residual (its rounding in
+                // some modes): the count checks it, and the bracket closes
+                // about it.
+                const double around = kNewtonBracket * lambda;
+                auto under = sturmCount(pencil, lambda - around);
+                if (!under) {
+                    return tl::unexpected(under.error());
+                }
+                std::vector<int> underPivots = problem.elementNegativePivots();
+                auto over = sturmCount(pencil, lambda + around);
+                if (!over) {
+                    return tl::unexpected(over.error());
+                }
+                if (*under <= below(lambda - around) && *over > below(lambda + around)) {
+                    low = lambda - around;
+                    top = lambda + around;
+                    lowPivots = std::move(underPivots);
+                    topPivots = problem.elementNegativePivots();
                 }
             }
         }
-        // A bar beyond its reach (the count jumps by kUnstableBar there) is
-        // one factor: nothing more to find at it.
-        if (missing.x.isZero()) {
-            auto above = sturmCount(pencil, top * (1.0 + kInsideMargin));
-            auto under = sturmCount(pencil, top * (1.0 - kInsideMargin));
-            if (above && under && *above - *under >= kUnstableBar) {
-                const bool again = std::ranges::any_of(found, [&missing](const Factor& f) {
-                    return std::abs(f.lambda - missing.lambda) <= kSameFactor * missing.lambda;
+
+        // A factor inside a bar, its nodes held: the bars whose internal
+        // count rises in the bracket are bisected on their own count (one
+        // element at a time, in parallel), and the lowest, with the bars
+        // alike at the same factor, confirmed by the global count.
+        if (fresh.empty()) {
+            if (topPivots.empty() && pencil.at(top)) {
+                topPivots = problem.elementNegativePivots();
+            }
+            struct Rise
+            {
+                double lambda = 0.0;
+                ElementIndex element = -1;
+                int level = 0;
+            };
+            std::vector<Rise> rises;
+            for (std::size_t e = 0; e < topPivots.size() && e < lowPivots.size(); ++e) {
+                if (topPivots[e] > lowPivots[e] && topPivots[e] < kUnstableBar) {
+                    rises.push_back({.lambda = top,
+                                     .element = static_cast<ElementIndex>(e),
+                                     .level = lowPivots[e] + 1});
+                }
+            }
+            tbb::parallel_for(std::size_t{0}, rises.size(), [&](std::size_t i) {
+                Rise& rise = rises[i];
+                const ReferenceProfile& base = reference[static_cast<std::size_t>(rise.element)];
+                double under = low;
+                for (int b = 0;
+                     b < kBisections && rise.lambda - under > kBisectionPrecision * rise.lambda;
+                     ++b) {
+                    const double middle = (under + rise.lambda) / 2.0;
+                    (problem.internalCount(rise.element, base.scaled(middle)) >= rise.level)
+                        ? rise.lambda = middle
+                        : under = middle;
+                }
+            });
+            std::ranges::sort(rises, {}, &Rise::lambda);
+            if (!rises.empty()) {
+                const double lambda = rises.front().lambda;
+                auto after = sturmCount(pencil, lambda * (1.0 + kInsideMargin));
+                auto before = sturmCount(pencil, lambda * (1.0 - kInsideMargin));
+                if (!after || !before) {
+                    return tl::unexpected(!after ? after.error() : before.error());
+                }
+                SparseMatrix k;
+                if (auto matrix = pencil.at(lambda * (1.0 + kInsideMargin)); matrix) {
+                    k = std::move(*matrix);
+                }
+                const auto there = std::ranges::count_if(found, [lambda](const Factor& f) {
+                    return std::abs(f.lambda - lambda) <= kSameFactor * lambda;
                 });
-                if (again) {
-                    break;
+                const auto same = std::ranges::count_if(rises, [lambda](const Rise& r) {
+                    return std::abs(r.lambda - lambda) <= kSameFactor * lambda;
+                });
+                const auto count = std::min<std::int64_t>(*after - *before - there, same);
+                for (std::int64_t i = 0; i < count; ++i) {
+                    const Rise& rise = rises[static_cast<std::size_t>(i)];
+                    fresh.push_back({.lambda = rise.lambda,
+                                     .x = Eigen::VectorXd::Zero(n),
+                                     .k = k,
+                                     .inside = rise.element});
                 }
             }
         }
-        found.push_back(std::move(missing));
+
+        // Otherwise the bisection on the global count goes to the end.
+        if (fresh.empty()) {
+            if (auto fine = bisect(kBisectionPrecision); !fine) {
+                return tl::unexpected(fine.error());
+            }
+            bool stop = false;
+            Factor missing{.lambda = top, .x = {}, .k = {}};
+            // Its vector, when it moves the nodes: from a shift just below it.
+            std::unique_ptr<SparseCholesky> near;
+            auto nearCount = sturmCount(pencil, top * (1.0 - 1e-6), &near);
+            if (!nearCount) {
+                return tl::unexpected(nearCount.error());
+            }
+            Eigen::VectorXd start =
+                Eigen::VectorXd::NullaryExpr(n, [&] { return uniform(random); });
+            double lambda = top;
+            SparseMatrix k;
+            auto converged = refine(pencil, *near, k0, found, options.tolerance, start, lambda, k);
+            if (!converged) {
+                return tl::unexpected(converged.error());
+            }
+            if (*converged && std::abs(lambda - top) <= 1e-6 * top) {
+                missing = {.lambda = lambda, .x = std::move(start), .k = std::move(k)};
+            } else {
+                // Inside a bar: the nodes do not move. The bar is the one whose
+                // count rises across the factor (the next one for a repeated
+                // factor).
+                missing.x = Eigen::VectorXd::Zero(n);
+                std::vector<int> before;
+                if (pencil.at(top * (1.0 - kInsideMargin))) {
+                    before = problem.elementNegativePivots();
+                }
+                if (auto after = pencil.at(top * (1.0 + kInsideMargin)); after) {
+                    missing.k = std::move(*after);
+                }
+                const std::vector<int>& now = problem.elementNegativePivots();
+                const auto taken = std::ranges::count_if(found, [top](const Factor& f) {
+                    return f.inside >= 0 && std::abs(f.lambda - top) <= kSameFactor * top;
+                });
+                std::int64_t skip = taken;
+                for (std::size_t e = 0; e < now.size() && e < before.size(); ++e) {
+                    if (now[e] > before[e] && skip-- == 0) {
+                        missing.inside = static_cast<ElementIndex>(e);
+                        break;
+                    }
+                }
+            }
+            // A bar beyond its reach (the count jumps by kUnstableBar there) is
+            // one factor: nothing more to find at it.
+            if (missing.x.isZero()) {
+                auto above = sturmCount(pencil, top * (1.0 + kInsideMargin));
+                auto under = sturmCount(pencil, top * (1.0 - kInsideMargin));
+                if (above && under && *above - *under >= kUnstableBar) {
+                    const bool again = std::ranges::any_of(found, [&missing](const Factor& f) {
+                        return std::abs(f.lambda - missing.lambda) <= kSameFactor * missing.lambda;
+                    });
+                    if (again) {
+                        stop = true;
+                    }
+                }
+            }
+            if (stop) {
+                break;
+            }
+            fresh.push_back(std::move(missing));
+        }
+        for (Factor& f : fresh) {
+            found.push_back(std::move(f));
+        }
         std::ranges::sort(found, {}, &Factor::lambda);
         if (static_cast<int>(found.size()) > wanted) {
             found.resize(static_cast<std::size_t>(wanted));

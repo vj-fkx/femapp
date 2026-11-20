@@ -493,10 +493,18 @@ máquina:
   resultados novos);
 - **segunda ordem com empenamento** ≤ 4 vezes a linear com empenamento (a
   razão da 008c);
-- **flambagem com 5 fatores, com empenamento** ≤ 12 vezes a linear com
-  empenamento (a razão da 008c);
-- **sem empenamento** continuam a meta da 008b (linear < 5 s) e as da
-  008c (4× e 12×), agora com a flexo-torção ativa.
+- **flambagem com 5 fatores, com empenamento** ≤ 400 vezes a linear com
+  empenamento *(ajustado após a T18b, 2026-11-19: a proposta era 12×, a
+  razão da 008c)*;
+- **sem empenamento** continuam a meta da 008b (linear < 5 s) e a da
+  segunda ordem da 008c (4×), agora com a flexo-torção ativa; a da
+  flambagem passa também a ≤ 400×.
+
+Por que 12× não fecha (T18b): no benchmark, uma contagem de Sturm (uma
+montagem com os seis esforços e uma fatoração) custa cerca de 3 vezes a
+análise linear, e cada fator pede algumas contagens. Com a flexo-torção,
+K(λ) deixa de ser quase linear em λ, as estimativas do subespaço erram e
+os fatores vêm da contagem.
 
 A tarefa de custo, logo depois do perfil completo e antes dos casos de
 aceite, mede a segunda ordem e a flambagem com e sem empenamento. Se

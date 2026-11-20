@@ -166,14 +166,32 @@ Regras:
   Testes: contagem igual com subdivisão extra; barra além das partes
   instável e limitada — arquivos: `beam_state.cpp`,
   `test_flexural_torsional.cpp` — cobre: 11, 16
-- [ ] **T18** [M] Medida de custo (design §5.9, risco do §10): no
+- [x] **T18** [M] Medida de custo (design §5.9, risco do §10): no
   `bench_frame`, com e sem `--warping`, montar com o perfil completo e
   registrar contra as metas:
   - segunda ordem ≤ 4×;
-  - flambagem com 5 fatores ≤ 12× (008c, sem empenamento);
+  - flambagem com 5 fatores ≤ 12× (008c, sem empenamento) — mudada para
+    ≤ 400× após a T18b;
   - as mesmas razões sobre a linear com empenamento.
   Se alguma não fechar, parar e propor otimização ou mudança da meta antes
   de seguir. Arquivos: `tests/perf/bench_frame.cpp`. Cobre: N02, 19
+
+- [x] **T18b** Busca mais rápida dos fatores (decidido pelo mantenedor em
+  2026-11-19, após a T18: flambagem de 704× e 282× a linear, meta 12×):
+  - estimativas pelo pencil quadrático K0 − λG + λ²K2 quando o termo em λ²
+    pesa na primeira estimativa linear: Rayleigh-Ritz na base de K0⁻¹Gx e
+    K0⁻¹K2x, forma companheira, e K2 reajustado para passar por K(λ) na
+    primeira estimativa;
+  - cada fator perdido: bissecção na contagem global só até 10⁻³, iteração
+    inversa e refinamento a partir da fatoração na ponta de baixo; se uma
+    barra sobe a contagem interna no intervalo, a bissecção é só dela,
+    confirmada pela contagem global; se nada disso fecha, a bissecção
+    global vai até o fim.
+  Meta mudada pelo mantenedor para ≤ 400× (NFR-008d-02, design §5.9).
+  Testes: as suítes da 008c e desta feature dão os mesmos fatores —
+  arquivos: `buckling.cpp`, `detail/static_stages.hpp`,
+  `static_analysis.cpp`, `src/core/CMakeLists.txt` (`/bigobj`), ADR 0007
+  (adendo) — cobre: N02, 11
 
 ## Fase 5 — Flambagem e segunda ordem
 
@@ -377,3 +395,21 @@ Regras:
   com a carga na mesa superior e na torção de um pilar; sem empenamento
   com Wagner além de G·J, ou com um momento que pediria mais de 8192
   partes, a barra fica instável.
+- T18 (`bench_frame --second-order --buckling 5`, Release, máquina do
+  mantenedor): sem empenamento, linear 3,12 s, segunda ordem 7,32 s =
+  2,34× (meta 4×), flambagem 2198 s = 704× (meta 12×); com empenamento,
+  linear 5,28 s (1,69× a sem empenamento, meta 2,2×), segunda ordem
+  11,85 s = 2,24×, flambagem 1489 s = 282×. Os primeiros fatores (15,28 a
+  16,24 sem empenamento; 18,51 a 21,20 com) são flambagens laterais das
+  vigas de 6 m sem contenção lateral, sob λ vezes o peso próprio: modos
+  dentro das barras, que só a contagem acha. A meta da flambagem não
+  fecha; o mantenedor escolheu otimizar a busca (T18b).
+- T18b (mesma máquina, Release): sem empenamento, flambagem 1015 s =
+  326× (era 704×), fatores 15,28 a 16,24 iguais; com empenamento, 1073 s
+  = 204× (era 282×), fatores 18,51 a 21,20. No pórtico 2×2×4, 35 s → 7,4 s.
+  O traço mostrou que os fatores "dentro das barras" eram, na maioria,
+  fatores nodais que o refinamento pulava (ele converge para o fator mais
+  perto do deslocamento, não da estimativa), e que uma contagem custa ~9 s
+  (3× a linear): 12× não fecha. O mantenedor mudou a meta para ≤ 400×.
+  Pendente para depois: no pórtico grande sem empenamento as estimativas
+  ainda saem ~3× acima (48 contra 15,3) e σ cai a 0.

@@ -98,6 +98,10 @@ public:
     // 008c §5.6); nothing for other elements.
     [[nodiscard]] const std::vector<int>& elementNegativePivots() const { return m_negative; }
     [[nodiscard]] std::optional<BeamResult> internalMode(ElementIndex element) const;
+    // Feature 008d (T18b, ADR 0007 addendum): the negative pivots inside one
+    // exact bar with the reference state `reference`, without assembling
+    // the problem; 0 for the other elements.
+    [[nodiscard]] int internalCount(ElementIndex element, const ReferenceProfile& reference) const;
 
 private:
     StaticProblem(const Model& model, const StaticOptions& options);

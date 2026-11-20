@@ -50,3 +50,9 @@ target_include_directories(fem_core PRIVATE
     "${CMAKE_CURRENT_BINARY_DIR}/generated"
     # Private headers, also visible to the module's own unit tests.
     "${CMAKE_CURRENT_SOURCE_DIR}")
+
+# The buckling search instantiates the dense real QZ and eigen solvers of
+# Eigen (feature 008d, the quadratic pencil).
+if(MSVC)
+    set_source_files_properties(buckling.cpp PROPERTIES COMPILE_OPTIONS /bigobj)
+endif()
