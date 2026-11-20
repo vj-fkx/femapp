@@ -195,13 +195,15 @@ Regras:
 
 ## Fase 5 — Flambagem e segunda ordem
 
-- [ ] **T19** Flambagem com flexo-torção (design §5.8):
+- [x] **T19** Flambagem com flexo-torção (design §5.8):
   - K(λ) com `reference.scaled(λ)` e `loadFactor = λ`;
   - `BucklingMode::warping`, e ψ e B nas barras do modo;
   - a recusa olha também os momentos.
   Testes (AC-5, AC-6):
   - momento linear, carga uniforme e concentrada no meio, 1e−6 contra a
-    barra subdividida e 1% contra as tabelas de C1;
+    barra subdividida e 1% contra as tabelas de C1 (no momento linear,
+    1e−6 contra Rayleigh-Ritz e 5% contra a tabela: decisão do mantenedor,
+    2026-11-19);
   - balanço com carga na ponta;
   - modos normalizados com giro e ψ, e o modo de torção pelo giro;
   - caso só de tração e sem momento sem fator.
@@ -413,3 +415,11 @@ Regras:
   (3× a linear): 12× não fecha. O mantenedor mudou a meta para ≤ 400×.
   Pendente para depois: no pórtico grande sem empenamento as estimativas
   ainda saem ~3× acima (48 contra 15,3) e σ cai a 0.
+- T19: `BucklingMode::warping` traz ψ só nos nós com o GDL (empenamento
+  contínuo entre barras); com o empenamento livre nas pontas, ψ fica dentro
+  da barra e sai em `at(x)`. A normalização olha só translações e as três
+  rotações (ψ é uma taxa de giro). No momento linear (ψ = 0) o C1 exato é
+  1,804 para κ = 0,38, contra 1,879 da tabela (4%): a tabela ignora κ;
+  Rayleigh-Ritz confere em 1e−6 e a tabela fica em 5% (decisão do
+  mantenedor). O balanço com carga na ponta confere com γ = 4,012599
+  (Timoshenko e Gere; a constante por shooting) em 1e−6.

@@ -54,6 +54,8 @@ struct BucklingMode
     double factor = 0.0;
     std::vector<Eigen::Vector3d> displacements; // per node
     std::vector<Eigen::Vector3d> rotations;
+    // REQ-008d-15: per node, the warping (rate of twist); 0 without the dof.
+    std::vector<double> warping;
     std::vector<std::optional<BeamResult>> beams;
 };
 

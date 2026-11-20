@@ -851,7 +851,13 @@ Expected<BucklingResult> runLinearBuckling(const Model& model, const BucklingOpt
         double largestRotation = 0.0;
         const DofMap& dofs = problem.dofs();
         for (DofIndex d = 0; d < dofs.size(); ++d) {
-            const bool rotation = static_cast<int>(dofs.typeOf(d)) >= 3;
+            // The translations and the rotations only: the warping (a rate
+            // of twist, REQ-008d-15) follows them.
+            const auto type = dofs.typeOf(d);
+            if (type > DofType::RZ) {
+                continue;
+            }
+            const bool rotation = type >= DofType::RX;
             double& top = rotation ? largestRotation : largest;
             if (std::abs(values[d]) > std::abs(top)) {
                 top = values[d];
@@ -880,6 +886,7 @@ Expected<BucklingResult> runLinearBuckling(const Model& model, const BucklingOpt
         out.modes.push_back({.factor = factor.lambda,
                              .displacements = std::move(shape->displacements),
                              .rotations = std::move(shape->rotations),
+                             .warping = std::move(shape->warping),
                              .beams = std::move(shape->beams)});
     }
     if (!inside.empty()) {

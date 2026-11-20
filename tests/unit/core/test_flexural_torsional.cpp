@@ -19,8 +19,11 @@
 #include <Eigen/LU>
 #include <array>
 #include <cmath>
+#include <functional>
 #include <memory>
 #include <numbers>
+#include <optional>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -402,7 +405,12 @@ namespace {
 //   - 1/2 lambda (q a int phi^2 + P a phi(L/2)^2),
 // a the height of the load above the shear centre. Uniform load q, or a
 // load P at the middle; lambda for q = 1 or P = 1.
-double ritzFactor(const Props& p, double l, bool uniform, double a)
+// Rayleigh-Ritz on sine series (fork supports) for the moment `moment(x)`
+// along the bar per unit factor; with a load at the height a (none for
+// a = 0), distributed (unit per length) when `uniform`, else a unit load at
+// the middle.
+double ritz(const Props& p, double l, const std::function<double(double)>& moment, bool uniform,
+            double a)
 {
     constexpr int kTerms = 120;
     const int n = 2 * kTerms;
@@ -428,7 +436,7 @@ double ritzFactor(const Props& p, double l, bool uniform, double a)
         for (std::size_t q = 0; q < kX.size(); ++q) {
             const double x = x0 + h * (kX.at(q) + 1.0) / 2.0;
             const double w = kW.at(q) * h / 2.0;
-            const double m = uniform ? x * (l - x) / 2.0 : (x < l / 2 ? x / 2.0 : (l - x) / 2.0);
+            const double m = moment(x);
             for (int i = 0; i < kTerms; ++i) {
                 for (int j = 0; j < kTerms; ++j) {
                     // M phi_j w_i'' = -c_i^2 M sin_i sin_j.
@@ -455,6 +463,14 @@ double ritzFactor(const Props& p, double l, bool uniform, double a)
     // (K + lambda G) v = 0: nu = 1 / lambda of (-G) v = nu K v.
     const Eigen::GeneralizedSelfAdjointEigenSolver<Eigen::MatrixXd> eigen(-g, k);
     return 1.0 / eigen.eigenvalues().maxCoeff();
+}
+
+double ritzFactor(const Props& p, double l, bool uniform, double a)
+{
+    const auto moment = [&](double x) {
+        return uniform ? x * (l - x) / 2.0 : (x < l / 2 ? x / 2.0 : (l - x) / 2.0);
+    };
+    return ritz(p, l, moment, uniform, a);
 }
 
 // The first buckling factor of the fork beam under a uniform load q (local
@@ -621,4 +637,187 @@ TEST_CASE("a bar beyond the reach of its parts is unstable", "[core][beam][flexu
         CHECK(fem::core::stateBarMatrices(beam, l, none, false).negativePivots >=
               fem::core::kUnstableBar);
     }
+}
+
+namespace {
+
+// The cantilever of `bars` equal bars along x, clamped at x = 0.
+fem::core::Model cantilever(const Props& p, double l, int bars)
+{
+    fem::core::Model model = forkChain(p, l, bars);
+    model.restraints.clear();
+    fem::core::test::fixAll(model, {1}, fem::core::ElementKind::Beam3D);
+    return model;
+}
+
+// The shape of a mode along a bar, which the test requires.
+const fem::core::BeamResult& beamOf(const fem::core::BucklingMode& mode, std::size_t element)
+{
+    const std::optional<fem::core::BeamResult>& beam = mode.beams.at(element);
+    if (!beam) {
+        throw std::logic_error("the mode has no shape along the bar");
+    }
+    return *beam;
+}
+
+// P_y = pi^2 E Iy / L^2 and the critical moment of the tables of C1 with
+// the load at the shear centre (k = 1).
+double tableMoment(const Props& p, double l, double c1)
+{
+    const double py = std::numbers::pi * std::numbers::pi * kE * p.iy / (l * l);
+    return c1 * py *
+           std::sqrt(p.iw / p.iy +
+                     l * l * kG * p.j / (std::numbers::pi * std::numbers::pi * kE * p.iy));
+}
+
+} // namespace
+
+// T19 (AC-5): a linear moment, M at one end only (psi = 0): one bar
+// against the bar cut in four and against Rayleigh-Ritz (1e-6), and the
+// critical moment against C1 = 1.879 (NCCI SN003, k = 1) within 5%: the
+// table ignores kappa, and the exact C1 is 1.804 here (maintainer's
+// decision, as for the loads at a height).
+TEST_CASE("lateral-torsional buckling under a linear moment",
+          "[core][beam][flexural-torsional][buckling]")
+{
+    const double l = 6.0;
+    const double m = 1.0e4;
+    const Props p;
+    const auto loaded = [&](int bars) {
+        fem::core::Model model = forkChain(p, l, bars);
+        model.nodalForces.push_back(
+            {.nodes = fem::core::NodeIds{{static_cast<fem::core::ExternalId>(bars) + 1}},
+             .moment = Eigen::Vector3d(0.0, m, 0.0)});
+        return model;
+    };
+    const double one = firstFactor(loaded(1));
+    CHECK(relative(firstFactor(loaded(4)), one) <= 1e-6);
+    CHECK(relative(one, ritz(p, l, [&](double x) { return m * x / l; }, true, 0.0)) <= 1e-6);
+    CHECK(relative(one * m, tableMoment(p, l, 1.879)) <= 5e-2);
+}
+
+// T19 (AC-5): a load at the middle, at the shear centre, as a concentrated
+// load on one bar and as a nodal force between two bars (1e-6).
+TEST_CASE("a load at the middle: in the span or at a node",
+          "[core][beam][flexural-torsional][buckling]")
+{
+    const double l = 6.0;
+    const double load = 5.0e3;
+    const Props p;
+    fem::core::Model span = forkBeam(p, l);
+    span.concentratedLoads.push_back(
+        {.elements = fem::core::ElementIds{{1}}, .force = Eigen::Vector3d(0.0, 0.0, -load)});
+    fem::core::Model node = forkChain(p, l, 2);
+    node.nodalForces.push_back(
+        {.nodes = fem::core::NodeIds{{2}}, .force = Eigen::Vector3d(0.0, 0.0, -load)});
+    CHECK(relative(firstFactor(span), firstFactor(node)) <= 1e-6);
+}
+
+// T19 (AC-5): a cantilever with a load at its tip, at the shear centre,
+// without warping: P = 4.012599 sqrt(E Iy G J) / L^2 (Timoshenko and Gere;
+// the constant by shooting), and one bar against two (1e-6).
+TEST_CASE("lateral-torsional buckling of a cantilever",
+          "[core][beam][flexural-torsional][buckling]")
+{
+    const double l = 4.0;
+    const double load = 1.0e3;
+    Props p;
+    p.iw = 0.0;
+    const auto loaded = [&](int bars) {
+        fem::core::Model model = cantilever(p, l, bars);
+        model.nodalForces.push_back(
+            {.nodes = fem::core::NodeIds{{static_cast<fem::core::ExternalId>(bars) + 1}},
+             .force = Eigen::Vector3d(0.0, 0.0, -load)});
+        return model;
+    };
+    const double one = firstFactor(loaded(1));
+    CHECK(relative(firstFactor(loaded(2)), one) <= 1e-6);
+    const double expected = 4.01259934 * std::sqrt(kE * p.iy * kG * p.j) / (l * l);
+    CHECK(relative(one * load, expected) <= 1e-6);
+}
+
+// T19 (AC-6, REQ-008d-15): the modes, normalized by the largest
+// translation or, without one, the largest rotation, with the warping per
+// node and psi and B along the bars.
+TEST_CASE("flexural-torsional buckling modes", "[core][beam][flexural-torsional][buckling]")
+{
+    const double l = 6.0;
+    SECTION("lateral torsion under a uniform moment: v = A sin, phi = B sin")
+    {
+        // The nodes do not move: by the lateral slope at the ends, A pi / L
+        // = 1; then B / A = Py / Mcr.
+        const double m = 1.0e4;
+        const Props p;
+        fem::core::Model model = forkBeam(p, l);
+        model.nodalForces.push_back(
+            {.nodes = fem::core::NodeIds{{1}}, .moment = Eigen::Vector3d(0.0, -m, 0.0)});
+        model.nodalForces.push_back(
+            {.nodes = fem::core::NodeIds{{2}}, .moment = Eigen::Vector3d(0.0, m, 0.0)});
+        const auto result = fem::core::runLinearBuckling(model);
+        REQUIRE(result.has_value());
+        REQUIRE_FALSE(result->modes.empty());
+        const fem::core::BucklingMode& mode = result->modes.front();
+        const double mcr = mode.factor * m;
+        const double py = std::numbers::pi * std::numbers::pi * kE * p.iy / (l * l);
+        const double ratio = py / mcr; // B / A
+        CHECK(std::abs(std::abs(mode.rotations[0].z()) - 1.0) <= 1e-8);
+        CHECK(std::abs(mode.rotations[0].y()) <= 1e-8);
+        // The warping free at the ends is inside the bar (no nodal dof):
+        // psi = phi' = B pi / L cos there.
+        REQUIRE(mode.warping.size() == 2);
+        CHECK(mode.warping[0] == 0.0);
+        const fem::core::BeamResult& beam = beamOf(mode, 0);
+        CHECK(relative(std::abs(beam.at(0.0).warping), ratio) <= 1e-6);
+        CHECK(relative(std::abs(beam.at(l).warping), ratio) <= 1e-6);
+        const fem::core::BeamPoint middle = beam.at(l / 2.0);
+        // At the middle: phi = B, psi = 0, and the bimoment E Iw phi''.
+        const double b = ratio * l / std::numbers::pi;
+        CHECK(relative(std::abs(middle.rotation.x()), b) <= 1e-6);
+        CHECK(std::abs(middle.warping) <= 1e-6 * ratio);
+        const double bimoment = kE * p.iw * b * std::pow(std::numbers::pi / l, 2);
+        CHECK(relative(std::abs(middle.forces.b), bimoment) <= 1e-6);
+    }
+    SECTION("a column free to twist at its top: by the twist")
+    {
+        // Two bars, the warping continuous at the middle node (a nodal
+        // dof); the twist held at the base only, the warping free at the
+        // ends: the column twists rigidly, phi = x / L, at P = G J / r0^2,
+        // and psi = 1 / L.
+        const double force = 1.0e4;
+        Props p;
+        p.area = 4e-3;
+        p.iy = p.iz = 4e-5;
+        p.j = 1e-7;
+        p.iw = 1e-9;
+        fem::core::Model model = forkChain(p, l, 2);
+        model.restraints.clear();
+        using fem::core::DofType;
+        fem::core::test::restrain(model, {1}, {DofType::U, DofType::V, DofType::W, DofType::RX});
+        fem::core::test::restrain(model, {3}, {DofType::V, DofType::W});
+        model.nodalForces.push_back(
+            {.nodes = fem::core::NodeIds{{3}}, .force = Eigen::Vector3d(-force, 0.0, 0.0)});
+        const auto result = fem::core::runLinearBuckling(model);
+        REQUIRE(result.has_value());
+        REQUIRE_FALSE(result->modes.empty());
+        const fem::core::BucklingMode& mode = result->modes.front();
+        const double r02 = (p.iy + p.iz) / p.area;
+        CHECK(relative(mode.factor * force, kG * p.j / r02) <= 1e-8);
+        CHECK(std::abs(std::abs(mode.rotations[2].x()) - 1.0) <= 1e-8);
+        CHECK(relative(std::abs(mode.rotations[1].x()), 0.5) <= 1e-6);
+        REQUIRE(mode.warping.size() == 3);
+        CHECK(relative(std::abs(mode.warping[1]), 1.0 / l) <= 1e-6);
+        CHECK(relative(std::abs(beamOf(mode, 0).at(0.0).warping), 1.0 / l) <= 1e-6);
+    }
+}
+
+// T19 (REQ-008d-16): tension and no bending moment: no buckling factor.
+TEST_CASE("a beam in tension without moment has no buckling factor",
+          "[core][beam][flexural-torsional][buckling]")
+{
+    fem::core::Model model = forkBeam(Props{}, 6.0);
+    model.nodalForces.push_back(
+        {.nodes = fem::core::NodeIds{{2}}, .force = Eigen::Vector3d(1.0e4, 0.0, 0.0)});
+    const auto result = fem::core::runLinearBuckling(model);
+    REQUIRE_FALSE(result.has_value());
+    CHECK(result.error().message.find("compressed or bent") != std::string::npos);
 }
