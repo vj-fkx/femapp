@@ -226,6 +226,18 @@ Regras:
   - recusa acima de Mcr com a mensagem.
   Arquivos: `second_order.cpp`, `test_second_order_analysis.cpp`. Cobre:
   10, 13, 16
+- [x] **T21b** Torque de referência (decidido pelo mantenedor em
+  2026-11-20, após a T21; design §5.5, ADR 0008): o termo
+  Mx(v'w'' − w'v'') no motor exato (curvaturas e linhas de momento,
+  simétrico), o limite das partes pelo Greenhill da parte engastada, e a
+  recusa da flambagem olhando também o torque. Testes:
+  - K simétrica com torque;
+  - eixo de Greenhill (rótulas esféricas, torque nas pontas):
+    2π·EI/L, 1e−8;
+  - pórtico em L com torque em AB que vira flexão em BC, contra a barra
+    linearizada: ±27967,6735 N·mm, 1e−6, com uma barra ou duas por membro.
+  Arquivos: `beam_state.cpp`, `buckling.cpp`, `test_flexural_torsional.cpp`
+  — cobre: 10, 11, 16
 - [ ] **T22** Revisão das suítes da 008c com a flexo-torção sempre ativa:
   cada resultado que mudar é conferido contra a referência analítica e
   registrado nas notas (o que mudou e por quê) — arquivos: testes da 008c,
@@ -458,4 +470,15 @@ Regras:
   mantenedor mudou a meta para ≤ 6× (NFR-008d-02, design §5.9). O torque
   de referência nas juntas (nota da T20) fica para uma verificação à
   parte.
+- T21b: o torque de referência faltava no funcional (design §5.5). A
+  barra linearizada da T20 deu o pórtico em L com torque em AB e flexão em
+  BC (±27967,67 N·mm) e o eixo de Greenhill engastado contra a flexão
+  (T·L/EI = 8,9868189568 = 2,8606π, o valor clássico); o motor errava 39%
+  no pórtico. Com os momentos semitangenciais dos estados, p = m − θ×M0/2,
+  o acoplamento do torque entra com T/2 (My − T·θz/2 e Mz + T·θy/2 nas
+  curvaturas, e o conjugado); com T inteiro o Greenhill saía 50% fora. Nos
+  momentos fletores o termo de giro leva o momento inteiro porque a outra
+  metade é o termo de ponta da T20. As partes ficam abaixo de
+  2π·EI/(margem·|T|), e a recusa da flambagem olha também o torque. Os dois
+  casos conferem em 1e−6 e 1e−8, com uma ou mais barras.
 

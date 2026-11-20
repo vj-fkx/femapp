@@ -819,7 +819,7 @@ TEST_CASE("a beam in tension without moment has no buckling factor",
         {.nodes = fem::core::NodeIds{{2}}, .force = Eigen::Vector3d(1.0e4, 0.0, 0.0)});
     const auto result = fem::core::runLinearBuckling(model);
     REQUIRE_FALSE(result.has_value());
-    CHECK(result.error().message.find("compressed or bent") != std::string::npos);
+    CHECK(result.error().message.find("compressed, bent or twisted") != std::string::npos);
 }
 
 namespace {
@@ -870,6 +870,26 @@ fem::core::Model argyrisFrame(double m, int parts, bool hinged)
     return model;
 }
 
+// The same frame with the moment m about X at A and -m at C: a torque in AB
+// that the joint turns into a bending moment of BC about X. A and C hold
+// the translations (v free at C) and the rotations about Y and Z.
+fem::core::Model torqueFrame(double m, int parts)
+{
+    fem::core::Model model = argyrisFrame(0.0, parts, false);
+    model.restraints.clear();
+    model.nodalForces.clear();
+    using fem::core::DofType;
+    const auto c = static_cast<fem::core::ExternalId>(2 * parts) + 1;
+    fem::core::test::restrain(model, {1},
+                              {DofType::U, DofType::V, DofType::W, DofType::RY, DofType::RZ});
+    fem::core::test::restrain(model, {c}, {DofType::U, DofType::W, DofType::RY, DofType::RZ});
+    model.nodalForces.push_back(
+        {.nodes = fem::core::NodeIds{{1}}, .moment = Eigen::Vector3d(m, 0.0, 0.0)});
+    model.nodalForces.push_back(
+        {.nodes = fem::core::NodeIds{{c}}, .moment = Eigen::Vector3d(-m, 0.0, 0.0)});
+    return model;
+}
+
 } // namespace
 
 // T20 (ADR 0008): the lateral buckling of Argyris's right-angle frame, the
@@ -900,4 +920,47 @@ TEST_CASE("the lateral buckling of Argyris's right-angle frame",
         CHECK(relative(firstFactor(argyrisFrame(m, parts, false)) * m, 176.34772588) <= 1e-6);
         CHECK(relative(firstFactor(argyrisFrame(-m, parts, false)) * m, 445.86036134) <= 1e-6);
     }
+}
+
+// The reference torque at a joint of bars at an angle (after T20, T21):
+// the frame of Argyris with a torque in AB and a bending moment about X in
+// BC, against the same linearized rod: +-27967.6735 N mm (1e-6), with one
+// bar or two per member.
+TEST_CASE("a torque turned into a bending moment at a joint",
+          "[core][beam][flexural-torsional][buckling]")
+{
+    const double m = 1000.0;
+    for (const int parts : {1, 2}) {
+        INFO(parts << " bars per member");
+        CHECK(relative(firstFactor(torqueFrame(m, parts)) * m, 27967.67354013) <= 1e-6);
+        CHECK(relative(firstFactor(torqueFrame(-m, parts)) * m, 27967.67354013) <= 1e-6);
+    }
+}
+
+// T21b (ADR 0008 addendum): Greenhill's shaft, clamped against bending at
+// both ends, a torque at the end free to twist: T L / EI = 8.9868189568
+// (2.8606 pi; the root of the same linearized rod), with EIy = EIz, one bar
+// or three (1e-8).
+TEST_CASE("Greenhill's shaft", "[core][beam][flexural-torsional][buckling]")
+{
+    const double l = 4.0;
+    const double torque = 1.0e3;
+    Props p;
+    p.iy = p.iz = 5e-6;
+    p.iw = 0.0;
+    const auto shaft = [&](int bars) {
+        fem::core::Model model = forkChain(p, l, bars);
+        model.restraints.clear();
+        using fem::core::DofType;
+        const auto last = static_cast<fem::core::ExternalId>(bars) + 1;
+        fem::core::test::fixAll(model, {1}, fem::core::ElementKind::Beam3D);
+        fem::core::test::restrain(model, {last},
+                                  {DofType::V, DofType::W, DofType::RY, DofType::RZ});
+        model.nodalForces.push_back(
+            {.nodes = fem::core::NodeIds{{last}}, .moment = Eigen::Vector3d(torque, 0.0, 0.0)});
+        return model;
+    };
+    const double expected = 8.986818956806337 * kE * p.iy / l;
+    CHECK(relative(firstFactor(shaft(1)) * torque, expected) <= 1e-8);
+    CHECK(relative(firstFactor(shaft(3)) * torque, expected) <= 1e-8);
 }

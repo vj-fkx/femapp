@@ -212,6 +212,33 @@ FullMatrix systemMatrix(const BeamData& beam, const ReferencePoint& r, double he
             a(MX, RX) -= r.my * r.my / beam.bendingZ;
         }
     }
+    // Feature 008d (T21b, ADR 0008 addendum): the reference torque, Mx (v'
+    // w'' - w' v''). With the semitangential moments of the states, p = m -
+    // theta x M0 / 2 (ADR 0008), the curvatures are C^-1 (p - theta x M0 /
+    // 2): with M0 = T e1, My - tau theta_z and Mz + tau theta_y, tau = T / 2,
+    // and the conjugate in the moment rows (H = (My + theta_x Mz0 - tau
+    // theta_z)^2 / 2 EIy + (Mz - theta_x My0 + tau theta_y)^2 / 2 EIz; M' =
+    // -dH/dtheta). For My0 and Mz0 the twist terms carry the whole moment:
+    // the other half is the end term of stateBarMatrices.
+    if (r.t != 0.0) {
+        const double tau = 0.5 * r.t;
+        if (beam.bendingY > 0.0) {
+            const double c = tau / beam.bendingY;
+            a(RY, RZ) -= c;
+            a(MZ, MY) += c;
+            a(MZ, RZ) -= tau * c;
+            a(MZ, RX) += r.mz * c;
+            a(MX, RZ) += r.mz * c;
+        }
+        if (beam.bendingZ > 0.0) {
+            const double c = tau / beam.bendingZ;
+            a(RZ, RY) += c;
+            a(MY, MZ) -= c;
+            a(MY, RY) -= tau * c;
+            a(MY, RX) += r.my * c;
+            a(MX, RY) += r.my * c;
+        }
+    }
     return a;
 }
 
@@ -733,10 +760,12 @@ double longestPart(const BeamData& beam, const SpanLoads& loads)
     // kCriticalMargin times the largest -K and |M|.
     double softening = 0.0; // the largest -K
     double moment = 0.0;    // the largest |M|
+    double torque = 0.0;    // the largest |T|
     for (int i = 0; i < reference.count; ++i) {
         const ReferencePoint& r = reference.values.at(static_cast<std::size_t>(i));
         softening = std::max(softening, -wagner(beam, r));
         moment = std::max({moment, std::abs(r.my), std::abs(r.mz)});
+        torque = std::max(torque, std::abs(r.t));
     }
     const double twoPi = 2.0 * std::numbers::pi;
     const double eiw = beam.warpingStiffness;
@@ -750,6 +779,11 @@ double longestPart(const BeamData& beam, const SpanLoads& loads)
         const double x =
             eiw > 0.0 ? (-gj + std::sqrt(gj * gj + 4.0 * eiw * target)) / (2.0 * eiw) : target / gj;
         limit(twoPi / std::sqrt(x));
+    }
+    // Feature 008d (T21b): the torque, below the Greenhill load of the part
+    // clamped at both ends (2.86 pi EI / l; 2 pi EI / l kept).
+    if (torque > 0.0 && ei > 0.0) {
+        limit(twoPi * ei / (kCriticalMargin * torque));
     }
     // Feature 008d: the loads at a height, a torsional foundation of
     // lambda (q . d) and point springs of lambda (P . d), destabilizing where

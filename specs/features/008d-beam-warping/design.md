@@ -350,13 +350,14 @@ de altura das cargas.
 **Funcional** (Vlasov, 1961; Trahair, 1993, cap. 3; Yang e McGuire,
 1986). A segunda variação da energia, em eixos principais, com os
 deslocamentos v, w do centro de cisalhamento, o giro φ e os esforços de
-referência N, My, Mz (Vy e Vz entram pelas derivadas, ao integrar por
+referência N, Mx, My, Mz (Vy e Vz entram pelas derivadas, ao integrar por
 partes), é:
 
 ```
 δ²Π = ½∫ [ EIz v''² + EIy w''² + GJ φ'² + EIw φ''²                 (elástica, 008b)
          + N (v'² + w'² + r0² φ'² + 2 zs v'φ' − 2 ys w'φ')          (Engesser, Wagner, excentricidade)
          + 2 Mz φ w'' − 2 My φ v''                                  (acoplamento flexão-torção)
+         + Mx (v' w'' − w' v'')                                     (torque de referência, T21b)
          + (βy My + βz Mz) φ'²                                      (monossimetria)
          − Σ_cargas (q · d) φ² ] dx                                 (altura da carga)
 ```
@@ -385,6 +386,13 @@ novos de A:
   o momento de referência (My,loc ← My − φ·Mz e Mz,loc ← Mz + φ·My, sinais
   pelos testes). Com M variável, os cortantes de referência entram pelo
   termo integrado por partes.
+- **Torque de referência** *(acrescentado após a T21, 2026-11-20)*: as
+  curvaturas de flexão ganham as rotações de flexão vezes metade do torque
+  (com os momentos semitangenciais dos estados, p = m − θ×M0/2, a regra
+  dá My,loc ← My − Mx·θz/2 e Mz,loc ← Mz + Mx·θy/2), com o conjugado nas
+  linhas de momento, o que mantém K simétrica. Sem ele, o pórtico de Argyris com torque na junta
+  errava 39% e o eixo de Greenhill (2π·EI/L) ficava de fora. As partes
+  ficam abaixo do Greenhill da parte engastada: l ≤ 2π·EI/(margem·|Mx|).
 - **Altura da carga distribuída**: k_q = λ·(q·d) no termo do giro em Mx',
   como uma base elástica de torção (negativa se desestabiliza).
   **Concentrada**: salto ΔMx = λ·(P·d)·θx no ponto, uma matriz de salto

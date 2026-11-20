@@ -73,3 +73,14 @@ linearizada em vetores globais com todos os vetores contínuos na junta,
 que dá ±622,208 N·mm no pórtico de Argyris sobre rótulas (Argyris et al.,
 1979: ±622 N·mm).
 
+## Adendo (2026-11-20, feature 008d, T21b)
+
+O funcional deixava de fora o torque de referência Mx. Ele entra como
+Mx·(v'w'' − w'v'') (Yang e McGuire, 1986): no espaço de estados, cujos
+momentos são semitangenciais (p = m − θ×M0/2), as curvaturas de flexão
+ganham −Mx·θz/2 e +Mx·θy/2 e as linhas de momento o conjugado, o que
+mantém a rigidez simétrica. Nos momentos fletores o termo de giro leva o
+momento inteiro porque a outra metade, integrada por partes, é o termo de
+ponta do adendo da T20. A verificação é a mesma barra linearizada da T20 e o eixo de
+Greenhill.
+

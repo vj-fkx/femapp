@@ -269,15 +269,16 @@ Expected<BucklingResult> runLinearBuckling(const Model& model, const BucklingOpt
         return tl::unexpected(linear.error());
     }
     std::vector<ReferenceProfile> reference = problem.profilesOf(problem.valuesOf(*linear));
-    // REQ-008c-12, 008d-16: no compression and no bending moment, no
-    // buckling (a moment can turn a beam out of its plane).
+    // REQ-008c-12, 008d-16: no compression, no bending moment and no
+    // torque, no buckling (a moment can turn a beam out of its plane, a
+    // torque bend a shaft: Greenhill).
     const auto unstable = [](const ReferenceProfile& p) {
         if (p.largestCompression() > 0.0) {
             return true;
         }
         for (int i = 0; i < p.count; ++i) {
             const ReferencePoint& r = p.values.at(static_cast<std::size_t>(i));
-            if (r.my != 0.0 || r.mz != 0.0) {
+            if (r.my != 0.0 || r.mz != 0.0 || r.t != 0.0) {
                 return true;
             }
         }
@@ -285,7 +286,7 @@ Expected<BucklingResult> runLinearBuckling(const Model& model, const BucklingOpt
     };
     if (std::ranges::none_of(reference, unstable)) {
         return makeError(
-            "No bar is compressed or bent by these loads: there is no buckling factor.");
+            "No bar is compressed, bent or twisted by these loads: there is no buckling factor.");
     }
     Pencil pencil(problem, reference);
     const Eigen::Index n = k0.rows();
