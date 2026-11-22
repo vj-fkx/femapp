@@ -38,7 +38,7 @@ Regras:
   próximos (Ericson §5.1.9) em coordenadas relativas, ponto-segmento e a
   classificação do contato (design §5.3). Arquivos:
   `src/mesher/detail/segment_geometry.hpp/.cpp`. Cobre: 03, 04, N02.
-- [ ] **T04** [P] BVH estática:
+- [x] **T04** [P] BVH estática:
   - testes primeiro: os pares iguais aos da força bruta em nuvens
     aleatórias de segmentos (semente fixa; 10, 1 000 e 20 000 segmentos;
     escalas misturadas), com 1, 2 e todas as threads; os pares ponto-caixa;

@@ -80,6 +80,7 @@ femapp_add_test(geom SOURCES
     test_point_resolver.cpp)
 femapp_add_test(mesher SOURCES
     test_line_mesher.cpp
+    test_segment_bvh.cpp
     test_segment_geometry.cpp)
 target_include_directories(test_mesher PRIVATE "${PROJECT_SOURCE_DIR}/src/mesher")
 femapp_add_test(io SOURCES

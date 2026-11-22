@@ -4,6 +4,7 @@ find_package(TBB CONFIG REQUIRED)
 femapp_add_module(mesher
     SOURCES
         line_mesher.cpp
+        segment_bvh.cpp
         segment_geometry.cpp
     PUBLIC_DEPS
         fem::core
