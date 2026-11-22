@@ -292,11 +292,11 @@ Regras:
 
 ## Fase 7 — Desempenho e documentação
 
-- [ ] **T25** [M] Benchmarks finais com e sem `--warping`: linear,
+- [x] **T25** [M] Benchmarks finais com e sem `--warping`: linear,
   `--second-order` e `--buckling 5`, registrados nas notas contra as metas
   do design §5.9; sem empenamento, a meta da 008b (< 5 s) e as da 008c —
   arquivos: `tests/perf/bench_frame.cpp` — cobre: N02
-- [ ] **T26** `specs/architecture.md` §3: empenamento no modelo, perfil de
+- [x] **T26** `specs/architecture.md` §3: empenamento no modelo, perfil de
   referência completo, flexo-torção e ADR 0008; a convenção dos momentos
   nodais no comentário de `NodalForce`; notas de implementação aqui —
   cobre: 20
@@ -601,3 +601,13 @@ Regras:
     barra resolvidos uma vez para todos os pontos (`statesAt`), 9,57× sem
     empenamento (30,1 s) e 8,06× com (42,4 s), 3 iterações. O mantenedor
     mudou a meta para ≤ 10× (NFR-008d-02, design §5.9).
+- T25 (`bench_frame --second-order --buckling 5`, Release, máquina do
+  mantenedor): sem empenamento, linear 3,135 s (meta da 008b < 5 s),
+  segunda ordem 29,2 s = 9,32× (meta 10×), flambagem 1020 s = 325× (meta
+  400×), fatores 15,2846 a 16,2486; com empenamento, linear 5,173 s
+  (1,65× a sem, meta 2,2×), segunda ordem 42,9 s = 8,29×, flambagem 336 s
+  = 65×, fatores 18,5037 a 21,1969. Todas dentro das metas. Os fatores
+  mudaram pouco desde a T18b (15,2844 → 15,2846; 20,132 → 20,129) pelas
+  correções da junta (T20), do torque (T21b) e do arco (T23); a flambagem
+  com empenamento ficou mais rápida (204× → 65×).
+

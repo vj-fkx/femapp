@@ -125,6 +125,11 @@ Conceitos principais:
   *Ampliado na 008b:* vigas curvas em `Line3`, com a formulação na atribuição
   (`CurvedFormulation`: arco ou isoparamétrica) e torque distribuído nas
   cargas.
+  *Ampliado na 008d:* empenamento por atribuição (`Assignment::warping`),
+  condições por ponta (`WarpingEnd`: livre, impedido, mola ou contínuo entre
+  barras), bimomento nodal (`NodalForce::bimoment`), ponto de aplicação das
+  cargas do vão na seção (altura da carga) e os coeficientes de
+  monossimetria opcionais na seção genérica.
 - **Análise estática** (`static_analysis.hpp`, feita na 007) — `validate`
   lista todos os problemas do modelo; `runLinearStatic` monta, verifica a
   diagonal (nó sem rigidez numa direção), fatora (equação singular →
@@ -164,7 +169,24 @@ Conceitos principais:
   K(λ)φ = 0 (subespaço, iteração inversa residual e contagem de Sturm de
   Wittrick-Williams, ADR 0007), inclusive os modos de uma barra que flamba
   com os nós parados. Flexo-torção e o termo de Wagner ficam para a 008d.
-- **`DofMap`** — GDL **variáveis por nó** (u, v, w, θx, θy, θz, T), definidos
+  *Ampliada na 008d:* o empenamento (7º GDL `Warp`, ψ e o bimomento nos
+  resultados e nas tensões) chega pelo `Model` às vigas retas, aos arcos e à
+  isoparamétrica (ψ nos três nós, Vlasov por penalidade). O perfil de
+  referência passa a ter os seis esforços (`ReferenceProfile`; nas barras
+  retas, exato pela estática a partir do início). A flexo-torção entra na
+  segunda ordem e na flambagem de toda viga 3D, pela segunda variação de um
+  funcional (ADR 0008 e adendos): acoplamento do giro com os momentos e o
+  torque, Wagner, monossimetria, excentricidade do centro de cisalhamento e
+  altura da carga; K continua simétrica, os momentos aplicados são
+  semitangenciais, e o arco leva os termos de curvatura do referencial
+  móvel. A isoparamétrica tem a rigidez geométrica completa em componentes
+  globais. A segunda ordem é um P-δ simétrico (os esforços espaciais do
+  equilíbrio deslocado); a rotação da seção antes da flambagem fica para a
+  008e. A flambagem estima os fatores pelo pencil quadrático e acha os
+  perdidos por bissecção grossa e refinamento (ADR 0007, adendo); a
+  fatoração indefinida julga o pivô nulo pela diagonal da própria equação.
+- **`DofMap`** — GDL **variáveis por nó** (u, v, w, θx, θy, θz, T e, desde a
+  008d, o empenamento ψ das vigas com empenamento contínuo), definidos
   pelos elementos conectados; trata restrições e a compatibilização entre barras,
   cascas e sólidos (REQ-G-13). *Feito na 006:* máscara por nó vinda das
   `ElementFormulation`, numeração determinística, apoios e recalques por

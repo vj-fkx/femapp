@@ -91,7 +91,10 @@ struct Restraint
     double value = 0.0;
 };
 
-// REQ-007-06: actions of the single load case.
+// REQ-007-06: actions of the single load case. Feature 008d (ADR 0008): in
+// the second order and the buckling the nodal moments are semitangential,
+// the conservative moments the flexural-torsional terms assume; they need
+// no load stiffness.
 struct NodalForce
 {
     NodeTarget nodes;
