@@ -207,7 +207,8 @@ TEST_CASE("the exact beam element does not allocate", "[core][allocations]")
 }
 
 // REQ-008b-14: the isoparametric element, with a spring, an offset, a
-// foundation and loads, computes on the stack.
+// foundation and loads, computes on the stack; feature 008d (T24), also with
+// the full reference state.
 TEST_CASE("the isoparametric beam element does not allocate", "[core][allocations]")
 {
     std::array<fem::core::IsoBeamData, 1> beams{};
@@ -224,7 +225,17 @@ TEST_CASE("the isoparametric beam element does not allocate", "[core][allocation
                                       .startValue = Eigen::Vector3d(0.0, 1.0, 0.0),
                                       .endValue = Eigen::Vector3d(0.0, 2.0, 0.0),
                                       .from = 0.1,
-                                      .to = 1.0});
+                                      .to = 1.0,
+                                      .point = Eigen::Vector2d(0.03, 0.0)});
+    // Feature 008d (T24): the six forces of the reference state, a load
+    // factor (the load at a height) and the Wagner properties.
+    fem::core::ReferenceProfile reference = fem::core::ReferenceProfile::constant(
+        fem::core::ReferencePoint{.n = -5.0, .vy = 1.0, .vz = 2.0, .t = 3.0, .my = 4.0, .mz = 5.0});
+    reference.loadFactor = 1.5;
+    data.beam.reference = std::make_shared<const fem::core::ReferenceProfile>(reference);
+    data.beam.polarRadius2 = 0.02;
+    data.beam.monosymmetryY = 0.01;
+    data.beam.monosymmetryZ = -0.02;
     fem::core::ElementNodes nodes;
     nodes.type = fem::core::ElementType::Line3;
     nodes.count = 3;

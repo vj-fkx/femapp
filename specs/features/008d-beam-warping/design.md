@@ -311,6 +311,10 @@ móvel. Muda só o acesso, a partir de `c19d42b`:
   linearmente dos 2 pontos reduzidos e integrada com 3 pontos. A da 008c
   (N·B⊥ᵀB⊥) é o caso só com N, e o teste confere que fica igual.
 - **Convergência**: contra o arco exato, com taxa ≥ 3,5, como na 008c.
+  Com a flexo-torção, taxa ≥ 3 e 1e−5 com 64 elementos *(ajustado na T24,
+  2026-11-22: os momentos negativos pequenos ainda não estão na assíntota,
+  taxas de 3,2 a 3,8)*, com áreas de cisalhamento: a penalidade de
+  Euler-Bernoulli estraga a escala das malhas finas.
 
 ### 5.4 Perfil de referência (REQ-008d-10, 13, 14)
 

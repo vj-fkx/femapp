@@ -12,6 +12,7 @@
 #include <fem/core/linear_solver.hpp>
 #include <fem/core/mesh_builder.hpp>
 #include <fem/core/stability_analysis.hpp>
+#include <fem/core/static_analysis.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -989,6 +990,8 @@ struct Arch
     double inPlane = 93.0;
     double area = 14.4;
     bool pinned = false;
+    bool iso = false;   // Line3 isoparametric instead of arcs (T24)
+    double shear = 0.0; // the shear areas (0: Euler-Bernoulli)
 };
 
 constexpr double kYooLength = 403.32;
@@ -1041,6 +1044,10 @@ fem::core::Model yooArch(const Arch& arch)
     yoo.inertiaY = arch.inPlane;
     yoo.inertiaZ = kYooOut;
     yoo.torsionConstant = kYooJ;
+    if (arch.shear > 0.0) {
+        yoo.shearAreaY = arch.shear;
+        yoo.shearAreaZ = arch.shear;
+    }
     if (arch.warped) {
         yoo.warpingConstant = kYooCw;
     }
@@ -1048,8 +1055,13 @@ fem::core::Model yooArch(const Arch& arch)
     fem::core::Assignment beam{.elements = bars,
                                .kind = fem::core::ElementKind::Beam3D,
                                .material = "Steel",
-                               .section = "Yoo"};
+                               .section = "Yoo",
+                               .theory = arch.shear > 0.0 ? fem::core::BeamTheory::Timoshenko
+                                                          : fem::core::BeamTheory::EulerBernoulli};
     beam.warping = arch.warped;
+    if (arch.iso) {
+        beam.curved = fem::core::CurvedFormulation::Isoparametric;
+    }
     model.assignments.push_back(beam);
     // The forks: both bending moments released at the ends of the beam.
     for (const auto& [element, end] :
@@ -1060,7 +1072,7 @@ fem::core::Model yooArch(const Arch& arch)
         fork.stiffness[5] = 0.0;
         model.endConnections.push_back(fork);
     }
-    if (!arch.curved && arch.warped) {
+    if ((!arch.curved || arch.iso) && arch.warped) {
         for (int k = 0; k + 1 < n; ++k) {
             const auto id = static_cast<fem::core::ExternalId>(k) + 1;
             model.warpingEnds.push_back({.elements = fem::core::ElementIds{{id}},
@@ -1280,4 +1292,127 @@ TEST_CASE("out-of-plane buckling of a curved arch under a uniform compression",
             }
         }
     }
+}
+
+namespace {
+
+// The rate of convergence of three values at n, 2n and 4n elements to the
+// exact one: log2 of the ratio of the last two errors.
+double rate(const std::array<double, 3>& values, double exact)
+{
+    return std::log2(std::abs(values[1] - exact) / std::abs(values[2] - exact));
+}
+
+// A straight fork beam of n Line3 isoparametric elements along X (the
+// supports and the section of forkBeam), the warping continuous between
+// the elements, under a uniform load q (down) at the height a.
+fem::core::Model isoForkBeam(const Props& p, double l, int n, double a, double q)
+{
+    fem::core::MeshBuilder builder;
+    for (int k = 0; k <= n; ++k) {
+        REQUIRE(builder.addNode(k + 1, Eigen::Vector3d(l * k / n, 0.0, 0.0)).has_value());
+    }
+    for (int k = 0; k < n; ++k) {
+        REQUIRE(
+            builder.addNode(1001 + k, Eigen::Vector3d(l * (k + 0.5) / n, 0.0, 0.0)).has_value());
+    }
+    fem::core::ElementIds bars;
+    for (int k = 0; k < n; ++k) {
+        const auto id = static_cast<fem::core::ExternalId>(k) + 1;
+        REQUIRE(builder
+                    .addElement(fem::core::ElementType::Line3, id,
+                                std::vector<fem::core::ExternalId>{id, id + 1, 1000 + id})
+                    .has_value());
+        bars.ids.push_back(id);
+    }
+    auto mesh = builder.build();
+    REQUIRE(mesh.has_value());
+    fem::core::Model model = forkBeam(p, l);
+    model.mesh = std::make_shared<const fem::core::Mesh>(std::move(*mesh));
+    model.restraints.clear();
+    model.assignments.front().elements = bars;
+    model.assignments.front().curved = fem::core::CurvedFormulation::Isoparametric;
+    for (int k = 0; k + 1 < n; ++k) {
+        const auto id = static_cast<fem::core::ExternalId>(k) + 1;
+        model.warpingEnds.push_back({.elements = fem::core::ElementIds{{id}},
+                                     .end = fem::core::BarEnd::End,
+                                     .condition = fem::core::WarpingCondition::Continuous});
+        model.warpingEnds.push_back({.elements = fem::core::ElementIds{{id + 1}},
+                                     .end = fem::core::BarEnd::Start,
+                                     .condition = fem::core::WarpingCondition::Continuous});
+    }
+    using fem::core::DofType;
+    const auto last = static_cast<fem::core::ExternalId>(n) + 1;
+    fem::core::test::restrain(model, {1}, {DofType::U, DofType::V, DofType::W, DofType::RX});
+    fem::core::test::restrain(model, {last}, {DofType::V, DofType::W, DofType::RX});
+    model.distributedLoads.push_back({.elements = bars,
+                                      .startValue = Eigen::Vector3d(0.0, 0.0, -q),
+                                      .endValue = Eigen::Vector3d(0.0, 0.0, -q),
+                                      .point = Eigen::Vector2d(a, 0.0)});
+    return model;
+}
+
+} // namespace
+
+// T24 (design 008d §5.3, AC-8): the full geometric stiffness of the
+// isoparametric beam, the second variation of the rod about its reference
+// state in global components. The cases of T23 converge to the exact arc
+// (16, 32 and 64 elements) with a rate of at least 3 and within 1e-5
+// (maintainer's decision, 2026-11-22: the small negative moments are still
+// short of the asymptote there, rates of 3.2 to 3.8): Yoo's beam with
+// warping under a uniform moment of either sign, and the arch under a
+// uniform compression (its real area: the shortening bends the arc and the
+// isoparametric beam alike). With shear areas (Timoshenko): the
+// penalty of Euler-Bernoulli, G As = 1e6 EI / l^2, spoils the scaling of
+// fine meshes (64 elements: 3e-5, growing). With N only it is the bar of
+// the 008c: those suites hold.
+TEST_CASE("the isoparametric beam buckles as the arc",
+          "[core][beam][flexural-torsional][buckling][iso]")
+{
+    const double beta = 90.0 * std::numbers::pi / 180.0;
+    const double m = 100.0;
+    const auto check = [](const std::function<double(int, bool)>& factor) {
+        const double exact = factor(2, false);
+        std::array<double, 3> iso{};
+        for (std::size_t k = 0; k < 3; ++k) {
+            iso.at(k) = factor(16 << k, true);
+        }
+        CHECK(relative(iso[2], exact) <= 1e-5);
+        CHECK(rate(iso, exact) >= 3.0);
+    };
+    for (const double sign : {1.0, -1.0}) {
+        INFO("uniform moment, sign " << sign);
+        check([&](int n, bool iso) {
+            return firstFactor(
+                bentArch({.beta = beta, .n = n, .iso = iso, .shear = 7.0}, sign * m));
+        });
+    }
+    INFO("uniform compression");
+    check([&](int n, bool iso) {
+        return firstFactor(pressedArch(
+            {.beta = beta, .n = n, .warped = false, .inPlane = 2000.0, .iso = iso, .shear = 7.0},
+            0.01));
+    });
+}
+
+// T24: a straight beam of isoparametric elements with what the curved cases
+// leave out: a monosymmetric section (Wagner's beta and the eccentric shear
+// centre), a moment and a shear that vary, and the load on the top flange.
+// It converges to the exact bar with a rate of at least 3.5 (4, 8 and 16
+// elements), within 1e-5.
+TEST_CASE("the isoparametric beam with the load at a height",
+          "[core][beam][flexural-torsional][buckling][iso]")
+{
+    const double l = 6.0;
+    const double q = 1.0e3;
+    Props p;
+    p.ys = 0.05;
+    p.betaZ = 0.18;
+    const double exact = heightFactor(p, l, true, 0.15, q) / q;
+    std::array<double, 3> iso{};
+    for (std::size_t k = 0; k < 3; ++k) {
+        iso.at(k) = firstFactor(isoForkBeam(p, l, 4 << k, 0.15, q));
+    }
+    CHECK(relative(iso[2], exact) <= 1e-5);
+    CHECK(rate(iso, exact) >= 3.5);
 }

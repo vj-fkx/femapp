@@ -258,14 +258,31 @@ Regras:
     extrapoladas em 1%;
   - raio grande: a média dos dois momentos críticos igual à reta (1e−8).
   Arquivos: `beam_state.cpp`, `test_buckling.cpp`. Cobre: 14, N01
-- [ ] **T24** Rigidez geométrica completa da isoparamétrica (design §5.3).
+- [x] **T24** Rigidez geométrica completa da isoparamétrica (design §5.3).
   Testes:
-  - só com N igual à 008c;
-  - os casos da T23 convergindo para o arco com taxa ≥ 3,5;
-  - segunda ordem de um arco com flexo-torção (arco e isoparamétrica);
-  - zero alocações.
-  Arquivos: `beam_iso.cpp`, `test_buckling.cpp`,
-  `test_second_order_analysis.cpp`, `test_allocations.cpp`. Cobre: 10, 14
+  - só com N igual à 008c (as suítes da 008c seguem);
+  - os casos da T23 convergindo para o arco (16, 32 e 64 elementos) com
+    taxa ≥ 3 e 1e−5 (decisão do mantenedor, 2026-11-22), com áreas de
+    cisalhamento;
+  - viga reta isoparamétrica monossimétrica com a carga na mesa superior,
+    taxa ≥ 3,5 e 1e−5 contra a barra exata;
+  - zero alocações com o perfil completo.
+  A segunda ordem do arco com flexo-torção foi para a T24b.
+  Arquivos: `beam_iso.cpp`, `linear_solver.cpp`, `test_flexural_torsional.cpp`,
+  `test_allocations.cpp`. Cobre: 10, 14
+- [ ] **T24b** Os esforços que a segunda ordem realimenta (decidido pelo
+  mantenedor em 2026-11-22, após a T24): o arco exato realimenta os seus
+  estados semitangenciais (δm − P·θ) e a isoparamétrica os momentos
+  materiais (C·κ = δm − θ×M0); depois de uma iteração os dois concordam,
+  mas convergidos o giro difere de 0,04% (eixo forte no plano) a 0,9% (a
+  flexão de Yoo no eixo fraco). Os dois passam a realimentar o incremento
+  verdadeiro δm = C·κ + θ×M0, verificado contra uma referência
+  independente do efeito da deformação antes do giro (na viga reta, o
+  fator de Kirby e Nethercot, 1/√((1 − EIy/EIz)(1 − GJ/EIz))), e a segunda
+  ordem de um arco com flexo-torção (arco e isoparamétrica) em 1e−4.
+  Arquivos: `static_analysis.cpp`, `beam_iso.cpp`,
+  `test_second_order_analysis.cpp`, `test_flexural_torsional.cpp` — cobre:
+  10, 14
 
 ## Fase 7 — Desempenho e documentação
 
@@ -528,4 +545,22 @@ Regras:
     maior, e barras rígidas alargam a faixa singular em volta do fator;
   - com raio grande os dois momentos críticos se separam em primeira ordem
     em 1/R (≈ (EI + GJ)/2R); a média deles é a da viga reta.
-
+- T24: a segunda variação da barra em componentes globais, com as
+  deformações de segunda ordem Γ₂ = −θ×u' + θ×(θ×t)/2 e κ₂ = −θ×θ'/2 (o
+  vetor de rotação, sem a curvatura de referência), dá o momento
+  semitangencial do motor exato. N fica no termo da 008c; os cortantes
+  entram na forma de pequenas deformações, −(v0·θ)(t·θ)/2 (com u' inteiro,
+  o acoplamento com a deformação axial travava com 3 pontos, e o arco
+  plano da 008c deixava de convergir); mais Wagner, a excentricidade do
+  centro de cisalhamento e a altura da carga, como no motor exato. Achados:
+  - a penalidade de Euler-Bernoulli (G·As = 1e6·EI/ℓ²) e a de Vlasov
+    (1e6·EIw/ℓ²) estragam a escala das malhas finas: com 64 elementos o
+    fator piorava (3e−5 e crescendo) e a segunda ordem não convergia; com
+    áreas de cisalhamento a convergência é limpa (até 7e−8 com 64);
+  - o pivô nulo da fatoração indefinida passou a ser julgado contra a
+    diagonal da própria equação (antes, contra o maior pivô): as
+    penalidades e as barras muito rígidas alargavam a faixa singular em
+    volta de um fator e a busca parava;
+  - na segunda ordem, os dois elementos concordam depois de uma iteração
+    (a mesma rigidez), mas realimentam esforços em convenções diferentes:
+    T24b.

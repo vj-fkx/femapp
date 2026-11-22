@@ -7,7 +7,8 @@
 // terms are integrated with 2 points and the curvature terms with 3
 // (Stolarski and Belytschko, 1983; Prathap, 1993), free of shear and
 // membrane locking. Feature 008c: the reference axial force adds its
-// geometric stiffness, integrated with 3 points. Feature 008d (design 008d
+// geometric stiffness, integrated with 3 points; feature 008d (T24) the
+// rest of the second variation (addGeometry). Feature 008d (design 008d
 // §5.3): with warping, psi is quadratic on its own at the three nodes
 // (flexible dofs 18 to 20), E Iw psi'^2 integrated with 3 points and
 // Vlasov's psi = kappa_x by a penalty k_psi = 1e6 E Iw / l^2 with 2.
@@ -192,6 +193,68 @@ Strain strainAt(const Point& p)
     return b;
 }
 
+// Feature 008d (T24, design 008d §5.3): the rest of the second variation
+// of the rod about its reference state, in global components. With the
+// second-order strains Gamma2 = -theta x u' + theta x (theta x t) / 2 and
+// kappa2 = -theta x theta' / 2 (the rotation vector, from the curve as it
+// is: no reference curvature in them), the energy n0 . Gamma2 + m0 . kappa2;
+// its moment is the semitangential one of the exact engine, m - theta x M0
+// / 2. N stays in the 008c term above; here the shears v0 and the moments
+// m0, Wagner's 1/2 K kappa_x^2 and N kappa_x (ez theta_z + ey theta_y) of
+// the eccentric shear centre, kappa_x = t . theta' (as the exact engine).
+// The shears with u' = Gamma1 - t x theta and Gamma1 left out (strain times
+// rotation; through the axial strain it locks with 3 points): -(v0 . theta)
+// (t . theta) / 2, zero in the plane. On z = (theta', theta):
+// H(theta', theta) = -[m0 x] / 2 + N t e^T, H(theta, theta) = -(v0 t^T + t
+// v0^T) / 2, H(theta', theta') = K t t^T, and the transpose.
+template <typename Block>
+void addGeometry(const BeamData& beam, const Point& p, const ReferencePoint& r, double w, Block&& k)
+{
+    const Eigen::Vector3d& t = p.t;
+    const Eigen::Vector3d y = p.axes.col(1);
+    const Eigen::Vector3d z = p.axes.col(2);
+    const Eigen::Vector3d v0 = r.vy * y + r.vz * z;
+    const Eigen::Vector3d m0 = p.axes * Eigen::Vector3d(r.t, r.my, r.mz);
+    const Eigen::Vector3d e = beam.shearCentre.x() * y + beam.shearCentre.y() * z;
+    const double wagner =
+        r.n * beam.polarRadius2 + beam.monosymmetryY * r.my - beam.monosymmetryZ * r.mz;
+    Eigen::Matrix<double, 6, 6> h = Eigen::Matrix<double, 6, 6>::Zero();
+    h.block<3, 3>(0, 3) = -0.5 * cross(m0) + r.n * t * e.transpose();
+    h.block<3, 3>(3, 0) = 0.5 * cross(m0) + r.n * e * t.transpose();
+    h.block<3, 3>(3, 3) = -0.5 * (v0 * t.transpose() + t * v0.transpose());
+    h.block<3, 3>(0, 0) = wagner * t * t.transpose();
+    Eigen::Matrix<double, 6, kDofs> b = Eigen::Matrix<double, 6, kDofs>::Zero();
+    for (int i = 0; i < 3; ++i) {
+        const auto node = static_cast<std::size_t>(i);
+        b.block<3, 3>(0, at(i) + 3).diagonal().setConstant(p.shape.dn.at(node) / p.j);
+        b.block<3, 3>(3, at(i) + 3).diagonal().setConstant(p.shape.n.at(node));
+    }
+    k.noalias() += w * b.transpose() * h * b;
+}
+
+// Feature 008d (T24): the load at a height, lambda (q . d) on the twist
+// t . theta (as the exact engine), d from the shear centre to the point of
+// the load; `force` global.
+template <typename Block>
+void addHeight(const BeamData& beam, const Point& p, const Eigen::Vector3d& force,
+               const Eigen::Vector2d& point, double w, Block&& k)
+{
+    const Eigen::Vector3d local = p.axes.transpose() * force;
+    const Eigen::Vector2d d = point - beam.shearCentre;
+    const double spring = referenceOf(beam).loadFactor * (local.y() * d.x() + local.z() * d.y());
+    if (spring == 0.0) {
+        return;
+    }
+    const Eigen::Matrix3d tt = spring * w * p.t * p.t.transpose();
+    for (int i = 0; i < 3; ++i) {
+        for (int j = 0; j < 3; ++j) {
+            k.template block<3, 3>(at(i) + 3, at(j) + 3) +=
+                p.shape.n.at(static_cast<std::size_t>(i)) *
+                p.shape.n.at(static_cast<std::size_t>(j)) * tt;
+        }
+    }
+}
+
 struct Flexible
 {
     Mat18 k;
@@ -247,6 +310,8 @@ Expected<Flexible> flexible(const IsoBeamData& data, ElementKind kind, const Iso
                     out.k.block<3, 3>(at(i), at(jn)) += w * axial * dd * transverse;
                 }
             }
+            addGeometry(beam, *p, referenceOf(beam).at(arcLength(x, kGauss3.at(g)), length), w,
+                        k18);
         }
         // The foundation, on the centroid displacements and the twist.
         if (!beam.foundation.isZero()) {
@@ -320,6 +385,9 @@ Expected<Flexible> flexible(const IsoBeamData& data, ElementKind kind, const Iso
                 out.f.segment<3>(at(i)) += n * q;
                 out.f.segment<3>(at(i) + 3) += n * m * p->t;
             }
+            if (referenceOf(beam).active()) {
+                addHeight(beam, *p, q, load.point, w, k18);
+            }
         }
     }
     for (const IsoLoads::Concentrated& load : data.loads.concentrated) {
@@ -338,6 +406,9 @@ Expected<Flexible> flexible(const IsoBeamData& data, ElementKind kind, const Iso
             const double n = p->shape.n.at(static_cast<std::size_t>(i));
             out.f.segment<3>(at(i)) += n * force;
             out.f.segment<3>(at(i) + 3) += n * moment;
+        }
+        if (referenceOf(beam).active()) {
+            addHeight(beam, *p, force, load.point, 1.0, k18);
         }
     }
     return out;

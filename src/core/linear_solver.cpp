@@ -130,10 +130,18 @@ Expected<void> SparseCholesky::factorizeIndefinite(const SparseMatrix& lowerTria
         }
         return singular();
     }
+    // Feature 008d (T24): a pivot is negligible against the diagonal of its
+    // own equation (the largest pivot where that is zero). Against the
+    // largest pivot of all, stiff parts of a model (the penalties of the
+    // isoparametric beam, very stiff members) widened the band about a
+    // buckling factor where the matrix counted as singular.
     const double largest = d.cwiseAbs().maxCoeff();
+    const auto& order = m_impl->ldlt.permutationPinv().indices();
     for (Eigen::Index k = 0; k < d.size(); ++k) {
-        if (!(std::abs(d[k]) > kNegligiblePivot * largest)) {
-            m_impl->singular = m_impl->ldlt.permutationPinv().indices()[k];
+        const double own = std::abs(lowerTriangle.coeff(order[k], order[k]));
+        const double scale = own > 0.0 ? own : largest;
+        if (!(std::abs(d[k]) > kNegligiblePivot * scale)) {
+            m_impl->singular = order[k];
             return singular();
         }
     }
