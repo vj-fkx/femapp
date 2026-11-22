@@ -1,6 +1,6 @@
 # Tarefas — 008d beam-warping
 
-Status: em andamento
+Status: concluído
 Design: [design.md](design.md) · Requisitos: [requirements.md](requirements.md)
 
 Regras:
@@ -303,12 +303,12 @@ Regras:
 
 ## Fase 8 — Fechamento
 
-- [ ] **T90** [M] Build e testes verdes nos jobs do CI, incluindo o de
+- [x] **T90** [M] Build e testes verdes nos jobs do CI, incluindo o de
   cobertura com `core` ≥ 80% (push com sua confirmação) — cobre: N03
-- [ ] **T91** `clang-format` e `clang-tidy` sem pendências (também o do
+- [x] **T91** `clang-format` e `clang-tidy` sem pendências (também o do
   Linux, pelo CI); `core` sem headers Qt — cobre: 20
-- [ ] **T92** Conferir os dez critérios de aceite de `requirements.md`
-- [ ] **T93** Atualizar `specs/roadmap.md` para `concluída`
+- [x] **T92** Conferir os dez critérios de aceite de `requirements.md`
+- [x] **T93** Atualizar `specs/roadmap.md` para `concluída`
 
 ## Matriz de rastreabilidade
 
@@ -625,3 +625,10 @@ Regras:
     plataformas diferem de alguns 1e−9 na razão dos dois últimos erros. A
     taxa passa a ser medida sobre a faixa (metade do log2 da razão do
     primeiro e do último erro): 3,54; 3,81; 3,77; 3,93 (meta 3,5); 3,40.
+- Fechamento (2026-11-22): CI verde nas quatro plataformas na execução
+  45069630592 (commit 6a9ce2d): Windows, macOS, Linux gcc e clang (com o
+  clang-tidy 19), formato e cobertura de `core` em 96,4% (mínimo 80%). Os
+  dez critérios de aceite conferidos contra as suítes `test_beam_warping`,
+  `test_beam_curved`, `test_section_thin_walled`, `test_flexural_torsional`,
+  `test_buckling`, `test_second_order_analysis` e `test_beam_validation`;
+  os benchmarks da T25 dentro das metas.

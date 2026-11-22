@@ -103,7 +103,7 @@ removidos da 008b em 2026-11-16, com os ajustes desta feature.
 
 ## 5. Critérios de aceite
 
-- [ ] **AC-1** (REQ-008d-01, 02, 04, 07, 08, NFR-008d-01) Torção com
+- [x] **AC-1** (REQ-008d-01, 02, 04, 07, 08, NFR-008d-01) Torção com
   empenamento em viga reta, contra a solução em senh/cosh:
   - balanço de perfil I com torque na ponta e engaste impedindo o
     empenamento (giro, B, Tsv e Tw ao longo da barra);
@@ -111,7 +111,7 @@ removidos da 008b em 2026-11-16, com os ajustes desta feature.
     e impedidas;
   - os limites G·J → 0 e E·Iw → 0;
   - bimomento nodal aplicado e reação de bimomento.
-- [ ] **AC-2** (REQ-008d-03, 05) Condições de empenamento:
+- [x] **AC-2** (REQ-008d-03, 05) Condições de empenamento:
   - viga contínua de dois vãos com empenamento contínuo, igual a uma barra
     só;
   - T de três barras: contínuo nas colineares, livre na terceira;
@@ -120,7 +120,7 @@ removidos da 008b em 2026-11-16, com os ajustes desta feature.
     e um valor intermediário contra a solução analítica;
   - liberação de torção e excentricidade com empenamento;
   - base elástica de torção contra a solução analítica.
-- [ ] **AC-3** (REQ-008d-06, 08) Viga curva com empenamento:
+- [x] **AC-3** (REQ-008d-06, 08) Viga curva com empenamento:
   - arco de perfil I em planta com raio grande, igual à viga reta com
     empenamento;
   - arco e isoparamétrica concordando com o refinamento;
@@ -129,10 +129,10 @@ removidos da 008b em 2026-11-16, com os ajustes desta feature.
     equações de Vlasov da viga curva (tiro com Runge-Kutta, no teste),
     1e−8 *(ajustado em 2026-11-18: os valores de Yang e Kuo, 1987, não
     estão abertos; decidido pelo mantenedor)*.
-- [ ] **AC-4** (REQ-008d-09) Tensões de empenamento: σw e τw nos pontos
+- [x] **AC-4** (REQ-008d-09) Tensões de empenamento: σw e τw nos pontos
   característicos de perfis I e U e nos pontos da seção de paredes finas,
   contra as fórmulas.
-- [ ] **AC-5** (REQ-008d-10, 11, 12, 13, NFR-008d-01) Flambagem lateral com
+- [x] **AC-5** (REQ-008d-10, 11, 12, 13, NFR-008d-01) Flambagem lateral com
   torção de vigas retas, um elemento por vão:
   - perfil I biapoiado com apoio de garfo sob momento uniforme, contra
     Mcr = (π/L)·√(E·Iz·G·J·(1 + π²·E·Iw/(G·J·L²))), com e sem empenamento
@@ -144,28 +144,28 @@ removidos da 008b em 2026-11-16, com os ajustes desta feature.
   - carga na mesa superior, no centro de cisalhamento e na mesa inferior;
   - perfil I monossimétrico (mesas desiguais) sob momento uniforme, contra
     a solução fechada com βz.
-- [ ] **AC-6** (REQ-008d-10, 11, 12, 15, NFR-008d-01) Flambagem de pilares
+- [x] **AC-6** (REQ-008d-10, 11, 12, 15, NFR-008d-01) Flambagem de pilares
   por torção e por flexo-torção:
   - perfil duplamente simétrico de torção crítica baixa (por exemplo,
     cruciforme), contra Pcr,T = (G·J + π²·E·Iw/L²)/r0²;
   - perfil monossimétrico (U ou T), contra a solução fechada da flambagem
     por flexo-torção;
   - modos normalizados com giro e empenamento.
-- [ ] **AC-7** (REQ-008d-10, 13, 16) Segunda ordem com flexo-torção:
+- [x] **AC-7** (REQ-008d-10, 13, 16) Segunda ordem com flexo-torção:
   - viga sob momento uniforme abaixo do crítico, com uma pequena carga
     lateral ou torque, com o giro amplificado contra a solução analítica;
   - o efeito da altura da carga no giro;
   - recusa acima do momento crítico, com a mensagem da instabilidade.
-- [ ] **AC-8** (REQ-008d-14, NFR-008d-01) Flexo-torção em vigas curvas:
+- [x] **AC-8** (REQ-008d-14, NFR-008d-01) Flexo-torção em vigas curvas:
   - flambagem fora do plano de arco circular sob compressão uniforme e sob
     momento uniforme, contra as referências documentadas no design;
   - arco de raio grande igual à viga reta;
   - arco e isoparamétrica concordando com o refinamento.
-- [ ] **AC-9** (REQ-008d-17, 18) Validação: cada problema do REQ-008d-17 gera
+- [x] **AC-9** (REQ-008d-17, 18) Validação: cada problema do REQ-008d-17 gera
   uma mensagem com o item envolvido, e vários aparecem juntos; um mecanismo
   de empenamento (todas as pontas livres num nó sem rigidez) é informado
   com o nó, a direção e a sugestão.
-- [ ] **AC-10** (REQ-008d-19, 20, NFR-008d-02, 03)
+- [x] **AC-10** (REQ-008d-19, 20, NFR-008d-02, 03)
   - os testes da 007 a 008c passam, e as revisões da flexo-torção ficam
     registradas;
   - `core` segue sem Qt;
