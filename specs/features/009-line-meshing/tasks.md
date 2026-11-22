@@ -48,7 +48,7 @@ Regras:
 
 ## Fase 2 — O gerador
 
-- [ ] **T05** Testes do caminho básico (devem falhar):
+- [x] **T05** Testes do caminho básico (devem falhar):
   - pórtico 2×2 com linhas que se tocam nas pontas: contagens, IDs
     externos na ordem do design §5.6, nós fundidos, `Point1` dos pontos;
   - polilinha aberta e fechada;
@@ -58,7 +58,7 @@ Regras:
   - `NoLines` (só pontos; vazio) e `UnknownEntity`.
   Arquivo: `tests/unit/mesher/test_line_mesher.cpp`. Cobre: 01, 02, 05,
   08, 09, 10, 14.
-- [ ] **T06** `meshLines`, coleta, fusão e numeração até a T05 passar:
+- [x] **T06** `meshLines`, coleta, fusão e numeração até a T05 passar:
   - coleta (§5.1, inclusive trechos ignorados);
   - fusão por grade de hash e union-find (§5.4);
   - um elemento por trecho, numeração, grupos, mapa e relatório (§5.6);
