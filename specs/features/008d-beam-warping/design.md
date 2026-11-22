@@ -468,6 +468,19 @@ Sω = ∫ ω·t ds acumulado desde a ponta livre, e a espessura no ponto.
   recusas não mudam. Sem carga lateral nem torque, um perfil duplamente
   simétrico sob momento fletor não gira, como na teoria: a segunda ordem
   amplifica um giro que já existe.
+- **O que a segunda ordem é** *(definido na T24b, 2026-11-22)*: um P-δ
+  simétrico. A barra linear em torno da forma indeformada, com a rigidez
+  simétrica do ADR 0008, é alimentada pelos esforços espaciais do
+  equilíbrio deslocado: na barra reta, a estática exata mais a diferença
+  entre os esforços espaciais dos estados e ela (o P-δ da deformada da
+  própria barra); no arco, os momentos dos estados mais P(M0)·θ; na
+  isoparamétrica, C·κ + θ×M0. Duas coisas ficam de fora, medidas contra a
+  barra exata não linear num balanço com EIy/EIz = 0,05:
+  - a parte não simétrica do P-δ (o torque do P-δ varia ao longo da barra
+    e a rigidez linearizada deixa de ser simétrica): 1e−4 a 7e−4;
+  - a rotação da seção antes da flambagem (Kirby e Nethercot), que mora na
+    rigidez e não nos esforços: 0,7% a 3,7%.
+  A análise geometricamente não linear completa é a feature 008e.
 - **Flambagem** (008c §5.6): o caso de carga dá os perfis e as cargas de
   referência, e K(λ) usa `reference.scaled(λ)` com `loadFactor = λ`. O
   subespaço, o refinamento, a contagem e a bissecção não mudam. O modo traz
@@ -503,15 +516,16 @@ máquina:
 - **linear com empenamento** ≤ 2,2 vezes a linear sem empenamento
   (medido: 1,65 a 1,68; a folga cobre as molas, a continuidade e os
   resultados novos);
-- **segunda ordem com empenamento** ≤ 6 vezes a linear com empenamento
-  *(ajustado após a T21, 2026-11-20: a proposta era 4×, a razão da 008c;
-  com os seis esforços iterados, cada montagem leva os momentos e divide
-  as barras)*;
+- **segunda ordem com empenamento** ≤ 10 vezes a linear com empenamento
+  *(ajustado após a T21, 2026-11-20, de 4× para 6×: com os seis esforços
+  iterados, cada montagem leva os momentos e divide as barras; e após a
+  T24b, 2026-11-22, para 10×: o P-δ exato pede os estados de cada barra
+  reta em cada iteração)*;
 - **flambagem com 5 fatores, com empenamento** ≤ 400 vezes a linear com
   empenamento *(ajustado após a T18b, 2026-11-19: a proposta era 12×, a
   razão da 008c)*;
 - **sem empenamento** continua a meta da 008b (linear < 5 s); a da
-  segunda ordem passa a ≤ 6× e a da flambagem a ≤ 400×, agora com a
+  segunda ordem passa a ≤ 10× e a da flambagem a ≤ 400×, agora com a
   flexo-torção ativa.
 
 Por que 12× não fecha (T18b): no benchmark, uma contagem de Sturm (uma

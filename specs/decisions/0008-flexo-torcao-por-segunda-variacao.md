@@ -95,3 +95,16 @@ o momento e a curvatura e dava quase o momento crítico da viga reta. Com
 ele, o arco reproduz em 1e−9 uma barra linearizada ao longo do círculo e a
 forma fechada de Yang e Kuo (1987) com r = 0 e o empenamento de Vlasov.
 
+## Adendo (2026-11-22, feature 008d, T24b)
+
+A segunda ordem é um P-δ simétrico: a rigidez desta decisão, em torno da
+forma indeformada, com os esforços espaciais do equilíbrio deslocado como
+referência. Os estados de momento do motor exato são m − P(M0)·θ; o que
+volta para a referência é o momento espacial, m_e + P(M0)·θ, e nas barras
+retas a estática exata mais a diferença dos estados para ela. A
+isoparamétrica devolve C·κ + θ×M0. Com a rigidez simétrica fica de fora a
+parte não simétrica do P-δ, e com qualquer realimentação de esforços a
+rotação da seção antes da flambagem; as duas foram medidas contra uma barra
+exata não linear e a segunda vai para a feature 008e (análise
+geometricamente não linear).
+

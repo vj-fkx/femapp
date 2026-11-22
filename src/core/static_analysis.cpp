@@ -641,8 +641,23 @@ std::vector<ReferenceProfile> StaticProblem::profilesOf(const Eigen::VectorXd& v
                 nodes.x.at(k) = mesh.nodeCoordinates(ids[k]);
             }
             const std::vector<double> local = nodeValues(element, 3, values);
+            // Feature 008d (T24b, design 008d §5.8): the moments spatial, as
+            // the second order feeds them back, C kappa + theta x M0 about the
+            // reference the beam was solved with; the forces as the exact
+            // engine takes them (its force states, material and spatial alike
+            // in its linearized law, as in the 008c).
+            const BeamData& iso = m_beams.iso[e].beam;
             profiles[e] = sampled(1, m_beams.length[e], [&](double s) {
-                return pointOf(isoBeamAt(m_beams.iso[e], kind, nodes, local, s).forces);
+                const BeamPoint point = isoBeamAt(m_beams.iso[e], kind, nodes, local, s);
+                ReferencePoint r = pointOf(point.forces);
+                const ReferencePoint r0 = referenceOf(iso).at(s, m_beams.length[e]);
+                const Eigen::Vector3d moment =
+                    Eigen::Vector3d(r.t, r.my, r.mz) +
+                    point.rotation.cross(Eigen::Vector3d(r0.t, r0.my, r0.mz));
+                r.t = moment.x();
+                r.my = moment.y();
+                r.mz = moment.z();
+                return r;
             });
             return;
         }
@@ -656,35 +671,48 @@ std::vector<ReferenceProfile> StaticProblem::profilesOf(const Eigen::VectorXd& v
         BeamForces end;
         exactEndForces(beam, planar, ends, endLoads, start, end);
         const double length = exactLength(beam, x1, x2);
+        // Feature 008d (T24b): the spatial forces of the states at the Gauss
+        // points of `parts` parts, the parts of the bar solved once.
+        const auto spatialProfile = [&](int parts) {
+            std::vector<double> positions;
+            positions.reserve(2 * static_cast<std::size_t>(parts));
+            for (int part = 0; part < parts; ++part) {
+                const auto points = ReferenceProfile::gaussPoints(part, parts, length);
+                positions.insert(positions.end(), points.begin(), points.end());
+            }
+            std::vector<BarState> states(positions.size());
+            statesAt(beam, length, loads, planar, ends, positions, Side::After, {}, states);
+            std::size_t next = 0;
+            return sampled(parts, length, [&](double s) {
+                return spatialForces(beam, states.at(next++), referenceAt(beam, loads, s, length));
+            });
+        };
         if (beam.arcLength > 0.0) {
             // An arc: the forces turn with the frame (design 008c §5.2).
             const double angle = beam.arcLength * beam.curvature.norm();
             const int parts =
                 std::clamp(static_cast<int>(std::ceil(angle / (std::numbers::pi / 16.0))), 1,
                            kMaxReferenceParts);
-            const double ey = beam.shearCentre.x();
-            const double ez = beam.shearCentre.y();
-            profiles[e] = sampled(parts, length, [&](double s) {
-                const BarState state = stateAt(beam, length, loads, planar, ends, s);
-                return ReferencePoint{.n = state.force.x(),
-                                      .vy = state.force.y(),
-                                      .vz = state.force.z(),
-                                      .t = state.moment.x() + ez * state.force.y() -
-                                           ey * state.force.z(),
-                                      .my = state.moment.y(),
-                                      .mz = state.moment.z()};
-            });
+            // Feature 008d (T24b): the spatial forces of the states.
+            profiles[e] = spatialProfile(parts);
             return;
         }
-        // A straight bar: by statics, sampled in one part without span loads
-        // (M linear) and in 4 with them (design 008c §5.2, 008d §5.4); the
-        // engine evaluates it exactly from its start (`statics`).
-        const int parts = loads.pieces.empty() && loads.points.empty() ? 1 : 4;
+        // A straight bar: by statics from its start, which the engine
+        // evaluates exactly (`statics`, design 008c §5.2, 008d §5.4), plus
+        // what the spatial forces of its states differ from them by,
+        // sampled in 4 parts (feature 008d, T24b: the P-delta of its own
+        // deflection; zero in a linear solution).
         const ReferencePoint first = pointOf(start);
-        profiles[e] = sampled(parts, length,
-                              [&](double s) { return straightStatics(beam, loads, first, s); });
+        profiles[e] = spatialProfile(4);
         profiles[e].statics = true;
         profiles[e].start = first;
+        for (int part = 0; part < 4; ++part) {
+            const auto points = ReferenceProfile::gaussPoints(part, 4, length);
+            for (std::size_t k = 0; k < 2; ++k) {
+                profiles[e].base.at(2 * static_cast<std::size_t>(part) + k) =
+                    straightStatics(beam, loads, first, points.at(k));
+            }
+        }
     };
     tbb::task_arena arena(m_options.threads > 0 ? m_options.threads : tbb::task_arena::automatic);
     arena.execute([&] {

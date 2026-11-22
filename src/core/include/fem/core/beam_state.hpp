@@ -35,7 +35,9 @@ using StateMatrix =
                                              double factor = 1.0);
 
 // The reference state at s: by statics from its start on a straight bar
-// (ReferenceProfile::statics), interpolated otherwise.
+// (ReferenceProfile::statics), plus the samples' difference from the
+// statics (feature 008d, T24b: the P-delta of the bar's own deflection);
+// interpolated otherwise.
 [[nodiscard]] ReferencePoint referenceAt(const BeamData& beam, const SpanLoads& loads, double s,
                                          double length);
 
@@ -77,12 +79,25 @@ struct BarState
     Eigen::Vector3d moment = Eigen::Vector3d::Zero();
     double bimoment = 0.0; // B = -E Iw psi'
 };
+// Feature 008d (T24b, design 008d §5.8): the forces of a state of the exact
+// bar as the second order feeds them back, spatial (the rod about the
+// undeformed bar): the force states as they are, the moment states m_e plus
+// P(M0) theta (their shift in the engine, ADR 0008 addenda); T about the
+// shear centre. `reference` is the state the bar was solved with.
+[[nodiscard]] ReferencePoint spatialForces(const BeamData& beam, const BarState& state,
+                                           const ReferencePoint& reference);
+
 // Feature 008c: with `junctions`, the local dofs of the junctions between
 // the parts of the engine (partStiffnesses) are given instead of solved
 // for: the shape of a bar buckling with its ends held (design 008c §5.6).
 [[nodiscard]] BarState stateAt(const BeamData& beam, double length, const SpanLoads& loads,
                                bool planar, const StateBarVector& ends, double s,
                                Side side = Side::After, std::span<const double> junctions = {});
+// Feature 008d (T24b): the states at several positions, the parts and their
+// junctions built once (`results` as long as `positions`).
+void statesAt(const BeamData& beam, double length, const SpanLoads& loads, bool planar,
+              const StateBarVector& ends, std::span<const double> positions, Side side,
+              std::span<const double> junctions, std::span<BarState> results);
 
 // Feature 008c (design 008c §5.4): the negative eigenvalues of a small
 // symmetric matrix (its inertia), by cyclic Jacobi rotations, without

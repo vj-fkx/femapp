@@ -1416,3 +1416,84 @@ TEST_CASE("the isoparametric beam with the load at a height",
     CHECK(relative(iso[2], exact) <= 1e-5);
     CHECK(rate(iso, exact) >= 3.5);
 }
+
+// T24b (design 008d §5.8): the second order is a symmetric P-delta: the bar
+// about its undeformed shape with the spatial forces of the displaced
+// equilibrium, the exact straight bar with the P-delta of its own
+// deflection. A cantilever without warping under a vertical tip load P (0.3
+// and 0.6 of its lateral-buckling load) and a small lateral one H: one bar
+// and four agree on d(tip y)/dH within 1e-6. An independent P-delta
+// iteration of the linear rod (non-symmetric: the twist the torque of P-delta
+// varies along the bar) gives 2.8579815272e-5 and 3.7464191957e-5, within
+// 1e-3 (1.2e-4 and 6.9e-4: the non-symmetric part, which the symmetric
+// stiffness of ADR 0008 leaves out). The exact nonlinear rod gives
+// 2.8476e-5 and 3.6654e-5: the section rotation (Kirby and Nethercot) is
+// the feature 008e.
+TEST_CASE("the second order is P-delta", "[core][second-order][flexural-torsional]")
+{
+    Props p;
+    p.iw = 0.0;
+    const double l = 4.0;
+    const double pcr = 4.0126 * std::sqrt(kE * p.iy * kG * p.j) / (l * l);
+    const std::array<std::pair<double, double>, 2> cases = {std::pair{0.3, 2.8579815272e-5},
+                                                            std::pair{0.6, 3.7464191957e-5}};
+    for (const auto& [fraction, rod] : cases) {
+        INFO("P / Pcr = " << fraction);
+        const double load = fraction * pcr;
+        const double h = 1e-4 * load;
+        const auto response = [&](int bars) {
+            const auto tipY = [&](double lateral) {
+                fem::core::Model model = cantilever(p, l, bars);
+                model.nodalForces.push_back(
+                    {.nodes = fem::core::NodeIds{{static_cast<fem::core::ExternalId>(bars) + 1}},
+                     .force = Eigen::Vector3d(0.0, lateral, -load)});
+                auto result = fem::core::runSecondOrderStatic(
+                    model, {.tolerance = 1e-12, .maxIterations = 200});
+                if (!result) {
+                    INFO(result.error().message);
+                    REQUIRE(result.has_value());
+                }
+                return result->result.displacements.back().y();
+            };
+            return (tipY(h) - tipY(-h)) / (2.0 * h);
+        };
+        const double one = response(1);
+        CHECK(relative(response(4), one) <= 1e-6);
+        CHECK(relative(one, rod) <= 1e-3);
+    }
+}
+
+// T24b: the second order of a curved beam with the flexural-torsional
+// terms, both elements feeding back the spatial moments: Yoo's beam without
+// warping (90 degrees, in-plane I = 2000 in^4, shear areas) under half its
+// negative critical moment and a small torque at the crown. The exact arc
+// does not depend on its elements (2 or 8, 1e-6); the isoparametric beam
+// converges to it (8, 16, 32 elements: rate >= 3, 1e-4). Before T24b the
+// two fed back moments in different conventions and parted by 4e-4.
+TEST_CASE("the second order of a curved beam", "[core][second-order][flexural-torsional][iso]")
+{
+    const double beta = 90.0 * std::numbers::pi / 180.0;
+    const double m = 0.5 * curvedMoments(beta, 0.0, false)[0];
+    const auto twist = [&](int n, bool iso) {
+        fem::core::Model model = bentArch(
+            {.beta = beta, .n = n, .warped = false, .inPlane = 2000.0, .iso = iso, .shear = 7.0},
+            m);
+        model.nodalForces.push_back(
+            {.nodes = fem::core::NodeIds{{static_cast<fem::core::ExternalId>(n / 2) + 1}},
+             .moment = Eigen::Vector3d(0.01, 0.0, 0.0)});
+        auto result = fem::core::runSecondOrderStatic(model);
+        if (!result) {
+            INFO(result.error().message);
+            REQUIRE(result.has_value());
+        }
+        return result->result.rotations.at(static_cast<std::size_t>(n / 2)).x();
+    };
+    const double exact = twist(2, false);
+    CHECK(relative(twist(8, false), exact) <= 1e-6);
+    std::array<double, 3> iso{};
+    for (std::size_t k = 0; k < 3; ++k) {
+        iso.at(k) = twist(8 << k, true);
+    }
+    CHECK(relative(iso[2], exact) <= 1e-4);
+    CHECK(rate(iso, exact) >= 3.0);
+}

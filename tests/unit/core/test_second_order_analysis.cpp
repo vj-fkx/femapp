@@ -453,11 +453,10 @@ double relative(double value, double reference)
 // first half, alpha^2 and -beta^2 the roots of E Iw r^4 - G J r^2 - M^2 /
 // E Iy = 0, phi' = 0 at the middle and 2 E Iw phi''' = T0 there. These
 // leave out the deflection of the beam in its major plane before the twist,
-// which the second order includes (the effect of the prebuckling
-// deflections, Kirby and Nethercot, 1979): 1e-6 with the major axis 10^6
-// times stiffer (an independent linearized rod confirms the closed forms to
-// 1e-15); with real ones the difference is a few per cent and goes with
-// E Iy / E Iz.
+// which the second order includes as P-delta (design 008d §5.8, T24b): 1e-6
+// with the major axis 10^6 times stiffer (an independent linearized rod
+// confirms the closed forms to 1e-15); with real ones the difference is a
+// few per cent and vanishes as the major axis stiffens.
 TEST_CASE("the lateral beam-column", "[core][second-order][flexural-torsional]")
 {
     const double l = 6.0;
@@ -495,10 +494,11 @@ TEST_CASE("the lateral beam-column", "[core][second-order][flexural-torsional]")
                 {.nodes = fem::core::NodeIds{{2}}, .moment = Vec(t0, 0.0, 0.0)});
             return relative(std::abs(second(model).result.rotations[1].x()), phi);
         };
+        // With the P-delta of T24b the gap no longer goes with E Iy / E Iz
+        // alone (840 for a major axis 1000 times stiffer), but it vanishes.
         const double real = gap(8e-5);
         CHECK(real < 0.05);
-        CHECK(real / gap(8e-2) > 900.0);
-        CHECK(real / gap(8e-2) < 1100.0);
+        CHECK(gap(8e-2) < 2e-5);
     }
     SECTION("a lateral load at the middle")
     {

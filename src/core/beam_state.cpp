@@ -727,9 +727,38 @@ ReferencePoint referenceAt(const BeamData& beam, const SpanLoads& loads, double 
 {
     const ReferenceProfile& reference = referenceOf(beam);
     if (reference.statics) {
-        return straightStatics(beam, loads, reference.start, s, reference.loadFactor);
+        const ReferencePoint exact =
+            straightStatics(beam, loads, reference.start, s, reference.loadFactor);
+        // Feature 008d (T24b): the samples' difference from the statics, linear
+        // within each part (zero when the samples are the statics).
+        const int parts = reference.parts();
+        const int part = std::clamp(static_cast<int>(s / length * parts), 0, parts - 1);
+        const auto points = ReferenceProfile::gaussPoints(part, parts, length);
+        const std::size_t k = 2 * static_cast<std::size_t>(part);
+        const ReferencePoint first = reference.values.at(k) - reference.base.at(k);
+        const ReferencePoint second = reference.values.at(k + 1) - reference.base.at(k + 1);
+        const double w = (s - points[0]) / (points[1] - points[0]);
+        return exact + first * (1.0 - w) + second * w;
     }
     return reference.at(s, length);
+}
+
+ReferencePoint spatialForces(const BeamData& beam, const BarState& state,
+                             const ReferencePoint& reference)
+{
+    // P(M0) theta: rows (0, Mz, -My), (0, 0, T / 2), (0, -T / 2, 0).
+    const Vec3& theta = state.rotation;
+    const Vec3 shift(reference.mz * theta.y() - reference.my * theta.z(),
+                     0.5 * reference.t * theta.z(), -0.5 * reference.t * theta.y());
+    const Vec3 moment = state.moment + shift;
+    const double ey = beam.shearCentre.x();
+    const double ez = beam.shearCentre.y();
+    return {.n = state.force.x(),
+            .vy = state.force.y(),
+            .vz = state.force.z(),
+            .t = moment.x() + ez * state.force.y() - ey * state.force.z(),
+            .my = moment.y(),
+            .mz = moment.z()};
 }
 
 int stateDofs(const BeamData& beam, bool planar)
@@ -1127,8 +1156,9 @@ std::vector<StateBarMatrix> partStiffnesses(const BeamData& beam, double length,
     return out;
 }
 
-BarState stateAt(const BeamData& beam, double length, const SpanLoads& loads, bool planar,
-                 const StateBarVector& ends, double s, Side side, std::span<const double> given)
+void statesAt(const BeamData& beam, double length, const SpanLoads& loads, bool planar,
+              const StateBarVector& ends, std::span<const double> positions, Side side,
+              std::span<const double> given, std::span<BarState> results)
 {
     const Plan plan = planFor(beam, planar);
     const Eigen::Index d = plan.dofs;
@@ -1181,86 +1211,100 @@ BarState stateAt(const BeamData& beam, double length, const SpanLoads& loads, bo
         junctions = referenceOf(beam).active() ? Eigen::VectorXd(kii.partialPivLu().solve(rhs))
                                                : Eigen::VectorXd(kii.ldlt().solve(rhs));
     }
-    // The part that holds s and the displacements of its ends.
-    const double x = std::clamp(s, 0.0, length);
-    int k = std::min(parts - 1, static_cast<int>(x / length * parts));
-    while (k > 0 && x < bound(k)) {
-        --k;
-    }
-    while (k + 1 < parts && x >= bound(k + 1)) {
-        ++k;
-    }
-    StateBarVector dk(2 * d);
-    if (k == 0) {
-        dk.head(d) = ends.head(d);
-    } else {
-        dk.head(d) = junctions.segment((k - 1) * d, d);
-    }
-    if (k + 1 == parts) {
-        dk.tail(d) = ends.tail(d);
-    } else {
-        dk.tail(d) = junctions.segment(k * d, d);
-    }
-    const auto at = static_cast<std::size_t>(k);
-    const PartVector p = stiffness[at] * dk + forces[at];
-    // The state at the start of the part: its displacements, and the
-    // internal forces, minus what the start node applies.
-    StateBarVector start(2 * d);
-    start.head(d) = dk.head(d);
-    start.tail(d) = -p.head(d);
-    Part part(beam, plan, length, bound(k), bound(k + 1), loads);
-    walk(part, beam, loads, length, bound(k), x, k == 0, side == Side::After);
-    const StateBarVector state = part.transfer() * start + part.particular();
-    BarState out;
-    for (Eigen::Index i = 0; i < 2 * d; ++i) {
-        const double value = state(i);
-        switch (plan.state.at(static_cast<std::size_t>(i))) {
-        case U:
-            out.displacement.x() = value;
-            break;
-        case V:
-            out.displacement.y() = value;
-            break;
-        case W:
-            out.displacement.z() = value;
-            break;
-        case RX:
-            out.rotation.x() = value;
-            break;
-        case RY:
-            out.rotation.y() = value;
-            break;
-        case RZ:
-            out.rotation.z() = value;
-            break;
-        case PSI:
-            out.warping = value;
-            break;
-        case N:
-            out.force.x() = value;
-            break;
-        case VY:
-            out.force.y() = value;
-            break;
-        case VZ:
-            out.force.z() = value;
-            break;
-        case MX:
-            out.moment.x() = value;
-            break;
-        case MY:
-            out.moment.y() = value;
-            break;
-        case MZ:
-            out.moment.z() = value;
-            break;
-        case Q:
-            out.bimoment = -value;
-            break;
-        default:
-            break;
+    // Feature 008d (T24b): the parts and the junctions once, then each
+    // position.
+    for (std::size_t q = 0; q < positions.size(); ++q) {
+        const double s = positions[q];
+        // The part that holds s and the displacements of its ends.
+        const double x = std::clamp(s, 0.0, length);
+        int k = std::min(parts - 1, static_cast<int>(x / length * parts));
+        while (k > 0 && x < bound(k)) {
+            --k;
         }
+        while (k + 1 < parts && x >= bound(k + 1)) {
+            ++k;
+        }
+        StateBarVector dk(2 * d);
+        if (k == 0) {
+            dk.head(d) = ends.head(d);
+        } else {
+            dk.head(d) = junctions.segment((k - 1) * d, d);
+        }
+        if (k + 1 == parts) {
+            dk.tail(d) = ends.tail(d);
+        } else {
+            dk.tail(d) = junctions.segment(k * d, d);
+        }
+        const auto at = static_cast<std::size_t>(k);
+        const PartVector p = stiffness[at] * dk + forces[at];
+        // The state at the start of the part: its displacements, and the
+        // internal forces, minus what the start node applies.
+        StateBarVector start(2 * d);
+        start.head(d) = dk.head(d);
+        start.tail(d) = -p.head(d);
+        Part part(beam, plan, length, bound(k), bound(k + 1), loads);
+        walk(part, beam, loads, length, bound(k), x, k == 0, side == Side::After);
+        const StateBarVector state = part.transfer() * start + part.particular();
+        BarState out;
+        for (Eigen::Index i = 0; i < 2 * d; ++i) {
+            const double value = state(i);
+            switch (plan.state.at(static_cast<std::size_t>(i))) {
+            case U:
+                out.displacement.x() = value;
+                break;
+            case V:
+                out.displacement.y() = value;
+                break;
+            case W:
+                out.displacement.z() = value;
+                break;
+            case RX:
+                out.rotation.x() = value;
+                break;
+            case RY:
+                out.rotation.y() = value;
+                break;
+            case RZ:
+                out.rotation.z() = value;
+                break;
+            case PSI:
+                out.warping = value;
+                break;
+            case N:
+                out.force.x() = value;
+                break;
+            case VY:
+                out.force.y() = value;
+                break;
+            case VZ:
+                out.force.z() = value;
+                break;
+            case MX:
+                out.moment.x() = value;
+                break;
+            case MY:
+                out.moment.y() = value;
+                break;
+            case MZ:
+                out.moment.z() = value;
+                break;
+            case Q:
+                out.bimoment = -value;
+                break;
+            default:
+                break;
+            }
+        }
+        results[q] = out;
     }
+}
+
+BarState stateAt(const BeamData& beam, double length, const SpanLoads& loads, bool planar,
+                 const StateBarVector& ends, double s, Side side, std::span<const double> given)
+{
+    BarState out;
+    statesAt(beam, length, loads, planar, ends, std::span<const double>(&s, 1), side, given,
+             std::span<BarState>(&out, 1));
     return out;
 }
 

@@ -44,6 +44,19 @@ struct ReferencePoint
     double my = 0.0;
     double mz = 0.0;
 
+    [[nodiscard]] ReferencePoint operator+(const ReferencePoint& o) const
+    {
+        return {.n = n + o.n,
+                .vy = vy + o.vy,
+                .vz = vz + o.vz,
+                .t = t + o.t,
+                .my = my + o.my,
+                .mz = mz + o.mz};
+    }
+    [[nodiscard]] ReferencePoint operator-(const ReferencePoint& o) const
+    {
+        return *this + o * -1.0;
+    }
     [[nodiscard]] ReferencePoint operator*(double factor) const
     {
         return {.n = n * factor,
@@ -72,6 +85,10 @@ struct ReferenceProfile
     // their samples (design 008d §5.4).
     bool statics = false;
     ReferencePoint start{};
+    // Feature 008d (T24b): with `statics`, the statics at the sample points
+    // (the values are the spatial forces fed back; referenceAt adds their
+    // difference from these to the exact statics).
+    std::array<ReferencePoint, std::size_t{2} * kMaxReferenceParts> base{};
 
     [[nodiscard]] static ReferenceProfile constant(double n);
     [[nodiscard]] static ReferenceProfile constant(const ReferencePoint& point);

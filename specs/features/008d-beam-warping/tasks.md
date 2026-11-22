@@ -270,19 +270,25 @@ Regras:
   A segunda ordem do arco com flexo-torção foi para a T24b.
   Arquivos: `beam_iso.cpp`, `linear_solver.cpp`, `test_flexural_torsional.cpp`,
   `test_allocations.cpp`. Cobre: 10, 14
-- [ ] **T24b** Os esforços que a segunda ordem realimenta (decidido pelo
-  mantenedor em 2026-11-22, após a T24): o arco exato realimenta os seus
-  estados semitangenciais (δm − P·θ) e a isoparamétrica os momentos
-  materiais (C·κ = δm − θ×M0); depois de uma iteração os dois concordam,
-  mas convergidos o giro difere de 0,04% (eixo forte no plano) a 0,9% (a
-  flexão de Yoo no eixo fraco). Os dois passam a realimentar o incremento
-  verdadeiro δm = C·κ + θ×M0, verificado contra uma referência
-  independente do efeito da deformação antes do giro (na viga reta, o
-  fator de Kirby e Nethercot, 1/√((1 − EIy/EIz)(1 − GJ/EIz))), e a segunda
-  ordem de um arco com flexo-torção (arco e isoparamétrica) em 1e−4.
-  Arquivos: `static_analysis.cpp`, `beam_iso.cpp`,
-  `test_second_order_analysis.cpp`, `test_flexural_torsional.cpp` — cobre:
-  10, 14
+- [x] **T24b** A segunda ordem como P-δ (decidido pelo mantenedor em
+  2026-11-22, após a pesquisa da T24b): a barra linear em torno da
+  configuração indeformada, alimentada pelos esforços espaciais do
+  equilíbrio deslocado. A rotação da seção antes da flambagem (Kirby e
+  Nethercot) fica de fora e vai para a 008e (análise não linear
+  geométrica). Os elementos passam a realimentar os esforços espaciais:
+  - barras retas: a estática exata mais a diferença entre os esforços
+    espaciais do estado e a estática, amostrada ao longo da barra (o P-δ da
+    deformada da própria barra);
+  - arco: δm = m_e + P(M0)·θ em vez do estado m_e;
+  - isoparamétrica: δm = C·κ + θ×M0 e n = C·Γ + θ×n0.
+  Testes: balanço reto, uma e quatro barras concordando em 1e−6 e a
+  iteração P-δ independente em 1e−3 (ela é não simétrica, ver as notas);
+  segunda ordem de um arco com flexo-torção, isoparamétrica convergindo
+  para o arco (taxa ≥ 3, 1e−4); as suítes da 008c seguem. O design §5.8
+  registra a definição e o que fica de fora (o README não tem seção de
+  comportamento das análises). Arquivos: `static_analysis.cpp`, `beam_state.cpp`,
+  `beam_iso.cpp`, `test_second_order_analysis.cpp`,
+  `test_flexural_torsional.cpp` — cobre: 10, 14
 
 ## Fase 7 — Desempenho e documentação
 
@@ -564,3 +570,34 @@ Regras:
   - na segunda ordem, os dois elementos concordam depois de uma iteração
     (a mesma rigidez), mas realimentam esforços em convenções diferentes:
     T24b.
+- T24b (pesquisa): uma barra exata não linear (Kirchhoff com
+  compressibilidade axial, tiro com Newton, cargas mortas), num balanço com
+  carga P vertical e H lateral pequena na ponta, deu a referência; a
+  linearizada clássica, a segunda ordem do motor e uma iteração P-δ
+  independente foram medidas contra ela (d(y)/dH, P = 0,3 e 0,6·Pcr):
+  clássica +0,73% e +3,8%; motor +0,37% e +2,2%; P-δ não simétrica
+  +0,36% e +2,2% (a mesma parte). O que falta para a exata é a rotação da
+  seção (energia cúbica ε₁·C·ε₂), que esforços realimentados não
+  representam; uma primeira tentativa de a pôr como deformação imposta
+  −ε₂ deu 72% de erro e ficou para a 008e, com o mantenedor. Achados:
+  - nas barras retas, a estática a partir do início perdia o P-δ da
+    própria barra: uma barra contra quatro diferia de até 9e−4; com os
+    esforços espaciais dos estados amostrados em 4 partes, 1e−7;
+  - o P-δ exato da barra linear é não simétrico quando o torque do P-δ
+    varia ao longo dela; a rigidez simétrica do ADR 0008 (contagem de
+    Sturm, Cholesky, gradiente conjugado) fica com a parte simétrica: a
+    diferença é 1,2e−4 e 6,9e−4 aqui. Um termo −P(M0' − estática)·θ foi
+    tentado e retirado: é quase todo antissimétrico e a simetrização da
+    barra o descarta;
+  - arco e isoparamétrica passam a realimentar os momentos espaciais e a
+    isoparamétrica converge para o arco (5e−5 com 32 elementos; antes,
+    parava a 4e−4); as forças da isoparamétrica ficam como na 008c (a lei
+    linearizada do motor exato não distingue força material e espacial);
+  - o teste de escala da T21 (lacuna proporcional a EIy/EIz) passou a
+    "a lacuna some com o eixo maior rígido": com o P-δ da barra ela não é
+    só de EIy/EIz (razão 840 para 1000).
+  - custo (Release, benchmark): os estados de cada barra reta em cada
+    iteração levaram a segunda ordem a 30× a linear; com os estados da
+    barra resolvidos uma vez para todos os pontos (`statesAt`), 9,57× sem
+    empenamento (30,1 s) e 8,06× com (42,4 s), 3 iterações. O mantenedor
+    mudou a meta para ≤ 10× (NFR-008d-02, design §5.9).

@@ -81,6 +81,7 @@ ReferenceProfile ReferenceProfile::scaled(double factor) const
     for (int i = 0; i < count; ++i) {
         out.values.at(static_cast<std::size_t>(i)) =
             values.at(static_cast<std::size_t>(i)) * factor;
+        out.base.at(static_cast<std::size_t>(i)) = base.at(static_cast<std::size_t>(i)) * factor;
     }
     out.loadFactor = loadFactor * factor;
     out.start = start * factor;
