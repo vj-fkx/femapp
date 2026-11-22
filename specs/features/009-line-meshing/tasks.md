@@ -25,7 +25,7 @@ Regras:
   - `femapp_add_test(mesher …)` com um teste de `entityGroupName`.
   Arquivos: `src/mesher/*`, `tests/CMakeLists.txt`,
   `tests/unit/mesher/test_line_mesher.cpp`. Cobre: 09, 17.
-- [ ] **T02** Testes da geometria de segmentos (devem falhar), com a
+- [x] **T02** Testes da geometria de segmentos (devem falhar), com a
   referência das contas à mão em 1e−12 relativo:
   - casos: cruzamento, T, paralelos, colineares com e sem pedaço comum,
     reversas, quase-T a menos e a mais de tol, segmento e ponto
@@ -34,7 +34,7 @@ Regras:
     dando a mesma classificação.
   Arquivo: `tests/unit/mesher/test_segment_geometry.cpp`. Cobre: 03, 04,
   N02.
-- [ ] **T03** `detail/segment_geometry` até a T02 passar: pontos mais
+- [x] **T03** `detail/segment_geometry` até a T02 passar: pontos mais
   próximos (Ericson §5.1.9) em coordenadas relativas, ponto-segmento e a
   classificação do contato (design §5.3). Arquivos:
   `src/mesher/detail/segment_geometry.hpp/.cpp`. Cobre: 03, 04, N02.

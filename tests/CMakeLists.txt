@@ -79,7 +79,9 @@ femapp_add_test(geom SOURCES
     test_drawing.cpp
     test_point_resolver.cpp)
 femapp_add_test(mesher SOURCES
-    test_line_mesher.cpp)
+    test_line_mesher.cpp
+    test_segment_geometry.cpp)
+target_include_directories(test_mesher PRIVATE "${PROJECT_SOURCE_DIR}/src/mesher")
 femapp_add_test(io SOURCES
     test_gmsh_cursor.cpp
     test_gmsh_reader.cpp
