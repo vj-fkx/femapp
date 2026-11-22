@@ -2,7 +2,7 @@
 
 Cada linha vira uma pasta `specs/features/NNN-nome/` quando sua especificação começar.
 
-Status: `planejada` → `requisitos` → `design` → `tarefas` → `implementando` → `concluída`
+Status: `planejada` → `requisitos` → `design` → `tarefas` → `implementando` → `concluída` (ou `adiada`, parada numa fase por decisão do mantenedor)
 
 O escopo da 1.0 é amplo, então a entrega é em versões intermediárias, cada uma
 utilizável de ponta a ponta. Barras e vigas são os primeiros elementos; os
@@ -92,7 +92,6 @@ cargas, resolver e ver diagramas de esforços.
 | Nº | Feature | Entrega | Depende de | Status |
 |----|---------|---------|------------|--------|
 | 008d | beam-warping | Torção com empenamento (7º GDL, Vlasov) em vigas retas e curvas: condições por ponta, bimomento, tensões de empenamento; parte do núcleo já existe da 008b (Iw, ω e o motor exato). Também a flexo-torção (instabilidade lateral com torção) e o termo de Wagner na segunda ordem e na flambagem, vindos da 008c | 008b, 008c | concluída |
-| 008e | beam-nonlinear-geometry | Análise geometricamente não linear de barras e vigas retas e curvas (corrotacional ou lagrangiana total, passos de carga e controle por comprimento de arco): grandes deslocamentos e rotações, o efeito da rotação da seção antes da flambagem (Kirby e Nethercot), pós-flambagem e cargas que acompanham a deformação; verificada contra a barra exata não linear da T24b da 008d. Decidida pelo mantenedor em 2026-11-22 | 008d | requisitos |
 
 ## v0.9 — Placas e cascas
 
@@ -122,6 +121,15 @@ tarefas da feature indicada (ou de uma nova) quando ela for especificada.
 | 008c | Imperfeições iniciais: curvatura inicial, cargas nocionais e imperfeição pelo modo de flambagem | 010 ou feature própria após a 008c |
 | 008c | Combinações de casos de carga (a segunda ordem não superpõe) | 010 / 011 |
 | 008c | Flambagem da própria barra de treliça entre os nós (hoje: modelar como viga) | 010 (aviso ou opção na atribuição) |
+
+## Pós-1.0
+
+Features já especificadas que ficam para depois da 1.0, por decisão do
+mantenedor. Retomam do ponto em que pararam.
+
+| Nº | Feature | Entrega | Depende de | Status |
+|----|---------|---------|------------|--------|
+| 008e | beam-nonlinear-geometry | Análise geometricamente não linear de barras e vigas retas e curvas (corrotacional ou lagrangiana total, passos de carga e controle por comprimento de arco): grandes deslocamentos e rotações, o efeito da rotação da seção antes da flambagem (Kirby e Nethercot), pós-flambagem e cargas que acompanham a deformação; verificada contra a barra exata não linear da T24b da 008d. Decidida pelo mantenedor em 2026-11-22; requisitos aprovados e design em rascunho, adiada para depois da 1.0 pelo mantenedor em 2026-11-22 | 008d | adiada |
 
 ## Pós-1.0 (ideias, sem ordem)
 

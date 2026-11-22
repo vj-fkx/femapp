@@ -34,9 +34,9 @@ O escopo é amplo; a entrega é incremental, em versões intermediárias utiliz�
 | Modal | Frequências naturais e modos de vibração |
 | Dinâmica linear | Resposta transiente (Newmark) e por superposição modal |
 | Segunda ordem e flambagem de barras | P-Δ/P-δ iterativo e flambagem linear de pórticos e treliças (feature 008c) |
-| Não linearidade geométrica de barras | Grandes deslocamentos e rotações de treliças e vigas, caminho com comprimento de arco, pontos críticos e pós-flambagem, cargas seguidoras (feature 008e) |
 
-Fora da 1.0: não linearidade geométrica de cascas e sólidos (a de barras entra pela 008e),
+Fora da 1.0: não linearidade geométrica geral (grandes deslocamentos; a de barras
+está especificada na 008e, adiada para depois da 1.0 em 2026-11-22),
 flambagem de cascas e sólidos, não linearidade de material, contato,
 acoplamento termomecânico, fadiga.
 
@@ -146,8 +146,7 @@ Notação: **QUANDO** <gatilho>, **O sistema DEVE** <resposta>.
   singular, O sistema DEVE recusar a execução indicando o que falta.
 - **REQ-G-15** O sistema DEVE executar análises estática linear, térmica
   (estacionária e transiente), modal e dinâmica linear e, para barras,
-  estática de segunda ordem, flambagem linear (alterado em 2026-11-17, 008c) e
-  estática geometricamente não linear (alterado em 2026-11-22, 008e).
+  estática de segunda ordem e flambagem linear (alterado em 2026-11-17, 008c).
 - **REQ-G-16** O sistema DEVE reproduzir soluções analíticas e benchmarks de
   referência (NAFEMS e equivalentes) dentro das tolerâncias definidas em cada feature.
 

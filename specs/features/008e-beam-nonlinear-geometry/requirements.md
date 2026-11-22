@@ -1,6 +1,6 @@
 # Requisitos — 008e beam-nonlinear-geometry
 
-Status: aprovado · Data: 2026-11-22
+Status: aprovado (feature adiada para depois da 1.0 em 2026-11-22) · Data: 2026-11-22
 
 ## 1. Contexto e objetivo
 
@@ -207,7 +207,8 @@ interface.
 - REQ-G-14 (recusa de modelos incompletos), REQ-G-15 (análises) e REQ-G-16
   (reproduzir referências).
 - **Alteração em `specs/product.md`**, aplicada com a aprovação destes
-  requisitos (2026-11-22):
+  requisitos e desfeita quando a feature foi adiada para depois da 1.0
+  (2026-11-22); volta quando ela for retomada:
   - o §3.1 hoje põe "não linearidade geométrica geral (grandes
     deslocamentos)" fora da 1.0. Passa a excluir só a de cascas e sólidos, e
     a tabela ganha a linha "Não linearidade geométrica de barras (feature
