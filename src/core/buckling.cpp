@@ -107,11 +107,16 @@ private:
 };
 
 // J(lambda): the factors below lambda (design 008c §5.4); the factorization
-// is kept in `keep` when given. A zero pivot moves lambda a little.
+// is kept in `keep` when given. A zero pivot moves lambda a little below:
+// 1e-8, then 1e-7 and 1e-6 (feature 008d, T23: a pivot is zero relative to
+// the largest one, so stiff members widen the band where the matrix counts
+// as singular about a factor; the factor there is not below lambda anyway).
 Expected<std::int64_t> sturmCount(Pencil& pencil, double lambda,
                                   std::unique_ptr<SparseCholesky>* keep = nullptr)
 {
-    for (int attempt = 0; attempt < 3; ++attempt) {
+    const double start = lambda;
+    double step = 1e-8;
+    for (int attempt = 0; attempt < 4; ++attempt) {
         std::int64_t internal = 0;
         auto matrix = pencil.at(lambda, &internal);
         if (!matrix) {
@@ -125,7 +130,8 @@ Expected<std::int64_t> sturmCount(Pencil& pencil, double lambda,
             }
             return count;
         }
-        lambda *= 1.0 - 1e-8;
+        lambda = start * (1.0 - step);
+        step *= 10.0;
     }
     return makeError("The buckling search met a singular matrix it could not step around.");
 }

@@ -10,6 +10,7 @@
 #include <fem/core/beam_loads.hpp>
 #include <fem/core/beam_state.hpp>
 #include <fem/core/linear_solver.hpp>
+#include <fem/core/mesh_builder.hpp>
 #include <fem/core/stability_analysis.hpp>
 
 #include <catch2/catch_test_macros.hpp>
@@ -963,4 +964,320 @@ TEST_CASE("Greenhill's shaft", "[core][beam][flexural-torsional][buckling]")
     const double expected = 8.986818956806337 * kE * p.iy / l;
     CHECK(relative(firstFactor(shaft(1)) * torque, expected) <= 1e-8);
     CHECK(relative(firstFactor(shaft(3)) * torque, expected) <= 1e-8);
+}
+
+namespace {
+
+// T23 (AC-8): a horizontally curved I-beam along a circle of angle beta in
+// the plane XY (centre at the origin, crown on +Y), length L = 403.32 in,
+// the section of Yoo (1982) as in Yang and Kuo (1987): E = 29000 ksi, G =
+// 11200 ksi, A = 14.4 in^2, the out-of-plane bending I = 273 in^4 (local
+// z), J = 1.414 in^4, Cw = 2070 in^6 when `warped`, and the in-plane
+// bending I (local y = Z) `inPlane`. Fork supports: the end nodes held in
+// every rotation, and the beam released there in both bending moments
+// (local My and Mz), so that only the twist about the end tangent is held
+// (stiff arms would spoil the scaling of the matrix, and the count with
+// it); the translations held at A (the start), Z and Y at B (`pinned`: also
+// X). n Line3 arcs (`curved`), or n straight chords with the warping
+// continuous at the kinks.
+struct Arch
+{
+    double beta = 0.0;
+    int n = 2;
+    bool curved = true;
+    bool warped = true;
+    double inPlane = 93.0;
+    double area = 14.4;
+    bool pinned = false;
+};
+
+constexpr double kYooLength = 403.32;
+constexpr double kYooE = 29000.0;
+constexpr double kYooG = 11200.0;
+constexpr double kYooOut = 273.0;
+constexpr double kYooJ = 1.414; // NOLINT(modernize-use-std-numbers): J of the section, not sqrt 2
+constexpr double kYooCw = 2070.0;
+
+fem::core::Model yooArch(const Arch& arch)
+{
+    const int n = arch.n;
+    const double r = kYooLength / arch.beta;
+    const double start = std::numbers::pi / 2.0 + arch.beta / 2.0;
+    const auto point = [&](double s) {
+        const double a = start - arch.beta * s;
+        return Eigen::Vector3d(r * std::cos(a), r * std::sin(a), 0.0);
+    };
+    fem::core::MeshBuilder builder;
+    for (int k = 0; k <= n; ++k) {
+        REQUIRE(builder.addNode(k + 1, point(static_cast<double>(k) / n)).has_value());
+    }
+    for (int k = 0; arch.curved && k < n; ++k) {
+        REQUIRE(builder.addNode(1001 + k, point((k + 0.5) / n)).has_value());
+    }
+    fem::core::ElementIds bars;
+    for (int k = 0; k < n; ++k) {
+        const auto id = static_cast<fem::core::ExternalId>(k) + 1;
+        const auto type =
+            arch.curved ? fem::core::ElementType::Line3 : fem::core::ElementType::Line2;
+        const std::vector<fem::core::ExternalId> line =
+            arch.curved ? std::vector<fem::core::ExternalId>{id, id + 1, 1000 + id}
+                        : std::vector<fem::core::ExternalId>{id, id + 1};
+        REQUIRE(builder.addElement(type, id, line).has_value());
+        bars.ids.push_back(id);
+    }
+    const auto last = static_cast<fem::core::ExternalId>(n) + 1;
+    auto mesh = builder.build();
+    REQUIRE(mesh.has_value());
+    fem::core::Model model;
+    model.mesh = std::make_shared<const fem::core::Mesh>(std::move(*mesh));
+    model.materials.push_back({.name = "Steel",
+                               .youngsModulus = kYooE,
+                               .poissonsRatio = kYooE / (2.0 * kYooG) - 1.0,
+                               .density = {},
+                               .thermalExpansion = {},
+                               .conductivity = {},
+                               .specificHeat = {}});
+    fem::core::Section yoo{.name = "Yoo", .area = arch.area};
+    yoo.inertiaY = arch.inPlane;
+    yoo.inertiaZ = kYooOut;
+    yoo.torsionConstant = kYooJ;
+    if (arch.warped) {
+        yoo.warpingConstant = kYooCw;
+    }
+    model.sections.push_back(yoo);
+    fem::core::Assignment beam{.elements = bars,
+                               .kind = fem::core::ElementKind::Beam3D,
+                               .material = "Steel",
+                               .section = "Yoo"};
+    beam.warping = arch.warped;
+    model.assignments.push_back(beam);
+    // The forks: both bending moments released at the ends of the beam.
+    for (const auto& [element, end] :
+         {std::pair{fem::core::ExternalId{1}, fem::core::BarEnd::Start},
+          std::pair{static_cast<fem::core::ExternalId>(n), fem::core::BarEnd::End}}) {
+        fem::core::EndConnection fork{.elements = fem::core::ElementIds{{element}}, .end = end};
+        fork.stiffness[4] = 0.0;
+        fork.stiffness[5] = 0.0;
+        model.endConnections.push_back(fork);
+    }
+    if (!arch.curved && arch.warped) {
+        for (int k = 0; k + 1 < n; ++k) {
+            const auto id = static_cast<fem::core::ExternalId>(k) + 1;
+            model.warpingEnds.push_back({.elements = fem::core::ElementIds{{id}},
+                                         .end = fem::core::BarEnd::End,
+                                         .condition = fem::core::WarpingCondition::Continuous});
+            model.warpingEnds.push_back({.elements = fem::core::ElementIds{{id + 1}},
+                                         .end = fem::core::BarEnd::Start,
+                                         .condition = fem::core::WarpingCondition::Continuous});
+        }
+    }
+    using fem::core::DofType;
+    fem::core::test::restrain(model, {1, last}, {DofType::RX, DofType::RY, DofType::RZ});
+    fem::core::test::restrain(model, {1}, {DofType::U, DofType::V, DofType::W});
+    fem::core::test::restrain(model, {last}, {DofType::V, DofType::W});
+    if (arch.pinned) {
+        fem::core::test::restrain(model, {last}, {DofType::U});
+    }
+    return model;
+}
+
+// The uniform moment m about Z (local y): m at the start of the beam, -m at
+// its end, on the beam side of the forks.
+fem::core::Model bentArch(const Arch& arch, double m)
+{
+    fem::core::Model model = yooArch(arch);
+    model.concentratedLoads.push_back({.elements = fem::core::ElementIds{{1}},
+                                       .axes = fem::core::Axes::Local,
+                                       .moment = Eigen::Vector3d(0.0, m, 0.0),
+                                       .at = {.value = 0.0, .fraction = true}});
+    model.concentratedLoads.push_back(
+        {.elements = fem::core::ElementIds{{static_cast<fem::core::ExternalId>(arch.n)}},
+         .axes = fem::core::Axes::Local,
+         .moment = Eigen::Vector3d(0.0, -m, 0.0),
+         .at = {.value = 1.0, .fraction = true}});
+    return model;
+}
+
+// A uniform compression N = q R: the radial load q (local z, inwards) on
+// the arch pinned in its plane at both ends.
+fem::core::Model pressedArch(Arch arch, double q)
+{
+    arch.pinned = true;
+    fem::core::Model model = yooArch(arch);
+    fem::core::ElementIds bars;
+    for (int k = 0; k < arch.n; ++k) {
+        bars.ids.push_back(static_cast<fem::core::ExternalId>(k) + 1);
+    }
+    model.distributedLoads.push_back({.elements = bars,
+                                      .axes = fem::core::Axes::Local,
+                                      .startValue = Eigen::Vector3d(0.0, 0.0, q),
+                                      .endValue = Eigen::Vector3d(0.0, 0.0, q)});
+    return model;
+}
+
+// The roots of a x^2 + b x + c, the smaller first.
+std::array<double, 2> quadraticRoots(double a, double b, double c)
+{
+    const double d = std::sqrt(b * b - 4.0 * a * c);
+    const double x1 = (-b - d) / (2.0 * a);
+    const double x2 = (-b + d) / (2.0 * a);
+    return {std::min(x1, x2), std::max(x1, x2)};
+}
+
+// The critical moments of the circular beam on forks under a uniform
+// moment, from Yang and Kuo's Eqs. 32a-b with v = a1 sin(lambda x), theta =
+// a2 sin(lambda x): with `published`, their Eqs. 34-35 (the Jacobian and
+// the radial stresses through r, and their warping term); otherwise r = 0
+// and Vlasov's warping E Cw (theta'' + v''/R)'', the theory of the exact
+// arc. Cw = 0 without warping. The two roots, negative first.
+std::array<double, 2> curvedMoments(double beta, double cw, bool published)
+{
+    const double rr = kYooLength / beta;
+    const double l2 = std::pow(std::numbers::pi / kYooLength, 2);
+    const double l4 = l2 * l2;
+    const double ei = kYooE * kYooOut;
+    const double gj = kYooG * kYooJ;
+    const double ecw = kYooE * cw;
+    if (published) {
+        const double r2 = (93.0 + kYooOut) / 14.4;
+        const double s = l2 - 1.0 / (rr * rr);
+        const double c1 = -s * (1.0 - r2 / (rr * rr)) * l2;
+        const double c2 = l2 / rr * s * (ei + gj - ecw * s + r2 * (ecw / (rr * rr) + ei) * s);
+        const double c3 = l2 * s * s * (ei * (ecw * l2 + gj) + gj * ecw / (rr * rr));
+        return quadraticRoots(c1, c2, c3);
+    }
+    // The 2 x 2 matrix of the equations, a0 + M a1; det = 0.
+    const double off = ei * l2 / rr + gj * l2 / rr + ecw * l4 / rr;
+    Eigen::Matrix2d a0;
+    a0 << ei * l4 + gj * l2 / (rr * rr) + ecw * l4 / (rr * rr), off, off,
+        ei / (rr * rr) + gj * l2 + ecw * l4;
+    Eigen::Matrix2d a1;
+    a1 << -l2 / rr, -l2, -l2, -1.0 / rr;
+    const double b =
+        a0(0, 0) * a1(1, 1) + a0(1, 1) * a1(0, 0) - a0(0, 1) * a1(1, 0) - a0(1, 0) * a1(0, 1);
+    return quadraticRoots(a1.determinant(), b, a0.determinant());
+}
+
+// The critical uniform compression of the circular beam on forks, from the
+// energy whose variation gives Yang and Kuo's Eqs. 32 with r = 0: EIz (v'' -
+// theta / R)^2, (G J - N r0^2) (theta' + v'/R)^2, Vlasov's E Cw (theta'' +
+// v''/R)^2 and -N v'^2, with sines; the least positive root. With r0 = Cw = 0
+// it is the formula of Timoshenko and Gere, N = (EI / R^2) (pi^2 / beta^2 -
+// 1)^2 / (pi^2 / beta^2 + EI / G J).
+double curvedCompression(double beta, double cw, double r02)
+{
+    const double rr = kYooLength / beta;
+    const double l2 = std::pow(std::numbers::pi / kYooLength, 2);
+    const double ei = kYooE * kYooOut;
+    // K(N) = K0 - N D, det K(N) = det K0 - N (K0_00 D_11 + K0_11 D_00 - 2 K0_01
+    // D_01) + N^2 det D.
+    const Eigen::Vector2d bend(l2, 1.0 / rr);
+    const Eigen::Vector2d twist(1.0 / rr, 1.0);
+    const Eigen::Matrix2d k0 = ei * bend * bend.transpose() +
+                               (kYooG * kYooJ + kYooE * cw * l2) * l2 * twist * twist.transpose();
+    Eigen::Matrix2d d = r02 * l2 * twist * twist.transpose();
+    d(0, 0) += l2;
+    const double b = -(k0(0, 0) * d(1, 1) + k0(1, 1) * d(0, 0) - 2.0 * k0(0, 1) * d(0, 1));
+    const double a = d.determinant();
+    if (a == 0.0) {
+        return -k0.determinant() / b;
+    }
+    const auto roots = quadraticRoots(a, b, k0.determinant());
+    return roots[0] > 0.0 ? roots[0] : roots[1];
+}
+
+} // namespace
+
+// T23 (AC-8, REQ-008d-14): the out-of-plane buckling of a circular beam
+// under a uniform moment (Yoo's beam, Yang and Kuo, 1987). The exact arc
+// follows the curved theory of the engine (r = 0, Vlasov's warping): its
+// closed form within 1e-8 with and without warping (the linearized rod of
+// T20, along the circle, gives the same without warping); the published
+// Eq. 34 within 1% (it adds the Jacobian and the radial stresses through r,
+// and another warping term: 5e-4 to 8e-4 here); a chain of 32 straight bars
+// with the warping continuous at the kinks within 1% (maintainer's choice,
+// 2026-11-22: straight chords converge slowly to the curved beam); a large
+// radius is the straight beam (1e-8, the mean of the two moments).
+TEST_CASE("lateral buckling of a curved beam under a uniform moment",
+          "[core][beam][flexural-torsional][buckling][arc]")
+{
+    const double m = 100.0;
+    for (const double degrees : {30.0, 90.0}) {
+        const double beta = degrees * std::numbers::pi / 180.0;
+        INFO(degrees << " degrees");
+        for (const bool warped : {true, false}) {
+            INFO("warping " << warped);
+            const auto exact = curvedMoments(beta, warped ? kYooCw : 0.0, false);
+            const double positive = firstFactor(bentArch({.beta = beta, .warped = warped}, m)) * m;
+            const double negative = firstFactor(bentArch({.beta = beta, .warped = warped}, -m)) * m;
+            CHECK(relative(positive, exact[1]) <= 1e-8);
+            CHECK(relative(negative, -exact[0]) <= 1e-8);
+        }
+        const auto published = curvedMoments(beta, kYooCw, true);
+        const double positive = firstFactor(bentArch({.beta = beta}, m)) * m;
+        CHECK(relative(positive, published[1]) <= 1e-2);
+        const double chain = firstFactor(bentArch({.beta = beta, .n = 32, .curved = false}, m)) * m;
+        CHECK(relative(chain, positive) <= 1e-2);
+    }
+    // Large radius: the straight beam, (pi / L) sqrt(E I (G J + pi^2 E Cw /
+    // L^2)). The two critical moments part to first order in 1 / R, by about
+    // (E I + G J) / 2 R (3e-6 here); their mean is the straight one.
+    const double straight =
+        std::numbers::pi / kYooLength *
+        std::sqrt(kYooE * kYooOut *
+                  (kYooG * kYooJ + std::pow(std::numbers::pi / kYooLength, 2) * kYooE * kYooCw));
+    const double plus = firstFactor(bentArch({.beta = 1e-6}, m)) * m;
+    const double minus = firstFactor(bentArch({.beta = 1e-6}, -m)) * m;
+    CHECK(relative((plus + minus) / 2.0, straight) <= 1e-8);
+}
+
+// T23 (AC-8, REQ-008d-14): the out-of-plane buckling of a circular arch
+// under a uniform compression (the radial load q, N = q R, pinned in its
+// plane). The arch is made axially rigid (A = 1e8 in^2): with a real area
+// its shortening between the pins bends it (with A = 14.4 in^2 the thrust
+// is 28% below q R), and the compression is no longer uniform; r0^2 then
+// vanishes, and Wagner's term stays with the straight bars. The in-plane
+// bending is stiffened (I = 2000 in^4) so that the arch buckles out of its
+// plane first. The exact arc against the closed form of the same theory
+// (Vlasov's warping) within 1e-6 (the shortening left with A = 1e8 is
+// about 6e-8), with and without warping; without warping that closed form
+// is the formula of Timoshenko and Gere; chains of 32 and 64 straight bars,
+// extrapolated to first order, within 1%.
+TEST_CASE("out-of-plane buckling of a curved arch under a uniform compression",
+          "[core][beam][flexural-torsional][buckling][arc]")
+{
+    const double q = 0.01;
+    for (const double degrees : {30.0, 90.0}) {
+        const double beta = degrees * std::numbers::pi / 180.0;
+        const double radius = kYooLength / beta;
+        INFO(degrees << " degrees");
+        for (const bool warped : {true, false}) {
+            INFO("warping " << warped);
+            const Arch arch{.beta = beta, .warped = warped, .inPlane = 2000.0, .area = 1e8};
+            const double engine = firstFactor(pressedArch(arch, q)) * q * radius;
+            const double closed = curvedCompression(beta, warped ? kYooCw : 0.0, 0.0);
+            INFO("engine " << engine << ", closed form " << closed);
+            CHECK(relative(engine, closed) <= 1e-6);
+            if (!warped) {
+                const double ei = kYooE * kYooOut;
+                const double k2 = std::pow(std::numbers::pi / beta, 2);
+                const double timoshenko =
+                    ei / (radius * radius) * std::pow(k2 - 1.0, 2) / (k2 + ei / (kYooG * kYooJ));
+                CHECK(relative(closed, timoshenko) <= 1e-12);
+                // The chain axially stiff enough (A = 1e5 in^2), not as stiff
+                // as the arc: chords of A = 1e8 spoil the scaling of the
+                // matrix. Under compression the chords converge to first order
+                // (4.1% with 32, 2.1% with 64 at 90 degrees): extrapolated as
+                // such, 2 c64 - c32.
+                const auto chain = [&](int bars) {
+                    Arch chord = arch;
+                    chord.n = bars;
+                    chord.curved = false;
+                    chord.area = 1e5;
+                    return firstFactor(pressedArch(chord, q)) * q * radius;
+                };
+                CHECK(relative(2.0 * chain(64) - chain(32), engine) <= 1e-2);
+            }
+        }
+    }
 }

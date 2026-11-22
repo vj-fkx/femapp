@@ -245,13 +245,18 @@ Regras:
 
 ## Fase 6 — Vigas curvas e isoparamétrica
 
-- [ ] **T23** Flexo-torção no arco exato (design §5.5, no referencial
-  móvel). Testes (AC-8):
-  - raio grande igual à reta (1e−6);
-  - fora do plano sob compressão uniforme e sob momento uniforme, 1e−6
-    contra a cadeia de barras retas exatas (Richardson) e 1% contra Yang
-    e Kuo (1987) e Pi e Trahair.
-  Se a literatura não fechar em 1%, parar e levar a escolha ao mantenedor.
+- [x] **T23** Flexo-torção no arco exato (design §5.5, no referencial
+  móvel). Testes (AC-8), com as referências revistas pelo mantenedor em
+  2026-11-22 (a cadeia de cordas retas não converge para a viga curva na
+  precisão prevista):
+  - momento uniforme (viga de Yoo): forma fechada das Eqs. 32 de Yang e
+    Kuo com r = 0 e o empenamento de Vlasov, 1e−8, com e sem empenamento;
+    Eq. 34 publicada em 1%; cadeia de 32 cordas com empenamento contínuo
+    em 1%;
+  - compressão uniforme: forma fechada da mesma teoria (com r = 0 é a
+    fórmula de Timoshenko e Gere), 1e−6; cadeias de 32 e 64 cordas
+    extrapoladas em 1%;
+  - raio grande: a média dos dois momentos críticos igual à reta (1e−8).
   Arquivos: `beam_state.cpp`, `test_buckling.cpp`. Cobre: 14, N01
 - [ ] **T24** Rigidez geométrica completa da isoparamétrica (design §5.3).
   Testes:
@@ -496,4 +501,31 @@ Regras:
   1,010× o deslocamento linear). Os fatores da 008c são exatamente as
   estimativas do pencil linear da 008d no mesmo pórtico (47,9 a 57,5): é
   por isso que essas estimativas saem ~3× acima (pendência da T18b).
+- T23: o arco exato errava a flexo-torção: dava quase o valor da viga reta
+  (2998 contra 11121 kip·in a 30°). Os estados de momento do motor são
+  m − P(M0)·θ, com P os termos de giro (e os do torque, T21b); no
+  referencial móvel a derivada deles traz a curvatura, P(Ω×M0) + P·Ω −
+  Ω·P nas linhas de momento, que faltavam (zero na barra reta). Com eles o
+  arco bate com uma barra linearizada ao longo do círculo (sem
+  empenamento) e com a forma fechada das Eqs. 32 de Yang e Kuo com r = 0
+  e o empenamento de Vlasov em 1e−9. A Eq. 34 publicada fica 5e−4 a 8e−4
+  acima: ela soma o jacobiano e as tensões radiais (termos em r²/R²) e
+  usa outra medida de empenamento (θ'' + θ/R² em vez de θ'' + v''/R).
+  Achados no caminho:
+  - as cordas retas convergem devagar para a viga curva (sem empenamento,
+    10547 → 10860 → 10964 contra 10972,6 a 30°; com empenamento contínuo
+    nas dobras elas vão para outro modelo de empenamento; sob compressão,
+    em primeira ordem): o mantenedor manteve a cadeia como verificação
+    de 1%;
+  - a compressão só é uniforme com o arco axialmente rígido: com
+    A = 14,4 in² o encurtamento entre os pinos tira 28% do empuxo e flete
+    o arco; o teste usa A = 1e8 (Wagner fica coberto nas barras retas);
+  - braços rígidos para o garfo estragavam a escala da matriz e a
+    contagem perto do fator (singular em 1e−8); os garfos vieram de
+    liberações de My e Mz nas pontas com o nó travado nas rotações;
+  - a contagem que encontra matriz singular passa a se afastar 1e−8, 1e−7
+    e 1e−6 abaixo de λ (antes, três vezes 1e−8): o pivô nulo é relativo ao
+    maior, e barras rígidas alargam a faixa singular em volta do fator;
+  - com raio grande os dois momentos críticos se separam em primeira ordem
+    em 1/R (≈ (EI + GJ)/2R); a média deles é a da viga reta.
 

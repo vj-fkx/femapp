@@ -239,6 +239,24 @@ FullMatrix systemMatrix(const BeamData& beam, const ReferencePoint& r, double he
             a(MX, RY) += r.my * c;
         }
     }
+    // Feature 008d (T23, ADR 0008 addendum): the moment states are m - P
+    // theta, P the matrix of the terms above (rows: (0, Mz, -My), (0, 0,
+    // T / 2), (0, -T / 2, 0)). Along an arc their derivative in the moving
+    // frame brings the curvature: P (Omega x M0) + P Omega - Omega P on
+    // theta in the moment rows (zero on a straight bar).
+    if (!beam.curvature.isZero() && (r.t != 0.0 || r.my != 0.0 || r.mz != 0.0)) {
+        const auto pOf = [](const Eigen::Vector3d& m) {
+            Mat3 p = Mat3::Zero();
+            p(0, 1) = m(2);
+            p(0, 2) = -m(1);
+            p(1, 2) = 0.5 * m(0);
+            p(2, 1) = -0.5 * m(0);
+            return p;
+        };
+        const Eigen::Vector3d m0(r.t, r.my, r.mz);
+        const Mat3 p = pOf(m0);
+        a.block<3, 3>(MX, RX) += pOf(beam.curvature.cross(m0)) + p * omega - omega * p;
+    }
     return a;
 }
 

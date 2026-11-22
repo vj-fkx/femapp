@@ -84,3 +84,14 @@ momento inteiro porque a outra metade, integrada por partes, é o termo de
 ponta do adendo da T20. A verificação é a mesma barra linearizada da T20 e o eixo de
 Greenhill.
 
+## Adendo (2026-11-22, feature 008d, T23)
+
+Os estados de momento do motor são m − P(M0)·θ, com P a matriz dos termos
+de giro (linha do torque (0, Mz, −My); linhas de flexão ±T/2). Na barra
+reta a derivada de P·θ só traz os termos já presentes; no arco, no
+referencial móvel, ela traz também a curvatura: P(Ω×M0) + P·Ω − Ω·P sobre
+θ nas linhas de momento. Sem esse termo o arco perdia o acoplamento entre
+o momento e a curvatura e dava quase o momento crítico da viga reta. Com
+ele, o arco reproduz em 1e−9 uma barra linearizada ao longo do círculo e a
+forma fechada de Yang e Kuo (1987) com r = 0 e o empenamento de Vlasov.
+
