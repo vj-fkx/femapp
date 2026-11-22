@@ -238,7 +238,7 @@ Regras:
     linearizada: ±27967,6735 N·mm, 1e−6, com uma barra ou duas por membro.
   Arquivos: `beam_state.cpp`, `buckling.cpp`, `test_flexural_torsional.cpp`
   — cobre: 10, 11, 16
-- [ ] **T22** Revisão das suítes da 008c com a flexo-torção sempre ativa:
+- [x] **T22** Revisão das suítes da 008c com a flexo-torção sempre ativa:
   cada resultado que mudar é conferido contra a referência analítica e
   registrado nas notas (o que mudou e por quê) — arquivos: testes da 008c,
   notas — cobre: 19
@@ -481,4 +481,19 @@ Regras:
   metade é o termo de ponta da T20. As partes ficam abaixo de
   2π·EI/(margem·|T|), e a recusa da flambagem olha também o torque. Os dois
   casos conferem em 1e−6 e 1e−8, com uma ou mais barras.
+- T22: nenhuma expectativa nem tolerância das suítes da 008c mudou; as
+  edições nos testes da 008c durante a 008d foram só a troca de
+  `AxialProfile` por `ReferenceProfile`. Todas passam com as tolerâncias
+  originais, e nenhum resultado delas muda: os casos são planos (a
+  flexo-torção fica fora em 2D) ou espaciais só com N. O único termo novo
+  que os alcança é o de Wagner, N·r0², no pilar "in space"; ele põe o fator
+  de torção em G·J/r0² ≈ 2,3·10⁸ N, contra 2,5·10⁶ e 9,9·10⁶ N dos três
+  fatores de flexão pedidos. Nos testes de barra, r0² = 0 no `BeamData`.
+  O que muda é o pórtico do benchmark (Release, versão final da 008c
+  construída à parte): os fatores passam de 47,57 a 57,56 (pilares, só N)
+  para 15,28 a 16,24 (flambagem lateral das vigas de 6 m sob o peso
+  próprio, que a 008c não via); a segunda ordem quase não muda (1,011× →
+  1,010× o deslocamento linear). Os fatores da 008c são exatamente as
+  estimativas do pencil linear da 008d no mesmo pórtico (47,9 a 57,5): é
+  por isso que essas estimativas saem ~3× acima (pendência da T18b).
 
