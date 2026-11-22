@@ -611,3 +611,17 @@ Regras:
   correções da junta (T20), do torque (T21b) e do arco (T23); a flambagem
   com empenamento ficou mais rápida (204× → 65×).
 
+- T90 (primeira rodada do CI, 2026-11-22): Windows e formato verdes; duas
+  falhas, reproduzidas no WSL (Ubuntu 24.04, gcc 13, como o CI):
+  - Linux (gcc, clang, cobertura): a flambagem lateral do arco de 30° sem
+    empenamento parava em "singular matrix it could not step around". O
+    pencil quadrático dava uma estimativa espúria de 1,9e14 (o fator é
+    cerca de 1; G quase não age nos nós, os fatores estão dentro das
+    barras), e o arco exato vira NaN abaixo dela. Uma estimativa abaixo da
+    qual a matriz não se fatora passa a ser tratada como fora de alcance: a
+    busca segue só pela contagem, como sem estimativas;
+  - macOS: a taxa da isoparamétrica (momento uniforme positivo) deu 2,90
+    contra ≥ 3 (3,08 no Linux): com erros de 1e−7 em 64 elementos, as
+    plataformas diferem de alguns 1e−9 na razão dos dois últimos erros. A
+    taxa passa a ser medida sobre a faixa (metade do log2 da razão do
+    primeiro e do último erro): 3,54; 3,81; 3,77; 3,93 (meta 3,5); 3,40.

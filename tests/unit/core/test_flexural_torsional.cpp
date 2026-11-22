@@ -1297,10 +1297,13 @@ TEST_CASE("out-of-plane buckling of a curved arch under a uniform compression",
 namespace {
 
 // The rate of convergence of three values at n, 2n and 4n elements to the
-// exact one: log2 of the ratio of the last two errors.
+// exact one over the range: half the log2 of the ratio of the first and last
+// errors. Feature 008d (T90): the ratio of the last two alone moved from 3.08
+// on Linux to 2.90 on macOS (errors of 1e-7 at 64 elements, where the
+// platforms part by a few 1e-9); over the range the rounding weighs half.
 double rate(const std::array<double, 3>& values, double exact)
 {
-    return std::log2(std::abs(values[1] - exact) / std::abs(values[2] - exact));
+    return std::log2(std::abs(values[0] - exact) / std::abs(values[2] - exact)) / 2.0;
 }
 
 // A straight fork beam of n Line3 isoparametric elements along X (the

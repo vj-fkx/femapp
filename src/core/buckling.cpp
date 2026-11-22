@@ -492,7 +492,15 @@ Expected<BucklingResult> runLinearBuckling(const Model& model, const BucklingOpt
     for (int halving = 0; !estimates.empty(); ++halving) {
         auto count = sturmCount(pencil, sigma, &shifted);
         if (!count) {
-            return tl::unexpected(count.error());
+            // Feature 008d (T90): an estimate so far up that the matrix
+            // cannot be factorized below it (a spurious root of the pencils
+            // when G barely acts on the nodes, the factors inside the bars:
+            // 1.9e14 on Linux for an arch whose factor is about 1) is beyond
+            // the reach of the search; only the count finds the factors.
+            estimates.clear();
+            shifted.reset();
+            sigma = 0.0;
+            break;
         }
         if (*count == 0) {
             break;
