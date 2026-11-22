@@ -1,6 +1,6 @@
 # Tarefas — 009 line-meshing
 
-Status: aprovado
+Status: em andamento
 Design: [design.md](design.md) · Requisitos: [requirements.md](requirements.md)
 
 Regras:
@@ -15,7 +15,7 @@ Regras:
 
 ## Fase 1 — Módulo e geometria dos segmentos
 
-- [ ] **T01** O módulo `mesher` ganha conteúdo:
+- [x] **T01** O módulo `mesher` ganha conteúdo:
   - sai o marcador `module.hpp`/`module.cpp` da 001 e o seu teste;
   - `line_mesher.hpp` com as interfaces do design §4 (`LineSizing`,
     `Grading`, `LineMeshOptions`, mapa, relatório, `Overlap`,

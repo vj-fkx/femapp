@@ -30,7 +30,7 @@ cargas, resolver e ver diagramas de esforços.
 | 008 | beam-elements | Viga reta Euler-Bernoulli e Timoshenko 2D/3D; seções simétricas e assimétricas; orientação; liberações, molas de ligação e excentricidades; base elástica; cargas no vão; tensões na seção | 007 | concluída |
 | 008b | beam-warping-curved | Viga curva `Line3` com curvatura em qualquer direção; seções de paredes finas e poligonal com propriedades numéricas (o empenamento foi adiado para a 008d) | 008 | concluída |
 | 008c | beam-second-order | Estática de segunda ordem (P-Δ e P-δ exato na barra, iterativa) e flambagem linear de treliças e vigas retas e curvas | 008b | concluída |
-| 009 | line-meshing | Divisão de linhas em elementos (contagem, tamanho, graduação; Line2 ou Line3), nós coincidentes fundidos, divisão em nós em T e cruzamentos, grupos por entidade; comando MESH | 005, 003 | tarefas |
+| 009 | line-meshing | Divisão de linhas em elementos (contagem, tamanho, graduação; Line2 ou Line3), nós coincidentes fundidos, divisão em nós em T e cruzamentos, grupos por entidade; comando MESH | 005, 003 | implementando |
 | 010 | model-setup-ui | Árvore do modelo, propriedades, materiais, seções, apoios, cargas nodais e distribuídas, undo/redo | 004, 005, 008 | planejada |
 | 011 | analysis-runner | Execução assíncrona, progresso, cancelamento, validação do modelo | 008, 010 | planejada |
 | 012 | results-visualization | Deformada com escala, mapa de cores, legenda, consulta de valores, reações de apoio | 004, 011 | planejada |

@@ -78,7 +78,8 @@ femapp_add_test(geom SOURCES
     test_commands.cpp
     test_drawing.cpp
     test_point_resolver.cpp)
-femapp_add_test(mesher)
+femapp_add_test(mesher SOURCES
+    test_line_mesher.cpp)
 femapp_add_test(io SOURCES
     test_gmsh_cursor.cpp
     test_gmsh_reader.cpp
