@@ -175,6 +175,11 @@ add_executable(bench_truss perf/bench_truss.cpp)
 target_link_libraries(bench_truss PRIVATE fem::core)
 femapp_set_warnings(bench_truss)
 
+# NFR-010-01: model document benchmark, run by hand on a Release build.
+add_executable(bench_setup perf/bench_setup.cpp)
+target_link_libraries(bench_setup PRIVATE fem::setup)
+femapp_set_warnings(bench_setup)
+
 # NFR-009-01: line mesher benchmark, run by hand on a Release build.
 add_executable(bench_line_mesh perf/bench_line_mesh.cpp)
 target_include_directories(bench_line_mesh PRIVATE "${PROJECT_SOURCE_DIR}/src/mesher")

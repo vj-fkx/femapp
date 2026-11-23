@@ -142,7 +142,7 @@ Regras:
     atribuição;
   - depois `checkModel`.
   Arquivos: `build.cpp`, `tests/unit/setup/test_build.cpp`. Cobre: 10, 21.
-- [ ] **T12** `bench_setup`: atribuir a 10⁵ entidades do pórtico do
+- [x] **T12** `bench_setup`: atribuir a 10⁵ entidades do pórtico do
   `bench_line_mesh`, desfazer e montar uma combinação de três casos. A
   medida em Release fica nas notas (metas: 1 s, 1 s, 2 s). Arquivos:
   `tests/perf/bench_setup.cpp`, `tests/CMakeLists.txt`. Cobre: N01.
@@ -333,3 +333,14 @@ Regras:
     com razão. O bimomento foi para um ponto no meio;
   - a soma dos recalques, comparada com `==`, passou a ser comparada com
     tolerância de 1e−15.
+- T12 (2026-11-23, Release, máquina do mantenedor): o `bench_setup` usa o
+  pórtico do `bench_line_mesh`, com 101 817 entidades (729 pilares, 33 696
+  vigas), malha em 0,64 s (51 921 nós, 185 976 elementos). Medidas:
+  - atribuir uma barra a todas as entidades: 0,011 s (meta: ≤ 1 s);
+  - uma segunda atribuição que toma metade delas: 0,008 s;
+  - desfazer e refazer: abaixo de 1 ms (meta: ≤ 1 s), porque só os itens
+    mudados vão e voltam;
+  - montar o `core::Model` de 1,35G + 1,5Q + 0,9W, com peso próprio, uma
+    carga em cada viga e outra em cada pilar: 0,110 s, o melhor de três
+    (meta: ≤ 2 s).
+  Os FPS com os símbolos ficam para o roteiro da T23.
