@@ -53,4 +53,12 @@ struct Field
 // A number shown in a field, with up to 12 significant digits.
 [[nodiscard]] QString formatNumber(double value);
 
+// REQ-010-15: the shortcuts of the Supports menu. Fixed holds the
+// translations and rotations, Pinned the translations, Roller the
+// translation along the global Y (vertical in the plane of the drawing);
+// Custom holds nothing, to be checked dof by dof.
+enum class SupportPreset : std::uint8_t { Fixed, Pinned, Roller, Custom };
+
+[[nodiscard]] setup::SupportItem supportOf(SupportPreset preset);
+
 } // namespace fem::app

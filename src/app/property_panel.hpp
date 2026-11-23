@@ -42,7 +42,6 @@ private:
     // A value typed or picked: written into a copy of the item and pushed,
     // or `editor` is marked invalid.
     void edit(const Field& field, const FieldValue& value, QWidget* editor);
-    static void markInvalid(QWidget* editor, bool invalid);
 
     ModelController* m_controller = nullptr;
     std::optional<setup::ItemId> m_item;

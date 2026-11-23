@@ -259,6 +259,37 @@ E fromIndex(int index)
     return static_cast<E>(index);
 }
 
+} // namespace
+
+setup::SupportItem supportOf(SupportPreset preset)
+{
+    setup::SupportItem support{.id = {}, .targets = {}, .held = {}};
+    const auto hold = [&support](core::DofType dof) {
+        support.held.at(static_cast<std::size_t>(dof)) = true;
+    };
+    switch (preset) {
+    case SupportPreset::Fixed:
+        for (const core::DofType dof : {core::DofType::U, core::DofType::V, core::DofType::W,
+                                        core::DofType::RX, core::DofType::RY, core::DofType::RZ}) {
+            hold(dof);
+        }
+        break;
+    case SupportPreset::Pinned:
+        for (const core::DofType dof : {core::DofType::U, core::DofType::V, core::DofType::W}) {
+            hold(dof);
+        }
+        break;
+    case SupportPreset::Roller:
+        hold(core::DofType::V);
+        break;
+    case SupportPreset::Custom:
+        break;
+    }
+    return support;
+}
+
+namespace {
+
 QStringList endChoices()
 {
     return {FieldText::tr("Start"), FieldText::tr("End")};

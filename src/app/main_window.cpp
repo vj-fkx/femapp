@@ -449,6 +449,58 @@ void MainWindow::createModelMenu()
     menu->addAction(tr("New &section..."), this, &MainWindow::newSection);
     menu->addSeparator();
     menu->addAction(tr("Assign &bars..."), this, &MainWindow::assignBars);
+    // REQ-010-08: the beam details, on bars.
+    QMenu* details = menu->addMenu(tr("Beam &details"));
+    details->addAction(tr("End &connections..."), this, [this] {
+        assignDetail(tr("End connections"),
+                     setup::ConnectionItem{.id = {}, .targets = {}, .data = {}}, 1,
+                     tr("assign end connections"));
+    });
+    details->addAction(tr("&Offsets..."), this, [this] {
+        assignDetail(tr("Rigid offsets"), setup::OffsetItem{.id = {}, .targets = {}, .data = {}}, 1,
+                     tr("assign offsets"));
+    });
+    details->addAction(tr("&Foundation..."), this, [this] {
+        assignDetail(tr("Elastic foundation"),
+                     setup::FoundationItem{.id = {}, .targets = {}, .data = {}}, 1,
+                     tr("assign foundation"));
+    });
+    details->addAction(tr("&Warping ends..."), this, [this] {
+        assignDetail(tr("Warping ends"), setup::WarpingEndItem{.id = {}, .targets = {}, .data = {}},
+                     1, tr("assign warping ends"));
+    });
+    // REQ-010-15: supports, on nodes; the shortcuts start the dialog checked.
+    QMenu* supports = menu->addMenu(tr("&Supports"));
+    const auto support = [this, supports](const QString& name, SupportPreset preset) {
+        supports->addAction(name, this, [this, name, preset] {
+            assignDetail(tr("Support: %1").arg(name).remove(QLatin1Char('&')), supportOf(preset), 0,
+                         tr("assign supports"));
+        });
+    };
+    support(tr("&Fixed..."), SupportPreset::Fixed);
+    support(tr("&Pinned..."), SupportPreset::Pinned);
+    support(tr("&Roller..."), SupportPreset::Roller);
+    support(tr("&Custom..."), SupportPreset::Custom);
+}
+
+void MainWindow::assignDetail(const QString& title, setup::Item item, int dimension,
+                              const QString& undo)
+{
+    const setup::Targets targets = selectedTargets();
+    const std::vector<setup::GroupTarget> groups = m_model->meshGroups(dimension);
+    auto choice = chooseDetail(this, title, std::move(item), m_model->document(), targets, groups);
+    if (!choice) {
+        return;
+    }
+    setup::Targets* chosen = setup::targetsOf(choice->item);
+    if (chosen == nullptr) {
+        return;
+    }
+    *chosen = targets;
+    if (chosen->empty()) {
+        chosen->groups = std::move(choice->groups);
+    }
+    m_model->push(setup::assign(m_model->documentForIds(), std::move(choice->item)), undo);
 }
 
 void MainWindow::selectItem(setup::ItemId id)

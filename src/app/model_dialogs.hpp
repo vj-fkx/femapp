@@ -12,6 +12,7 @@
 #include <string>
 #include <vector>
 
+class QString;
 class QWidget;
 
 namespace fem::app {
@@ -37,5 +38,20 @@ struct BarChoice
 [[nodiscard]] std::optional<BarChoice> chooseBars(QWidget* parent, const setup::Document& document,
                                                   const setup::Targets& targets,
                                                   std::span<const setup::GroupTarget> groups);
+
+// REQ-010-08, 15: a beam detail or a support, edited by the fields of
+// `item` (as the properties panel shows them), on `targets` or else the
+// `groups` checked; none when cancelled.
+struct DetailChoice
+{
+    setup::Item item;
+    std::vector<setup::GroupTarget> groups;
+};
+
+[[nodiscard]] std::optional<DetailChoice> chooseDetail(QWidget* parent, const QString& title,
+                                                       setup::Item item,
+                                                       const setup::Document& document,
+                                                       const setup::Targets& targets,
+                                                       std::span<const setup::GroupTarget> groups);
 
 } // namespace fem::app

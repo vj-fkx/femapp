@@ -1,5 +1,6 @@
 #include "model_dialogs.hpp"
 
+#include "field_editor.hpp"
 #include "fields.hpp"
 
 #include <fem/setup/library.hpp>
@@ -19,7 +20,9 @@
 
 #include <array>
 #include <cmath>
+#include <memory>
 #include <numbers>
+#include <set>
 
 namespace fem::app {
 
@@ -40,6 +43,55 @@ QDialogButtonBox* okCancel(QDialog& dialog)
     QObject::connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
     QObject::connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
     return buttons;
+}
+
+// The targets at the top of an assignment dialog: what is selected, or the
+// groups of the mesh to check (the list returned), or why there are none.
+QListWidget* addTargets(QDialog& dialog, QVBoxLayout* layout, const setup::Targets& targets,
+                        std::span<const setup::GroupTarget> groups)
+{
+    if (!targets.empty()) {
+        QString what;
+        if (!targets.entities.empty()) {
+            what = Text::tr("%n drawing object(s) selected", nullptr,
+                            static_cast<int>(targets.entities.size()));
+        } else {
+            what = Text::tr("%n mesh element(s) and %1 node(s) selected", nullptr,
+                            static_cast<int>(targets.elements.size()))
+                       .arg(targets.nodes.size());
+        }
+        layout->addWidget(new QLabel(what, &dialog));
+        return nullptr;
+    }
+    if (groups.empty()) {
+        layout->addWidget(new QLabel(
+            Text::tr("Nothing selected and no mesh groups: select objects of the drawing or "
+                     "of the mesh first."),
+            &dialog));
+        return nullptr;
+    }
+    layout->addWidget(
+        new QLabel(Text::tr("Nothing selected: assign to the groups checked."), &dialog));
+    auto* list = new QListWidget(&dialog);
+    for (const setup::GroupTarget& g : groups) {
+        auto* item = new QListWidgetItem(QString::fromStdString(g.name), list);
+        item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
+        item->setCheckState(Qt::Unchecked);
+    }
+    layout->addWidget(list);
+    return list;
+}
+
+std::vector<setup::GroupTarget> checkedGroups(const QListWidget* list,
+                                              std::span<const setup::GroupTarget> groups)
+{
+    std::vector<setup::GroupTarget> checked;
+    for (int r = 0; list != nullptr && r < list->count(); ++r) {
+        if (list->item(r)->checkState() == Qt::Checked) {
+            checked.push_back(groups[static_cast<std::size_t>(r)]);
+        }
+    }
+    return checked;
 }
 
 } // namespace
@@ -172,30 +224,7 @@ std::optional<BarChoice> chooseBars(QWidget* parent, const setup::Document& docu
     auto* layout = new QVBoxLayout(&dialog);
 
     // The targets: the selection, or the groups of the mesh.
-    QListWidget* groupList = nullptr;
-    if (!targets.empty()) {
-        const QString what = !targets.entities.empty()
-                                 ? Text::tr("%n drawing object(s) selected", nullptr,
-                                            static_cast<int>(targets.entities.size()))
-                                 : Text::tr("%n mesh element(s) selected", nullptr,
-                                            static_cast<int>(targets.elements.size()));
-        layout->addWidget(new QLabel(what, &dialog));
-    } else if (!groups.empty()) {
-        layout->addWidget(
-            new QLabel(Text::tr("Nothing selected: assign to the groups checked."), &dialog));
-        groupList = new QListWidget(&dialog);
-        for (const setup::GroupTarget& g : groups) {
-            auto* item = new QListWidgetItem(QString::fromStdString(g.name), groupList);
-            item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
-            item->setCheckState(Qt::Unchecked);
-        }
-        layout->addWidget(groupList);
-    } else {
-        layout->addWidget(new QLabel(
-            Text::tr("Nothing selected and no mesh groups: select the lines of the drawing or the "
-                     "elements of the mesh first."),
-            &dialog));
-    }
+    QListWidget* groupList = addTargets(dialog, layout, targets, groups);
 
     auto* form = new QFormLayout;
     auto* kind = new QComboBox(&dialog);
@@ -304,15 +333,68 @@ std::optional<BarChoice> chooseBars(QWidget* parent, const setup::Document& docu
         choice.data.warping = warping->isChecked() && choice.data.kind == core::ElementKind::Beam3D;
         choice.data.curved = static_cast<core::CurvedFormulation>(curved->currentIndex());
         if (groupList != nullptr) {
-            for (int r = 0; r < groupList->count(); ++r) {
-                if (groupList->item(r)->checkState() == Qt::Checked) {
-                    choice.groups.push_back(groups[static_cast<std::size_t>(r)]);
-                }
-            }
+            choice.groups = checkedGroups(groupList, groups);
             if (choice.groups.empty()) {
                 warning->setText(Text::tr("Check at least one group."));
                 continue;
             }
+        }
+        return choice;
+    }
+}
+
+std::optional<DetailChoice> chooseDetail(QWidget* parent, const QString& title, setup::Item item,
+                                         const setup::Document& document,
+                                         const setup::Targets& targets,
+                                         std::span<const setup::GroupTarget> groups)
+{
+    QDialog dialog(parent);
+    dialog.setWindowTitle(title);
+    auto* layout = new QVBoxLayout(&dialog);
+    QListWidget* groupList = addTargets(dialog, layout, targets, groups);
+
+    // The fields write into a copy of the item; the refused ones are
+    // remembered until they are corrected.
+    auto edited = std::make_shared<setup::Item>(std::move(item));
+    auto refused = std::make_shared<std::set<QWidget*>>();
+    auto* body = new QWidget(&dialog);
+    auto* form = new QFormLayout(body);
+    form->setContentsMargins(0, 0, 0, 0);
+    const setup::UnitSystem units = document.units();
+    for (const Field& field : fieldsOf(*edited, document)) {
+        addFieldEditor(form, body, field, field.get(*edited),
+                       QString::fromStdString(setup::unitLabel(units, field.quantity)),
+                       [edited, refused](const Field& f, const FieldValue& value, QWidget* editor) {
+                           const bool ok = f.set && f.set(*edited, value);
+                           markInvalid(editor, !ok);
+                           if (ok) {
+                               refused->erase(editor);
+                           } else {
+                               refused->insert(editor);
+                           }
+                       });
+    }
+    layout->addWidget(body);
+    auto* problem = new QLabel(&dialog);
+    problem->setWordWrap(true);
+    problem->setStyleSheet(QStringLiteral("color: #d04040;"));
+    layout->addWidget(problem);
+    QDialogButtonBox* buttons = okCancel(dialog);
+    buttons->button(QDialogButtonBox::Ok)->setEnabled(!targets.empty() || groupList != nullptr);
+    layout->addWidget(buttons);
+
+    for (;;) {
+        if (dialog.exec() != QDialog::Accepted) {
+            return std::nullopt;
+        }
+        if (!refused->empty()) {
+            problem->setText(Text::tr("Correct the values marked in red."));
+            continue;
+        }
+        DetailChoice choice{.item = *edited, .groups = checkedGroups(groupList, groups)};
+        if (groupList != nullptr && choice.groups.empty()) {
+            problem->setText(Text::tr("Check at least one group."));
+            continue;
         }
         return choice;
     }

@@ -176,3 +176,27 @@ TEST_CASE("a truss assignment warns of buckling between its nodes", "[app][field
     CHECK_FALSE(warning(c::ElementKind::Truss3D).isEmpty());
     CHECK(warning(c::ElementKind::Beam3D).isEmpty());
 }
+
+TEST_CASE("the shortcuts of the supports", "[app][fields]")
+{
+    // Feature 010, T18: REQ-010-15.
+    using fem::app::SupportPreset;
+    const auto held = [](SupportPreset preset) {
+        std::string dofs;
+        const auto support = fem::app::supportOf(preset);
+        for (const bool h : support.held) {
+            dofs += h ? '1' : '0';
+        }
+        return dofs; // U V W RX RY RZ T Warp
+    };
+    CHECK(held(SupportPreset::Fixed) == "11111100");
+    CHECK(held(SupportPreset::Pinned) == "11100000");
+    CHECK(held(SupportPreset::Roller) == "01000000");
+    CHECK(held(SupportPreset::Custom) == "00000000");
+    // The support fields show what the shortcut holds.
+    const s::Document document;
+    const s::Item item = fem::app::supportOf(SupportPreset::Pinned);
+    const auto fields = fem::app::fieldsOf(item, document);
+    CHECK(std::get<bool>(field(fields, "W").get(item)));
+    CHECK_FALSE(std::get<bool>(field(fields, "RZ").get(item)));
+}

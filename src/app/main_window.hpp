@@ -87,6 +87,9 @@ private:
     void newMaterial();
     void newSection();
     void assignBars();
+    // REQ-010-08, 15: a beam detail or a support, from `item` as the
+    // dialog starts it, on the selection or the groups of `dimension`.
+    void assignDetail(const QString& title, setup::Item item, int dimension, const QString& undo);
     // The new item selected in the tree, for its properties.
     void selectItem(setup::ItemId id);
     // REQ-010-12: the targets of the viewport selection.

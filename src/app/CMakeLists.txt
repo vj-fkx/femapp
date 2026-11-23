@@ -8,6 +8,8 @@ qt_add_executable(femapp WIN32 MACOSX_BUNDLE
     drafting_controller.hpp
     drafting_settings_dialog.cpp
     drafting_settings_dialog.hpp
+    field_editor.cpp
+    field_editor.hpp
     fields.cpp
     fields.hpp
     line_mesh_job.cpp

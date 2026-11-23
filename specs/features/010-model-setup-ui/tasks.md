@@ -212,10 +212,17 @@ Regras:
   da malha do modelo) e, sem seleção, dos grupos 1D marcados no diálogo.
   Testados: `newSection`, `targetsFrom`, `meshGroups` e o aviso de
   treliça; os diálogos ficam para o roteiro T23.
-- [ ] **T18** Detalhes de viga e apoios: os diálogos de ligações (por ponta
+- [x] **T18** Detalhes de viga e apoios: os diálogos de ligações (por ponta
   e esforço), excentricidades, base elástica, pontas de empenamento e
   apoios (engaste, articulação, rolete, por GDL). Arquivos:
   `model_dialogs.*`, `model_controller.cpp`. Cobre: 08, 15.
+  Nota: um só diálogo (`chooseDetail`) monta o formulário pelos mesmos
+  campos do painel (`fieldsOf`); o editor de cada campo saiu do painel
+  para `field_editor.*`, usado pelos dois. Os atalhos de apoio são
+  `supportOf` (engaste: translações e rotações; articulação:
+  translações; rolete: a translação em Y global, vertical no plano do
+  desenho), testados em `test_fields.cpp`. Apoios usam os grupos 0D sem
+  seleção; os detalhes, os 1D.
 - [ ] **T19** Casos, cargas e combinações:
   - o diálogo dos casos (criar, renomear, ativar, classificar pela norma
     e pela categoria, mostrando os ψ);
