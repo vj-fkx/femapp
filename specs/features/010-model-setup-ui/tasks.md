@@ -41,7 +41,7 @@ Regras:
   - depois `units.hpp/.cpp`.
   Arquivos: `src/setup/include/fem/setup/units.hpp`, `units.cpp`,
   `tests/unit/setup/test_units.cpp`. Cobre: 02, N02.
-- [ ] **T04** O documento:
+- [x] **T04** O documento:
   - testes primeiro: ids que não voltam; `find`; aplicar e reverter cada
     espécie de item; revisão; caso ativo; unidades na edição;
   - depois `document.hpp/.cpp` (itens, `Targets`, `Document`,
