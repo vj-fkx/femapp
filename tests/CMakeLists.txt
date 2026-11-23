@@ -197,14 +197,17 @@ add_executable(test_app
     unit/app/test_cli_options.cpp
     unit/app/test_line_mesh_job.cpp
     unit/app/test_line_mesh_text.cpp
+    unit/app/test_model_controller.cpp
     "${PROJECT_SOURCE_DIR}/src/app/cli_options.cpp"
     "${PROJECT_SOURCE_DIR}/src/app/line_mesh_job.cpp"
     "${PROJECT_SOURCE_DIR}/src/app/line_mesh_job.hpp"
-    "${PROJECT_SOURCE_DIR}/src/app/line_mesh_text.cpp")
+    "${PROJECT_SOURCE_DIR}/src/app/line_mesh_text.cpp"
+    "${PROJECT_SOURCE_DIR}/src/app/model_controller.cpp"
+    "${PROJECT_SOURCE_DIR}/src/app/model_controller.hpp")
 set_target_properties(test_app PROPERTIES AUTOMOC ON)
 target_include_directories(test_app PRIVATE "${PROJECT_SOURCE_DIR}/src/app")
 target_compile_features(test_app PRIVATE cxx_std_20)
-target_link_libraries(test_app PRIVATE fem::mesher fem::render Qt6::Core Catch2::Catch2WithMain)
+target_link_libraries(test_app PRIVATE fem::mesher fem::render fem::setup Qt6::Gui Catch2::Catch2WithMain)
 femapp_set_warnings(test_app)
 catch_discover_tests(test_app DISCOVERY_MODE PRE_TEST)
 

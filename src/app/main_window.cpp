@@ -4,6 +4,7 @@
 #include "drafting_controller.hpp"
 #include "drafting_settings_dialog.hpp"
 #include "mesh_import.hpp"
+#include "model_controller.hpp"
 
 #include <fem/core/version.hpp>
 #include <fem/render/camera.hpp>
@@ -357,6 +358,8 @@ void MainWindow::createDraftingUi()
     m_commandLine = new CommandLineWidget(this);
     auto* dock = new QDockWidget(tr("Command Line"), this);
     m_drafting = new DraftingController(m_viewport, m_commandLine, this);
+    // Feature 010: the model document shares the undo stack of the drawing.
+    m_model = new ModelController(m_drafting->undoStack(), m_drafting->drawing(), this);
     // NOLINTEND(cppcoreguidelines-owning-memory)
     dock->setObjectName(QStringLiteral("commandLine"));
     dock->setWidget(m_commandLine);
@@ -453,6 +456,9 @@ void MainWindow::createDraftingMenus()
         QStringLiteral("-000000.0000, -000000.0000, -000000.0000")));
     statusBar()->insertPermanentWidget(0, m_coordinates);
     connect(m_drafting, &DraftingController::cursorPointChanged, m_coordinates, &QLabel::setText);
+    // Feature 010 (design §5.8): the mesh of MESH and its map, for the model.
+    connect(m_drafting, &DraftingController::drawingMeshed, m_model,
+            &ModelController::meshGenerated);
     // REQ-009-13: the mesh of MESH, as an imported one is shown (REQ-004-08).
     connect(m_drafting, &DraftingController::meshGenerated, this,
             [this](int nodes, int elements, int groups) {
@@ -525,6 +531,8 @@ void MainWindow::meshImported(const QString& path, std::shared_ptr<const render:
                             .arg(mesh.nodeCount())
                             .arg(mesh.elementCount())
                             .arg(mesh.groups().size()));
+    // Feature 010: a new mesh generation, without a map to the drawing.
+    m_model->meshImported(scene);
     // REQ-004-05
     m_viewport->setScene(std::move(scene));
     // REQ-009-15: the mesh of MESH is no longer the one shown.

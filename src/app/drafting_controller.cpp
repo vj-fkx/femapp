@@ -93,10 +93,12 @@ DraftingController::DraftingController(render::Viewport* viewport, CommandLineWi
     // REQ-009-13, 14: the mesh of MESH, or why there is none.
     connect(m_meshJob, &LineMeshJob::finished, this,
             [this](std::shared_ptr<const render::MeshScene> scene,
-                   const mesher::LineMeshReport& report, std::uint64_t revision) {
+                   const mesher::LineMeshReport& report,
+                   std::shared_ptr<const mesher::LineMeshMap> map, std::uint64_t revision) {
                 const core::Mesh& mesh = scene->mesh();
                 emit meshGenerated(mesh.nodeCount(), mesh.elementCount(),
                                    static_cast<int>(mesh.groups().size()));
+                emit drawingMeshed(scene, std::move(map), revision);
                 if (m_viewport) {
                     m_viewport->setScene(std::move(scene));
                 }

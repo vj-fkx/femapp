@@ -149,7 +149,7 @@ Regras:
 
 ## Fase 4 — App: controlador, árvore e painel
 
-- [ ] **T13** O MESH devolve o mapa:
+- [x] **T13** O MESH devolve o mapa:
   - `LineMeshJob::finished` com o `LineMeshMap`;
   - o `ModelController` com o documento, o `MeshContext` (geração na
     MESH e na importação, revisão) e as edições num `QUndoCommand` na pilha

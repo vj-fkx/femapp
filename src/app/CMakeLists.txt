@@ -13,6 +13,8 @@ qt_add_executable(femapp WIN32 MACOSX_BUNDLE
     line_mesh_text.cpp
     line_mesh_text.hpp
     main_window.cpp
+    model_controller.cpp
+    model_controller.hpp
     main_window.hpp
     mesh_import.cpp
     mesh_import.hpp)

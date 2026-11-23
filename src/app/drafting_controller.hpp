@@ -3,7 +3,9 @@
 #include <fem/geom/commands.hpp>
 #include <fem/geom/drawing.hpp>
 #include <fem/geom/point_resolver.hpp>
+#include <fem/mesher/line_mesher.hpp>
 #include <fem/render/camera.hpp>
+#include <fem/render/mesh_scene.hpp>
 
 #include <QObject>
 #include <QPointer>
@@ -70,6 +72,10 @@ signals:
     void settingsChanged();
     // REQ-009-13: the MESH command put a mesh in the viewport.
     void meshGenerated(int nodes, int elements, int groups);
+    // Feature 010 (design §5.8): the mesh of MESH, with its map to the
+    // drawing and the revision of the drawing meshed.
+    void drawingMeshed(std::shared_ptr<const fem::render::MeshScene> scene,
+                       std::shared_ptr<const fem::mesher::LineMeshMap> map, std::uint64_t revision);
 
 private:
     void cursorMoved(render::Vec2 pixel);

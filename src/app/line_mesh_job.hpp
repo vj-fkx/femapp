@@ -28,9 +28,11 @@ public:
     bool start(const geom::Drawing& drawing, const mesher::LineMeshOptions& options);
 
 signals:
-    // `revision` is the revision of the drawing that was meshed.
+    // `revision` is the revision of the drawing that was meshed; `map` ties
+    // the mesh to the drawing (feature 010, design §5.8).
     void finished(std::shared_ptr<const fem::render::MeshScene> scene,
-                  const fem::mesher::LineMeshReport& report, std::uint64_t revision);
+                  const fem::mesher::LineMeshReport& report,
+                  std::shared_ptr<const fem::mesher::LineMeshMap> map, std::uint64_t revision);
     void failed(const fem::mesher::LineMeshError& error);
 
 private:

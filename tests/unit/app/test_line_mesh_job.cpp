@@ -42,6 +42,7 @@ void addLine(Drawing& drawing, const Vec3& a, const Vec3& b)
 struct Outcome
 {
     std::shared_ptr<const fem::render::MeshScene> scene;
+    std::shared_ptr<const fem::mesher::LineMeshMap> map;
     bool finished = false;
     fem::mesher::LineMeshReport report;
     std::uint64_t revision = 0;
@@ -55,8 +56,11 @@ void waitFor(fem::app::LineMeshJob& job, Outcome& outcome)
     QEventLoop loop;
     QObject::connect(&job, &fem::app::LineMeshJob::finished, &loop,
                      [&](std::shared_ptr<const fem::render::MeshScene> scene,
-                         const fem::mesher::LineMeshReport& report, std::uint64_t revision) {
+                         const fem::mesher::LineMeshReport& report,
+                         std::shared_ptr<const fem::mesher::LineMeshMap> map,
+                         std::uint64_t revision) {
                          outcome.scene = std::move(scene);
+                         outcome.map = std::move(map);
                          outcome.finished = true;
                          outcome.report = report;
                          outcome.revision = revision;
@@ -94,6 +98,10 @@ TEST_CASE("a drawing is meshed on a worker thread", "[app][mesh]")
     CHECK(outcome.report.elements == 3);
     CHECK(outcome.report.splits.size() == 1);
     CHECK(outcome.revision == drawing.revision());
+    // Feature 010: the map of the mesh to the drawing comes with it.
+    REQUIRE(outcome.map != nullptr);
+    CHECK(outcome.map->elements.size() == 3);
+    CHECK(outcome.map->nodes.size() == 4);
     // Free again.
     CHECK(job.start(drawing, {}));
     Outcome again;

@@ -24,6 +24,7 @@ namespace fem::app {
 
 class CommandLineWidget;
 class DraftingController;
+class ModelController;
 class MeshImport;
 
 class MainWindow : public QMainWindow
@@ -82,6 +83,8 @@ private:
     QLabel* m_coordinates = nullptr;
     QPointer<CommandLineWidget> m_commandLine;
     DraftingController* m_drafting = nullptr;
+    // Feature 010: the model document and the mesh it is built on.
+    ModelController* m_model = nullptr;
     bool m_quietMessages = false;
 };
 
