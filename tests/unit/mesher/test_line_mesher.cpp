@@ -4,7 +4,9 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdint>
+#include <limits>
 #include <span>
 #include <utility>
 #include <vector>
@@ -470,5 +472,245 @@ TEST_CASE("overlapping bars are refused", "[mesher][line][contact]")
         REQUIRE(result.error().overlaps.size() == 1);
         CHECK(result.error().overlaps[0].first == id);
         CHECK(result.error().overlaps[0].second == id);
+    }
+}
+
+namespace {
+
+using fem::mesher::Grading;
+using fem::mesher::LineMeshOptions;
+using fem::mesher::LineSizing;
+
+// The x of the nodes of a mesh along the x axis, sorted.
+std::vector<double> nodeXs(const fem::core::Mesh& mesh)
+{
+    std::vector<double> xs;
+    xs.reserve(static_cast<std::size_t>(mesh.nodeCount()));
+    for (fem::core::NodeIndex n = 0; n < mesh.nodeCount(); ++n) {
+        xs.push_back(mesh.nodeCoordinates(n).x());
+    }
+    std::ranges::sort(xs);
+    return xs;
+}
+
+// The lengths of consecutive elements along x.
+std::vector<double> lengthsOf(const std::vector<double>& xs)
+{
+    std::vector<double> out;
+    for (std::size_t i = 1; i < xs.size(); ++i) {
+        out.push_back(xs[i] - xs[i - 1]);
+    }
+    return out;
+}
+
+bool close(double a, double b)
+{
+    return std::abs(a - b) <= 1e-12 * std::max(1.0, std::abs(b));
+}
+
+fem::core::Mesh meshOf(const Drawing& drawing, const LineMeshOptions& options)
+{
+    auto result = meshLines(drawing, options);
+    REQUIRE(result.has_value());
+    return std::move(result->mesh);
+}
+
+} // namespace
+
+// T09 (AC-4): REQ-009-05, 06, 07.
+TEST_CASE("divisions and target lengths", "[mesher][line][sizing]")
+{
+    Drawing drawing;
+    addLine(drawing, Vec3(0, 0, 0), Vec3(8, 0, 0));
+    LineMeshOptions options;
+
+    SECTION("a number of divisions")
+    {
+        options.defaults.divisions = 4;
+        const auto mesh = meshOf(drawing, options);
+        CHECK(mesh.elementCount() == 4);
+        CHECK(nodeXs(mesh) == std::vector<double>{0, 2, 4, 6, 8});
+        // Numbered along the line.
+        CHECK(nodeAt(mesh, 2) == Vec3(2, 0, 0));
+        CHECK(elementNodeIds(mesh, 4) == std::vector<fem::core::ExternalId>{4, 5});
+    }
+    SECTION("a target length: ceil(L / h)")
+    {
+        options.defaults.length = 3.0;
+        CHECK(meshOf(drawing, options).elementCount() == 3);
+        options.defaults.length = 8.0;
+        CHECK(meshOf(drawing, options).elementCount() == 1);
+        options.defaults.length = 100.0;
+        CHECK(meshOf(drawing, options).elementCount() == 1);
+    }
+    SECTION("divisions win over a length")
+    {
+        options.defaults.divisions = 2;
+        options.defaults.length = 1.0;
+        CHECK(meshOf(drawing, options).elementCount() == 2);
+    }
+}
+
+TEST_CASE("a target length that divides the piece exactly", "[mesher][line][sizing]")
+{
+    LineMeshOptions options;
+    options.defaults.length = 3.0;
+    Drawing exact;
+    addLine(exact, Vec3(0, 0, 0), Vec3(9, 0, 0));
+    CHECK(meshOf(exact, options).elementCount() == 3);
+    // L / h = 3 + 1e-12: still 3.
+    Drawing nearly;
+    addLine(nearly, Vec3(0, 0, 0), Vec3(9 + 3e-12, 0, 0));
+    CHECK(meshOf(nearly, options).elementCount() == 3);
+    // Clearly more: 4.
+    Drawing more;
+    addLine(more, Vec3(0, 0, 0), Vec3(9.1, 0, 0));
+    CHECK(meshOf(more, options).elementCount() == 4);
+}
+
+TEST_CASE("graded divisions", "[mesher][line][sizing]")
+{
+    Drawing drawing;
+    addLine(drawing, Vec3(0, 0, 0), Vec3(15, 0, 0));
+    LineMeshOptions options;
+
+    SECTION("toward the end: 1, 2, 4, 8")
+    {
+        options.defaults.divisions = 4;
+        options.defaults.ratio = 8.0;
+        const auto lengths = lengthsOf(nodeXs(meshOf(drawing, options)));
+        REQUIRE(lengths.size() == 4);
+        CHECK(close(lengths[0], 1.0));
+        CHECK(close(lengths[1], 2.0));
+        CHECK(close(lengths[2], 4.0));
+        CHECK(close(lengths[3], 8.0));
+        CHECK(close(lengths[3] / lengths[0], 8.0));
+    }
+    SECTION("toward both ends, even: 1, 3, 3, 1")
+    {
+        options.defaults.divisions = 4;
+        options.defaults.ratio = 3.0;
+        options.defaults.grading = Grading::TowardBoth;
+        const auto lengths = lengthsOf(nodeXs(meshOf(drawing, options)));
+        REQUIRE(lengths.size() == 4);
+        const double unit = 15.0 / 8.0;
+        CHECK(close(lengths[0], unit));
+        CHECK(close(lengths[1], 3 * unit));
+        CHECK(close(lengths[2], 3 * unit));
+        CHECK(close(lengths[3], unit));
+    }
+    SECTION("toward both ends, odd: 1, 2, 4, 2, 1")
+    {
+        options.defaults.divisions = 5;
+        options.defaults.ratio = 4.0;
+        options.defaults.grading = Grading::TowardBoth;
+        const auto xs = nodeXs(meshOf(drawing, options));
+        const auto lengths = lengthsOf(xs);
+        REQUIRE(lengths.size() == 5);
+        const double unit = 15.0 / 10.0;
+        CHECK(close(lengths[0], unit));
+        CHECK(close(lengths[1], 2 * unit));
+        CHECK(close(lengths[2], 4 * unit));
+        CHECK(close(lengths[3], 2 * unit));
+        CHECK(close(lengths[4], unit));
+        CHECK(xs.back() == 15.0);
+    }
+    SECTION("the sum is the piece")
+    {
+        options.defaults.divisions = 7;
+        options.defaults.ratio = 0.37;
+        const auto xs = nodeXs(meshOf(drawing, options));
+        CHECK(xs.front() == 0.0);
+        CHECK(xs.back() == 15.0);
+        double sum = 0.0;
+        for (const double l : lengthsOf(xs)) {
+            sum += l;
+        }
+        CHECK(close(sum, 15.0));
+    }
+}
+
+TEST_CASE("the grading follows the entity through a split", "[mesher][line][sizing]")
+{
+    Drawing drawing;
+    const EntityId beam = addLine(drawing, Vec3(0, 0, 0), Vec3(8, 0, 0));
+    addLine(drawing, Vec3(4, 0, 0), Vec3(4, 5, 0)); // a T at x = 4
+    LineMeshOptions options;
+    options.sizing[static_cast<std::uint64_t>(beam)] = {.divisions = 2, .ratio = 2.0};
+    const auto mesh = meshOf(drawing, options);
+    std::vector<double> xs;
+    for (fem::core::NodeIndex n = 0; n < mesh.nodeCount(); ++n) {
+        if (mesh.nodeCoordinates(n).y() == 0.0) {
+            xs.push_back(mesh.nodeCoordinates(n).x());
+        }
+    }
+    std::ranges::sort(xs);
+    const auto lengths = lengthsOf(xs);
+    REQUIRE(lengths.size() == 4);
+    // Each half: 4/3 then 8/3, growing toward the end of the beam.
+    CHECK(close(lengths[0], 4.0 / 3.0));
+    CHECK(close(lengths[1], 8.0 / 3.0));
+    CHECK(close(lengths[2], 4.0 / 3.0));
+    CHECK(close(lengths[3], 8.0 / 3.0));
+}
+
+TEST_CASE("sizing per entity over the defaults", "[mesher][line][sizing]")
+{
+    Drawing drawing;
+    addLine(drawing, Vec3(0, 0, 0), Vec3(6, 0, 0));
+    const EntityId second = addLine(drawing, Vec3(0, 5, 0), Vec3(6, 5, 0));
+    LineMeshOptions options;
+    options.defaults.divisions = 2;
+    options.sizing[static_cast<std::uint64_t>(second)] = {.divisions = 3};
+    const auto result = meshLines(drawing, options);
+    REQUIRE(result.has_value());
+    CHECK(result->mesh.elementCount() == 5);
+    CHECK(result->mesh.findGroup(fem::mesher::entityGroupName(second), 1)->elements.size() == 3);
+}
+
+TEST_CASE("quadratic elements", "[mesher][line][sizing]")
+{
+    Drawing drawing;
+    addLine(drawing, Vec3(0, 0, 0), Vec3(4, 2, 0));
+    LineMeshOptions options;
+    options.defaults.divisions = 2;
+    options.defaults.quadratic = true;
+    const auto mesh = meshOf(drawing, options);
+    CHECK(mesh.elementCount(ElementType::Line3) == 2);
+    CHECK(mesh.elementCount(ElementType::Line2) == 0);
+    CHECK(mesh.nodeCount() == 5);
+    // Numbered along the line: start, middle, end; the middle node is the
+    // midpoint of its element, and comes last in the element.
+    CHECK(nodeAt(mesh, 2) == Vec3(1, 0.5, 0));
+    CHECK(elementNodeIds(mesh, 1) == std::vector<fem::core::ExternalId>{1, 3, 2});
+    CHECK(elementNodeIds(mesh, 2) == std::vector<fem::core::ExternalId>{3, 5, 4});
+    CHECK(nodeAt(mesh, 4) == Vec3(3, 1.5, 0));
+}
+
+TEST_CASE("invalid sizing is refused", "[mesher][line][sizing]")
+{
+    Drawing drawing;
+    const EntityId line = addLine(drawing, Vec3(0, 0, 0), Vec3(1, 0, 0));
+    SECTION("per entity")
+    {
+        LineMeshOptions options;
+        options.sizing[static_cast<std::uint64_t>(line)] = {.divisions = 0};
+        const auto result = meshLines(drawing, options);
+        REQUIRE_FALSE(result.has_value());
+        CHECK(result.error().kind == LineMeshError::Kind::InvalidSizing);
+        CHECK(result.error().items == std::vector<EntityId>{line});
+    }
+    SECTION("the defaults")
+    {
+        for (const LineSizing& sizing :
+             {LineSizing{.length = 0.0}, LineSizing{.length = -1.0}, LineSizing{.ratio = 0.0},
+              LineSizing{.ratio = std::numeric_limits<double>::infinity()}}) {
+            LineMeshOptions options;
+            options.defaults = sizing;
+            const auto result = meshLines(drawing, options);
+            REQUIRE_FALSE(result.has_value());
+            CHECK(result.error().kind == LineMeshError::Kind::InvalidSizing);
+            CHECK(result.error().items.empty());
+        }
     }
 }

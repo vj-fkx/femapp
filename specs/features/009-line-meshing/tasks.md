@@ -83,7 +83,7 @@ Regras:
   classificação, os parâmetros de divisão levados aos nós pela fusão e os
   trechos entre nós obrigatórios (§5.2, §5.3, §5.5). Arquivo:
   `src/mesher/line_mesher.cpp`. Cobre: 03, 04, 11.
-- [ ] **T09** Divisão:
+- [x] **T09** Divisão:
   - testes primeiro, depois a implementação (§5.5);
   - divisões;
   - comprimento alvo (L/h inteiro e 3 + 1e−12);

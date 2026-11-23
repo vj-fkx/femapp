@@ -252,6 +252,65 @@ core::ExternalId externalId(std::size_t index)
     return static_cast<core::ExternalId>(index) + 1;
 }
 
+// REQ-009-06: what a sizing may hold.
+bool valid(const LineSizing& sizing)
+{
+    return (!sizing.divisions || *sizing.divisions >= 1) &&
+           (!sizing.length || (std::isfinite(*sizing.length) && *sizing.length > 0.0)) &&
+           std::isfinite(sizing.ratio) && sizing.ratio > 0.0;
+}
+
+// The number of elements of a piece of length `length` (design §5.5).
+int divisionsOf(const LineSizing& sizing, double length)
+{
+    if (sizing.divisions) {
+        return *sizing.divisions;
+    }
+    if (sizing.length) {
+        // The 1e-9 keeps L / h = 3 + 1e-12 at 3.
+        return std::max(1, static_cast<int>(std::ceil(length / *sizing.length - 1e-9)));
+    }
+    return 1;
+}
+
+// The positions of the n + 1 nodes of a piece as fractions of it, from 0
+// to 1, graded as design §5.5 says.
+std::vector<double> fractionsOf(const LineSizing& sizing, int n)
+{
+    std::vector<double> lengths(static_cast<std::size_t>(n), 1.0);
+    if (sizing.ratio != 1.0) {
+        if (sizing.grading == Grading::TowardEnd && n > 1) {
+            const double q = std::pow(sizing.ratio, 1.0 / (n - 1));
+            for (int k = 1; k < n; ++k) {
+                lengths[static_cast<std::size_t>(k)] = lengths[static_cast<std::size_t>(k - 1)] * q;
+            }
+        } else if (sizing.grading == Grading::TowardBoth) {
+            // From both ends to the middle: m sizes, mirrored.
+            const int m = (n + 1) / 2;
+            if (m > 1) {
+                const double q = std::pow(sizing.ratio, 1.0 / (m - 1));
+                for (int k = 1; k < m; ++k) {
+                    const double l = lengths[static_cast<std::size_t>(k - 1)] * q;
+                    lengths[static_cast<std::size_t>(k)] = l;
+                    lengths[static_cast<std::size_t>(n - 1 - k)] = l;
+                }
+            }
+        }
+    }
+    double total = 0.0;
+    for (const double l : lengths) {
+        total += l;
+    }
+    std::vector<double> fractions{0.0};
+    double sum = 0.0;
+    for (int k = 0; k + 1 < n; ++k) {
+        sum += lengths[static_cast<std::size_t>(k)];
+        fractions.push_back(sum / total);
+    }
+    fractions.push_back(1.0); // the end exactly
+    return fractions;
+}
+
 template <typename T>
 T check(core::Expected<T> value)
 {
@@ -278,6 +337,24 @@ tl::expected<LineMeshResult, LineMeshError> meshLines(const geom::Drawing& drawi
     auto entities = entitiesOf(drawing, options);
     if (!entities) {
         return tl::unexpected(std::move(entities.error()));
+    }
+    // REQ-009-06: the sizing of every entity meshed, checked first.
+    if (!valid(options.defaults)) {
+        return tl::unexpected(LineMeshError{.kind = LineMeshError::Kind::InvalidSizing});
+    }
+    std::vector<const LineSizing*> sizingOf(entities->size(), &options.defaults);
+    LineMeshError invalid{.kind = LineMeshError::Kind::InvalidSizing};
+    for (std::size_t e = 0; e < entities->size(); ++e) {
+        const auto own = options.sizing.find(static_cast<std::uint64_t>((*entities)[e]->id));
+        if (own != options.sizing.end()) {
+            sizingOf[e] = &own->second;
+            if (!valid(own->second)) {
+                invalid.items.push_back((*entities)[e]->id);
+            }
+        }
+    }
+    if (!invalid.items.empty()) {
+        return tl::unexpected(std::move(invalid));
     }
     const double tolerance = drawing.tolerance();
     LineMeshResult result;
@@ -415,8 +492,9 @@ tl::expected<LineMeshResult, LineMeshError> meshLines(const geom::Drawing& drawi
     Merge merge(candidates.size());
     mergeCandidates(candidates, tolerance, merge);
 
-    // 4. Numbering along the entities (design §5.5, §5.6): one element
-    // between consecutive required nodes of each piece.
+    // 4. Numbering along the entities (design §5.5, §5.6): each stretch
+    // between consecutive required nodes divided by the sizing of its
+    // entity, along the direction of the entity.
     Numbering numbering(candidates.size());
     const auto nodeOf = [&](std::int32_t candidate) {
         const std::int32_t root = merge.root(candidate);
@@ -440,6 +518,9 @@ tl::expected<LineMeshResult, LineMeshError> meshLines(const geom::Drawing& drawi
             splits.emplace_back(0.0, piece.startCandidate);
             splits.emplace_back(1.0, piece.endCandidate);
             std::ranges::sort(splits);
+            const LineSizing& sizing = *sizingOf[e];
+            const auto type =
+                sizing.quadratic ? core::ElementType::Line3 : core::ElementType::Line2;
             std::int32_t previous = -1;
             for (const auto& [s, candidate] : splits) {
                 const std::int32_t root = merge.root(candidate);
@@ -447,8 +528,31 @@ tl::expected<LineMeshResult, LineMeshError> meshLines(const geom::Drawing& drawi
                     continue;
                 }
                 if (previous >= 0) {
-                    const std::array<std::int32_t, 2> nodes{nodeOf(previous), nodeOf(root)};
-                    numbering.element(core::ElementType::Line2, nodes, e, piece.segment);
+                    const Vec3& from = candidates[static_cast<std::size_t>(previous)].position;
+                    const Vec3& to = candidates[static_cast<std::size_t>(root)].position;
+                    const std::vector<double> f =
+                        fractionsOf(sizing, divisionsOf(sizing, (to - from).norm()));
+                    std::int32_t start = nodeOf(previous);
+                    for (std::size_t k = 1; k < f.size(); ++k) {
+                        // Numbered from start to end: the middle node before
+                        // the end, but last in the element (Gmsh order).
+                        std::int32_t middle = -1;
+                        if (sizing.quadratic) {
+                            middle = numbering.interiorNode(from +
+                                                            0.5 * (f[k - 1] + f[k]) * (to - from));
+                        }
+                        const std::int32_t end =
+                            k + 1 == f.size() ? nodeOf(root)
+                                              : numbering.interiorNode(from + f[k] * (to - from));
+                        if (sizing.quadratic) {
+                            const std::array<std::int32_t, 3> nodes{start, end, middle};
+                            numbering.element(type, nodes, e, piece.segment);
+                        } else {
+                            const std::array<std::int32_t, 2> nodes{start, end};
+                            numbering.element(type, nodes, e, piece.segment);
+                        }
+                        start = end;
+                    }
                 }
                 previous = root;
             }
