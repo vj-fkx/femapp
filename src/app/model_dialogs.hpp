@@ -48,10 +48,22 @@ struct DetailChoice
     std::vector<setup::GroupTarget> groups;
 };
 
-[[nodiscard]] std::optional<DetailChoice> chooseDetail(QWidget* parent, const QString& title,
-                                                       setup::Item item,
-                                                       const setup::Document& document,
-                                                       const setup::Targets& targets,
-                                                       std::span<const setup::GroupTarget> groups);
+// A load without targets (a self-weight): `needsTargets` false.
+[[nodiscard]] std::optional<DetailChoice>
+chooseDetail(QWidget* parent, const QString& title, setup::Item item,
+             const setup::Document& document, const setup::Targets& targets,
+             std::span<const setup::GroupTarget> groups, bool needsTargets = true);
+
+class ModelController;
+
+// REQ-010-16, 26: the load cases: new, activate, delete, and the name, the
+// standard and the category of the one selected (with its psi), each change
+// pushed at once.
+void editLoadCases(QWidget* parent, ModelController* model);
+
+// REQ-010-17: the name and the factor of each load case of `combination`;
+// none when cancelled.
+[[nodiscard]] std::optional<setup::Combination>
+chooseCombination(QWidget* parent, const setup::Document& document, setup::Combination combination);
 
 } // namespace fem::app

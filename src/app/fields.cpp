@@ -288,6 +288,54 @@ setup::SupportItem supportOf(SupportPreset preset)
     return support;
 }
 
+setup::Action newAction(LoadKind kind, setup::UnitSystem units)
+{
+    switch (kind) {
+    case LoadKind::Nodal:
+        return core::NodalForce{};
+    case LoadKind::Distributed:
+        return core::DistributedLoad{};
+    case LoadKind::Concentrated:
+        return core::ConcentratedLoad{};
+    case LoadKind::SelfWeight: {
+        const double g = 9.80665 * setup::conversionFactor(setup::UnitSystem::NewtonMetre, units,
+                                                           q::kAcceleration);
+        return setup::SelfWeight{.acceleration = Eigen::Vector3d(0.0, -g, 0.0)};
+    }
+    case LoadKind::Temperature:
+        return core::TemperatureChange{};
+    case LoadKind::Gradient:
+        return core::TemperatureGradient{};
+    case LoadKind::InitialStrain:
+        return core::InitialStrain{};
+    case LoadKind::Settlement:
+        return setup::Settlement{.dof = core::DofType::V, .value = 0.0};
+    }
+    return core::NodalForce{};
+}
+
+bool loadOnNodes(LoadKind kind)
+{
+    return kind == LoadKind::Nodal || kind == LoadKind::Settlement;
+}
+
+std::optional<std::vector<std::pair<setup::ItemId, double>>>
+termsOf(std::span<const std::pair<setup::ItemId, QString>> typed)
+{
+    std::vector<std::pair<setup::ItemId, double>> terms;
+    for (const auto& [id, text] : typed) {
+        const auto parsed = parseNumber(text);
+        if (!parsed) {
+            return std::nullopt;
+        }
+        const auto* factor = std::get_if<double>(&*parsed);
+        if (factor != nullptr && *factor != 0.0) {
+            terms.emplace_back(id, *factor);
+        }
+    }
+    return terms;
+}
+
 namespace {
 
 QStringList endChoices()

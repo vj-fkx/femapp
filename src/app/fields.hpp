@@ -12,9 +12,12 @@
 #include <QStringList>
 
 #include <Eigen/Core>
+#include <array>
 #include <cstdint>
 #include <functional>
 #include <optional>
+#include <span>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -60,5 +63,34 @@ struct Field
 enum class SupportPreset : std::uint8_t { Fixed, Pinned, Roller, Custom };
 
 [[nodiscard]] setup::SupportItem supportOf(SupportPreset preset);
+
+// REQ-010-16: the actions of the Add load menu, in the order of
+// setup::Action.
+enum class LoadKind : std::uint8_t {
+    Nodal,
+    Distributed,
+    Concentrated,
+    SelfWeight,
+    Temperature,
+    Gradient,
+    InitialStrain,
+    Settlement
+};
+inline constexpr std::array<LoadKind, 8> kLoadKinds{
+    LoadKind::Nodal,       LoadKind::Distributed, LoadKind::Concentrated,  LoadKind::SelfWeight,
+    LoadKind::Temperature, LoadKind::Gradient,    LoadKind::InitialStrain, LoadKind::Settlement};
+
+// A new action of `kind`: zero, but the self-weight, which is the gravity
+// along -Y (vertical in the plane of the drawing) in `units`, a distributed
+// load over the whole bar and a settlement of V.
+[[nodiscard]] setup::Action newAction(LoadKind kind, setup::UnitSystem units);
+// Whether the action acts on nodes (its targets are nodes) or on bars.
+[[nodiscard]] bool loadOnNodes(LoadKind kind);
+
+// REQ-010-17: the terms of a combination from the factors typed per load
+// case: an empty or zero factor leaves the case out; none when a factor is
+// not a number.
+[[nodiscard]] std::optional<std::vector<std::pair<setup::ItemId, double>>>
+termsOf(std::span<const std::pair<setup::ItemId, QString>> typed);
 
 } // namespace fem::app

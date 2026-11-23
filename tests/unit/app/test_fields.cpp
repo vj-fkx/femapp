@@ -3,8 +3,11 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <cmath>
 #include <string>
+#include <utility>
 #include <variant>
+#include <vector>
 
 // Feature 010, T15 (design §5.5): REQ-010-19. The fields of the items read
 // and write them, and refuse invalid values, without widgets.
@@ -199,4 +202,35 @@ TEST_CASE("the shortcuts of the supports", "[app][fields]")
     const auto fields = fem::app::fieldsOf(item, document);
     CHECK(std::get<bool>(field(fields, "W").get(item)));
     CHECK_FALSE(std::get<bool>(field(fields, "RZ").get(item)));
+}
+
+TEST_CASE("a new load of each action", "[app][fields]")
+{
+    // Feature 010, T19: REQ-010-16.
+    using fem::app::LoadKind;
+    for (const LoadKind kind : fem::app::kLoadKinds) {
+        const s::Action action = fem::app::newAction(kind, s::UnitSystem::KilonewtonMetre);
+        CHECK(static_cast<std::size_t>(action.index()) == static_cast<std::size_t>(kind));
+        CHECK(fem::app::loadOnNodes(kind) ==
+              (kind == LoadKind::Nodal || kind == LoadKind::Settlement));
+    }
+    // Gravity along -Y, in the units of the model.
+    const auto mm = fem::app::newAction(LoadKind::SelfWeight, s::UnitSystem::NewtonMillimetre);
+    CHECK(std::abs(std::get<s::SelfWeight>(mm).acceleration.y() + 9806.65) <= 1e-9);
+    CHECK(std::get<s::SelfWeight>(mm).acceleration.x() == 0.0);
+}
+
+TEST_CASE("the terms of a combination from the factors typed", "[app][fields]")
+{
+    // Feature 010, T19: REQ-010-17.
+    const std::vector<std::pair<s::ItemId, QString>> typed{{s::ItemId{1}, QStringLiteral("1.4")},
+                                                           {s::ItemId{2}, QString()},
+                                                           {s::ItemId{3}, QStringLiteral(" 1.5 ")},
+                                                           {s::ItemId{4}, QStringLiteral("0")}};
+    const auto terms = fem::app::termsOf(typed);
+    REQUIRE(terms.has_value());
+    CHECK(terms.value_or(std::vector<std::pair<s::ItemId, double>>{}) ==
+          std::vector<std::pair<s::ItemId, double>>{{s::ItemId{1}, 1.4}, {s::ItemId{3}, 1.5}});
+    const std::vector<std::pair<s::ItemId, QString>> wrong{{s::ItemId{1}, QStringLiteral("x")}};
+    CHECK_FALSE(fem::app::termsOf(wrong).has_value());
 }

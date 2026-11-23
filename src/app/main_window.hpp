@@ -1,5 +1,7 @@
 #pragma once
 
+#include "fields.hpp"
+
 #include <fem/render/display_options.hpp>
 #include <fem/setup/document.hpp>
 
@@ -90,6 +92,10 @@ private:
     // REQ-010-08, 15: a beam detail or a support, from `item` as the
     // dialog starts it, on the selection or the groups of `dimension`.
     void assignDetail(const QString& title, setup::Item item, int dimension, const QString& undo);
+    // REQ-010-16: a load in the active load case.
+    void addLoad(LoadKind kind, const QString& title);
+    // REQ-010-17: a new combination, or the terms of `id` edited.
+    void editCombination(std::optional<setup::ItemId> id);
     // The new item selected in the tree, for its properties.
     void selectItem(setup::ItemId id);
     // REQ-010-12: the targets of the viewport selection.

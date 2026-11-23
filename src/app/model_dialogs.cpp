@@ -2,7 +2,10 @@
 
 #include "field_editor.hpp"
 #include "fields.hpp"
+#include "model_controller.hpp"
+#include "property_panel.hpp"
 
+#include <fem/setup/editing.hpp>
 #include <fem/setup/library.hpp>
 
 #include <QCheckBox>
@@ -12,14 +15,20 @@
 #include <QDialogButtonBox>
 #include <QFormLayout>
 #include <QHBoxLayout>
+#include <QHeaderView>
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
+#include <QPointer>
 #include <QPushButton>
+#include <QSignalBlocker>
+#include <QTableWidget>
+#include <QTimer>
 #include <QVBoxLayout>
 
 #include <array>
 #include <cmath>
+#include <functional>
 #include <memory>
 #include <numbers>
 #include <set>
@@ -346,41 +355,69 @@ std::optional<BarChoice> chooseBars(QWidget* parent, const setup::Document& docu
 std::optional<DetailChoice> chooseDetail(QWidget* parent, const QString& title, setup::Item item,
                                          const setup::Document& document,
                                          const setup::Targets& targets,
-                                         std::span<const setup::GroupTarget> groups)
+                                         std::span<const setup::GroupTarget> groups,
+                                         bool needsTargets)
 {
     QDialog dialog(parent);
     dialog.setWindowTitle(title);
     auto* layout = new QVBoxLayout(&dialog);
-    QListWidget* groupList = addTargets(dialog, layout, targets, groups);
+    QListWidget* groupList = needsTargets ? addTargets(dialog, layout, targets, groups) : nullptr;
 
     // The fields write into a copy of the item; the refused ones are
     // remembered until they are corrected.
     auto edited = std::make_shared<setup::Item>(std::move(item));
     auto refused = std::make_shared<std::set<QWidget*>>();
-    auto* body = new QWidget(&dialog);
-    auto* form = new QFormLayout(body);
-    form->setContentsMargins(0, 0, 0, 0);
     const setup::UnitSystem units = document.units();
-    for (const Field& field : fieldsOf(*edited, document)) {
-        addFieldEditor(form, body, field, field.get(*edited),
-                       QString::fromStdString(setup::unitLabel(units, field.quantity)),
-                       [edited, refused](const Field& f, const FieldValue& value, QWidget* editor) {
-                           const bool ok = f.set && f.set(*edited, value);
-                           markInvalid(editor, !ok);
-                           if (ok) {
-                               refused->erase(editor);
-                           } else {
-                               refused->insert(editor);
-                           }
-                       });
-    }
-    layout->addWidget(body);
+    auto* holder = new QVBoxLayout;
+    layout->addLayout(holder);
+    QPointer<QWidget> body;
+    const auto labelsOf = [&document](const setup::Item& i) {
+        QStringList labels;
+        for (const Field& field : fieldsOf(i, document)) {
+            labels.append(field.label);
+        }
+        return labels;
+    };
+    std::function<void()> build;
+    build = [&] {
+        if (body) {
+            body->hide();
+            body->deleteLater();
+        }
+        refused->clear();
+        body = new QWidget(&dialog);
+        auto* form = new QFormLayout(body);
+        form->setContentsMargins(0, 0, 0, 0);
+        const QStringList before = labelsOf(*edited);
+        for (const Field& field : fieldsOf(*edited, document)) {
+            addFieldEditor(form, body, field, field.get(*edited),
+                           QString::fromStdString(setup::unitLabel(units, field.quantity)),
+                           [&dialog, &build, &labelsOf, edited, refused,
+                            before](const Field& f, const FieldValue& value, QWidget* editor) {
+                               const bool ok = f.set && f.set(*edited, value);
+                               markInvalid(editor, !ok);
+                               if (ok) {
+                                   refused->erase(editor);
+                               } else {
+                                   refused->insert(editor);
+                               }
+                               // Other fields now (a length instead of a fraction):
+                               // the form again, once the editor has returned.
+                               if (ok && labelsOf(*edited) != before) {
+                                   QTimer::singleShot(0, &dialog, [&build] { build(); });
+                               }
+                           });
+        }
+        holder->addWidget(body);
+    };
+    build();
     auto* problem = new QLabel(&dialog);
     problem->setWordWrap(true);
     problem->setStyleSheet(QStringLiteral("color: #d04040;"));
     layout->addWidget(problem);
     QDialogButtonBox* buttons = okCancel(dialog);
-    buttons->button(QDialogButtonBox::Ok)->setEnabled(!targets.empty() || groupList != nullptr);
+    buttons->button(QDialogButtonBox::Ok)
+        ->setEnabled(!needsTargets || !targets.empty() || groupList != nullptr);
     layout->addWidget(buttons);
 
     for (;;) {
@@ -397,6 +434,171 @@ std::optional<DetailChoice> chooseDetail(QWidget* parent, const QString& title, 
             continue;
         }
         return choice;
+    }
+}
+
+void editLoadCases(QWidget* parent, ModelController* model)
+{
+    QDialog dialog(parent);
+    dialog.setWindowTitle(Text::tr("Load cases"));
+    auto* layout = new QHBoxLayout(&dialog);
+    auto* left = new QVBoxLayout;
+    auto* list = new QListWidget(&dialog);
+    left->addWidget(list);
+    auto* newCase = new QPushButton(Text::tr("New"), &dialog);
+    auto* activate = new QPushButton(Text::tr("Activate"), &dialog);
+    auto* remove = new QPushButton(Text::tr("Delete"), &dialog);
+    auto* close = new QPushButton(Text::tr("Close"), &dialog);
+    for (QPushButton* button : {newCase, activate, remove}) {
+        left->addWidget(button);
+    }
+    left->addStretch();
+    left->addWidget(close);
+    layout->addLayout(left);
+    // REQ-010-26: the name, the standard, the category and its psi, as in
+    // the properties panel, each change one step of undo.
+    auto* panel = new PropertyPanel(model, &dialog);
+    panel->setMinimumWidth(360);
+    layout->addWidget(panel, 1);
+
+    const auto selected = [list]() -> std::optional<setup::ItemId> {
+        const QListWidgetItem* item = list->currentItem();
+        if (item == nullptr) {
+            return std::nullopt;
+        }
+        return static_cast<setup::ItemId>(item->data(Qt::UserRole).toULongLong());
+    };
+    // The cases, the active one marked; the one selected kept.
+    const auto fill = [list, model, selected](std::optional<setup::ItemId> keep) {
+        const QSignalBlocker block(list);
+        if (!keep) {
+            keep = selected();
+        }
+        list->clear();
+        const setup::Document& document = model->document();
+        for (const setup::Item& item : document.items()) {
+            const auto* c = std::get_if<setup::LoadCase>(&item);
+            if (c == nullptr) {
+                continue;
+            }
+            QString text = QString::fromStdString(c->name);
+            if (!c->category.empty()) {
+                text += QStringLiteral(" [%1]").arg(QString::fromStdString(c->category));
+            }
+            auto* row = new QListWidgetItem(text, list);
+            row->setData(Qt::UserRole, QVariant::fromValue(static_cast<qulonglong>(c->id)));
+            if (document.activeCase() == c->id) {
+                QFont bold = row->font();
+                bold.setBold(true);
+                row->setFont(bold);
+                row->setText(text + Text::tr(" (active)"));
+            }
+            if (keep == c->id) {
+                list->setCurrentItem(row);
+            }
+        }
+    };
+    QObject::connect(list, &QListWidget::currentRowChanged, &dialog,
+                     [panel, selected] { panel->showItem(selected()); });
+    QObject::connect(model, &ModelController::documentChanged, &dialog,
+                     [fill] { fill(std::nullopt); });
+    QObject::connect(newCase, &QPushButton::clicked, &dialog, [model, fill, panel] {
+        setup::LoadCase c{.id = {}, .name = {}, .standard = {}, .category = {}};
+        c.name = setup::freeName(model->document(), c, "Load case");
+        if (const auto id = model->add(std::move(c), Text::tr("new load case"))) {
+            fill(*id);
+            panel->showItem(*id);
+        }
+    });
+    QObject::connect(activate, &QPushButton::clicked, &dialog, [model, selected] {
+        if (const auto id = selected()) {
+            model->push(setup::setActiveCase(model->document(), *id),
+                        Text::tr("activate load case"));
+        }
+    });
+    QObject::connect(remove, &QPushButton::clicked, &dialog, [model, selected] {
+        if (const auto id = selected()) {
+            model->push(setup::removeItem(model->document(), *id), Text::tr("delete"));
+        }
+    });
+    QObject::connect(close, &QPushButton::clicked, &dialog, &QDialog::accept);
+    QObject::connect(list, &QListWidget::itemDoubleClicked, &dialog,
+                     [activate] { activate->click(); });
+    fill(model->document().activeCase());
+    if (list->currentItem() == nullptr && list->count() > 0) {
+        list->setCurrentRow(0);
+    }
+    panel->showItem(selected());
+    dialog.exec();
+}
+
+std::optional<setup::Combination>
+chooseCombination(QWidget* parent, const setup::Document& document, setup::Combination combination)
+{
+    std::vector<const setup::LoadCase*> cases;
+    for (const setup::Item& item : document.items()) {
+        if (const auto* c = std::get_if<setup::LoadCase>(&item)) {
+            cases.push_back(c);
+        }
+    }
+    QDialog dialog(parent);
+    dialog.setWindowTitle(Text::tr("Combination"));
+    auto* layout = new QVBoxLayout(&dialog);
+    auto* form = new QFormLayout;
+    auto* name = new QLineEdit(QString::fromStdString(combination.name), &dialog);
+    form->addRow(Text::tr("Name"), name);
+    layout->addLayout(form);
+    layout->addWidget(
+        new QLabel(Text::tr("The factor of each load case; empty or 0 leaves it out."), &dialog));
+    auto* table = new QTableWidget(static_cast<int>(cases.size()), 2, &dialog);
+    table->setHorizontalHeaderLabels({Text::tr("Load case"), Text::tr("Factor")});
+    table->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
+    table->verticalHeader()->setVisible(false);
+    for (std::size_t r = 0; r < cases.size(); ++r) {
+        const auto row = static_cast<int>(r);
+        auto* caseName = new QTableWidgetItem(QString::fromStdString(cases[r]->name));
+        caseName->setFlags(caseName->flags() & ~Qt::ItemIsEditable);
+        table->setItem(row, 0, caseName);
+        QString factor;
+        for (const auto& [id, f] : combination.terms) {
+            if (id == cases[r]->id) {
+                factor = formatNumber(f);
+            }
+        }
+        table->setItem(row, 1, new QTableWidgetItem(factor));
+    }
+    layout->addWidget(table);
+    auto* problem = new QLabel(&dialog);
+    problem->setStyleSheet(QStringLiteral("color: #d04040;"));
+    layout->addWidget(problem);
+    QDialogButtonBox* buttons = okCancel(dialog);
+    buttons->button(QDialogButtonBox::Ok)->setEnabled(!cases.empty());
+    layout->addWidget(buttons);
+    if (cases.empty()) {
+        problem->setText(Text::tr("Make the load cases first."));
+    }
+
+    for (;;) {
+        if (dialog.exec() != QDialog::Accepted) {
+            return std::nullopt;
+        }
+        std::vector<std::pair<setup::ItemId, QString>> typed;
+        for (std::size_t r = 0; r < cases.size(); ++r) {
+            const QTableWidgetItem* cell = table->item(static_cast<int>(r), 1);
+            typed.emplace_back(cases[r]->id, cell != nullptr ? cell->text() : QString());
+        }
+        const auto terms = termsOf(typed);
+        if (!terms) {
+            problem->setText(Text::tr("A factor is not a number."));
+            continue;
+        }
+        if (terms->empty() || name->text().trimmed().isEmpty()) {
+            problem->setText(Text::tr("Give a name and at least one factor."));
+            continue;
+        }
+        combination.name = name->text().trimmed().toStdString();
+        combination.terms = *terms;
+        return combination;
     }
 }
 

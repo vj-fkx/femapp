@@ -481,6 +481,95 @@ void MainWindow::createModelMenu()
     support(tr("&Pinned..."), SupportPreset::Pinned);
     support(tr("&Roller..."), SupportPreset::Roller);
     support(tr("&Custom..."), SupportPreset::Custom);
+
+    // REQ-010-16, 17, 26: load cases, loads and combinations.
+    menu->addSeparator();
+    menu->addAction(tr("Load &cases..."), this, [this] { editLoadCases(this, m_model); });
+    QMenu* loads = menu->addMenu(tr("Add &load"));
+    const std::array<std::pair<QString, LoadKind>, 8> kinds{{
+        {tr("&Nodal..."), LoadKind::Nodal},
+        {tr("&Distributed..."), LoadKind::Distributed},
+        {tr("&Concentrated..."), LoadKind::Concentrated},
+        {tr("&Self-weight..."), LoadKind::SelfWeight},
+        {tr("&Temperature..."), LoadKind::Temperature},
+        {tr("&Gradient..."), LoadKind::Gradient},
+        {tr("&Initial strain..."), LoadKind::InitialStrain},
+        {tr("S&ettlement..."), LoadKind::Settlement},
+    }};
+    for (const auto& [name, kind] : kinds) {
+        loads->addAction(name, this, [this, name, kind] {
+            addLoad(kind, QString(name).remove(QLatin1Char('&')).remove(QStringLiteral("...")));
+        });
+    }
+    menu->addAction(tr("New c&ombination..."), this, [this] { editCombination(std::nullopt); });
+}
+
+void MainWindow::addLoad(LoadKind kind, const QString& title)
+{
+    // The active load case; the first one is made when there is none.
+    const setup::Document& document = m_model->document();
+    std::optional<setup::ItemId> loadCase = document.activeCase();
+    const setup::Item* active = loadCase ? document.find(*loadCase) : nullptr;
+    if (active != nullptr && !std::holds_alternative<setup::LoadCase>(*active)) {
+        showMessage(tr("Add load"),
+                    tr("A combination is active: activate the load case to add the load to."),
+                    true);
+        return;
+    }
+    if (active == nullptr) {
+        setup::LoadCase first{.id = {}, .name = {}, .standard = {}, .category = {}};
+        first.name = setup::freeName(document, first, "Load case");
+        loadCase = m_model->add(std::move(first), tr("new load case"));
+        if (!loadCase) {
+            return;
+        }
+    }
+    const bool onNodes = loadOnNodes(kind);
+    const bool needsTargets = kind != LoadKind::SelfWeight;
+    const setup::Targets targets = needsTargets ? selectedTargets() : setup::Targets{};
+    const std::vector<setup::GroupTarget> groups = m_model->meshGroups(onNodes ? 0 : 1);
+    const setup::Item item = setup::LoadItem{.id = {},
+                                             .loadCase = *loadCase,
+                                             .targets = {},
+                                             .action = newAction(kind, document.units())};
+    const QString caseName =
+        QString::fromStdString(setup::nameOf(*m_model->document().find(*loadCase)));
+    auto choice = chooseDetail(this, tr("%1 in %2").arg(title, caseName), item, m_model->document(),
+                               targets, groups, needsTargets);
+    if (!choice) {
+        return;
+    }
+    auto& load = std::get<setup::LoadItem>(choice->item);
+    load.targets = targets;
+    if (load.targets.empty()) {
+        load.targets.groups = std::move(choice->groups);
+    }
+    m_model->add(std::move(choice->item), tr("add load"));
+}
+
+void MainWindow::editCombination(std::optional<setup::ItemId> id)
+{
+    const setup::Document& document = m_model->document();
+    setup::Combination start{.id = {}, .name = {}, .terms = {}};
+    if (id) {
+        const setup::Item* item = document.find(*id);
+        const auto* existing = item != nullptr ? std::get_if<setup::Combination>(item) : nullptr;
+        if (existing == nullptr) {
+            return;
+        }
+        start = *existing;
+    } else {
+        start.name = setup::freeName(document, start, "Combination");
+    }
+    auto chosen = chooseCombination(this, document, std::move(start));
+    if (!chosen) {
+        return;
+    }
+    if (id) {
+        m_model->push(setup::changeItem(m_model->document(), *chosen), tr("edit combination"));
+    } else {
+        m_model->add(std::move(*chosen), tr("new combination"));
+    }
 }
 
 void MainWindow::assignDetail(const QString& title, setup::Item item, int dimension,
@@ -722,6 +811,10 @@ void MainWindow::showModelMenu(const QPoint& position)
         if (std::holds_alternative<setup::LoadCase>(*item) ||
             std::holds_alternative<setup::Combination>(*item)) {
             menu.addAction(tr("Activate"), this, [this, index] { activateItem(index); });
+        }
+        if (std::holds_alternative<setup::Combination>(*item)) {
+            menu.addAction(tr("Edit factors..."), this,
+                           [this, itemId] { editCombination(itemId); });
         }
         if (!setup::nameOf(*item).empty()) {
             menu.addAction(tr("Rename..."), this, [this, itemId] {

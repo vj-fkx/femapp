@@ -223,13 +223,21 @@ Regras:
   translações; rolete: a translação em Y global, vertical no plano do
   desenho), testados em `test_fields.cpp`. Apoios usam os grupos 0D sem
   seleção; os detalhes, os 1D.
-- [ ] **T19** Casos, cargas e combinações:
+- [x] **T19** Casos, cargas e combinações:
   - o diálogo dos casos (criar, renomear, ativar, classificar pela norma
     e pela categoria, mostrando os ψ);
   - Add load com cada ação, sobre a seleção, no caso ativo;
   - o diálogo das combinações (casos e fatores).
   Arquivos: `model_dialogs.*`, `model_controller.cpp`. Cobre: 16, 17, 18,
   26.
+  Nota: o diálogo dos casos é a lista com o mesmo painel de propriedades
+  (nome, norma, categoria, ψ), cada mudança um passo de desfazer. Add
+  load usa o diálogo de detalhes, que agora refaz o formulário quando os
+  campos mudam (posição em comprimento ou fração) e aceita cargas sem
+  alvo (peso próprio, gravidade em −Y nas unidades do modelo). Sem caso,
+  o primeiro é criado; com uma combinação ativa, a carga é recusada. As
+  combinações se criam pelo menu e se editam pela árvore ("Edit
+  factors..."). Testados: `newAction`, `loadOnNodes`, `termsOf`.
 
 ## Fase 6 — Símbolos no viewport
 
