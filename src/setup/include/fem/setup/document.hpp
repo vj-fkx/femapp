@@ -144,6 +144,10 @@ struct LoadCase
 {
     ItemId id{};
     std::string name;
+    // REQ-010-26: the standard and the category of its action (keys of
+    // actionCategories()); empty for none.
+    std::string standard;
+    std::string category;
 };
 
 struct LoadItem

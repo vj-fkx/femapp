@@ -123,7 +123,7 @@ Regras:
   - depois as ações e a soma.
   Arquivos: `build.cpp`, `tests/unit/setup/test_build.cpp`. Cobre: 15, 16,
   17, 20.
-- [ ] **T10b** Categorias de ação por norma (design §5.10, ampliada na
+- [x] **T10b** Categorias de ação por norma (design §5.10, ampliada na
   implementação a pedido do mantenedor):
   - testes primeiro:
     - cada categoria contra a tabela;
