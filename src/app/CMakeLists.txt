@@ -29,6 +29,8 @@ qt_add_executable(femapp WIN32 MACOSX_BUNDLE
     section_geometry.hpp
     section_view.cpp
     section_view.hpp
+    symbol_builder.cpp
+    symbol_builder.hpp
     thin_walled_table.cpp
     thin_walled_table.hpp
     main_window.hpp

@@ -258,12 +258,21 @@ Regras:
   `supportShape` (no plano só U, V e RZ contam; o rolete aponta para o
   GDL preso). Os símbolos vão por cima do modelo, sem teste de
   profundidade. O desenho na tela fica para a T21 e o roteiro T23.
-- [ ] **T21** O `ModelController` monta o `SymbolSet`:
+- [x] **T21** O `ModelController` monta o `SymbolSet`:
   - do caso ou da combinação ativa, com as posições da malha ou, sem
     malha, do desenho;
   - Show symbols e Show local axes (selecionadas ou todas);
   - refeito a cada edição, malha ou troca de caso.
   Arquivos: `model_controller.cpp`, `main_window.cpp`. Cobre: 09, 22.
+  Nota: a montagem ficou em `symbol_builder.*` (sem widgets), testada
+  em `test_symbol_builder.cpp`. Com malha, os símbolos saem do
+  `core::Model` montado (só as atribuições que ele aceita, com material e
+  seção); sem malha, dos alvos por entidade sobre o desenho, com os
+  fatores da combinação. Forças e momentos nodais somam-se por nó. O
+  `ModelController` refaz o conjunto uma vez por volta do laço de
+  eventos (um `QTimer` de 0 ms) após cada edição, desfazer, malha ou
+  troca de caso. Menu Model: Show symbols e Show local axes (nenhum, da
+  seleção, de todas).
 
 ## Fase 7 — Conferência e fechamento
 

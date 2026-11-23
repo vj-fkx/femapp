@@ -1,6 +1,7 @@
 #pragma once
 
 #include "fields.hpp"
+#include "symbol_builder.hpp"
 
 #include <fem/render/display_options.hpp>
 #include <fem/setup/document.hpp>
@@ -94,6 +95,8 @@ private:
     void assignDetail(const QString& title, setup::Item item, int dimension, const QString& undo);
     // REQ-010-16: a load in the active load case.
     void addLoad(LoadKind kind, const QString& title);
+    // REQ-010-09: the local axes shown, of the selection or of all.
+    void showLocalAxes(AxesShown shown);
     // REQ-010-17: a new combination, or the terms of `id` edited.
     void editCombination(std::optional<setup::ItemId> id);
     // The new item selected in the tree, for its properties.

@@ -44,7 +44,33 @@ ModelController::ModelController(QUndoStack* undo, const geom::Drawing& drawing,
     : QObject(parent)
     , m_undo(undo)
     , m_drawing(drawing)
-{}
+{
+    m_symbolTimer.setSingleShot(true);
+    m_symbolTimer.setInterval(0);
+    connect(&m_symbolTimer, &QTimer::timeout, this, &ModelController::rebuildSymbols);
+    // The drawing shares the undo stack: its edits move the symbols too.
+    connect(m_undo, &QUndoStack::indexChanged, this, &ModelController::scheduleSymbols);
+}
+
+void ModelController::setSymbolOptions(SymbolOptions options)
+{
+    m_symbolOptions = std::move(options);
+    scheduleSymbols();
+}
+
+void ModelController::scheduleSymbols()
+{
+    // Many changes in one turn (an edit and its index) build them once.
+    m_symbolTimer.start();
+}
+
+void ModelController::rebuildSymbols()
+{
+    m_symbolTimer.stop();
+    m_symbols = std::make_shared<const render::SymbolSet>(
+        buildSymbols(m_document, m_drawing, m_mesh, m_symbolOptions));
+    emit symbolsChanged();
+}
 
 bool ModelController::push(const setup::EditResult& edit, const QString& text)
 {
@@ -157,6 +183,7 @@ void ModelController::meshGenerated(const std::shared_ptr<const render::MeshScen
     ++m_mesh.generation;
     m_mesh.drawingRevision = revision;
     emit meshChanged();
+    scheduleSymbols();
 }
 
 void ModelController::meshImported(const std::shared_ptr<const render::MeshScene>& scene)
@@ -166,11 +193,13 @@ void ModelController::meshImported(const std::shared_ptr<const render::MeshScene
     ++m_mesh.generation;
     m_mesh.drawingRevision.reset();
     emit meshChanged();
+    scheduleSymbols();
 }
 
 void ModelController::changed()
 {
     emit documentChanged();
+    scheduleSymbols();
 }
 
 } // namespace fem::app

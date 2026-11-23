@@ -4,16 +4,20 @@
 // mesh it is built on. Every change goes through the undo stack of the
 // drawing (REQ-010-23).
 
+#include "symbol_builder.hpp"
+
 #include <fem/geom/drawing.hpp>
 #include <fem/mesher/line_mesher.hpp>
 #include <fem/render/mesh_scene.hpp>
 #include <fem/render/selection.hpp>
+#include <fem/render/symbols.hpp>
 #include <fem/setup/build.hpp>
 #include <fem/setup/document.hpp>
 #include <fem/setup/editing.hpp>
 
 #include <QObject>
 #include <QString>
+#include <QTimer>
 
 #include <cstdint>
 #include <memory>
@@ -62,6 +66,18 @@ public:
     // An item added as one step of undo: its id, or none when refused.
     std::optional<setup::ItemId> add(setup::Item item, const QString& text);
 
+    // REQ-010-09, 22: the symbols of the model, rebuilt (once per turn of
+    // the event loop) after every edit of the document or the drawing, a
+    // new mesh or a new active case; symbolsChanged() then.
+    [[nodiscard]] const std::shared_ptr<const render::SymbolSet>& symbols() const noexcept
+    {
+        return m_symbols;
+    }
+    void setSymbolOptions(SymbolOptions options);
+    [[nodiscard]] const SymbolOptions& symbolOptions() const noexcept { return m_symbolOptions; }
+    // Builds them now (the deferred rebuild does this).
+    void rebuildSymbols();
+
     std::optional<QString> setSolidFromPolylines(setup::ItemId id,
                                                  std::span<const geom::EntityId> entities);
 
@@ -77,6 +93,7 @@ signals:
     void documentChanged();
     void meshChanged();
     void refused(const fem::setup::EditRefusal& refusal);
+    void symbolsChanged();
 
 private:
     friend class DocumentUndoCommand;
@@ -86,6 +103,10 @@ private:
     const geom::Drawing& m_drawing;
     setup::Document m_document;
     setup::MeshContext m_mesh;
+    SymbolOptions m_symbolOptions;
+    std::shared_ptr<const render::SymbolSet> m_symbols;
+    QTimer m_symbolTimer;
+    void scheduleSymbols();
 };
 
 } // namespace fem::app

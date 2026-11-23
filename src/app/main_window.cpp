@@ -502,6 +502,54 @@ void MainWindow::createModelMenu()
         });
     }
     menu->addAction(tr("New c&ombination..."), this, [this] { editCombination(std::nullopt); });
+
+    // REQ-010-09, 22: the symbols of the model in the viewport.
+    menu->addSeparator();
+    QAction* symbols = menu->addAction(tr("Show s&ymbols"));
+    symbols->setCheckable(true);
+    symbols->setChecked(true);
+    connect(symbols, &QAction::toggled, this, [this](bool on) {
+        if (!m_viewport.isNull()) {
+            m_viewport->setSymbolsVisible(on);
+        }
+    });
+    QMenu* axes = menu->addMenu(tr("Show local &axes"));
+    // NOLINTNEXTLINE(cppcoreguidelines-owning-memory): owned by the menu.
+    auto* axesGroup = new QActionGroup(axes);
+    for (const auto& [name, shown] : std::array<std::pair<QString, AxesShown>, 3>{
+             {{tr("&None"), AxesShown::None},
+              {tr("Of the &selection"), AxesShown::Selected},
+              {tr("Of &all bars"), AxesShown::All}}}) {
+        QAction* action = axes->addAction(name);
+        action->setCheckable(true);
+        action->setChecked(shown == AxesShown::None);
+        axesGroup->addAction(action);
+        connect(action, &QAction::triggered, this, [this, shown] { showLocalAxes(shown); });
+    }
+    connect(m_model, &ModelController::symbolsChanged, this, [this] {
+        if (!m_viewport.isNull()) {
+            m_viewport->setSymbols(m_model->symbols());
+        }
+    });
+    // The axes of the selection follow it.
+    const auto selectionMoved = [this] {
+        if (m_model->symbolOptions().axes == AxesShown::Selected) {
+            showLocalAxes(AxesShown::Selected);
+        }
+    };
+    connect(m_viewport, &render::Viewport::selectionChanged, this, selectionMoved);
+    connect(m_viewport, &render::Viewport::drawingSelectionChanged, this, selectionMoved);
+    m_model->rebuildSymbols();
+}
+
+void MainWindow::showLocalAxes(AxesShown shown)
+{
+    SymbolOptions options;
+    options.axes = shown;
+    if (shown == AxesShown::Selected) {
+        options.axesOf = selectedTargets();
+    }
+    m_model->setSymbolOptions(std::move(options));
 }
 
 void MainWindow::addLoad(LoadKind kind, const QString& title)
