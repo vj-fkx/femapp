@@ -59,7 +59,7 @@ No `app`:
 | app | `line_mesh_job.hpp`, `line_mesh_job.cpp` | novo | Geração e cena numa thread de trabalho; sinais `finished`/`failed` (REQ-009-13) |
 | app | `drafting_controller.hpp`, `drafting_controller.cpp` | alterado | `MESH`/`ME`, o pedido de tamanho, Esc, o aviso de desatualizada, o Tab completando MESH (REQ-009-12, 15) |
 | app | `main_window.hpp`, `main_window.cpp` | alterado | Mostrar a malha gerada (mesma rota do `meshImported`), o relatório e as falhas no console (REQ-009-13, 14) |
-| app | `i18n/femapp_pt_BR.ts` | alterado | Textos novos (REQ-009-16) |
+| app | `i18n/femapp_pt_BR.ts` | adiado | Tradução dos textos novos (REQ-009-16): adiada pelo mantenedor em 2026-11-22; os textos ficam em inglês por `tr()` |
 | tests | `tests/unit/mesher/test_line_mesher.cpp`, `test_segment_geometry.cpp`, `test_segment_bvh.cpp` | novo | AC-1 a AC-5, NFR-009-02 |
 | tests | `tests/CMakeLists.txt` | alterado | `femapp_add_test(mesher ...)` |
 | tests | `tests/perf/bench_line_mesh.cpp` | novo | NFR-009-01 |
@@ -331,7 +331,8 @@ signals:
   is out of date: run MESH again.". O aviso volta a valer depois de outro
   MESH.
 - **Desfazer:** o MESH não gera `DrawingEdit`, então o desfazer não o vê.
-- **Textos:** todos por `tr()` no `app`, com a tradução pt_BR. Os números
+- **Textos:** todos por `tr()` no `app`, em inglês por ora (a tradução
+  pt_BR foi adiada pelo mantenedor em 2026-11-22). Os números
   saem com o ponto decimal, como as coordenadas da 005.
 
 ## 6. Fluxo

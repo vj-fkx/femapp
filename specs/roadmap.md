@@ -121,6 +121,7 @@ tarefas da feature indicada (ou de uma nova) quando ela for especificada.
 | 008c | Imperfeições iniciais: curvatura inicial, cargas nocionais e imperfeição pelo modo de flambagem | 010 ou feature própria após a 008c |
 | 008c | Combinações de casos de carga (a segunda ordem não superpõe) | 010 / 011 |
 | 008c | Flambagem da própria barra de treliça entre os nós (hoje: modelar como viga) | 010 (aviso ou opção na atribuição) |
+| 009 | Tradução pt_BR dos textos do comando MESH (pedido, mensagens e relatório, já por `tr()`) | 010 ou uma passada de traduções |
 
 ## Pós-1.0
 

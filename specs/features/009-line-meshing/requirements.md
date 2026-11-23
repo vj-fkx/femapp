@@ -69,7 +69,7 @@ mostra a malha no viewport.
 | REQ-009-13 | ENQUANTO a malha estiver sendo gerada, O sistema DEVE manter a interface responsiva (fora da thread da interface), como na importação de `.msh` da 004. Ao terminar, DEVE mostrar a malha no viewport junto com o desenho e escrever no console o relatório do REQ-009-11. | US-4 |
 | REQ-009-14 | SE a geração falhar (REQ-009-04, desenho sem linhas), ENTÃO O sistema DEVE escrever no console o motivo, com as entidades envolvidas, e manter a malha anterior inalterada (REQ-G-10). | US-4 |
 | REQ-009-15 | O comando MESH não DEVE alterar o desenho: não entra no desfazer. QUANDO o desenho for editado depois de uma malha, O sistema DEVE avisar uma vez no console que a malha mostrada está desatualizada. A malha continua visível até o próximo MESH. | US-4 |
-| REQ-009-16 | Os textos do comando (nome, pedido, mensagens e relatório) DEVEM passar por `tr()`, com a tradução pt_BR. | US-4 |
+| REQ-009-16 | Os textos do comando (nome, pedido, mensagens e relatório) DEVEM passar por `tr()`, prontos para a tradução. Nesta feature eles ficam só em inglês: a tradução pt_BR fica para depois *(ajustado na implementação, 2026-11-22, decidido pelo mantenedor)*. | US-4 |
 
 ### Arquitetura
 
@@ -125,7 +125,7 @@ mostra a malha no viewport.
   - uma falha que mantém a malha anterior;
   - o aviso de malha desatualizada depois de uma edição;
   - o desfazer não afetado;
-  - os textos em pt_BR.
+  - os textos em inglês, por `tr()` (a tradução pt_BR ficou para depois).
 - [ ] **AC-7** (NFR-009-01, 02, 03, REQ-009-17):
   - o benchmark de 100 mil trechos dentro da meta;
   - a robustez com translação e escala;

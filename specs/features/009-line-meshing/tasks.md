@@ -137,7 +137,9 @@ Regras:
   Arquivos: `src/app/line_mesh_text.hpp/.cpp`,
   `src/app/drafting_controller.*`, `src/app/main_window.*`,
   `tests/unit/app/test_line_mesh_text.cpp`. Cobre: 12, 13, 14, 15.
-- [ ] **T13** Traduções pt_BR dos textos novos (`lupdate`, `.ts`
+- [ ] **T13** *(adiada pelo mantenedor em 2026-11-22: os textos do MESH
+  ficam só em inglês por ora, por `tr()`; a tradução vai para as
+  pendências do roadmap.)* Traduções pt_BR dos textos novos (`lupdate`, `.ts`
   preenchido, `lrelease` no build). Arquivo:
   `src/app/i18n/femapp_pt_BR.ts`. Cobre: 16.
 - [ ] **T14** [M] Roteiro manual do MESH na interface, pelo mantenedor ou
@@ -151,7 +153,7 @@ Regras:
   4. Mover uma linha: o aviso de desatualizada aparece uma vez; uma
      segunda edição não repete.
   5. Desfazer e refazer: só o desenho muda; a malha fica.
-  6. Interface em pt_BR: os textos do MESH traduzidos.
+  6. Interface em pt_BR: os textos do MESH aparecem em inglês (T13 adiada).
   7. MESH, `abc` e `-1`: "Invalid size."; Esc cancela.
 
 ## Fase 4 — Desempenho e fechamento
@@ -193,7 +195,7 @@ Regras:
 | REQ-009-13 | T11, T12, T14 | `test_line_mesh_job.cpp`, `test_line_mesh_text.cpp`, roteiro manual |
 | REQ-009-14 | T05, T11, T12, T14 | `test_line_mesher.cpp`, `test_line_mesh_job.cpp`, `test_line_mesh_text.cpp`, roteiro manual |
 | REQ-009-15 | T12, T14 | roteiro manual |
-| REQ-009-16 | T13, T14 | roteiro manual |
+| REQ-009-16 | T12, T14 (T13 adiada) | `test_line_mesh_text.cpp`, roteiro manual |
 | REQ-009-17 | T01, T17, T91 | `check_no_qt_includes` |
 | NFR-009-01 | T04, T15 | `test_segment_bvh.cpp`, `bench_line_mesh` |
 | NFR-009-02 | T02, T03, T10 | `test_segment_geometry.cpp`, `test_line_mesher.cpp` |
