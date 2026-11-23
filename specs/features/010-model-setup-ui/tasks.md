@@ -55,7 +55,7 @@ Regras:
   - depois `convert.hpp/.cpp` e `changeUnits`.
   Arquivos: `src/setup/include/fem/setup/convert.hpp`, `convert.cpp`,
   `editing.cpp`, `tests/unit/setup/test_units.cpp`. Cobre: 03, N02.
-- [ ] **T06** As edições (design §5.2):
+- [x] **T06** As edições (design §5.2):
   - testes primeiro:
     - criar, alterar, duplicar;
     - apagar recusado com os usos (material, seção, caso com
@@ -288,3 +288,10 @@ Regras:
 | AC-7 | T01, T12, T23, T25, T90, T91 |
 
 ## Notas de implementação
+
+- T06 (2026-11-23): `duplicateItem` recusa atribuições, detalhes e apoios
+  (`EditRefusal::Unsupported`): dois itens da mesma espécie nos mesmos
+  alvos não fazem sentido, porque o novo tiraria os alvos do outro. Os
+  nomeados (material, seção, caso, combinação) e as cargas são duplicados.
+  Ligação de extremidade para as duas pontas vira um item por ponta, como
+  no design §5.2.

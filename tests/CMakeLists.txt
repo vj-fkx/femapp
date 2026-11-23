@@ -87,6 +87,7 @@ target_include_directories(test_mesher PRIVATE "${PROJECT_SOURCE_DIR}/src/mesher
 femapp_add_test(setup SOURCES
     test_convert.cpp
     test_document.cpp
+    test_editing.cpp
     test_units.cpp)
 target_include_directories(test_setup PRIVATE "${PROJECT_SOURCE_DIR}/src/setup")
 femapp_add_test(io SOURCES
