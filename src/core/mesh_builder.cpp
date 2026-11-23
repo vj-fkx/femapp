@@ -134,10 +134,11 @@ Expected<void> MeshBuilder::addGroup(std::string name, int dimension,
     if (dimension < 0 || dimension > 3) {
         return makeError(label + " has an invalid dimension.");
     }
-    const bool duplicate = std::ranges::any_of(m_groups, [&](const PendingGroup& g) {
-        return g.dimension == dimension && g.name == name;
-    });
-    if (duplicate) {
+    if (!m_groupKeys) {
+        m_groupKeys = std::make_unique<std::unordered_set<std::string>>();
+    }
+    std::string key = std::to_string(dimension) + ':' + name;
+    if (m_groupKeys->contains(key)) {
         return makeError("There is already a " + std::to_string(dimension) + "D group named '" +
                          name + "'.");
     }
@@ -153,6 +154,7 @@ Expected<void> MeshBuilder::addGroup(std::string name, int dimension,
                              std::to_string(elementDimension) + "D.");
         }
     }
+    m_groupKeys->insert(std::move(key));
     m_groups.push_back(PendingGroup{
         .name = std::move(name), .dimension = dimension, .elements = std::move(elements)});
     return {};

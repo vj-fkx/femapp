@@ -142,7 +142,9 @@ Regras:
   pendências do roadmap.)* Traduções pt_BR dos textos novos (`lupdate`, `.ts`
   preenchido, `lrelease` no build). Arquivo:
   `src/app/i18n/femapp_pt_BR.ts`. Cobre: 16.
-- [ ] **T14** [M] Roteiro manual do MESH na interface, pelo mantenedor ou
+- [ ] **T14** [M] *(adiada pelo mantenedor em 2026-11-22: o roteiro roda
+  junto com o dos comandos de malha 2D e 3D, quando eles existirem.)*
+  Roteiro manual do MESH na interface, pelo mantenedor ou
   com ele. Cobre: 12 a 16, AC-6.
   1. Desenhar um pórtico 2×2 com uma diagonal cruzando outra e uma viga
      em T; MESH, Enter: a malha aparece com o desenho, e o console mostra
@@ -158,7 +160,7 @@ Regras:
 
 ## Fase 4 — Desempenho e fechamento
 
-- [ ] **T15** `bench_line_mesh`: grade 3D de pilares, vigas e diagonais
+- [x] **T15** `bench_line_mesh`: grade 3D de pilares, vigas e diagonais
   cruzadas, cerca de 100 mil trechos, com o tempo de cada etapa. A medida
   em Release fica registrada nas notas, ≤ 2 s. Arquivos:
   `tests/perf/bench_line_mesh.cpp`, `tests/perf/CMakeLists.txt`. Cobre:
@@ -212,3 +214,24 @@ Regras:
 | AC-7 | T10, T15, T16, T90, T91 |
 
 ## Notas de implementação
+
+- T15 (2026-11-22, Release, máquina do mantenedor): `bench_line_mesh` com
+  um pórtico espacial de 26 × 26 vãos e 24 andares, com pilares inteiros
+  na altura, vigas terminando neles (nós em T) e um X em cada vão de cada
+  linha de pórtico nas duas direções. São 101 817 trechos, que dão
+  51 921 nós, 185 976 elementos e 50 463 divisões. Medidas:
+  - busca: árvore 0,06 s e 2,49 milhões de pares em 0,09 s;
+  - `meshLines`: 0,64 s (o melhor de três, nas duas rodadas). Meta: ≤ 2 s.
+  A primeira medida deu 17,5 s. Duas causas, corrigidas:
+  - o `MeshBuilder::addGroup` da 003 procurava grupo repetido percorrendo
+    todos os grupos já postos: O(G²) com um grupo por entidade (10⁵
+    grupos). Passou a um conjunto de chaves (dimensão, nome), guardado
+    por ponteiro para o movimento do builder não poder lançar exceção
+    (clang-tidy). A mensagem de grupo repetido é a mesma, e as suítes da
+    003 passam;
+  - o relatório juntava as divisões por nó e tipo com uma busca linear;
+    passou a um mapa.
+  Pendente notado para a 010: `Mesh::findGroup` também é linear. Atribuir
+  por grupo a cada uma de 10⁵ entidades faria O(G²) na resolução dos
+  alvos; ali vale um índice por nome.
+

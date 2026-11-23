@@ -640,14 +640,18 @@ tl::expected<LineMeshResult, LineMeshError> meshLines(const geom::Drawing& drawi
             list.push_back(e);
         }
     };
+    // NFR-009-01: found by node and kind through a map, not a search.
+    std::unordered_map<std::int64_t, std::size_t> joinedAt;
+    joinedAt.reserve(events.size());
     for (const SplitEvent& event : events) {
         const std::int32_t root = merge.root(event.candidate);
-        auto it = std::ranges::find_if(
-            joined, [&](const Joined& j) { return j.root == root && j.kind == event.kind; });
-        if (it == joined.end()) {
+        const std::int64_t key =
+            (static_cast<std::int64_t>(root) << 2U) | static_cast<std::int64_t>(event.kind);
+        const auto [where, added] = joinedAt.try_emplace(key, joined.size());
+        if (added) {
             joined.push_back({.root = root, .kind = event.kind, .split = {}, .cause = {}});
-            it = joined.end() - 1;
         }
+        Joined* it = &joined[where->second];
         for (const std::size_t e : event.split) {
             addOnce(it->split, e);
         }

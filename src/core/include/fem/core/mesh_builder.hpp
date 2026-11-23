@@ -9,8 +9,10 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <span>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 namespace fem::core {
@@ -72,6 +74,11 @@ private:
     std::array<PendingBlock, kElementTypeCount> m_blocks;
     std::size_t m_elementCount = 0;
     std::vector<PendingGroup> m_groups;
+    // Feature 009 (NFR-009-01): dimension and name of each group, so that
+    // a repeated group is found without a search (one group per entity of
+    // a drawing makes 100 000 of them). Held by pointer, so that moving the
+    // builder cannot throw.
+    std::unique_ptr<std::unordered_set<std::string>> m_groupKeys;
     std::vector<NodeIndex> m_scratch;
 };
 
