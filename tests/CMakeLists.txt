@@ -195,6 +195,7 @@ femapp_set_warnings(bench_frame)
 # REQ-004-03: command line parsing of the application, built on its own.
 # Feature 009: also the mesh job of the MESH command, with a QCoreApplication.
 add_executable(test_app
+    unit/app/test_check_issues.cpp
     unit/app/test_cli_options.cpp
     unit/app/test_fields.cpp
     unit/app/test_line_mesh_job.cpp
@@ -203,6 +204,7 @@ add_executable(test_app
     unit/app/test_model_tree.cpp
     unit/app/test_section_geometry.cpp
     unit/app/test_symbol_builder.cpp
+    "${PROJECT_SOURCE_DIR}/src/app/check_issues.cpp"
     "${PROJECT_SOURCE_DIR}/src/app/cli_options.cpp"
     "${PROJECT_SOURCE_DIR}/src/app/fields.cpp"
     "${PROJECT_SOURCE_DIR}/src/app/line_mesh_job.cpp"

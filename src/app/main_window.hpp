@@ -1,5 +1,6 @@
 #pragma once
 
+#include "check_issues.hpp"
 #include "fields.hpp"
 #include "symbol_builder.hpp"
 
@@ -13,6 +14,8 @@
 #include <QStringList>
 
 #include <memory>
+
+class QDockWidget;
 
 class QAction;
 class QEvent;
@@ -34,6 +37,7 @@ class DraftingController;
 class ModelController;
 class ModelTree;
 class PropertyPanel;
+class CheckPanel;
 class MeshImport;
 
 class MainWindow : public QMainWindow
@@ -97,6 +101,10 @@ private:
     void addLoad(LoadKind kind, const QString& title);
     // REQ-010-09: the local axes shown, of the selection or of all.
     void showLocalAxes(AxesShown shown);
+    // REQ-010-21: the check of the model in its dock, and what a problem of
+    // the core names shown in the mesh.
+    void checkModel();
+    void highlightIds(const NamedIds& ids);
     // REQ-010-17: a new combination, or the terms of `id` edited.
     void editCombination(std::optional<setup::ItemId> id);
     // The new item selected in the tree, for its properties.
@@ -124,6 +132,8 @@ private:
     ModelTree* m_tree = nullptr;
     QTreeView* m_treeView = nullptr;
     PropertyPanel* m_properties = nullptr;
+    CheckPanel* m_check = nullptr;
+    QDockWidget* m_checkDock = nullptr;
     QLabel* m_units = nullptr;
     bool m_quietMessages = false;
 };

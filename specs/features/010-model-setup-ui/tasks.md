@@ -276,11 +276,17 @@ Regras:
 
 ## Fase 7 — Conferência e fechamento
 
-- [ ] **T22** O dock da conferência (Check model): a lista com gravidade,
+- [x] **T22** O dock da conferência (Check model): a lista com gravidade,
   texto e item. O clique seleciona o item na árvore, ou realça os
   elementos e nós de um problema do `core`. Arquivos:
   `src/app/check_panel.*`, `model_controller.cpp`, `main_window.cpp`.
   Cobre: 21.
+  Nota: Model ▸ Check model abre o dock (embaixo) e confere o caso ou a
+  combinação ativa. Os textos e a leitura dos ids ficaram em
+  `check_issues.*` (sem widgets), testados em `test_check_issues.cpp`:
+  as mensagens do `core::validate` nomeiam "element N" e "node N", e a
+  lista "Elements without an assignment: a, b and N more" (N é uma
+  contagem). Os ids são realçados só se a malha mostrada é a do modelo.
 - [ ] **T23** [M] Roteiro manual com o mantenedor (AC-6):
   1. Unidades kN-m: a barra de status; trocar para N-mm, conferir um
      material e uma carga convertidos, ver o aviso do desenho; desfazer.

@@ -1,5 +1,6 @@
 #include "main_window.hpp"
 
+#include "check_panel.hpp"
 #include "command_line_widget.hpp"
 #include "drafting_controller.hpp"
 #include "drafting_settings_dialog.hpp"
@@ -434,6 +435,17 @@ void MainWindow::createModelUi()
                 }
             });
     addDockWidget(Qt::RightDockWidgetArea, properties);
+    // REQ-010-21: the check of the model, at the bottom, shown on demand.
+    // NOLINTBEGIN(cppcoreguidelines-owning-memory): owned by their Qt parents.
+    m_check = new CheckPanel(m_model, m_tree, this);
+    m_checkDock = new QDockWidget(tr("Check"), this);
+    // NOLINTEND(cppcoreguidelines-owning-memory)
+    m_checkDock->setObjectName(QStringLiteral("check"));
+    m_checkDock->setWidget(m_check);
+    addDockWidget(Qt::BottomDockWidgetArea, m_checkDock);
+    m_checkDock->hide();
+    connect(m_check, &CheckPanel::itemRequested, this, &MainWindow::selectItem);
+    connect(m_check, &CheckPanel::idsRequested, this, &MainWindow::highlightIds);
     // REQ-010-02: the unit system always in sight.
     statusBar()->addPermanentWidget(m_units);
     connect(m_model, &ModelController::documentChanged, this, &MainWindow::showUnits);
@@ -503,6 +515,10 @@ void MainWindow::createModelMenu()
     }
     menu->addAction(tr("New c&ombination..."), this, [this] { editCombination(std::nullopt); });
 
+    // REQ-010-21
+    menu->addSeparator();
+    menu->addAction(tr("&Check model"), this, &MainWindow::checkModel);
+
     // REQ-010-09, 22: the symbols of the model in the viewport.
     menu->addSeparator();
     QAction* symbols = menu->addAction(tr("Show s&ymbols"));
@@ -540,6 +556,38 @@ void MainWindow::createModelMenu()
     connect(m_viewport, &render::Viewport::selectionChanged, this, selectionMoved);
     connect(m_viewport, &render::Viewport::drawingSelectionChanged, this, selectionMoved);
     m_model->rebuildSymbols();
+}
+
+void MainWindow::checkModel()
+{
+    m_checkDock->show();
+    m_checkDock->raise();
+    m_check->check();
+}
+
+void MainWindow::highlightIds(const NamedIds& ids)
+{
+    // On the mesh shown, if it is the model's (the ids are its own).
+    const setup::MeshContext& mesh = m_model->mesh();
+    if (m_viewport.isNull() || !mesh.mesh || !m_viewport->scene() ||
+        m_viewport->scene()->sharedMesh() != mesh.mesh) {
+        statusBar()->showMessage(tr("The mesh of the model is not shown."), 5000);
+        return;
+    }
+    render::SelectionItems items;
+    for (const core::ExternalId id : ids.elements) {
+        if (const auto e = mesh.mesh->findElement(id)) {
+            items[render::SelectionKind::Element].push_back(*e);
+        }
+    }
+    for (const core::ExternalId id : ids.nodes) {
+        if (const auto n = mesh.mesh->findNode(id)) {
+            items[render::SelectionKind::Node].push_back(*n);
+        }
+    }
+    if (!items.empty()) {
+        m_viewport->setSelection(items);
+    }
 }
 
 void MainWindow::showLocalAxes(AxesShown shown)
