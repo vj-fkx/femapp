@@ -1,3 +1,6 @@
+#include <fem/core/mesh_builder.hpp>
+#include <fem/core/model.hpp>
+#include <fem/core/static_analysis.hpp>
 #include <fem/mesher/line_mesher.hpp>
 
 #include <catch2/catch_test_macros.hpp>
@@ -7,6 +10,8 @@
 #include <cmath>
 #include <cstdint>
 #include <limits>
+#include <memory>
+#include <random>
 #include <span>
 #include <utility>
 #include <vector>
@@ -711,6 +716,275 @@ TEST_CASE("invalid sizing is refused", "[mesher][line][sizing]")
             REQUIRE_FALSE(result.has_value());
             CHECK(result.error().kind == LineMeshError::Kind::InvalidSizing);
             CHECK(result.error().items.empty());
+        }
+    }
+}
+
+namespace {
+
+using fem::core::ExternalId;
+
+// The 2 x 2 frame of the tests above, exact (no offset), with points at
+// the three bases and at the top corner: columns, beams, then the points.
+struct ExactFrame
+{
+    Drawing drawing;
+    std::vector<EntityId> bars;
+    std::vector<EntityId> bases;
+    EntityId top{};
+};
+
+void drawExactFrame(ExactFrame& f)
+{
+    for (int c = 0; c < 3; ++c) {
+        for (int s = 0; s < 2; ++s) {
+            f.bars.push_back(
+                addLine(f.drawing, Vec3(4.0 * c, 3.0 * s, 0.0), Vec3(4.0 * c, 3.0 * (s + 1), 0.0)));
+        }
+    }
+    for (int s = 1; s <= 2; ++s) {
+        for (int b = 0; b < 2; ++b) {
+            f.bars.push_back(
+                addLine(f.drawing, Vec3(4.0 * b, 3.0 * s, 0.0), Vec3(4.0 * (b + 1), 3.0 * s, 0.0)));
+        }
+    }
+    for (int c = 0; c < 3; ++c) {
+        f.bases.push_back(addPoint(f.drawing, Vec3(4.0 * c, 0.0, 0.0)));
+    }
+    f.top = addPoint(f.drawing, Vec3(0.0, 6.0, 0.0));
+}
+
+void addMaterials(fem::core::Model& model)
+{
+    model.materials.push_back({.name = "steel", .youngsModulus = 2.0e8, .poissonsRatio = 0.3});
+    model.sections.push_back({.name = "bar", .shape = fem::core::Rectangle{.b = 0.3, .h = 0.5}});
+}
+
+void fix(fem::core::Model& model, const fem::core::NodeTarget& nodes)
+{
+    for (const auto dof : {fem::core::DofType::U, fem::core::DofType::V, fem::core::DofType::RZ}) {
+        model.restraints.push_back({.nodes = nodes, .dof = dof, .value = 0.0});
+    }
+}
+
+// The same frame built by hand: nodes numbered backwards from 109, targets
+// by ids.
+fem::core::Model handFrame()
+{
+    fem::core::MeshBuilder builder;
+    std::vector<Vec3> positions;
+    for (int c = 0; c < 3; ++c) {
+        for (int s = 0; s <= 2; ++s) {
+            positions.emplace_back(4.0 * c, 3.0 * s, 0.0);
+        }
+    }
+    const auto idOf = [&](const Vec3& p) {
+        const auto it = std::ranges::find(positions, p);
+        return static_cast<ExternalId>(109 - (it - positions.begin()));
+    };
+    for (const Vec3& p : positions) {
+        REQUIRE(builder.addNode(idOf(p), p).has_value());
+    }
+    std::vector<fem::core::ElementHandle> bars;
+    ExternalId next = 500;
+    const auto bar = [&](const Vec3& a, const Vec3& b) {
+        const std::array<ExternalId, 2> nodes{idOf(a), idOf(b)};
+        const auto handle = builder.addElement(ElementType::Line2, next++, nodes);
+        REQUIRE(handle.has_value());
+        bars.push_back(*handle);
+    };
+    for (int c = 0; c < 3; ++c) {
+        for (int s = 0; s < 2; ++s) {
+            bar(Vec3(4.0 * c, 3.0 * s, 0.0), Vec3(4.0 * c, 3.0 * (s + 1), 0.0));
+        }
+    }
+    for (int s = 1; s <= 2; ++s) {
+        for (int b = 0; b < 2; ++b) {
+            bar(Vec3(4.0 * b, 3.0 * s, 0.0), Vec3(4.0 * (b + 1), 3.0 * s, 0.0));
+        }
+    }
+    REQUIRE(builder.addGroup("bars", 1, std::move(bars)).has_value());
+    auto mesh = builder.build();
+    REQUIRE(mesh.has_value());
+    fem::core::Model model;
+    model.mesh = std::make_shared<const fem::core::Mesh>(std::move(*mesh));
+    addMaterials(model);
+    model.assignments.push_back({.elements = fem::core::GroupRef{"bars"},
+                                 .kind = fem::core::ElementKind::Beam2D,
+                                 .material = "steel",
+                                 .section = "bar"});
+    fix(model, fem::core::NodeIds{{idOf(Vec3(0, 0, 0)), idOf(Vec3(4, 0, 0)), idOf(Vec3(8, 0, 0))}});
+    model.nodalForces.push_back(
+        {.nodes = fem::core::NodeIds{{idOf(Vec3(0, 6, 0))}}, .force = Vec3(10.0, -20.0, 0.0)});
+    return model;
+}
+
+// The meshed frame, with every target by the group of an entity.
+fem::core::Model meshedFrame(const ExactFrame& f)
+{
+    auto result = meshLines(f.drawing);
+    REQUIRE(result.has_value());
+    fem::core::Model model;
+    model.mesh = std::make_shared<const fem::core::Mesh>(std::move(result->mesh));
+    addMaterials(model);
+    for (const EntityId id : f.bars) {
+        model.assignments.push_back(
+            {.elements = fem::core::GroupRef{fem::mesher::entityGroupName(id)},
+             .kind = fem::core::ElementKind::Beam2D,
+             .material = "steel",
+             .section = "bar"});
+    }
+    for (const EntityId id : f.bases) {
+        fix(model, fem::core::GroupRef{fem::mesher::entityGroupName(id)});
+    }
+    model.nodalForces.push_back({.nodes = fem::core::GroupRef{fem::mesher::entityGroupName(f.top)},
+                                 .force = Vec3(10.0, -20.0, 0.0)});
+    return model;
+}
+
+// A drawing of crossing lines in the plane z = 0, from a fixed seed.
+void drawCrossingLines(Drawing& drawing, int count)
+{
+    std::mt19937 random(5U);
+    std::uniform_real_distribution<double> place(0.0, 10.0);
+    for (int i = 0; i < count; ++i) {
+        addLine(drawing, Vec3(place(random), place(random), 0.0),
+                Vec3(place(random), place(random), 0.0));
+    }
+}
+
+// A frame with every kind of connection, scaled and moved: a column, a
+// beam ending on it (T), two diagonals crossing each other and the beam at
+// one point, and a point on the beam.
+void drawConnected(Drawing& drawing, double scale, const Vec3& shift)
+{
+    const auto at = [&](double x, double y) { return Vec3(scale * Vec3(x, y, 0.0) + shift); };
+    addLine(drawing, at(0, 0), at(0, 6));
+    addLine(drawing, at(0, 3), at(4, 3));
+    addLine(drawing, at(0, 0), at(4, 6));
+    addLine(drawing, at(4, 0), at(0, 6));
+    addPoint(drawing, at(1, 3));
+}
+
+} // namespace
+
+// T10 (AC-1): REQ-009-01, 02, 08, 09 — the meshed frame analyses like the
+// same frame built by hand.
+TEST_CASE("a meshed frame analyses like the frame built by hand", "[mesher][line][verify]")
+{
+    ExactFrame f;
+    drawExactFrame(f);
+    const fem::core::Model meshed = meshedFrame(f);
+    const fem::core::Model hand = handFrame();
+    const auto a = fem::core::runLinearStatic(meshed);
+    const auto b = fem::core::runLinearStatic(hand);
+    REQUIRE(a.has_value());
+    REQUIRE(b.has_value());
+    double largest = 0.0;
+    for (const Vec3& d : b->displacements) {
+        largest = std::max(largest, d.norm());
+    }
+    REQUIRE(largest > 0.0);
+    const fem::core::Mesh& ma = *meshed.mesh;
+    const fem::core::Mesh& mb = *hand.mesh;
+    REQUIRE(ma.nodeCount() == mb.nodeCount());
+    for (fem::core::NodeIndex n = 0; n < ma.nodeCount(); ++n) {
+        const Vec3 p = ma.nodeCoordinates(n);
+        fem::core::NodeIndex m = 0;
+        while (m < mb.nodeCount() && (mb.nodeCoordinates(m) - p).norm() > 1e-12) {
+            ++m;
+        }
+        REQUIRE(m < mb.nodeCount());
+        INFO("node at " << p.transpose());
+        const auto i = static_cast<std::size_t>(n);
+        const auto j = static_cast<std::size_t>(m);
+        CHECK((a->displacements[i] - b->displacements[j]).norm() <= 1e-12 * largest);
+        CHECK(std::abs(a->rotations[i].z() - b->rotations[j].z()) <=
+              1e-12 * std::max(1.0, std::abs(b->rotations[j].z())));
+    }
+}
+
+// REQ-009-08
+TEST_CASE("the mesh does not depend on the threads", "[mesher][line][verify]")
+{
+    Drawing drawing;
+    drawCrossingLines(drawing, 300);
+    fem::mesher::LineMeshOptions one;
+    one.threads = 1;
+    fem::mesher::LineMeshOptions all;
+    all.threads = 0;
+    const auto a = meshLines(drawing, one);
+    const auto b = meshLines(drawing, all);
+    REQUIRE(a.has_value());
+    REQUIRE(b.has_value());
+    // Plenty of crossings to order.
+    CHECK(a->report.splits.size() > 1000);
+    REQUIRE(a->mesh.nodeCount() == b->mesh.nodeCount());
+    REQUIRE(a->mesh.elementCount() == b->mesh.elementCount());
+    for (fem::core::NodeIndex n = 0; n < a->mesh.nodeCount(); ++n) {
+        CHECK(a->mesh.nodeId(n) == b->mesh.nodeId(n));
+        CHECK(a->mesh.nodeCoordinates(n) == b->mesh.nodeCoordinates(n));
+    }
+    for (fem::core::ElementIndex e = 0; e < a->mesh.elementCount(); ++e) {
+        CHECK(a->mesh.elementId(e) == b->mesh.elementId(e));
+        CHECK(std::ranges::equal(a->mesh.elementNodes(e), b->mesh.elementNodes(e)));
+    }
+    REQUIRE(a->report.splits.size() == b->report.splits.size());
+    for (std::size_t i = 0; i < a->report.splits.size(); ++i) {
+        CHECK(a->report.splits[i].position == b->report.splits[i].position);
+        CHECK(a->report.splits[i].entities == b->report.splits[i].entities);
+    }
+}
+
+// AC-5: REQ-009-09
+TEST_CASE("a moved entity keeps the name of its group", "[mesher][line][verify]")
+{
+    ExactFrame f;
+    drawExactFrame(f);
+    const EntityId beam = f.bars.back();
+    const Entity* old = f.drawing.find(beam);
+    REQUIRE(old != nullptr);
+    DrawingEdit move;
+    move.removed.push_back(*old);
+    move.added.push_back(fem::geom::translated(*old, Vec3(0.0, 1.0, 0.0), beam));
+    f.drawing.apply(move);
+    const auto result = meshLines(f.drawing);
+    REQUIRE(result.has_value());
+    const auto* group = result->mesh.findGroup(fem::mesher::entityGroupName(beam), 1);
+    REQUIRE(group != nullptr);
+    CHECK(group->elements.size() == 1);
+    const auto element = group->elements.front();
+    CHECK(result->map.elements[static_cast<std::size_t>(element)].entity == beam);
+}
+
+// NFR-009-02: the frame with every connection, moved far and scaled.
+TEST_CASE("the mesh does not depend on the place or the scale", "[mesher][line][verify]")
+{
+    Drawing original;
+    drawConnected(original, 1.0, Vec3::Zero());
+    const auto base = meshLines(original);
+    REQUIRE(base.has_value());
+    // Six ends, the triple crossing at (2, 3) and the point at (1, 3); the
+    // column in 2 (the T), the beam in 3, each diagonal in 2.
+    CHECK(base->mesh.nodeCount() == 8);
+    CHECK(base->mesh.elementCount(ElementType::Line2) == 9);
+    for (const double scale : {1.0, 1e3, 1e6}) {
+        for (const Vec3& shift : {Vec3(Vec3::Zero()), Vec3(1e6, -1e6, 1e6)}) {
+            INFO("scale " << scale << ", shift " << shift.x());
+            Drawing drawing;
+            drawConnected(drawing, scale, shift);
+            const auto moved = meshLines(drawing);
+            REQUIRE(moved.has_value());
+            REQUIRE(moved->mesh.nodeCount() == base->mesh.nodeCount());
+            REQUIRE(moved->mesh.elementCount() == base->mesh.elementCount());
+            CHECK(moved->report.splits.size() == base->report.splits.size());
+            for (fem::core::NodeIndex n = 0; n < base->mesh.nodeCount(); ++n) {
+                const Vec3 back = (moved->mesh.nodeCoordinates(n) - shift) / scale;
+                CHECK((back - base->mesh.nodeCoordinates(n)).norm() <= 1e-8);
+            }
+            for (fem::core::ElementIndex e = 0; e < base->mesh.elementCount(); ++e) {
+                CHECK(std::ranges::equal(moved->mesh.elementNodes(e), base->mesh.elementNodes(e)));
+            }
         }
     }
 }

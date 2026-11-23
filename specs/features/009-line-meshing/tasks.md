@@ -95,7 +95,7 @@ Regras:
   - `InvalidSizing`.
   Arquivos: `tests/unit/mesher/test_line_mesher.cpp`,
   `src/mesher/line_mesher.cpp`. Cobre: 05, 06, 07.
-- [ ] **T10** Verificação e determinismo:
+- [x] **T10** Verificação e determinismo:
   - o pórtico 2×2 gerado, analisado pela `runLinearStatic` com
     atribuições, apoios e cargas por `GroupRef` de `entityGroupName`,
     contra o mesmo pórtico montado à mão (deslocamentos em 1e−12
