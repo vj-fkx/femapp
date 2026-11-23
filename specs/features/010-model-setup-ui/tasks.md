@@ -34,7 +34,7 @@ Regras:
   Arquivos: `src/setup/*`, `CMakeLists.txt` (o `add_subdirectory`),
   `tests/CMakeLists.txt`, `cmake/CheckNoQtIncludes.cmake`,
   `specs/architecture.md`. Cobre: 01.
-- [ ] **T03** Unidades (design §5.1):
+- [x] **T03** Unidades (design §5.1):
   - testes primeiro: os fatores dos cinco sistemas; a coerência
     (E·A/L numa rigidez de cada sistema, ρ·g numa força por volume); ida e
     volta de cada grandeza em 1e−12; os rótulos;
