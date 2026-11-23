@@ -4,6 +4,7 @@ femapp_add_module(setup
         convert.cpp
         document.cpp
         editing.cpp
+        library.cpp
         units.cpp
     PUBLIC_DEPS
         fem::core

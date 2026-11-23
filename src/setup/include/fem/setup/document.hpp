@@ -50,12 +50,27 @@ struct Targets
     friend bool operator==(const Targets&, const Targets&) = default;
 };
 
+// REQ-010-04: an extra property of a material, only informative (fy, fu,
+// fck, G...): its key, its quantity for the unit conversion, its value.
+// New keys need no change in the conversion (design §5.9).
+struct MaterialProperty
+{
+    std::string key;
+    Quantity quantity;
+    double value = 0.0;
+
+    friend bool operator==(const MaterialProperty&, const MaterialProperty&) = default;
+};
+
 // REQ-010-04, 05: the data of each item is the core type; where the core
 // type has a target of its own, it is not used: `targets` is.
 struct MaterialItem
 {
     ItemId id{};
     core::Material data;
+    std::string standard; // "EN 1993-1-1"; empty for a material of the user's
+    std::string grade;    // "S355"
+    std::vector<MaterialProperty> properties;
 };
 
 struct SectionItem

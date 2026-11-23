@@ -204,6 +204,10 @@ void convertItem(Item& item, UnitSystem from, UnitSystem to)
                 c(i.data.thermalExpansion, q::kPerTemperature);
                 c(i.data.conductivity, q::kConductivity);
                 c(i.data.specificHeat, q::kSpecificHeat);
+                // The extra properties by their own quantity (design §5.9).
+                for (MaterialProperty& p : i.properties) {
+                    c(p.value, p.quantity);
+                }
             } else if constexpr (std::is_same_v<T, SectionItem>) {
                 convertSection(i.data, c);
             } else if constexpr (std::is_same_v<T, ConnectionItem>) {

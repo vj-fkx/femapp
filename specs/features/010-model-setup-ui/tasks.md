@@ -69,7 +69,7 @@ Regras:
   - depois `editing.hpp/.cpp`.
   Arquivos: `src/setup/include/fem/setup/editing.hpp`, `editing.cpp`,
   `tests/unit/setup/test_editing.cpp`. Cobre: 04, 05, 07, 08, 15 a 18, 23.
-- [ ] **T07** A biblioteca de materiais por norma (design §5.9, ampliada na
+- [x] **T07** A biblioteca de materiais por norma (design §5.9, ampliada na
   implementação a pedido do mantenedor):
   - testes primeiro:
     - cada material contra a tabela;

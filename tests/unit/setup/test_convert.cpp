@@ -108,6 +108,9 @@ Fields fieldsOf(const s::Item& item)
                 add(out, "alpha", *i.data.thermalExpansion);
                 add(out, "k", *i.data.conductivity);
                 add(out, "c", *i.data.specificHeat);
+                for (const auto& p : i.properties) {
+                    add(out, p.key, p.value, !(p.quantity == s::quantity::kNone));
+                }
             } else if constexpr (std::is_same_v<T, s::SectionItem>) {
                 const c::Section& sec = i.data;
                 if (sec.area) {
@@ -191,14 +194,19 @@ std::vector<s::Item> everything()
     std::vector<s::Item> items;
     std::uint64_t id = 0;
     const auto next = [&] { return s::ItemId{++id}; };
-    items.emplace_back(s::MaterialItem{.id = next(),
-                                       .data = {.name = "m",
-                                                .youngsModulus = 2.1e8,
-                                                .poissonsRatio = 0.3,
-                                                .density = 7.85,
-                                                .thermalExpansion = 1.2e-5,
-                                                .conductivity = 50.0,
-                                                .specificHeat = 460.0}});
+    items.emplace_back(s::MaterialItem{
+        .id = next(),
+        .data = {.name = "m",
+                 .youngsModulus = 2.1e8,
+                 .poissonsRatio = 0.3,
+                 .density = 7.85,
+                 .thermalExpansion = 1.2e-5,
+                 .conductivity = 50.0,
+                 .specificHeat = 460.0},
+        .standard = "EN 1993-1-1",
+        .grade = "S355",
+        .properties = {{.key = "fy", .quantity = s::quantity::kStress, .value = 3.55e5},
+                       {.key = "ratio", .quantity = s::quantity::kNone, .value = 0.5}}});
     items.emplace_back(s::SectionItem{.id = next(),
                                       .data = {.name = "generic",
                                                .area = 0.01,
