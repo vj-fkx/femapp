@@ -7,6 +7,7 @@
 #include <fem/render/display_options.hpp>
 #include <fem/render/mesh_scene.hpp>
 #include <fem/render/selection.hpp>
+#include <fem/render/symbols.hpp>
 
 #include <QColor>
 #include <QRhiWidget>
@@ -90,6 +91,10 @@ public:
     // REQ-005-33: the drawing shown with the mesh; drawingChanged() after
     // every edit of it.
     void setDrawing(std::shared_ptr<const geom::Drawing> drawing);
+    // REQ-010-22: the symbols of the model (none for nullptr), shown or not.
+    void setSymbols(std::shared_ptr<const SymbolSet> symbols);
+    void setSymbolsVisible(bool visible);
+    [[nodiscard]] bool symbolsVisible() const;
     [[nodiscard]] const std::shared_ptr<const geom::Drawing>& drawing() const;
     void drawingChanged();
     // REQ-005-18: elastic line and ghosts of the running command.

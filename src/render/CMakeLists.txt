@@ -22,6 +22,8 @@ femapp_add_module(render
         selection.cpp
         selection_overlay.cpp
         selection_overlay.hpp
+        symbol_layer.cpp
+        symbol_layer.hpp
         scene_renderer.cpp
         scene_renderer.hpp
         viewport.cpp
@@ -60,4 +62,6 @@ qt_add_shaders(fem_render "fem_render_shaders"
         shaders/mesh_line.frag
         shaders/mesh_point.vert
         shaders/mesh_point.frag
-        shaders/mesh_segment.vert)
+        shaders/mesh_segment.vert
+        shaders/symbol.vert
+        shaders/symbol.frag)

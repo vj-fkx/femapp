@@ -1,4 +1,5 @@
 #include "axis_labels.hpp"
+#include "gui_app.hpp"
 #include "mesh_fixtures.hpp"
 #include "scene_renderer.hpp"
 
@@ -23,18 +24,7 @@
 
 namespace {
 
-// QPainter text (used for the axis labels) needs a QGuiApplication. The
-// offscreen platform keeps the test independent of any display.
-void ensureGuiApplication()
-{
-    static int argc = 1;
-    static std::array<char, 12> name = {"test_render"};
-    static std::array<char*, 2> argv = {name.data(), nullptr};
-    static const std::unique_ptr<QGuiApplication> app = [] {
-        qputenv("QT_QPA_PLATFORM", "offscreen");
-        return std::make_unique<QGuiApplication>(argc, argv.data());
-    }();
-}
+using fem::render::test::ensureGuiApplication;
 
 } // namespace
 
@@ -122,7 +112,8 @@ TEST_CASE("scene renderer draws frames with the Null backend", "[render][rendere
                                    .showGrid = variant.showGrid,
                                    .showAxes = variant.showAxes,
                                    .mesh = {},
-                                   .drawing = {}}));
+                                   .drawing = {},
+                                   .symbols = {}}));
             CHECK(rhi->endOffscreenFrame() == QRhi::FrameOpSuccess);
             camera.orbit(40.0, 15.0);
         }
@@ -186,7 +177,8 @@ TEST_CASE("scene renderer draws frames with the Null backend", "[render][rendere
                                                        .showGrid = true,
                                                        .showAxes = true,
                                                        .mesh = frame,
-                                                       .drawing = {}});
+                                                       .drawing = {},
+                                                       .symbols = {}});
                 INFO(renderer.errorString().toStdString());
                 CHECK(rendered);
                 CHECK(rhi->endOffscreenFrame() == QRhi::FrameOpSuccess);
@@ -228,7 +220,8 @@ TEST_CASE("scene renderer draws frames with the Null backend", "[render][rendere
                                                    .showGrid = true,
                                                    .showAxes = true,
                                                    .mesh = {},
-                                                   .drawing = drawingFrame});
+                                                   .drawing = drawingFrame,
+                                                   .symbols = {}});
             INFO(renderer.errorString().toStdString());
             CHECK(rendered);
             CHECK(rhi->endOffscreenFrame() == QRhi::FrameOpSuccess);

@@ -241,7 +241,7 @@ Regras:
 
 ## Fase 6 — Símbolos no viewport
 
-- [ ] **T20** O `SymbolLayer` no `render`:
+- [x] **T20** O `SymbolLayer` no `render`:
   - os moldes dos glifos (engaste, articulação, rolete, genérico, seta,
     arco, tríade);
   - o shader instanciado com tamanho constante na tela;
@@ -252,6 +252,12 @@ Regras:
   Arquivos: `src/render/include/fem/render/symbols.hpp`,
   `symbol_layer.*`, `shaders/symbol.vert/.frag`, `viewport.*`,
   `scene_renderer.cpp`, `tests/unit/render/test_symbols.cpp`. Cobre: 22.
+  Nota: oito moldes (engaste, articulação, rolete, genérico, seta, arco,
+  tríade e o elo entre as pontas das setas distribuídas, cuja parte ao
+  longo da barra fica em unidades do mundo). O glifo do apoio sai de
+  `supportShape` (no plano só U, V e RZ contam; o rolete aponta para o
+  GDL preso). Os símbolos vão por cima do modelo, sem teste de
+  profundidade. O desenho na tela fica para a T21 e o roteiro T23.
 - [ ] **T21** O `ModelController` monta o `SymbolSet`:
   - do caso ou da combinação ativa, com as posições da malha ou, sem
     malha, do desenho;

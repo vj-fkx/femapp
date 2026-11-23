@@ -111,6 +111,7 @@ public:
     bool rectangle = false;
     bool isolated = false;
     bool commandSelection = false; // REQ-005-27: a command asks for objects
+    bool symbolsVisible = true;    // REQ-010-22
     SelectionTarget selectionTarget = SelectionTarget::Drawing;
     MouseMode mouseMode = MouseMode::Select;
     QPointF pressPosition;
@@ -125,6 +126,8 @@ public:
     std::shared_ptr<const geom::Drawing> drawing;
     std::vector<geom::EntityId> drawingSelection;
     std::uint64_t drawingSelectionVersion = 0;
+    std::shared_ptr<const SymbolSet> symbols;
+    std::uint64_t symbolsVersion = 0;
     geom::Preview preview;
     std::uint64_t previewVersion = 0;
 
@@ -627,7 +630,10 @@ void Viewport::render(QRhiCommandBuffer* commandBuffer)
                                          .selectionVersion = m_impl->drawingSelectionVersion,
                                          .selection = &m_impl->drawingSelection,
                                          .preview = &m_impl->preview,
-                                         .previewVersion = m_impl->previewVersion}};
+                                         .previewVersion = m_impl->previewVersion},
+                             .symbols = {.symbols = m_impl->symbols.get(),
+                                         .version = m_impl->symbolsVersion,
+                                         .visible = m_impl->symbolsVisible}};
     if (!m_impl->renderer.render(commandBuffer, renderTarget(), params)) {
         tryNextBackend(m_impl->renderer.errorString());
         return;
@@ -792,6 +798,24 @@ void Viewport::setDrawing(std::shared_ptr<const geom::Drawing> drawing)
     m_impl->drawingSelection.clear();
     ++m_impl->drawingSelectionVersion;
     update();
+}
+
+void Viewport::setSymbols(std::shared_ptr<const SymbolSet> symbols)
+{
+    m_impl->symbols = std::move(symbols);
+    ++m_impl->symbolsVersion;
+    update();
+}
+
+void Viewport::setSymbolsVisible(bool visible)
+{
+    m_impl->symbolsVisible = visible;
+    update();
+}
+
+bool Viewport::symbolsVisible() const
+{
+    return m_impl->symbolsVisible;
 }
 
 const std::shared_ptr<const geom::Drawing>& Viewport::drawing() const

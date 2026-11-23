@@ -74,7 +74,8 @@ bool SceneRenderer::initialize(QRhi* rhi, QRhiRenderPassDescriptor* renderPass, 
                          createGizmo(renderPass, sampleCount, updates) &&
                          createLabels(renderPass, sampleCount, updates) &&
                          m_mesh.create(rhi, renderPass, sampleCount, &m_error) &&
-                         m_drawing.create(rhi, renderPass, sampleCount, &m_error);
+                         m_drawing.create(rhi, renderPass, sampleCount, &m_error) &&
+                         m_symbols.create(rhi, renderPass, sampleCount, &m_error);
     if (!created) {
         updates->release();
         release();
@@ -390,6 +391,8 @@ bool SceneRenderer::render(QRhiCommandBuffer* commandBuffer, QRhiRenderTarget* t
     if (!m_mesh.prepare(updates, params.mesh, *params.camera, params.pixelSize,
                         params.devicePixelRatio, &m_error) ||
         !m_drawing.prepare(updates, params.drawing, *params.camera, params.pixelSize,
+                           params.devicePixelRatio, &m_error) ||
+        !m_symbols.prepare(updates, params.symbols, *params.camera, params.pixelSize,
                            params.devicePixelRatio, &m_error)) {
         updates->release();
         return false;
@@ -414,6 +417,8 @@ bool SceneRenderer::render(QRhiCommandBuffer* commandBuffer, QRhiRenderTarget* t
 
     // REQ-005-33: after the grid, so that lines on the plane z = 0 stay on top.
     m_drawing.draw(commandBuffer, sceneViewport);
+    // REQ-010-22: the symbols over the model.
+    m_symbols.draw(commandBuffer, sceneViewport);
 
     if (drawAxes) {
         // QRhi viewports have their origin at the bottom-left corner.
@@ -443,6 +448,7 @@ void SceneRenderer::release()
 {
     m_mesh.release();
     m_drawing.release();
+    m_symbols.release();
     if (m_pendingUpdates != nullptr) {
         m_pendingUpdates->release();
         m_pendingUpdates = nullptr;
