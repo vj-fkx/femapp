@@ -31,7 +31,7 @@ cargas, resolver e ver diagramas de esforços.
 | 008b | beam-warping-curved | Viga curva `Line3` com curvatura em qualquer direção; seções de paredes finas e poligonal com propriedades numéricas (o empenamento foi adiado para a 008d) | 008 | concluída |
 | 008c | beam-second-order | Estática de segunda ordem (P-Δ e P-δ exato na barra, iterativa) e flambagem linear de treliças e vigas retas e curvas | 008b | concluída |
 | 009 | line-meshing | Divisão de linhas em elementos (contagem, tamanho, graduação; Line2 ou Line3), nós coincidentes fundidos, divisão em nós em T e cruzamentos, grupos por entidade; comando MESH | 005, 003 | implementando |
-| 010 | model-setup-ui | Árvore do modelo, propriedades, materiais, seções, apoios, cargas nodais e distribuídas, undo/redo | 004, 005, 008 | planejada |
+| 010 | model-setup-ui | Árvore do modelo, propriedades, materiais, seções, apoios, cargas nodais e distribuídas, undo/redo | 004, 005, 008 | requisitos |
 | 011 | analysis-runner | Execução assíncrona, progresso, cancelamento, validação do modelo | 008, 010 | planejada |
 | 012 | results-visualization | Deformada com escala, mapa de cores, legenda, consulta de valores, reações de apoio | 004, 011 | planejada |
 | 013 | frame-postprocessing | Diagramas N/V/M, seção extrudada no viewport | 012 | planejada |
@@ -121,7 +121,7 @@ tarefas da feature indicada (ou de uma nova) quando ela for especificada.
 | 008c | Imperfeições iniciais: curvatura inicial, cargas nocionais e imperfeição pelo modo de flambagem | 010 ou feature própria após a 008c |
 | 008c | Combinações de casos de carga (a segunda ordem não superpõe) | 010 / 011 |
 | 008c | Flambagem da própria barra de treliça entre os nós (hoje: modelar como viga) | 010 (aviso ou opção na atribuição) |
-| 009 | Tradução pt_BR dos textos do comando MESH (pedido, mensagens e relatório, já por `tr()`) | 010 ou uma passada de traduções |
+| 009, 010 | Tradução pt_BR dos textos do comando MESH (009) e da preparação do modelo (010), já por `tr()` | Uma passada de traduções |
 
 ## Pós-1.0
 
