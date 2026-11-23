@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <memory>
 #include <vector>
 
@@ -323,4 +324,226 @@ TEST_CASE("the state of targets", "[setup][build]")
     CHECK(s::targetState(group, f.drawing, mesh) == s::TargetState::Valid);
     group.groups.front().name = "nope";
     CHECK(s::targetState(group, f.drawing, mesh) == s::TargetState::MissingGroup);
+}
+
+namespace {
+
+// The same analysis at every node, matching by external id (the same mesh).
+void sameResults(const c::Model& a, const c::Model& b)
+{
+    const auto ra = c::runLinearStatic(a);
+    const auto rb = c::runLinearStatic(b);
+    if (!ra) {
+        INFO(ra.error().message);
+        REQUIRE(ra.has_value());
+    }
+    REQUIRE(rb.has_value());
+    double largest = 0.0;
+    double turned = 0.0;
+    for (std::size_t n = 0; n < rb->displacements.size(); ++n) {
+        largest = std::max(largest, rb->displacements[n].norm());
+        turned = std::max(turned, rb->rotations[n].norm());
+    }
+    REQUIRE(largest > 0.0);
+    for (std::size_t n = 0; n < ra->displacements.size(); ++n) {
+        CHECK((ra->displacements[n] - rb->displacements[n]).norm() <= 1e-12 * largest);
+        CHECK((ra->rotations[n] - rb->rotations[n]).norm() <= 1e-12 * std::max(1.0, turned));
+        CHECK(std::abs(ra->warping[n] - rb->warping[n]) <= 1e-12 * std::max(1.0, turned));
+    }
+}
+
+} // namespace
+
+// AC-3: REQ-010-08 — every beam detail of the core through the document.
+TEST_CASE("beam details prepared in the document", "[setup][build]")
+{
+    Drawing drawing;
+    const EntityId first = addLine(drawing, Vec3(0, 0, 0), Vec3(3, 0, 0));
+    const EntityId second = addLine(drawing, Vec3(3, 0, 0), Vec3(6, 0, 0));
+    const EntityId root = addPoint(drawing, Vec3(0, 0, 0));
+    const EntityId tip = addPoint(drawing, Vec3(6, 0, 0));
+    const s::MeshContext mesh = meshOf(drawing);
+
+    s::Document d;
+    added(d, s::addItem(
+                 d, s::MaterialItem{
+                        .id = {},
+                        .data = {.name = "steel", .youngsModulus = 2.1e8, .poissonsRatio = 0.3}}));
+    added(d, s::addItem(d, s::SectionItem{
+                               .id = {},
+                               .data = {.name = "I",
+                                        .shape = c::ISection{
+                                            .h = 0.3, .bf = 0.15, .tf = 0.0107, .tw = 0.0071}}}));
+    added(d, s::assign(d, s::BarAssignment{.id = {},
+                                           .targets = entities({first, second}),
+                                           .data = {.kind = c::ElementKind::Beam3D,
+                                                    .material = "steel",
+                                                    .section = "I",
+                                                    .warping = true}}));
+    c::EndConnection spring;
+    spring.end = c::BarEnd::End;
+    spring.stiffness[4] = 5e3; // My, at the end of the first bar
+    added(d,
+          s::assign(d, s::ConnectionItem{.id = {}, .targets = entities({first}), .data = spring}));
+    added(d, s::assign(d, s::OffsetItem{.id = {},
+                                        .targets = entities({second}),
+                                        .data = {.end = Vec3(0, 0, 0.05)}}));
+    added(d, s::assign(d, s::FoundationItem{
+                              .id = {},
+                              .targets = entities({first, second}),
+                              .data = {.translational = Vec3(0, 50, 80), .torsional = 10}}));
+    added(d,
+          s::assign(d, s::WarpingEndItem{.id = {},
+                                         .targets = entities({first}),
+                                         .data = {.end = c::BarEnd::Start,
+                                                  .condition = c::WarpingCondition::Restrained}}));
+    s::SupportItem fixed{.id = {}, .targets = entities({root}), .held = {}};
+    for (const auto dof : {c::DofType::U, c::DofType::V, c::DofType::W, c::DofType::RX,
+                           c::DofType::RY, c::DofType::RZ}) {
+        fixed.held[static_cast<std::size_t>(dof)] = true;
+    }
+    added(d, s::assign(d, fixed));
+    const s::ItemId loadCase = added(d, s::addItem(d, s::LoadCase{.id = {}, .name = "tip"}));
+    added(d, s::addItem(d, s::LoadItem{.id = {},
+                                       .loadCase = loadCase,
+                                       .targets = entities({tip}),
+                                       .action = c::NodalForce{.force = Vec3(0, 1, -2),
+                                                               .moment = Vec3(0.3, 0, 0)}}));
+    const s::BuildResult built = s::buildModel(d, drawing, mesh, {.item = loadCase});
+    for (const s::BuildIssue& issue : built.issues) {
+        INFO(static_cast<int>(issue.kind) << " " << issue.detail);
+        CHECK(issue.severity != s::Severity::Error);
+    }
+
+    // By hand, on the same mesh: the first bar is element 1, the second 2;
+    // the root is node 1, the tip node 3 (009 numbering).
+    c::Model hand;
+    hand.mesh = mesh.mesh;
+    hand.materials.push_back({.name = "steel", .youngsModulus = 2.1e8, .poissonsRatio = 0.3});
+    hand.sections.push_back(
+        {.name = "I", .shape = c::ISection{.h = 0.3, .bf = 0.15, .tf = 0.0107, .tw = 0.0071}});
+    hand.assignments.push_back({.elements = c::ElementIds{{1, 2}},
+                                .kind = c::ElementKind::Beam3D,
+                                .material = "steel",
+                                .section = "I",
+                                .warping = true});
+    c::EndConnection handSpring = spring;
+    handSpring.elements = c::ElementIds{{1}};
+    hand.endConnections.push_back(handSpring);
+    hand.rigidOffsets.push_back({.elements = c::ElementIds{{2}}, .end = Vec3(0, 0, 0.05)});
+    hand.foundations.push_back(
+        {.elements = c::ElementIds{{1, 2}}, .translational = Vec3(0, 50, 80), .torsional = 10});
+    hand.warpingEnds.push_back({.elements = c::ElementIds{{1}},
+                                .end = c::BarEnd::Start,
+                                .condition = c::WarpingCondition::Restrained});
+    for (const auto dof : {c::DofType::U, c::DofType::V, c::DofType::W, c::DofType::RX,
+                           c::DofType::RY, c::DofType::RZ}) {
+        hand.restraints.push_back({.nodes = c::NodeIds{{1}}, .dof = dof, .value = 0.0});
+    }
+    hand.nodalForces.push_back(
+        {.nodes = c::NodeIds{{3}}, .force = Vec3(0, 1, -2), .moment = Vec3(0.3, 0, 0)});
+    sameResults(built.model, hand);
+}
+
+// AC-4: REQ-010-12, 13 — an imported mesh, by group and by picked items.
+TEST_CASE("targets on an imported mesh", "[setup][build]")
+{
+    // A cantilever of two bars, with point groups at the root and the tip.
+    c::MeshBuilder builder;
+    REQUIRE(builder.addNode(10, Vec3(0, 0, 0)).has_value());
+    REQUIRE(builder.addNode(20, Vec3(2, 0, 0)).has_value());
+    REQUIRE(builder.addNode(30, Vec3(4, 0, 0)).has_value());
+    const std::array<c::ExternalId, 2> a{10, 20};
+    const std::array<c::ExternalId, 2> b{20, 30};
+    const std::array<c::ExternalId, 1> r{10};
+    const auto e1 = builder.addElement(c::ElementType::Line2, 1, a);
+    const auto e2 = builder.addElement(c::ElementType::Line2, 2, b);
+    const auto p = builder.addElement(c::ElementType::Point1, 3, r);
+    REQUIRE((e1 && e2 && p));
+    REQUIRE(builder.addGroup("beam", 1, {*e1, *e2}).has_value());
+    REQUIRE(builder.addGroup("root", 0, {*p}).has_value());
+    auto built = builder.build();
+    REQUIRE(built.has_value());
+    s::MeshContext mesh;
+    mesh.mesh = std::make_shared<const c::Mesh>(std::move(*built));
+    mesh.generation = 3; // no map, no drawing revision: imported
+
+    const Drawing drawing;
+    s::Document d;
+    added(d, s::addItem(
+                 d, s::MaterialItem{
+                        .id = {},
+                        .data = {.name = "steel", .youngsModulus = 2.0e8, .poissonsRatio = 0.3}}));
+    added(d, s::addItem(d, s::SectionItem{
+                               .id = {},
+                               .data = {.name = "R", .shape = c::Rectangle{.b = 0.2, .h = 0.4}}}));
+    s::Targets beam;
+    beam.groups = {{.name = "beam", .dimension = 1}};
+    added(d, s::assign(d, s::BarAssignment{.id = {},
+                                           .targets = beam,
+                                           .data = {.kind = c::ElementKind::Beam2D,
+                                                    .material = "steel",
+                                                    .section = "R"}}));
+    s::Targets root;
+    root.groups = {{.name = "root", .dimension = 0}};
+    s::SupportItem fixed{.id = {}, .targets = root, .held = {}};
+    fixed.held[static_cast<std::size_t>(c::DofType::U)] = true;
+    fixed.held[static_cast<std::size_t>(c::DofType::V)] = true;
+    fixed.held[static_cast<std::size_t>(c::DofType::RZ)] = true;
+    added(d, s::assign(d, fixed));
+    const s::ItemId loadCase = added(d, s::addItem(d, s::LoadCase{.id = {}, .name = "tip"}));
+    s::Targets tip;
+    tip.nodes = {30};
+    tip.meshGeneration = 3;
+    const s::ItemId load =
+        added(d, s::addItem(d, s::LoadItem{.id = {},
+                                           .loadCase = loadCase,
+                                           .targets = tip,
+                                           .action = c::NodalForce{.force = Vec3(0, -5, 0)}}));
+    // A distributed load on a picked element.
+    s::Targets second;
+    second.elements = {2};
+    second.meshGeneration = 3;
+    added(d, s::addItem(d, s::LoadItem{.id = {},
+                                       .loadCase = loadCase,
+                                       .targets = second,
+                                       .action = c::DistributedLoad{.startValue = Vec3(0, -1, 0),
+                                                                    .endValue = Vec3(0, -1, 0)}}));
+
+    const s::BuildResult result = s::buildModel(d, drawing, mesh, {.item = loadCase});
+    CHECK(result.issues.empty());
+    c::Model hand;
+    hand.mesh = mesh.mesh;
+    hand.materials.push_back({.name = "steel", .youngsModulus = 2.0e8, .poissonsRatio = 0.3});
+    hand.sections.push_back({.name = "R", .shape = c::Rectangle{.b = 0.2, .h = 0.4}});
+    hand.assignments.push_back({.elements = c::GroupRef{"beam"},
+                                .kind = c::ElementKind::Beam2D,
+                                .material = "steel",
+                                .section = "R"});
+    for (const auto dof : {c::DofType::U, c::DofType::V, c::DofType::RZ}) {
+        hand.restraints.push_back({.nodes = c::GroupRef{"root"}, .dof = dof, .value = 0.0});
+    }
+    hand.nodalForces.push_back({.nodes = c::NodeIds{{30}}, .force = Vec3(0, -5, 0)});
+    hand.distributedLoads.push_back(
+        {.elements = c::ElementIds{{2}}, .startValue = Vec3(0, -1, 0), .endValue = Vec3(0, -1, 0)});
+    sameResults(result.model, hand);
+
+    // A new mesh: the picked load and element are stale and left out.
+    s::MeshContext next = mesh;
+    next.generation = 4;
+    const s::BuildResult stale = s::buildModel(d, drawing, next, {.item = loadCase});
+    CHECK(has(stale.issues, IssueKind::StaleSelection, load));
+    CHECK(stale.model.nodalForces.empty());
+    CHECK(stale.model.distributedLoads.empty());
+    // Entity targets on an imported mesh cannot be found.
+    added(d, s::assign(d, s::OffsetItem{.id = {}, .targets = entities({EntityId{1}}), .data = {}}));
+    CHECK(
+        has(s::buildModel(d, drawing, mesh, {.item = loadCase}).issues, IssueKind::MissingEntity));
+    // A group that is not in the mesh.
+    s::Targets nope;
+    nope.groups = {{.name = "nope", .dimension = 1}};
+    const s::ItemId missing =
+        added(d, s::assign(d, s::FoundationItem{.id = {}, .targets = nope, .data = {}}));
+    CHECK(has(s::buildModel(d, drawing, mesh, {.item = loadCase}).issues, IssueKind::MissingGroup,
+              missing));
 }

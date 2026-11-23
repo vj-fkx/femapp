@@ -99,7 +99,7 @@ Regras:
     nós de linhas e de pontos).
   Arquivos: `src/setup/include/fem/setup/build.hpp`, `build.cpp`,
   `tests/unit/setup/test_build.cpp`. Cobre: 07, 11, 12, 14, 15, 20.
-- [ ] **T09** Detalhes de viga e alvos da malha:
+- [x] **T09** Detalhes de viga e alvos da malha:
   - testes primeiro:
     - viga 3D com ligações, excentricidades, base e empenamento,
       montada = feita à mão;
@@ -306,3 +306,7 @@ Regras:
   nomeados (material, seção, caso, combinação) e as cargas são duplicados.
   Ligação de extremidade para as duas pontas vira um item por ponta, como
   no design §5.2.
+- T09 (2026-11-23): a montagem dos detalhes de viga e dos alvos por grupo
+  e por seleção já tinha sido escrita na T08, junto com o resto da
+  montagem. Por isso os testes da T09 passaram de primeira e não foram
+  vistos falhando antes do código.
