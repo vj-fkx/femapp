@@ -65,7 +65,7 @@ Regras:
   - ainda sem as divisões por contato.
   Arquivo: `src/mesher/line_mesher.cpp`. Cobre: 01, 02, 05, 08, 09, 10,
   11.
-- [ ] **T07** Testes das ligações (devem falhar), cada divisão com o nó
+- [x] **T07** Testes das ligações (devem falhar), cada divisão com o nó
   comum e listada no relatório com o tipo e as entidades:
   - viga que termina no meio de um pilar;
   - diagonais que se cruzam;
@@ -79,7 +79,7 @@ Regras:
   - trecho nulo ignorado;
   - volta colinear de uma polilinha sobre si mesma.
   Arquivo: `tests/unit/mesher/test_line_mesher.cpp`. Cobre: 03, 04, 11.
-- [ ] **T08** Contatos no gerador até a T07 passar: a BVH, a
+- [x] **T08** Contatos no gerador até a T07 passar: a BVH, a
   classificação, os parâmetros de divisão levados aos nós pela fusão e os
   trechos entre nós obrigatórios (§5.2, §5.3, §5.5). Arquivo:
   `src/mesher/line_mesher.cpp`. Cobre: 03, 04, 11.

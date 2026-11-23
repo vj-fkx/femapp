@@ -3,6 +3,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cstdint>
 #include <span>
 #include <utility>
@@ -274,5 +275,200 @@ TEST_CASE("drawings that cannot be meshed", "[mesher][line]")
         REQUIRE_FALSE(result.has_value());
         CHECK(result.error().kind == LineMeshError::Kind::UnknownEntity);
         CHECK(result.error().items == std::vector<EntityId>{EntityId{99}});
+    }
+}
+
+namespace {
+
+using fem::mesher::SplitKind;
+
+// The positions of the nodes of a mesh, sorted, for comparisons that do not
+// depend on the numbering.
+std::vector<std::array<double, 3>> sortedNodes(const fem::core::Mesh& mesh)
+{
+    std::vector<std::array<double, 3>> out;
+    for (fem::core::NodeIndex n = 0; n < mesh.nodeCount(); ++n) {
+        const Vec3 p = mesh.nodeCoordinates(n);
+        out.push_back({p.x(), p.y(), p.z()});
+    }
+    std::ranges::sort(out);
+    return out;
+}
+
+bool hasNode(const fem::core::Mesh& mesh, const Vec3& p, double tolerance = 1e-12)
+{
+    for (fem::core::NodeIndex n = 0; n < mesh.nodeCount(); ++n) {
+        if ((mesh.nodeCoordinates(n) - p).norm() <= tolerance) {
+            return true;
+        }
+    }
+    return false;
+}
+
+std::size_t groupSize(const fem::core::Mesh& mesh, EntityId id)
+{
+    const auto* group = mesh.findGroup(fem::mesher::entityGroupName(id), 1);
+    return group == nullptr ? 0 : group->elements.size();
+}
+
+} // namespace
+
+// T07 (AC-2): REQ-009-03, 11.
+TEST_CASE("a beam ending on the middle of a column", "[mesher][line][contact]")
+{
+    Drawing drawing;
+    const EntityId column = addLine(drawing, Vec3(0, 0, 0), Vec3(0, 6, 0));
+    const EntityId beam = addLine(drawing, Vec3(0, 3, 0), Vec3(4, 3, 0));
+    const auto result = meshLines(drawing);
+    REQUIRE(result.has_value());
+    const auto& mesh = result->mesh;
+    CHECK(mesh.nodeCount() == 4);
+    CHECK(mesh.elementCount() == 3);
+    // The column in two, through the node of the beam.
+    CHECK(elementNodeIds(mesh, 1) == std::vector<fem::core::ExternalId>{1, 2});
+    CHECK(elementNodeIds(mesh, 2) == std::vector<fem::core::ExternalId>{2, 3});
+    CHECK(elementNodeIds(mesh, 3) == std::vector<fem::core::ExternalId>{2, 4});
+    CHECK(nodeAt(mesh, 2) == Vec3(0, 3, 0));
+    CHECK(groupSize(mesh, column) == 2);
+    // Both elements of the column come from its only segment.
+    for (const auto& origin : result->map.elements) {
+        CHECK(origin.segment == 0);
+    }
+    REQUIRE(result->report.splits.size() == 1);
+    const auto& split = result->report.splits[0];
+    CHECK(split.kind == SplitKind::TJoint);
+    CHECK(split.position == Vec3(0, 3, 0));
+    CHECK(split.entities == std::vector<EntityId>{column, beam});
+}
+
+TEST_CASE("two bracing diagonals that cross", "[mesher][line][contact]")
+{
+    Drawing drawing;
+    const EntityId first = addLine(drawing, Vec3(0, 0, 0), Vec3(4, 4, 0));
+    const EntityId second = addLine(drawing, Vec3(4, 0, 0), Vec3(0, 4, 0));
+    const auto result = meshLines(drawing);
+    REQUIRE(result.has_value());
+    CHECK(result->mesh.nodeCount() == 5);
+    CHECK(result->mesh.elementCount() == 4);
+    CHECK(nodeAt(result->mesh, 2) == Vec3(2, 2, 0));
+    CHECK(elementNodeIds(result->mesh, 3) == std::vector<fem::core::ExternalId>{4, 2});
+    REQUIRE(result->report.splits.size() == 1);
+    CHECK(result->report.splits[0].kind == SplitKind::Crossing);
+    CHECK(result->report.splits[0].entities == std::vector<EntityId>{first, second});
+}
+
+TEST_CASE("a line through a vertex of a polyline", "[mesher][line][contact]")
+{
+    Drawing drawing;
+    const EntityId roof =
+        addPolyline(drawing, {Vec3(0, 0, 0), Vec3(2, 2, 0), Vec3(4, 0, 0)}, false);
+    const EntityId post = addLine(drawing, Vec3(2, 0, 0), Vec3(2, 4, 0));
+    const auto result = meshLines(drawing);
+    REQUIRE(result.has_value());
+    // The vertex is a node of both; only the line is split, once.
+    CHECK(result->mesh.nodeCount() == 5);
+    CHECK(result->mesh.elementCount() == 4);
+    CHECK(groupSize(result->mesh, post) == 2);
+    REQUIRE(result->report.splits.size() == 1);
+    CHECK(result->report.splits[0].kind == SplitKind::TJoint);
+    CHECK(result->report.splits[0].entities == std::vector<EntityId>{post, roof});
+}
+
+TEST_CASE("a point on a beam", "[mesher][line][contact]")
+{
+    Drawing drawing;
+    const EntityId beam = addLine(drawing, Vec3(0, 0, 0), Vec3(4, 0, 0));
+    const EntityId point = addPoint(drawing, Vec3(1, 0, 0));
+    const auto result = meshLines(drawing);
+    REQUIRE(result.has_value());
+    CHECK(result->mesh.nodeCount() == 3);
+    CHECK(result->mesh.elementCount(ElementType::Line2) == 2);
+    CHECK(result->mesh.elementCount(ElementType::Point1) == 1);
+    CHECK(nodeAt(result->mesh, 2) == Vec3(1, 0, 0));
+    REQUIRE(result->report.splits.size() == 1);
+    CHECK(result->report.splits[0].kind == SplitKind::PointOnLine);
+    CHECK(result->report.splits[0].entities == std::vector<EntityId>{beam, point});
+    // The node of the point lies on the beam, and comes from the point.
+    const auto node = result->mesh.findNode(2);
+    REQUIRE(node.has_value());
+    const auto& origin = result->map.nodes[static_cast<std::size_t>(*node)];
+    CHECK(origin.entities == std::vector<EntityId>{beam, point});
+    CHECK(origin.vertex.value_or(std::pair{EntityId{}, -1}).first == point);
+}
+
+TEST_CASE("crossings in space, and lines that pass by", "[mesher][line][contact]")
+{
+    Drawing drawing;
+    addLine(drawing, Vec3(0, 0, 0), Vec3(2, 2, 2));
+    addLine(drawing, Vec3(2, 0, 0), Vec3(0, 2, 2));
+    // Skew, 2 apart.
+    addLine(drawing, Vec3(10, 0, 0), Vec3(14, 0, 0));
+    addLine(drawing, Vec3(11, -1, 2), Vec3(11, 1, 2));
+    const auto result = meshLines(drawing);
+    REQUIRE(result.has_value());
+    CHECK(result->mesh.nodeCount() == 5 + 4);
+    CHECK(result->mesh.elementCount() == 4 + 2);
+    CHECK(hasNode(result->mesh, Vec3(1, 1, 1)));
+    REQUIRE(result->report.splits.size() == 1);
+    CHECK(result->report.splits[0].kind == SplitKind::Crossing);
+}
+
+TEST_CASE("many bars at one node", "[mesher][line][contact]")
+{
+    Drawing drawing;
+    addLine(drawing, Vec3(-2, 0, 0), Vec3(2, 0, 0));
+    addLine(drawing, Vec3(0, -2, 0), Vec3(0, 2, 0));
+    addLine(drawing, Vec3(1, 1, 0), Vec3(0, 0, 0)); // ends on both
+    const auto result = meshLines(drawing);
+    REQUIRE(result.has_value());
+    CHECK(result->mesh.nodeCount() == 6);
+    CHECK(result->mesh.elementCount() == 5);
+    const std::vector<std::array<double, 3>> expected{{-2, 0, 0}, {0, -2, 0}, {0, 0, 0},
+                                                      {0, 2, 0},  {1, 1, 0},  {2, 0, 0}};
+    CHECK(sortedNodes(result->mesh) == expected);
+}
+
+TEST_CASE("a beam ending within the tolerance of a column", "[mesher][line][contact]")
+{
+    Drawing drawing;
+    addLine(drawing, Vec3(0, 0, 0), Vec3(0, 6, 0));
+    // The tolerance is about 1e-8 here: 3e-9 away from the column.
+    addLine(drawing, Vec3(3e-9, 3, 0), Vec3(4, 3, 0));
+    const auto result = meshLines(drawing);
+    REQUIRE(result.has_value());
+    CHECK(result->mesh.nodeCount() == 4);
+    CHECK(result->mesh.elementCount() == 3);
+    // The node is the end of the beam, where it was drawn.
+    CHECK(nodeAt(result->mesh, 2) == Vec3(3e-9, 3, 0));
+}
+
+// REQ-009-04
+TEST_CASE("overlapping bars are refused", "[mesher][line][contact]")
+{
+    SECTION("two lines")
+    {
+        Drawing drawing;
+        const EntityId first = addLine(drawing, Vec3(0, 0, 0), Vec3(3, 0, 0));
+        const EntityId second = addLine(drawing, Vec3(2, 0, 0), Vec3(5, 0, 0));
+        const auto result = meshLines(drawing);
+        REQUIRE_FALSE(result.has_value());
+        CHECK(result.error().kind == LineMeshError::Kind::Overlaps);
+        REQUIRE(result.error().overlaps.size() == 1);
+        const auto& overlap = result.error().overlaps[0];
+        CHECK(overlap.first == first);
+        CHECK(overlap.second == second);
+        CHECK(overlap.from == Vec3(2, 0, 0));
+        CHECK(overlap.to == Vec3(3, 0, 0));
+    }
+    SECTION("a polyline folding back on itself")
+    {
+        Drawing drawing;
+        const EntityId id =
+            addPolyline(drawing, {Vec3(0, 0, 0), Vec3(3, 0, 0), Vec3(1, 0, 0)}, false);
+        const auto result = meshLines(drawing);
+        REQUIRE_FALSE(result.has_value());
+        REQUIRE(result.error().overlaps.size() == 1);
+        CHECK(result.error().overlaps[0].first == id);
+        CHECK(result.error().overlaps[0].second == id);
     }
 }

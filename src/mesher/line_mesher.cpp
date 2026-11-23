@@ -1,3 +1,6 @@
+#include "detail/segment_bvh.hpp"
+#include "detail/segment_geometry.hpp"
+
 #include <fem/core/mesh_builder.hpp>
 #include <fem/mesher/line_mesher.hpp>
 
@@ -35,6 +38,16 @@ struct Candidate
     Vec3 position = Vec3::Zero();
     std::size_t entity = 0;
     int vertex = -1; // geom::verticesOf index; -1 for a split
+};
+
+// A split found by the contacts (REQ-009-11), by entity index; joined per
+// node and kind in the report.
+struct SplitEvent
+{
+    SplitKind kind = SplitKind::Crossing;
+    std::int32_t candidate = 0;
+    std::vector<std::size_t> split; // the entities split
+    std::vector<std::size_t> cause; // the entity whose end or point splits them
 };
 
 // Union-find whose root is the smallest index: the first candidate in order
@@ -309,11 +322,101 @@ tl::expected<LineMeshResult, LineMeshError> meshLines(const geom::Drawing& drawi
         return tl::unexpected(LineMeshError{.kind = LineMeshError::Kind::NoLines});
     }
 
-    // 2. Merge (design §5.4).
+    // 2. Contacts (design §5.2, §5.3): where the pieces are split, and by
+    // which node candidate.
+    std::vector<std::vector<std::pair<double, std::int32_t>>> splitsOf(pieces.size());
+    std::vector<SplitEvent> events;
+    LineMeshError overlaps{.kind = LineMeshError::Kind::Overlaps};
+    {
+        std::vector<std::size_t> live; // the pieces that are not ignored
+        std::vector<detail::Box3> boxes;
+        for (std::size_t p = 0; p < pieces.size(); ++p) {
+            if (!pieces[p].ignored) {
+                live.push_back(p);
+                boxes.push_back(detail::segmentBox(pieces[p].a, pieces[p].b, tolerance));
+            }
+        }
+        const detail::SegmentBvh bvh(boxes);
+        for (const auto& [i, j] : bvh.pairs(options.threads)) {
+            const std::size_t pi = live[static_cast<std::size_t>(i)];
+            const std::size_t pj = live[static_cast<std::size_t>(j)];
+            const Piece& first = pieces[pi];
+            const Piece& second = pieces[pj];
+            const detail::Contact contact =
+                detail::classify(first.a, first.b, second.a, second.b, tolerance);
+            switch (contact.kind) {
+            case detail::ContactKind::Overlap:
+                overlaps.overlaps.push_back({.first = (*entities)[first.entity]->id,
+                                             .second = (*entities)[second.entity]->id,
+                                             .from = contact.from,
+                                             .to = contact.to});
+                break;
+            case detail::ContactKind::Crossing: {
+                const auto c = static_cast<std::int32_t>(candidates.size());
+                candidates.push_back(
+                    {.position = contact.position, .entity = first.entity, .vertex = -1});
+                splitsOf[pi].emplace_back(contact.splitFirst.value_or(0.5), c);
+                splitsOf[pj].emplace_back(contact.splitSecond.value_or(0.5), c);
+                events.push_back({.kind = SplitKind::Crossing,
+                                  .candidate = c,
+                                  .split = {first.entity, second.entity},
+                                  .cause = {}});
+                break;
+            }
+            case detail::ContactKind::TJoint: {
+                // The node is the end of the piece that lands on the other.
+                const bool firstSplit = contact.splitFirst.has_value();
+                const Piece& hit = firstSplit ? first : second;
+                const Piece& end = firstSplit ? second : first;
+                const std::int32_t c =
+                    (contact.position - end.a).norm() <= (contact.position - end.b).norm()
+                        ? end.startCandidate
+                        : end.endCandidate;
+                splitsOf[firstSplit ? pi : pj].emplace_back(
+                    firstSplit ? *contact.splitFirst : contact.splitSecond.value_or(0.5), c);
+                events.push_back({.kind = SplitKind::TJoint,
+                                  .candidate = c,
+                                  .split = {hit.entity},
+                                  .cause = {end.entity}});
+                break;
+            }
+            case detail::ContactKind::None:
+            case detail::ContactKind::Ends:
+                break;
+            }
+        }
+        // REQ-009-03: points on the interior of a piece.
+        std::vector<std::int32_t> found;
+        for (std::size_t e = 0; e < entities->size(); ++e) {
+            const std::int32_t c = pointCandidate[e];
+            if (c < 0) {
+                continue;
+            }
+            const Vec3& p = candidates[static_cast<std::size_t>(c)].position;
+            bvh.query(detail::segmentBox(p, p, tolerance), found);
+            for (const std::int32_t k : found) {
+                const std::size_t pk = live[static_cast<std::size_t>(k)];
+                if (const auto s =
+                        detail::interiorParameter(p, pieces[pk].a, pieces[pk].b, tolerance)) {
+                    splitsOf[pk].emplace_back(*s, c);
+                    events.push_back({.kind = SplitKind::PointOnLine,
+                                      .candidate = c,
+                                      .split = {pieces[pk].entity},
+                                      .cause = {e}});
+                }
+            }
+        }
+    }
+    if (!overlaps.overlaps.empty()) {
+        return tl::unexpected(std::move(overlaps));
+    }
+
+    // 3. Merge (design §5.4).
     Merge merge(candidates.size());
     mergeCandidates(candidates, tolerance, merge);
 
-    // 3. Numbering along the entities (design §5.6): one element per piece.
+    // 4. Numbering along the entities (design §5.5, §5.6): one element
+    // between consecutive required nodes of each piece.
     Numbering numbering(candidates.size());
     const auto nodeOf = [&](std::int32_t candidate) {
         const std::int32_t root = merge.root(candidate);
@@ -331,9 +434,24 @@ tl::expected<LineMeshResult, LineMeshError> meshLines(const geom::Drawing& drawi
             if (piece.ignored) {
                 continue;
             }
-            const std::array<std::int32_t, 2> nodes{nodeOf(piece.startCandidate),
-                                                    nodeOf(piece.endCandidate)};
-            numbering.element(core::ElementType::Line2, nodes, e, piece.segment);
+            // The required nodes along the piece, in order; splits whose
+            // nodes merged count once.
+            auto& splits = splitsOf[next];
+            splits.emplace_back(0.0, piece.startCandidate);
+            splits.emplace_back(1.0, piece.endCandidate);
+            std::ranges::sort(splits);
+            std::int32_t previous = -1;
+            for (const auto& [s, candidate] : splits) {
+                const std::int32_t root = merge.root(candidate);
+                if (previous >= 0 && root == previous) {
+                    continue;
+                }
+                if (previous >= 0) {
+                    const std::array<std::int32_t, 2> nodes{nodeOf(previous), nodeOf(root)};
+                    numbering.element(core::ElementType::Line2, nodes, e, piece.segment);
+                }
+                previous = root;
+            }
         }
     }
 
@@ -397,9 +515,55 @@ tl::expected<LineMeshResult, LineMeshError> meshLines(const geom::Drawing& drawi
     result.report.nodes = result.mesh.nodeCount();
     result.report.elements = result.mesh.elementCount();
     for (std::size_t i = 0; i < candidates.size(); ++i) {
-        if (merge.root(static_cast<std::int32_t>(i)) != static_cast<std::int32_t>(i)) {
+        // Crossings are new nodes, not merged ends.
+        if (candidates[i].vertex >= 0 &&
+            merge.root(static_cast<std::int32_t>(i)) != static_cast<std::int32_t>(i)) {
             ++result.report.mergedNodes;
         }
+    }
+    // One split per node and kind: the entities split, then the ones that
+    // split them, each once, in the order found.
+    struct Joined
+    {
+        std::int32_t root = 0;
+        SplitKind kind = SplitKind::Crossing;
+        std::vector<std::size_t> split;
+        std::vector<std::size_t> cause;
+    };
+    std::vector<Joined> joined;
+    const auto addOnce = [](std::vector<std::size_t>& list, std::size_t e) {
+        if (std::ranges::find(list, e) == list.end()) {
+            list.push_back(e);
+        }
+    };
+    for (const SplitEvent& event : events) {
+        const std::int32_t root = merge.root(event.candidate);
+        auto it = std::ranges::find_if(
+            joined, [&](const Joined& j) { return j.root == root && j.kind == event.kind; });
+        if (it == joined.end()) {
+            joined.push_back({.root = root, .kind = event.kind, .split = {}, .cause = {}});
+            it = joined.end() - 1;
+        }
+        for (const std::size_t e : event.split) {
+            addOnce(it->split, e);
+        }
+        for (const std::size_t e : event.cause) {
+            addOnce(it->cause, e);
+        }
+    }
+    for (const Joined& j : joined) {
+        Split split{.kind = j.kind,
+                    .position = candidates[static_cast<std::size_t>(j.root)].position,
+                    .entities = {}};
+        for (const std::size_t e : j.split) {
+            split.entities.push_back((*entities)[e]->id);
+        }
+        for (const std::size_t e : j.cause) {
+            if (std::ranges::find(j.split, e) == j.split.end()) {
+                split.entities.push_back((*entities)[e]->id);
+            }
+        }
+        result.report.splits.push_back(std::move(split));
     }
     return result;
 }
