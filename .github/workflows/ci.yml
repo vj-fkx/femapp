@@ -187,6 +187,12 @@ jobs:
         run: |
           gcovr --root . --filter 'src/mesher/' --gcov-ignore-parse-errors=all --print-summary --fail-under-line 80 build/${{ matrix.preset }}
 
+      # NFR-010-03: line coverage of setup, at least 80% as for core.
+      - name: Coverage of setup
+        if: matrix.coverage
+        run: |
+          gcovr --root . --filter 'src/setup/' --gcov-ignore-parse-errors=all --print-summary --fail-under-line 80 build/${{ matrix.preset }}
+
   format:
     name: format
     runs-on: ubuntu-24.04

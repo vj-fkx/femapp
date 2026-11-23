@@ -310,8 +310,10 @@ Regras:
   Nota: `architecture.md` ganhou a §3c (o `setup`), os símbolos na §4 e o
   modelo na §5; o README, a seção "O modelo (menu Model)". A T23 (roteiro
   manual) ficou para depois, a pedido do mantenedor.
-- [ ] **T25** Cobertura de `src/setup/` ≥ 80% no CI, num terceiro `gcovr`.
+- [x] **T25** Cobertura de `src/setup/` ≥ 80% no CI, num terceiro `gcovr`.
   Arquivo: `.github/workflows/ci.yml`. Cobre: N03.
+  Nota: o passo "Coverage of setup" foi acrescentado; a medida em si só
+  sai no CI (T90), que não rodou ainda.
 - [ ] **T90** [M] Build e testes verdes nos jobs do CI, inclusive a
   cobertura de `core`, `mesher` e `setup`; push com sua confirmação.
   Cobre: N03.
