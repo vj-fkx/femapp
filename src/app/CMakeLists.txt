@@ -15,6 +15,8 @@ qt_add_executable(femapp WIN32 MACOSX_BUNDLE
     main_window.cpp
     model_controller.cpp
     model_controller.hpp
+    model_tree.cpp
+    model_tree.hpp
     main_window.hpp
     mesh_import.cpp
     mesh_import.hpp)

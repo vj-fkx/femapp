@@ -5,6 +5,7 @@
 #include "drafting_settings_dialog.hpp"
 #include "mesh_import.hpp"
 #include "model_controller.hpp"
+#include "model_tree.hpp"
 
 #include <fem/core/version.hpp>
 #include <fem/render/camera.hpp>
@@ -20,9 +21,11 @@
 #include <QDropEvent>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QInputDialog>
 #include <QKeyEvent>
 #include <QKeySequence>
 #include <QLabel>
+#include <QLineEdit>
 #include <QMenu>
 #include <QMenuBar>
 #include <QMessageBox>
@@ -32,14 +35,19 @@
 #include <QStatusBar>
 #include <QString>
 #include <QStringList>
+#include <QStyle>
 #include <QToolButton>
+#include <QTreeView>
 #include <QUndoStack>
 #include <QUrl>
 
 #include <array>
 #include <iostream>
 #include <string_view>
+#include <type_traits>
 #include <utility>
+#include <variant>
+#include <vector>
 
 namespace fem::app {
 
@@ -93,6 +101,7 @@ MainWindow::MainWindow(QWidget* parent)
     exitAction->setMenuRole(QAction::QuitRole);
 
     createDraftingUi();
+    createModelUi();
     createEditMenu();
     createViewMenu();
     createDraftingMenus();
@@ -349,6 +358,220 @@ void MainWindow::createEditMenu()
         editMenu->addAction(tr("&Clear Selection"), m_drafting, &DraftingController::escape);
     clear->setShortcut(QKeySequence(Qt::Key_Escape));
     m_viewActions.append(clear);
+}
+
+void MainWindow::createModelUi()
+{
+    // REQ-010-19: the model tree, docked on the left.
+    // NOLINTBEGIN(cppcoreguidelines-owning-memory): owned by their Qt parents.
+    m_tree = new ModelTree(m_model, this);
+    m_treeView = new QTreeView(this);
+    auto* dock = new QDockWidget(tr("Model"), this);
+    // NOLINTEND(cppcoreguidelines-owning-memory)
+    m_tree->setWarningIcon(style()->standardIcon(QStyle::SP_MessageBoxWarning));
+    m_treeView->setModel(m_tree);
+    m_treeView->setHeaderHidden(true);
+    m_treeView->setContextMenuPolicy(Qt::CustomContextMenu);
+    m_treeView->expandAll();
+    // The tree is rebuilt on every change: open again, as it was before.
+    connect(m_tree, &QAbstractItemModel::modelReset, m_treeView, &QTreeView::expandAll);
+    connect(m_treeView, &QTreeView::customContextMenuRequested, this, &MainWindow::showModelMenu);
+    connect(m_treeView, &QTreeView::doubleClicked, this, &MainWindow::activateItem);
+    connect(m_treeView->selectionModel(), &QItemSelectionModel::currentChanged, this,
+            [this](const QModelIndex& current) { highlightTargets(current); });
+    connect(m_model, &ModelController::refused, this, [this](const setup::EditRefusal& refusal) {
+        QString text;
+        switch (refusal.kind) {
+        case setup::EditRefusal::Kind::InUse:
+            text = tr("It is in use by:");
+            break;
+        case setup::EditRefusal::Kind::DuplicateName:
+            text = tr("The name is already taken by:");
+            break;
+        case setup::EditRefusal::Kind::NotFound:
+            text = tr("The item is not in the model.");
+            break;
+        case setup::EditRefusal::Kind::NoTargets:
+            text = tr("Select the objects to assign it to first.");
+            break;
+        case setup::EditRefusal::Kind::Unsupported:
+            text = tr("This cannot be done with this kind of item.");
+            break;
+        }
+        for (const setup::ItemId id : refusal.items) {
+            if (const setup::Item* item = m_model->document().find(id)) {
+                text += QLatin1Char('\n') + QStringLiteral("  ") + m_tree->label(*item);
+            }
+        }
+        showMessage(tr("The change was refused"), text, true);
+    });
+    dock->setObjectName(QStringLiteral("modelTree"));
+    dock->setWidget(m_treeView);
+    addDockWidget(Qt::LeftDockWidgetArea, dock);
+}
+
+void MainWindow::activateItem(const QModelIndex& index)
+{
+    // REQ-010-16: a double click on a load case or combination makes it the
+    // active one.
+    const auto id = m_tree->itemAt(index);
+    if (!id) {
+        return;
+    }
+    const setup::Item* item = m_model->document().find(*id);
+    if (item != nullptr && (std::holds_alternative<setup::LoadCase>(*item) ||
+                            std::holds_alternative<setup::Combination>(*item))) {
+        m_model->push(setup::setActiveCase(m_model->document(), *id), tr("activate load case"));
+    }
+}
+
+void MainWindow::highlightTargets(const QModelIndex& index)
+{
+    // REQ-010-19: the targets of the item selected in the tree, selected in
+    // the viewport.
+    const auto id = m_tree->itemAt(index);
+    if (!id || m_viewport.isNull()) {
+        return;
+    }
+    const setup::Item* item = m_model->document().find(*id);
+    const setup::Targets* targets = item != nullptr ? setup::targetsOf(*item) : nullptr;
+    if (targets == nullptr) {
+        return;
+    }
+    if (!targets->entities.empty()) {
+        m_viewport->setDrawingSelection(targets->entities);
+    }
+    // Groups and picked items, on the mesh shown, if it is the model's.
+    const setup::MeshContext& mesh = m_model->mesh();
+    const auto& scene = m_viewport->scene();
+    if (!mesh.mesh || !scene || scene->sharedMesh() != mesh.mesh) {
+        return;
+    }
+    render::SelectionItems items;
+    auto& elements = items[render::SelectionKind::Element];
+    auto& nodes = items[render::SelectionKind::Node];
+    for (const setup::GroupTarget& g : targets->groups) {
+        if (const core::Group* group = mesh.mesh->findGroup(g.name, g.dimension)) {
+            elements.insert(elements.end(), group->elements.begin(), group->elements.end());
+        }
+    }
+    if (targets->meshGeneration == mesh.generation) {
+        for (const core::ExternalId e : targets->elements) {
+            if (const auto found = mesh.mesh->findElement(e)) {
+                elements.push_back(*found);
+            }
+        }
+        for (const core::ExternalId n : targets->nodes) {
+            if (const auto found = mesh.mesh->findNode(n)) {
+                nodes.push_back(*found);
+            }
+        }
+    }
+    if (!items.empty()) {
+        m_viewport->setSelection(items);
+    }
+}
+
+void MainWindow::showModelMenu(const QPoint& position)
+{
+    // REQ-010-18: new, rename, duplicate, copy and delete, from the tree.
+    const QModelIndex index = m_treeView->indexAt(position);
+    const auto group = m_tree->groupAt(index);
+    const auto id = m_tree->itemAt(index);
+    const setup::Document& document = m_model->document();
+    const setup::Item* item = id ? document.find(*id) : nullptr;
+    QMenu menu;
+    if (item == nullptr && group == ModelTree::Group::LoadCases) {
+        menu.addAction(tr("New load case..."), this, [this] {
+            bool ok = false;
+            const QString name =
+                QInputDialog::getText(this, tr("New load case"), tr("Name:"), QLineEdit::Normal,
+                                      QString::fromStdString(setup::freeName(
+                                          m_model->document(), setup::LoadCase{}, "Load case")),
+                                      &ok);
+            if (ok && !name.isEmpty()) {
+                m_model->push(setup::addItem(m_model->documentForIds(),
+                                             setup::LoadCase{.id = {}, .name = name.toStdString()}),
+                              tr("new load case"));
+            }
+        });
+    }
+    if (item != nullptr) {
+        const setup::ItemId itemId = *id;
+        if (std::holds_alternative<setup::LoadCase>(*item) ||
+            std::holds_alternative<setup::Combination>(*item)) {
+            menu.addAction(tr("Activate"), this, [this, index] { activateItem(index); });
+        }
+        if (!setup::nameOf(*item).empty()) {
+            menu.addAction(tr("Rename..."), this, [this, itemId] {
+                const setup::Item* current = m_model->document().find(itemId);
+                if (current == nullptr) {
+                    return;
+                }
+                bool ok = false;
+                const QString name =
+                    QInputDialog::getText(this, tr("Rename"), tr("Name:"), QLineEdit::Normal,
+                                          QString::fromStdString(setup::nameOf(*current)), &ok);
+                if (!ok || name.isEmpty()) {
+                    return;
+                }
+                setup::Item renamed = *current;
+                std::visit(
+                    [&](auto& i) {
+                        using T = std::decay_t<decltype(i)>;
+                        if constexpr (std::is_same_v<T, setup::MaterialItem> ||
+                                      std::is_same_v<T, setup::SectionItem>) {
+                            i.data.name = name.toStdString();
+                        } else if constexpr (std::is_same_v<T, setup::LoadCase> ||
+                                             std::is_same_v<T, setup::Combination>) {
+                            i.name = name.toStdString();
+                        }
+                    },
+                    renamed);
+                m_model->push(setup::changeItem(m_model->document(), renamed), tr("rename"));
+            });
+        }
+        if (setup::targetsOf(*item) == nullptr || std::holds_alternative<setup::LoadItem>(*item)) {
+            menu.addAction(tr("Duplicate"), this, [this, itemId] {
+                m_model->push(setup::duplicateItem(m_model->documentForIds(), itemId),
+                              tr("duplicate"));
+            });
+        }
+        if (const auto* load = std::get_if<setup::LoadItem>(item)) {
+            menu.addAction(tr("Copy to load case..."), this, [this, itemId, from = load->loadCase] {
+                QStringList names;
+                std::vector<setup::ItemId> cases;
+                for (const setup::Item& other : m_model->document().items()) {
+                    const auto* c = std::get_if<setup::LoadCase>(&other);
+                    if (c != nullptr && c->id != from) {
+                        names.append(QString::fromStdString(c->name));
+                        cases.push_back(c->id);
+                    }
+                }
+                if (cases.empty()) {
+                    showMessage(tr("Copy loads"), tr("There is no other load case."), false);
+                    return;
+                }
+                bool ok = false;
+                const QString chosen = QInputDialog::getItem(
+                    this, tr("Copy loads"), tr("Load case:"), names, 0, false, &ok);
+                if (!ok) {
+                    return;
+                }
+                const auto at = static_cast<std::size_t>(names.indexOf(chosen));
+                const std::array<setup::ItemId, 1> loads{itemId};
+                m_model->push(setup::copyLoads(m_model->documentForIds(), loads, cases.at(at)),
+                              tr("copy loads"));
+            });
+        }
+        menu.addSeparator();
+        menu.addAction(tr("Delete"), this, [this, itemId] {
+            m_model->push(setup::removeItem(m_model->document(), itemId), tr("delete"));
+        });
+    }
+    if (!menu.isEmpty()) {
+        menu.exec(m_treeView->viewport()->mapToGlobal(position));
+    }
 }
 
 void MainWindow::createDraftingUi()

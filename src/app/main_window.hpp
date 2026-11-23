@@ -13,7 +13,10 @@
 class QAction;
 class QEvent;
 class QLabel;
+class QModelIndex;
+class QPoint;
 class QProgressBar;
+class QTreeView;
 
 namespace fem::render {
 class MeshScene;
@@ -25,6 +28,7 @@ namespace fem::app {
 class CommandLineWidget;
 class DraftingController;
 class ModelController;
+class ModelTree;
 class MeshImport;
 
 class MainWindow : public QMainWindow
@@ -71,6 +75,12 @@ private:
     void createEditMenu();
     void createDraftingUi();
     void createDraftingMenus();
+    // Feature 010: the model tree dock, its menu and the highlight of the
+    // targets of the item selected.
+    void createModelUi();
+    void showModelMenu(const QPoint& position);
+    void activateItem(const QModelIndex& index);
+    void highlightTargets(const QModelIndex& index);
     void showMessage(const QString& title, const QString& text, bool error);
 
     QPointer<render::Viewport> m_viewport;
@@ -85,6 +95,8 @@ private:
     DraftingController* m_drafting = nullptr;
     // Feature 010: the model document and the mesh it is built on.
     ModelController* m_model = nullptr;
+    ModelTree* m_tree = nullptr;
+    QTreeView* m_treeView = nullptr;
     bool m_quietMessages = false;
 };
 

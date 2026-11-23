@@ -123,6 +123,9 @@ public slots:
     // isolationChanged) while the selection is empty.
     void setIsolated(bool isolated);
     void clearSelection();
+    // Feature 010 (REQ-010-19): the selection set from outside, as the
+    // targets of a model item; replaces the current one.
+    void setSelection(const fem::render::SelectionItems& items);
     // REQ-005-26
     void setSelectionTarget(fem::render::SelectionTarget target);
 

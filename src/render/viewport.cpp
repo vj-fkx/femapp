@@ -387,6 +387,13 @@ void Viewport::clearSelection()
     }
 }
 
+void Viewport::setSelection(const SelectionItems& items)
+{
+    m_impl->selection.clear();
+    m_impl->selection.add(items);
+    selectionEdited();
+}
+
 void Viewport::selectionEdited()
 {
     ++m_impl->colorVersion;

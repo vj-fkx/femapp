@@ -158,7 +158,7 @@ Regras:
   Arquivos: `src/app/line_mesh_job.*`, `model_controller.hpp/.cpp`,
   `drafting_controller.*`, `main_window.*`,
   `tests/unit/app/test_line_mesh_job.cpp`. Cobre: 13, 23.
-- [ ] **T14** A árvore do modelo:
+- [x] **T14** A árvore do modelo:
   - `ModelTree` (`QAbstractItemModel`) num dock;
   - os grupos de itens, o caso ativo em negrito e os estados de alvo
     com ícone e dica;

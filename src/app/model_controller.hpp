@@ -35,6 +35,9 @@ public:
     [[nodiscard]] setup::Document& documentForIds() noexcept { return m_document; }
     [[nodiscard]] const setup::MeshContext& mesh() const noexcept { return m_mesh; }
     [[nodiscard]] const geom::Drawing& drawing() const noexcept { return m_drawing; }
+    // The undo stack shared with the drawing: its changes may change the
+    // state of targets (an entity erased).
+    [[nodiscard]] QUndoStack* undoStack() const noexcept { return m_undo; }
 
     // An edit as one step of the undo stack, applied now. Refused edits are
     // reported by refused() and change nothing; returns whether it was
