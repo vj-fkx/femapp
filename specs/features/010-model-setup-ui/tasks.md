@@ -136,7 +136,7 @@ Regras:
   Arquivos: `src/setup/include/fem/setup/document.hpp`,
   `src/setup/include/fem/setup/actions.hpp`, `actions.cpp`,
   `tests/unit/setup/test_actions.cpp`. Cobre: 26.
-- [ ] **T11** Conferência:
+- [x] **T11** Conferência:
   - testes primeiro: `checkModel` com os problemas da montagem (com o
     item), os do `core::validate` (sem item) e o aviso de treliça por
     atribuição;

@@ -77,6 +77,12 @@ struct BuildResult
 [[nodiscard]] BuildResult buildModel(const Document& document, const geom::Drawing& drawing,
                                      const MeshContext& mesh, LoadSelection load);
 
+// REQ-010-21: the issues of the build, then those of core::validate on the
+// model built (kind Core, without an item); without a mesh, only NoMesh.
+[[nodiscard]] std::vector<BuildIssue> checkModel(const Document& document,
+                                                 const geom::Drawing& drawing,
+                                                 const MeshContext& mesh, LoadSelection load);
+
 // REQ-010-13, 14: the state of the targets of an item, for the tree.
 enum class TargetState : std::uint8_t { Valid, MissingEntity, StaleSelection, MissingGroup };
 

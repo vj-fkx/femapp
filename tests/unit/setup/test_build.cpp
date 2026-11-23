@@ -11,6 +11,7 @@
 #include <array>
 #include <cmath>
 #include <memory>
+#include <string>
 #include <vector>
 
 // Feature 010, T08 (design §5.3, §5.4): REQ-010-07, 11, 12, 14, 15, 20.
@@ -762,4 +763,67 @@ TEST_CASE("settlements in a combination", "[setup][build][actions]")
                                   .action = s::Settlement{.dof = c::DofType::U, .value = 0.001}}));
     CHECK(has(s::buildModel(d, f.drawing, meshOf(f.drawing), {.item = one}).issues,
               IssueKind::SettlementNotHeld, wrong));
+}
+
+// REQ-010-10, 21: the check lists the problems of the build (with their
+// item), those of core::validate (without one) and the truss warning.
+TEST_CASE("the check of a model", "[setup][build][check]")
+{
+    Frame f;
+    drawFrame(f);
+    Setup setup;
+    prepare(setup, f);
+    s::Document& d = setup.document;
+    const s::LoadSelection load{.item = setup.loadCase};
+
+    SECTION("a complete model has nothing to report")
+    {
+        CHECK(s::checkModel(d, f.drawing, meshOf(f.drawing), load).empty());
+    }
+    SECTION("a bar without an assignment, from the core")
+    {
+        // The last beam goes back to no assignment.
+        const auto& bars =
+            std::get<s::BarAssignment>(*std::ranges::find_if(d.items(), [](const s::Item& i) {
+                return std::holds_alternative<s::BarAssignment>(i);
+            }));
+        s::BarAssignment fewer = bars;
+        fewer.targets.entities.pop_back();
+        const auto change = s::changeItem(d, fewer);
+        REQUIRE(change.has_value());
+        d.apply(*change);
+        const auto issues = s::checkModel(d, f.drawing, meshOf(f.drawing), load);
+        const auto core = std::ranges::find_if(
+            issues, [](const s::BuildIssue& i) { return i.kind == IssueKind::Core; });
+        REQUIRE(core != issues.end());
+        CHECK(core->severity == s::Severity::Error);
+        CHECK_FALSE(core->item.has_value());
+        CHECK(core->detail.find("without an assignment") != std::string::npos);
+    }
+    SECTION("a truss is warned about")
+    {
+        const s::ItemId truss =
+            added(d, s::assign(d, s::BarAssignment{.id = {},
+                                                   .targets = entities({f.bars.back()}),
+                                                   .data = {.kind = c::ElementKind::Truss2D,
+                                                            .material = "steel",
+                                                            .section = "bar"}}));
+        const auto issues = s::checkModel(d, f.drawing, meshOf(f.drawing), load);
+        const auto warning = std::ranges::find_if(
+            issues, [](const s::BuildIssue& i) { return i.kind == IssueKind::TrussBuckling; });
+        REQUIRE(warning != issues.end());
+        CHECK(warning->severity == s::Severity::Warning);
+        CHECK(warning->item == truss);
+    }
+    SECTION("problems of the build come with their item, and stop the core check without a mesh")
+    {
+        const s::ItemId gone =
+            added(d, s::assign(d, s::OffsetItem{
+                                      .id = {}, .targets = entities({EntityId{999}}), .data = {}}));
+        CHECK(has(s::checkModel(d, f.drawing, meshOf(f.drawing), load), IssueKind::MissingEntity,
+                  gone));
+        const auto noMesh = s::checkModel(d, f.drawing, {}, load);
+        REQUIRE(noMesh.size() == 1);
+        CHECK(noMesh.front().kind == IssueKind::NoMesh);
+    }
 }

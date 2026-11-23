@@ -1,3 +1,4 @@
+#include <fem/core/static_analysis.hpp>
 #include <fem/setup/build.hpp>
 
 #include <algorithm>
@@ -405,6 +406,24 @@ BuildResult buildModel(const Document& document, const geom::Drawing& drawing,
             {.nodes = nodeIds(std::move(nodes)), .dof = key.first, .value = key.second});
     }
     return result;
+}
+
+std::vector<BuildIssue> checkModel(const Document& document, const geom::Drawing& drawing,
+                                   const MeshContext& mesh, LoadSelection load)
+{
+    BuildResult built = buildModel(document, drawing, mesh, load);
+    if (!mesh.mesh) {
+        return std::move(built.issues);
+    }
+    // REQ-010-21: then the core's own validation of the model built. Its
+    // issues name elements and nodes, not items of the document.
+    for (core::ModelIssue& issue : core::validate(built.model)) {
+        built.issues.push_back({.severity = Severity::Error,
+                                .kind = IssueKind::Core,
+                                .item = std::nullopt,
+                                .detail = std::move(issue.message)});
+    }
+    return std::move(built.issues);
 }
 
 TargetState targetState(const Targets& targets, const geom::Drawing& drawing,
