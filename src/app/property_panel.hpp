@@ -28,9 +28,17 @@ public:
     // The item to show; none for an empty panel.
     void showItem(std::optional<fem::setup::ItemId> id);
 
+signals:
+    // REQ-010-05: the outline of a solid polygon section from the closed
+    // polylines selected in the drawing.
+    void solidFromSelectionRequested(fem::setup::ItemId id);
+
 private:
     void rebuild();
     void addField(QFormLayout* form, const Field& field, const setup::Item& item);
+    // REQ-010-05, 06: what the core computes for a section, its drawing and
+    // the editors of the thin-walled and polygon shapes.
+    void addSection(QFormLayout* form, const setup::SectionItem& section);
     // A value typed or picked: written into a copy of the item and pushed,
     // or `editor` is marked invalid.
     void edit(const Field& field, const FieldValue& value, QWidget* editor);

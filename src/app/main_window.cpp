@@ -422,6 +422,15 @@ void MainWindow::createModelUi()
     // NOLINTEND(cppcoreguidelines-owning-memory)
     properties->setObjectName(QStringLiteral("properties"));
     properties->setWidget(m_properties);
+    // REQ-010-05: a solid polygon from the polylines selected in the drawing.
+    connect(m_properties, &PropertyPanel::solidFromSelectionRequested, this,
+            [this](setup::ItemId id) {
+                const std::vector<geom::EntityId> selected =
+                    m_viewport ? m_viewport->drawingSelection() : std::vector<geom::EntityId>{};
+                if (const auto problem = m_model->setSolidFromPolylines(id, selected)) {
+                    showMessage(tr("Section from polylines"), *problem, true);
+                }
+            });
     addDockWidget(Qt::RightDockWidgetArea, properties);
     // REQ-010-02: the unit system always in sight.
     statusBar()->addPermanentWidget(m_units);

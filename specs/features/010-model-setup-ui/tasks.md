@@ -181,7 +181,7 @@ Regras:
     inválido).
   Arquivos: `src/app/fields.hpp/.cpp`, `property_panel.hpp/.cpp`,
   `model_dialogs.*`, `tests/unit/app/test_fields.cpp`. Cobre: 02, 03, 19.
-- [ ] **T16** Seções no painel:
+- [x] **T16** Seções no painel:
   - a tabela das propriedades do `core` e a mensagem dele quando
     inválida;
   - o `SectionView` (contorno, eixos principais, centroide, centro de
@@ -190,6 +190,11 @@ Regras:
   - o polígono maciço a partir das polilinhas fechadas selecionadas.
   Arquivos: `src/app/section_view.*`, `thin_walled_table.*`,
   `property_panel.cpp`, `model_controller.cpp`. Cobre: 05, 06.
+  Nota: a geometria do desenho (contornos, eixos, polígono a partir das
+  polilinhas) ficou em `section_geometry.*`, sem widgets, testada em
+  `test_section_geometry.cpp`; o comando é
+  `ModelController::setSolidFromPolylines`, testado em
+  `test_model_controller.cpp`. O desenho em si fica para o roteiro T23.
 
 ## Fase 5 — App: criar e atribuir
 

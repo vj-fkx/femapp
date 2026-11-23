@@ -200,6 +200,7 @@ add_executable(test_app
     unit/app/test_line_mesh_text.cpp
     unit/app/test_model_controller.cpp
     unit/app/test_model_tree.cpp
+    unit/app/test_section_geometry.cpp
     "${PROJECT_SOURCE_DIR}/src/app/cli_options.cpp"
     "${PROJECT_SOURCE_DIR}/src/app/fields.cpp"
     "${PROJECT_SOURCE_DIR}/src/app/line_mesh_job.cpp"
@@ -208,7 +209,8 @@ add_executable(test_app
     "${PROJECT_SOURCE_DIR}/src/app/model_controller.cpp"
     "${PROJECT_SOURCE_DIR}/src/app/model_controller.hpp"
     "${PROJECT_SOURCE_DIR}/src/app/model_tree.cpp"
-    "${PROJECT_SOURCE_DIR}/src/app/model_tree.hpp")
+    "${PROJECT_SOURCE_DIR}/src/app/model_tree.hpp"
+    "${PROJECT_SOURCE_DIR}/src/app/section_geometry.cpp")
 set_target_properties(test_app PROPERTIES AUTOMOC ON)
 target_include_directories(test_app PRIVATE "${PROJECT_SOURCE_DIR}/src/app")
 target_compile_features(test_app PRIVATE cxx_std_20)

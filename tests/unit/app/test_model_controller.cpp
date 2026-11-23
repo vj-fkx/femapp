@@ -4,8 +4,10 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <array>
 #include <memory>
 #include <variant>
+#include <vector>
 
 // Feature 010, T13 (design §5.8): REQ-010-13, 23. The document edits on the
 // undo stack of the drawing, and the generations of the mesh.
@@ -84,4 +86,44 @@ TEST_CASE("every new mesh is a new generation", "[app][model]")
     CHECK(controller.mesh().map == nullptr);
     CHECK_FALSE(controller.mesh().drawingRevision.has_value());
     CHECK(controller.mesh().generation == 2);
+}
+
+TEST_CASE("a solid polygon section from closed polylines", "[app][model][section]")
+{
+    // Feature 010, T16: REQ-010-05.
+    Drawing drawing;
+    const auto add = [&](std::vector<Vec3> vertices) {
+        const fem::geom::EntityId id = drawing.nextId();
+        fem::geom::DrawingEdit edit;
+        edit.added.push_back(fem::geom::Entity{
+            .id = id,
+            .shape = fem::geom::PolylineEntity{.vertices = std::move(vertices), .closed = true}});
+        drawing.apply(edit);
+        return id;
+    };
+    const auto outer = add({{0, 0, 0}, {0.4, 0, 0}, {0.4, 0.3, 0}, {0, 0.3, 0}});
+    const auto hole = add({{0.1, 0.1, 0}, {0.2, 0.1, 0}, {0.2, 0.2, 0}, {0.1, 0.2, 0}});
+    QUndoStack undo;
+    fem::app::ModelController controller(&undo, drawing);
+    s::Document& ids = controller.documentForIds();
+    REQUIRE(controller.push(
+        s::addItem(ids, s::SectionItem{.id = {}, .data = {.name = "slab", .area = 1.0}}),
+        QStringLiteral("section")));
+    const s::ItemId section = std::get<s::SectionItem>(controller.document().items().front()).id;
+    const std::array<fem::geom::EntityId, 2> both{hole, outer};
+    CHECK_FALSE(controller.setSolidFromPolylines(section, both).has_value());
+    CHECK(undo.count() == 2);
+    const auto& made = std::get<s::SectionItem>(*controller.document().find(section));
+    CHECK(made.data.name == "slab");
+    CHECK_FALSE(made.data.area.has_value());
+    REQUIRE(made.data.shape.has_value());
+    const auto& solid = std::get<fem::core::SolidPolygon>(*made.data.shape);
+    CHECK(solid.regions.front().holes.size() == 1);
+    // One step of undo brings the generic section back.
+    undo.undo();
+    CHECK(std::get<s::SectionItem>(*controller.document().find(section)).data.area == 1.0);
+    // Not a section, nothing selected: a text, and no edit.
+    CHECK(controller.setSolidFromPolylines(s::ItemId{999}, both).has_value());
+    CHECK(controller.setSolidFromPolylines(section, {}).has_value());
+    CHECK(undo.count() == 2);
 }

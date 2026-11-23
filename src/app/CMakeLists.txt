@@ -21,6 +21,12 @@ qt_add_executable(femapp WIN32 MACOSX_BUNDLE
     model_tree.hpp
     property_panel.cpp
     property_panel.hpp
+    section_geometry.cpp
+    section_geometry.hpp
+    section_view.cpp
+    section_view.hpp
+    thin_walled_table.cpp
+    thin_walled_table.hpp
     main_window.hpp
     mesh_import.cpp
     mesh_import.hpp)

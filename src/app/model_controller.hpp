@@ -16,6 +16,8 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
+#include <span>
 
 class QUndoStack;
 
@@ -44,6 +46,13 @@ public:
     // pushed.
     bool push(const setup::EditResult& edit, const QString& text);
     void push(setup::DocumentEdit edit, const QString& text);
+
+    // REQ-010-05: section `id` becomes the solid polygon of the closed
+    // polylines `entities` of the drawing (the largest the outline, the
+    // others its holes), one step of undo. The problem as a text when it is
+    // not a section or the entities are not closed polylines.
+    std::optional<QString> setSolidFromPolylines(setup::ItemId id,
+                                                 std::span<const geom::EntityId> entities);
 
 public slots:
     // REQ-010-13: a new mesh, from MESH (with its map and the revision of
