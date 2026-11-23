@@ -66,7 +66,7 @@ A análise (execução, progresso, resultados) fica para a 011 e a 012.
 
 | ID | Requisito | História |
 |----|-----------|----------|
-| REQ-010-04 | O sistema DEVE permitir criar, editar, renomear, duplicar e apagar materiais (E, ν, ρ, α, k, c, como o `core::Material`). DEVE oferecer uma biblioteca com materiais comuns (aço estrutural, concreto, alumínio, madeira), copiados para o documento nas unidades ativas. Apagar um material em uso DEVE ser recusado, com a lista de onde ele é usado. | US-2 |
+| REQ-010-04 | O sistema DEVE permitir criar, editar, renomear, duplicar e apagar materiais (E, ν, ρ, α, k, c, como o `core::Material`). Apagar um material em uso DEVE ser recusado, com a lista de onde ele é usado. Cada material DEVE poder ter: <br>• a norma e a classe ou grau; <br>• propriedades extras com nome, grandeza e valor (fy, fu, fck, G…), só informativas, porque as análises usam E, ν, ρ e α; <br>• conversão de unidades. <br>O sistema DEVE oferecer uma biblioteca por norma, copiada para o documento nas unidades ativas, com os aços do EN 1993-1-1, do AISC 360 e da ABNT NBR 8800, os concretos do EN 1992-1-1, do ACI 318 e da ABNT NBR 6118, o alumínio do EN 1999-1-1 e a madeira C24 do EN 338, com os valores do design §5.9. A biblioteca DEVE ser uma tabela de dados, em que uma norma, um material ou uma propriedade nova se acrescenta sem mudar a conversão nem a interface *(ampliado na implementação, 2026-11-23, decidido pelo mantenedor)*. | US-2 |
 | REQ-010-05 | O sistema DEVE permitir criar e editar seções de todos os tipos do `core`, com as mesmas regras de apagar do REQ-010-04: <br>• genérica, pelas propriedades; <br>• as oito formas paramétricas; <br>• paredes finas, por uma tabela de nós e segmentos com espessura; <br>• polígono maciço, a partir de polilinhas fechadas selecionadas no desenho (a de fora e os furos), copiadas para a seção. | US-2 |
 | REQ-010-06 | O painel de uma seção DEVE mostrar as propriedades calculadas pelo `core`: A, Iy, Iz, J, Iw, centroide, centro de cisalhamento, áreas de cisalhamento e coeficientes de monossimetria. DEVE mostrar também um desenho da seção com os eixos principais, o centroide, o centro de cisalhamento e os pontos de tensão. SE os dados forem inválidos, ENTÃO DEVE mostrar a mensagem do `core` em vez das propriedades. | US-2 |
 
@@ -133,7 +133,10 @@ A análise (execução, progresso, resultados) fica para a 011 e a 012.
   - o desfazer da troca;
   - a unidade nos campos e na barra de status.
 - [ ] **AC-2** (REQ-010-04, 05, 06) Materiais e seções:
-  - a biblioteca nas unidades ativas;
+  - a biblioteca por norma nas unidades ativas, cada material com os
+    valores da tabela do design §5.9 (o E do concreto pela fórmula da sua
+    norma, em cada classe);
+  - as propriedades extras convertidas com as unidades;
   - as propriedades de cada tipo de seção iguais às do `core`;
   - o polígono maciço a partir de polilinhas do desenho;
   - a tabela de paredes finas;

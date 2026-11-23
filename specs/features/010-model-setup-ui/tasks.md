@@ -69,10 +69,21 @@ Regras:
   - depois `editing.hpp/.cpp`.
   Arquivos: `src/setup/include/fem/setup/editing.hpp`, `editing.cpp`,
   `tests/unit/setup/test_editing.cpp`. Cobre: 04, 05, 07, 08, 15 a 18, 23.
-- [ ] **T07** [P] A biblioteca de materiais (aço estrutural, concreto,
-  alumínio, madeira, em SI) convertida ao sistema ativo, com teste em cada
-  sistema. Arquivos: `src/setup/include/fem/setup/library.hpp`,
-  `library.cpp`, `tests/unit/setup/test_units.cpp`. Cobre: 04.
+- [ ] **T07** A biblioteca de materiais por norma (design §5.9, ampliada na
+  implementação a pedido do mantenedor):
+  - testes primeiro:
+    - cada material contra a tabela;
+    - o E dos concretos pela fórmula da norma em cada classe;
+    - `fromLibrary` nas cinco unidades;
+    - as propriedades extras de um `MaterialItem` convertidas por
+      grandeza, ida e volta;
+  - depois:
+    - `MaterialItem` com `standard`, `grade` e `properties`, convertidos
+      por `convertItem`;
+    - `library.hpp/.cpp` como tabela de dados, uma função por norma.
+  Arquivos: `src/setup/include/fem/setup/document.hpp`, `convert.cpp`,
+  `src/setup/include/fem/setup/library.hpp`, `library.cpp`,
+  `tests/unit/setup/test_library.cpp`, `test_convert.cpp`. Cobre: 04.
 
 ## Fase 3 — Montagem do `core::Model`
 

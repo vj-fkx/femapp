@@ -59,7 +59,7 @@ No `core`, `Mesh` ganha um índice dos grupos por nome (REQ-010-25).
 | setup | `include/fem/setup/editing.hpp`, `editing.cpp` | novo | As edições prontas: criar, alterar, apagar com usos, atribuir com substituição, copiar entre casos, trocar unidades (REQ-010-03, 04, 07, 18, 23) |
 | setup | `include/fem/setup/convert.hpp`, `convert.cpp` | novo | A conversão de cada tipo do `core` por grandeza (materiais, as oito formas e as seções genéricas, paredes finas, polígono, cargas, ligações, excentricidades, base, molas de empenamento) |
 | setup | `include/fem/setup/build.hpp`, `build.cpp` | novo | `MeshContext`, `LoadSelection`, `buildModel`, `checkModel`, `targetState` (REQ-010-10, 13, 14, 17, 20, 21) |
-| setup | `include/fem/setup/library.hpp`, `library.cpp` | novo | A biblioteca de materiais em SI, convertida ao sistema ativo (REQ-010-04) |
+| setup | `include/fem/setup/library.hpp`, `library.cpp` | novo | A biblioteca de materiais por norma, uma tabela de dados em SI, convertida ao sistema ativo (REQ-010-04, §5.9) |
 | setup | `CMakeLists.txt` | novo | Módulo `fem::setup` |
 | core | `include/fem/core/mesh.hpp`, `mesh.cpp`, `mesh_builder.cpp` | alterado | Índice dos grupos por (nome, dimensão), feito em `build()`; `findGroup` e `findGroups` por busca binária (REQ-010-25) |
 | render | `include/fem/render/symbols.hpp` | novo | `SymbolSet`: apoios, forças, momentos, distribuídas e eixos, em coordenadas globais (REQ-010-09, 22) |
@@ -132,7 +132,17 @@ struct Targets
     std::uint64_t meshGeneration = 0;
 };
 
-struct MaterialItem { ItemId id{}; core::Material data; };
+// REQ-010-04: an extra property of a material, informative (fy, fu, fck,
+// G...): a key, its quantity for the unit conversion, and the value.
+struct MaterialProperty { std::string key; Quantity quantity; double value = 0.0; };
+struct MaterialItem
+{
+    ItemId id{};
+    core::Material data;
+    std::string standard;                    // "EN 1993-1-1"; empty for one of the user's
+    std::string grade;                       // "S355"
+    std::vector<MaterialProperty> properties;
+};
 struct SectionItem { ItemId id{}; core::Section data; };
 struct BarAssignment { ItemId id{}; Targets targets; core::Assignment data; }; // data.elements unused
 struct ConnectionItem { ItemId id{}; Targets targets; core::EndConnection data; };
@@ -452,6 +462,44 @@ ganho.
 - **Malha importada:** os alvos por entidade dão `EntityNotMeshed`; os
   por grupo e por seleção valem.
 
+### 5.9 Biblioteca de materiais por norma (REQ-010-04)
+
+*Ampliada na implementação (2026-11-23), por decisão do mantenedor.*
+
+- **Dados, não código:** a biblioteca é uma lista de `LibraryMaterial`, com
+  a norma, a família (aço, concreto, alumínio, madeira), a classe ou grau,
+  o `core::Material` em SI e as propriedades extras em SI. Cada norma é uma
+  função que devolve as suas linhas, e `materialLibrary()` junta todas.
+  - **Uma norma nova** é uma função a mais.
+  - **Uma classe nova** é uma linha a mais.
+  - **Uma propriedade nova** é uma chave a mais (`fy`, `fu`, `fck`, `fmk`,
+    `G`), com a sua grandeza. A conversão de unidades percorre a lista de
+    propriedades por grandeza, sem conhecer as chaves, e o painel mostra
+    o rótulo da chave (com a própria chave quando ela é desconhecida).
+- **Copiar para o documento:** `fromLibrary(material, sistema)` faz o
+  `MaterialItem` com o nome "grau (norma)", convertido ao sistema ativo.
+- **Valores** (SI):
+
+| Norma | Classes | E | ν | ρ | α | Extras |
+|-------|---------|---|---|---|---|--------|
+| EN 1993-1-1 | S235, S275, S355, S460 | 210 GPa | 0,3 | 7850 kg/m³ | 12·10⁻⁶/°C | fy/fu: 235/360, 275/430, 355/490, 460/540 MPa; G = 81 GPa |
+| AISC 360 | A36, A572 Gr 50, A992 | 200 GPa (29 000 ksi) | 0,3 | 7850 | 11,7·10⁻⁶/°C | fy/fu: 250/400, 345/450, 345/450 MPa; G = 77,2 GPa |
+| ABNT NBR 8800 | MR250, A572 Gr 50 | 200 GPa | 0,3 | 7850 | 12·10⁻⁶/°C | fy/fu: 250/400, 345/450 MPa; G = 77 GPa |
+| EN 1992-1-1 | C20/25 a C50/60 | Ecm = 22·[(fck + 8)/10]^0,3 GPa | 0,2 | 2500 (armado) | 10·10⁻⁶/°C | fck |
+| ACI 318 | f′c 3000, 4000, 5000, 6000 psi | Ec = 4700·√f′c MPa | 0,2 | 2400 | 9,9·10⁻⁶/°C | fck = f′c |
+| ABNT NBR 6118 | C20 a C50 | Ecs = αi·5600·√fck MPa, αE = 1 (granito), αi = 0,8 + 0,2·fck/80 ≤ 1 | 0,2 | 2500 (armado) | 10·10⁻⁶/°C | fck |
+| EN 1999-1-1 | alumínio | 70 GPa | 0,3 | 2700 | 23·10⁻⁶/°C | — |
+| EN 338 | C24 | E₀,mean = 11 GPa | — | 420 (ρmean) | — | fmk = 24 MPa; G = 0,69 GPa |
+
+- **Limites:**
+  - k e c ficam vazios, porque estas normas não os dão à temperatura
+    ambiente.
+  - A madeira não tem ν isotrópico: fica vazio, e uma viga de C24 é
+    recusada pela validação do `core`, que pede ν, até haver material
+    ortotrópico.
+  - Os valores vêm do conhecimento das normas, não dos textos, que são
+    pagos. O mantenedor os conferiu na aprovação (2026-11-23).
+
 ## 6. Fluxo
 
 ```
@@ -485,7 +533,7 @@ Check model ─► setup::checkModel(document, drawing, meshContext, caso ativo)
 | Fatores dos sistemas e ida e volta de todas as grandezas | unitário | REQ-010-02, NFR-010-02 | 1e−12; E·A/L coerente em cada sistema |
 | Troca de unidades de um documento com todos os tipos; desfazer | unitário | REQ-010-03 | valores exatos do antes |
 | Documento: aplicar e reverter, ids, usos, substituição de atribuição, cargas que somam, copiar cargas | unitário | REQ-010-01, 04, 07, 15 a 18, 23 | exatos |
-| Biblioteca de materiais em cada sistema | unitário | REQ-010-04 | contra os valores SI convertidos |
+| Biblioteca por norma: cada material contra a tabela da §5.9, o E dos concretos pela fórmula da norma em cada classe, nas cinco unidades; as propriedades extras convertidas por grandeza | unitário | REQ-010-04 | 1e−12 |
 | Seções: o documento devolve o `Section` do `core` com as propriedades iguais às calculadas direto | unitário | REQ-010-05, 06 | 1e−14 |
 | Pórtico 2×2 da T10 da 009 montado pelo documento = o modelo do teste da 009 (análise linear) | verificação | REQ-010-07, 11, 12, 20, AC-3 | 1e−12 |
 | Viga 3D com ligações, excentricidades, base e empenamento montada = feita à mão | verificação | REQ-010-08, AC-3 | 1e−12 |
