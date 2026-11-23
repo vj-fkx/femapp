@@ -1,6 +1,8 @@
 #include "drafting_controller.hpp"
 
 #include "command_line_widget.hpp"
+#include "line_mesh_job.hpp"
+#include "line_mesh_text.hpp"
 
 #include <fem/geom/command_input.hpp>
 #include <fem/render/viewport.hpp>
@@ -66,6 +68,8 @@ DraftingController::DraftingController(render::Viewport* viewport, CommandLineWi
     , m_session(*m_drawing)
     // NOLINTNEXTLINE(cppcoreguidelines-owning-memory): owned by its Qt parent.
     , m_undo(new QUndoStack(this))
+    // NOLINTNEXTLINE(cppcoreguidelines-owning-memory): owned by its Qt parent.
+    , m_meshJob(new LineMeshJob(this))
 {
     m_viewport->setDrawing(m_drawing);
     connect(m_viewport, &render::Viewport::cursorMoved, this, &DraftingController::cursorMoved);
@@ -84,6 +88,31 @@ DraftingController::DraftingController(render::Viewport* viewport, CommandLineWi
             m_shownRevision = m_drawing->revision();
             m_viewport->drawingChanged();
         }
+        warnIfMeshOutdated();
+    });
+    // REQ-009-13, 14: the mesh of MESH, or why there is none.
+    connect(m_meshJob, &LineMeshJob::finished, this,
+            [this](std::shared_ptr<const render::MeshScene> scene,
+                   const mesher::LineMeshReport& report, std::uint64_t revision) {
+                const core::Mesh& mesh = scene->mesh();
+                emit meshGenerated(mesh.nodeCount(), mesh.elementCount(),
+                                   static_cast<int>(mesh.groups().size()));
+                if (m_viewport) {
+                    m_viewport->setScene(std::move(scene));
+                }
+                for (const QString& line : meshReportLines(report)) {
+                    m_commandLine->appendHistory(line);
+                }
+                m_meshedRevision = revision;
+                m_outdatedWarned = false;
+                // Edited while it was being meshed.
+                warnIfMeshOutdated();
+            });
+    connect(m_meshJob, &LineMeshJob::failed, this, [this](const mesher::LineMeshError& error) {
+        // REQ-G-10: the mesh shown stays as it was.
+        for (const QString& line : meshErrorLines(error)) {
+            m_commandLine->appendHistory(line);
+        }
     });
     sync();
 }
@@ -98,6 +127,7 @@ void DraftingController::run(geom::CommandName name)
 
 void DraftingController::startCommand(geom::CommandName name)
 {
+    m_meshPrompt = false;
     // REQ-005-27: objects selected before the command are used by it.
     const std::vector<geom::EntityId> selection =
         m_viewport ? m_viewport->drawingSelection() : std::vector<geom::EntityId>{};
@@ -110,9 +140,18 @@ void DraftingController::enterText(const QString& text)
     m_commandLine->appendHistory(text.isEmpty() ? promptText()
                                                 : promptText() + QLatin1Char(' ') + text);
     const std::string input = text.toStdString();
+    if (m_meshPrompt) {
+        enterMeshSize(text);
+        return;
+    }
     // A command name with nothing running starts it with the current
-    // selection; the rest goes to the session.
+    // selection; the rest goes to the session. MESH belongs to the app
+    // (REQ-009-17).
     if (!m_session.isActive()) {
+        if (isMeshCommand(text)) {
+            startMeshPrompt();
+            return;
+        }
         if (const auto name = geom::findCommand(input)) {
             startCommand(*name);
             return;
@@ -129,6 +168,10 @@ void DraftingController::enterText(const QString& text)
 
 void DraftingController::escape()
 {
+    if (m_meshPrompt) {
+        cancelMeshPrompt();
+        return;
+    }
     if (m_session.isActive()) {
         m_session.cancel();
         m_commandLine->appendHistory(tr("*Cancel*"));
@@ -144,6 +187,10 @@ void DraftingController::escape()
 
 void DraftingController::cancelCommand()
 {
+    if (m_meshPrompt) {
+        cancelMeshPrompt();
+        return;
+    }
     if (m_session.isActive()) {
         m_session.cancel();
         m_commandLine->appendHistory(tr("*Cancel*"));
@@ -222,6 +269,59 @@ void DraftingController::setAperture(double pixels)
     if (pixels > 0.0) {
         m_settings.aperturePx = pixels;
         emit settingsChanged();
+    }
+}
+
+void DraftingController::meshReplaced()
+{
+    m_meshedRevision.reset();
+}
+
+void DraftingController::startMeshPrompt()
+{
+    // REQ-009-13: one at a time.
+    if (m_meshJob->isRunning()) {
+        m_commandLine->appendHistory(meshAlreadyRunning());
+        return;
+    }
+    m_meshPrompt = true;
+    m_commandLine->setPrompt(promptText());
+}
+
+void DraftingController::cancelMeshPrompt()
+{
+    m_meshPrompt = false;
+    m_commandLine->appendHistory(tr("*Cancel*"));
+    m_commandLine->setPrompt(promptText());
+}
+
+void DraftingController::enterMeshSize(const QString& text)
+{
+    // REQ-009-12: Enter for one element per piece, or a target length.
+    const MeshSize size = parseMeshSize(text);
+    if (size.kind == MeshSize::Kind::Invalid) {
+        m_commandLine->appendHistory(meshInvalidSize());
+        return;
+    }
+    m_meshPrompt = false;
+    mesher::LineMeshOptions options;
+    if (size.kind == MeshSize::Kind::Length) {
+        options.defaults.length = size.length;
+    }
+    if (m_meshJob->start(*m_drawing, options)) {
+        m_commandLine->appendHistory(meshStarted());
+    } else {
+        m_commandLine->appendHistory(meshAlreadyRunning());
+    }
+    m_commandLine->setPrompt(promptText());
+}
+
+void DraftingController::warnIfMeshOutdated()
+{
+    // REQ-009-15: once per mesh, the first time the drawing differs from it.
+    if (m_meshedRevision && *m_meshedRevision != m_drawing->revision() && !m_outdatedWarned) {
+        m_outdatedWarned = true;
+        m_commandLine->appendHistory(meshOutOfDate());
     }
 }
 
@@ -316,6 +416,7 @@ void DraftingController::sync()
         }
         updatePreview();
     }
+    warnIfMeshOutdated();
     m_commandLine->setPrompt(promptText());
 }
 
@@ -332,6 +433,9 @@ void DraftingController::updatePreview()
 
 QString DraftingController::promptText() const
 {
+    if (m_meshPrompt) {
+        return meshPrompt();
+    }
     const geom::Prompt prompt = m_session.prompt();
     QString text;
     switch (prompt.id) {

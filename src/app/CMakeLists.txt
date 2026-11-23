@@ -10,6 +10,8 @@ qt_add_executable(femapp WIN32 MACOSX_BUNDLE
     drafting_settings_dialog.hpp
     line_mesh_job.cpp
     line_mesh_job.hpp
+    line_mesh_text.cpp
+    line_mesh_text.hpp
     main_window.cpp
     main_window.hpp
     mesh_import.cpp

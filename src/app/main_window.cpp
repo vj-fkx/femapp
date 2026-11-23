@@ -453,6 +453,14 @@ void MainWindow::createDraftingMenus()
         QStringLiteral("-000000.0000, -000000.0000, -000000.0000")));
     statusBar()->insertPermanentWidget(0, m_coordinates);
     connect(m_drafting, &DraftingController::cursorPointChanged, m_coordinates, &QLabel::setText);
+    // REQ-009-13: the mesh of MESH, as an imported one is shown (REQ-004-08).
+    connect(m_drafting, &DraftingController::meshGenerated, this,
+            [this](int nodes, int elements, int groups) {
+                m_meshInfo->setText(tr("Drawing: %1 nodes, %2 elements, %3 groups")
+                                        .arg(nodes)
+                                        .arg(elements)
+                                        .arg(groups));
+            });
 }
 
 bool MainWindow::eventFilter(QObject* watched, QEvent* event)
@@ -519,6 +527,8 @@ void MainWindow::meshImported(const QString& path, std::shared_ptr<const render:
                             .arg(mesh.groups().size()));
     // REQ-004-05
     m_viewport->setScene(std::move(scene));
+    // REQ-009-15: the mesh of MESH is no longer the one shown.
+    m_drafting->meshReplaced();
     // REQ-004-06
     if (!warnings.isEmpty()) {
         showMessage(tr("Mesh imported with warnings"), warnings.join(QLatin1Char('\n')), false);

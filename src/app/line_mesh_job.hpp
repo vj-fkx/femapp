@@ -25,7 +25,7 @@ public:
 
     // Copies the drawing and its revision; ignored (returns false) while
     // another job is running.
-    bool start(const geom::Drawing& drawing, mesher::LineMeshOptions options);
+    bool start(const geom::Drawing& drawing, const mesher::LineMeshOptions& options);
 
 signals:
     // `revision` is the revision of the drawing that was meshed.

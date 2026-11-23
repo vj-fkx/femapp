@@ -120,7 +120,7 @@ Regras:
   Arquivos: `src/app/line_mesh_job.hpp/.cpp`,
   `tests/unit/app/test_line_mesh_job.cpp`, `tests/CMakeLists.txt`. Cobre:
   13, 14.
-- [ ] **T12** MESH no `DraftingController` e na `MainWindow`:
+- [x] **T12** MESH no `DraftingController` e na `MainWindow`:
   - o estado `meshing`, com o pedido, o número, Enter, Esc e "Invalid
     size.";
   - o Tab com MESH;

@@ -1,5 +1,7 @@
 #include "command_line_widget.hpp"
 
+#include "line_mesh_text.hpp"
+
 #include <fem/geom/command_input.hpp>
 
 #include <QHBoxLayout>
@@ -103,6 +105,9 @@ bool CommandLineWidget::eventFilter(QObject* watched, QEvent* event)
         const auto name = geom::completeCommand(m_input->text().toStdString());
         if (name) {
             m_input->setText(QString::fromUtf8(name->data(), static_cast<qsizetype>(name->size())));
+        } else if (const auto mesh = completeMeshCommand(m_input->text())) {
+            // REQ-009-12: MESH is a command of the app.
+            m_input->setText(*mesh);
         }
         return true;
     }

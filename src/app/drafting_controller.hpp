@@ -9,6 +9,7 @@
 #include <QPointer>
 #include <QString>
 
+#include <cstdint>
 #include <memory>
 #include <optional>
 
@@ -21,6 +22,7 @@ class Viewport;
 namespace fem::app {
 
 class CommandLineWidget;
+class LineMeshJob;
 
 // Ties the drafting pieces together (design 005 §5.7, §6): the command line,
 // the viewport, the command session, the point resolver and the undo stack.
@@ -59,11 +61,15 @@ public slots:
     void setOrtho(bool on);
     void setGridStep(double step);
     void setAperture(double pixels);
+    // REQ-009-15: another mesh (an import) replaced the one of MESH.
+    void meshReplaced();
 
 signals:
     // REQ-005-24: the point a click would give, for the status bar.
     void cursorPointChanged(const QString& coordinates);
     void settingsChanged();
+    // REQ-009-13: the MESH command put a mesh in the viewport.
+    void meshGenerated(int nodes, int elements, int groups);
 
 private:
     void cursorMoved(render::Vec2 pixel);
@@ -76,6 +82,11 @@ private:
     void updatePreview();
     [[nodiscard]] QString promptText() const;
     [[nodiscard]] static QString messageText(const geom::Message& message);
+    // Feature 009: the MESH command.
+    void startMeshPrompt();
+    void cancelMeshPrompt();
+    void enterMeshSize(const QString& text);
+    void warnIfMeshOutdated();
 
     QPointer<render::Viewport> m_viewport;
     QPointer<CommandLineWidget> m_commandLine;
@@ -86,6 +97,12 @@ private:
     QUndoStack* m_undo = nullptr;
     std::optional<geom::ResolvedPoint> m_cursor;
     std::uint64_t m_shownRevision = 0;
+    // Feature 009: the size prompt of MESH, its job, and the revision of the
+    // drawing in the mesh shown (REQ-009-15).
+    bool m_meshPrompt = false;
+    LineMeshJob* m_meshJob = nullptr;
+    std::optional<std::uint64_t> m_meshedRevision;
+    bool m_outdatedWarned = false;
 };
 
 } // namespace fem::app

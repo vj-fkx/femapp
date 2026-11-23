@@ -13,7 +13,7 @@ LineMeshJob::LineMeshJob(QObject* parent)
     : QObject(parent)
 {}
 
-bool LineMeshJob::start(const geom::Drawing& drawing, mesher::LineMeshOptions options)
+bool LineMeshJob::start(const geom::Drawing& drawing, const mesher::LineMeshOptions& options)
 {
     if (m_running) {
         return false;
@@ -34,7 +34,7 @@ bool LineMeshJob::start(const geom::Drawing& drawing, mesher::LineMeshOptions op
     auto result = std::make_shared<Result>();
     result->drawing = drawing;
     result->revision = drawing.revision();
-    result->options = std::move(options);
+    result->options = options;
 
     // NOLINTNEXTLINE(bugprone-exception-escape): only allocation failures can escape.
     QThread* thread = QThread::create([result] {
