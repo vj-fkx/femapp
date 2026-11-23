@@ -1,6 +1,6 @@
 # Tarefas — 010 model-setup-ui
 
-Status: aprovado
+Status: em andamento
 Design: [design.md](design.md) · Requisitos: [requirements.md](requirements.md)
 
 Regras:
@@ -16,7 +16,7 @@ Regras:
 
 ## Fase 1 — Índice dos grupos no `core`
 
-- [ ] **T01** O índice dos grupos (design §5.7):
+- [x] **T01** O índice dos grupos (design §5.7):
   - testes primeiro: `findGroup` e `findGroups` com muitos grupos, nomes
     repetidos em dimensões diferentes e a ordem de `groups()` mantida;
   - depois o índice ordenado por (nome, dimensão), feito em

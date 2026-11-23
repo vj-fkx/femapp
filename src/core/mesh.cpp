@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <cassert>
+#include <functional>
+#include <string_view>
 
 namespace fem::core {
 
@@ -100,21 +102,32 @@ BoundingBox Mesh::boundingBox() const
     return box;
 }
 
+std::span<const std::int32_t> Mesh::groupsNamed(std::string_view name) const
+{
+    // REQ-010-25: m_groupOrder is sorted by name, then by the order added.
+    const auto range =
+        std::ranges::equal_range(m_groupOrder, name, std::less<>{}, [this](std::int32_t i) {
+            return std::string_view(m_groups[static_cast<std::size_t>(i)].name);
+        });
+    return {range.begin(), range.end()};
+}
+
 const Group* Mesh::findGroup(std::string_view name, int dimension) const
 {
-    const auto it = std::ranges::find_if(m_groups, [&](const Group& group) {
-        return group.dimension == dimension && group.name == name;
-    });
-    return it == m_groups.end() ? nullptr : &*it;
+    for (const std::int32_t i : groupsNamed(name)) {
+        const Group& group = m_groups[static_cast<std::size_t>(i)];
+        if (group.dimension == dimension) {
+            return &group;
+        }
+    }
+    return nullptr;
 }
 
 std::vector<const Group*> Mesh::findGroups(std::string_view name) const
 {
     std::vector<const Group*> result;
-    for (const Group& group : m_groups) {
-        if (group.name == name) {
-            result.push_back(&group);
-        }
+    for (const std::int32_t i : groupsNamed(name)) {
+        result.push_back(&m_groups[static_cast<std::size_t>(i)]);
     }
     return result;
 }
@@ -142,6 +155,7 @@ std::size_t Mesh::memoryUsage() const noexcept
         bytes += block.connectivity.capacity() * sizeof(NodeIndex);
     }
     bytes += m_groups.capacity() * sizeof(Group);
+    bytes += m_groupOrder.capacity() * sizeof(std::int32_t);
     for (const Group& group : m_groups) {
         bytes += group.name.capacity() + group.elements.capacity() * sizeof(ElementIndex);
     }

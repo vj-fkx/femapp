@@ -91,6 +91,8 @@ private:
     friend class MeshBuilder;
 
     [[nodiscard]] const ElementBlock& blockOf(ElementIndex element) const;
+    // The indices in m_groups of the groups named `name`, in the order added.
+    [[nodiscard]] std::span<const std::int32_t> groupsNamed(std::string_view name) const;
 
     std::vector<double> m_x;
     std::vector<double> m_y;
@@ -99,6 +101,9 @@ private:
     std::vector<ElementBlock> m_blocks;
     detail::IdRanges m_elementIds;
     std::vector<Group> m_groups;
+    // REQ-010-25: the groups by name, then by the order added (indices in
+    // m_groups), for a binary search.
+    std::vector<std::int32_t> m_groupOrder;
     int m_elementCount = 0;
     bool m_liesInXYPlane = true;
 };

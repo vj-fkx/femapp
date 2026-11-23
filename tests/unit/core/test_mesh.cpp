@@ -5,6 +5,7 @@
 #include <catch2/matchers/catch_matchers_string.hpp>
 
 #include <Eigen/Core>
+#include <array>
 #include <cstdint>
 #include <optional>
 #include <span>
@@ -204,6 +205,88 @@ TEST_CASE("groups are found by name and give their nodes", "[core][mesh][group]"
     CHECK(mesh.findGroup("edges", 2) != nullptr);
     CHECK(mesh.findGroup("edges", 3) == nullptr);
     CHECK(mesh.findGroups("missing").empty());
+}
+
+// REQ-010-25 (design 010 §5.7): with many groups, each found by name and
+// dimension through the index; findGroups in the order the groups were
+// added; groups() unchanged.
+TEST_CASE("many groups are found by their index", "[core][mesh][group]")
+{
+    MeshBuilder builder;
+    REQUIRE(builder.addNode(1, Eigen::Vector3d(0, 0, 0)).has_value());
+    REQUIRE(builder.addNode(2, Eigen::Vector3d(1, 0, 0)).has_value());
+    constexpr int kGroups = 3000;
+    std::vector<ElementHandle> lines;
+    lines.reserve(kGroups);
+    std::vector<ElementHandle> points;
+    points.reserve(kGroups);
+    for (int i = 0; i < kGroups; ++i) {
+        const std::array<ExternalId, 2> nodes{1, 2};
+        const auto line = builder.addElement(ElementType::Line2, i + 1, nodes);
+        REQUIRE(line.has_value());
+        lines.push_back(*line);
+    }
+    const std::array<ExternalId, 1> node{1};
+    for (int i = 0; i < kGroups; ++i) {
+        const auto point = builder.addElement(ElementType::Point1, kGroups + i + 1, node);
+        REQUIRE(point.has_value());
+        points.push_back(*point);
+    }
+    // Names added out of order; every third name also as a group of points
+    // (dimension 0), added after the lines.
+    std::vector<std::string> names;
+    names.reserve(kGroups);
+    for (int i = 0; i < kGroups; ++i) {
+        names.push_back("g" + std::to_string((i * 7919) % kGroups));
+    }
+    for (int i = 0; i < kGroups; ++i) {
+        REQUIRE(builder
+                    .addGroup(names[static_cast<std::size_t>(i)], 1,
+                              {lines[static_cast<std::size_t>(i)]})
+                    .has_value());
+    }
+    for (int i = 0; i < kGroups; i += 3) {
+        REQUIRE(builder
+                    .addGroup(names[static_cast<std::size_t>(i)], 0,
+                              {points[static_cast<std::size_t>(i)]})
+                    .has_value());
+    }
+    const auto built = builder.build();
+    REQUIRE(built.has_value());
+    const Mesh& mesh = *built;
+    REQUIRE(mesh.groups().size() == static_cast<std::size_t>(kGroups + kGroups / 3));
+    // groups() keeps the order added.
+    CHECK(mesh.groups()[0].name == names[0]);
+    CHECK(mesh.groups()[0].dimension == 1);
+    CHECK(mesh.groups()[kGroups].name == names[0]);
+    CHECK(mesh.groups()[kGroups].dimension == 0);
+    for (int i = 0; i < kGroups; ++i) {
+        const std::string& name = names[static_cast<std::size_t>(i)];
+        const fem::core::Group* line = mesh.findGroup(name, 1);
+        REQUIRE(line != nullptr);
+        CHECK(line == &mesh.groups()[static_cast<std::size_t>(i)]);
+        CHECK(mesh.elementId(line->elements.front()) == i + 1);
+        const fem::core::Group* point = mesh.findGroup(name, 0);
+        const auto both = mesh.findGroups(name);
+        if (i % 3 == 0) {
+            REQUIRE(point != nullptr);
+            CHECK(point->dimension == 0);
+            // In the order added: the line group, then the point group.
+            REQUIRE(both.size() == 2);
+            CHECK(both[0] == line);
+            CHECK(both[1] == point);
+        } else {
+            CHECK(point == nullptr);
+            CHECK(both.size() == 1);
+        }
+        CHECK(mesh.findGroup(name, 2) == nullptr);
+    }
+    CHECK(mesh.findGroup("g", 1) == nullptr);
+    CHECK(mesh.findGroups("zzz").empty());
+    // A mesh without groups.
+    const Mesh empty;
+    CHECK(empty.findGroup("g0", 1) == nullptr);
+    CHECK(empty.findGroups("g0").empty());
 }
 
 // REQ-003-09

@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <string>
+#include <string_view>
 #include <utility>
 
 namespace fem::core {
@@ -218,6 +219,14 @@ Expected<Mesh> MeshBuilder::build()
         group.elements.shrink_to_fit();
         mesh.m_groups.push_back(std::move(group));
     }
+    // REQ-010-25: the index of the groups by name, then by the order added.
+    mesh.m_groupOrder.resize(mesh.m_groups.size());
+    for (std::size_t i = 0; i < mesh.m_groupOrder.size(); ++i) {
+        mesh.m_groupOrder[i] = static_cast<std::int32_t>(i);
+    }
+    std::ranges::stable_sort(mesh.m_groupOrder, {}, [&mesh](std::int32_t i) {
+        return std::string_view(mesh.m_groups[static_cast<std::size_t>(i)].name);
+    });
 
     mesh.m_liesInXYPlane = liesInXYPlane(mesh);
     return mesh;
