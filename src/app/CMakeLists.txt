@@ -23,6 +23,7 @@ target_link_libraries(femapp PRIVATE
     fem::core
     fem::geom
     fem::mesher
+    fem::setup
     fem::io
     fem::render
     Qt6::Widgets)

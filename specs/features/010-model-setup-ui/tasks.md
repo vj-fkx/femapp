@@ -26,7 +26,7 @@ Regras:
 
 ## Fase 2 — Módulo `setup`: unidades e documento
 
-- [ ] **T02** O módulo `setup`:
+- [x] **T02** O módulo `setup`:
   - `CMakeLists`, `femapp_add_test(setup …)` e o `check_no_qt_includes`
     com `setup`;
   - a arquitetura com a linha do módulo e o grafo do ADR 0010;

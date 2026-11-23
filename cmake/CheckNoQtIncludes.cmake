@@ -2,15 +2,15 @@
 #
 # Usage: cmake -DFEMAPP_SOURCE_DIR=<repo root> -P CheckNoQtIncludes.cmake
 #
-# The core, geom, mesher and io modules must stay usable without Qt
-# (specs/constitution.md, section 4; io since feature 003).
+# The core, geom, mesher, io and setup modules must stay usable without Qt
+# (specs/constitution.md, section 4; io since feature 003, setup since 010).
 
 if(NOT FEMAPP_SOURCE_DIR)
     message(FATAL_ERROR "FEMAPP_SOURCE_DIR is not set")
 endif()
 get_filename_component(FEMAPP_SOURCE_DIR "${FEMAPP_SOURCE_DIR}" ABSOLUTE)
 
-set(qt_free_modules core geom mesher io)
+set(qt_free_modules core geom mesher io setup)
 set(qt_include_regex
     "^[ \t]*#[ \t]*include[ \t]*[<\"](Q[A-Z][A-Za-z0-9_]*[>\"/]|Qt[A-Za-z0-9]*/|q[a-z0-9_]+\\.h[>\"])")
 

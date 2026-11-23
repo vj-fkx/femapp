@@ -37,6 +37,7 @@ fem_app/
 │   ├── core/      # fem::core   — núcleo numérico (sem Qt, sem GPU)
 │   ├── geom/      # fem::geom   — modelador geométrico (sem Qt, sem GPU)
 │   ├── mesher/    # fem::mesher — geradores de malha (sem Qt, sem GPU)
+│   ├── setup/     # fem::setup  — documento do modelo (sem Qt; ADR 0010)
 │   ├── io/        # fem::io     — leitura/escrita de arquivos
 │   ├── render/    # fem::render — renderização via QRhi
 │   └── app/       # fem::app    — interface Qt Widgets, executável
@@ -57,8 +58,10 @@ app ──► render ──────────► core
  ├────► io ─────────────────┤
  │       │                  │
  │       ▼                  │
- └────► mesher ──► geom     │
-           └────────────────┘
+ ├────► mesher ──► geom     │
+ │        ▲ └───────────────┤
+ └────► setup ──────────────┘
+          └──────► geom
 ```
 
 | Módulo | Tipo | Pode depender de |
@@ -66,6 +69,7 @@ app ──► render ──────────► core
 | `core` | lib estática | STL, Eigen, `tl-expected`, Spectra, oneTBB, spdlog |
 | `geom` | lib estática | STL, Eigen, OpenCASCADE |
 | `mesher` | lib estática | `core` (apenas `Mesh`), `geom`, oneTBB |
+| `setup` | lib estática | `core`, `geom`, `mesher` (o documento do modelo e a montagem do `core::Model`; ADR 0010, feature 010) |
 | `io` | lib estática | `core`; `geom` e nlohmann/json quando chegarem STEP/IGES/DXF e o arquivo de projeto |
 | `render` | lib estática | `core`, `geom`, Qt Gui (RHI, headers privados), Qt Widgets (`QRhiWidget`); Qt Shader Tools no build — ver ADR 0002 |
 | `app` | executável | todos, Qt Widgets |

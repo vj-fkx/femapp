@@ -83,6 +83,10 @@ femapp_add_test(mesher SOURCES
     test_segment_bvh.cpp
     test_segment_geometry.cpp)
 target_include_directories(test_mesher PRIVATE "${PROJECT_SOURCE_DIR}/src/mesher")
+# Feature 010: the model document.
+femapp_add_test(setup SOURCES
+    test_units.cpp)
+target_include_directories(test_setup PRIVATE "${PROJECT_SOURCE_DIR}/src/setup")
 femapp_add_test(io SOURCES
     test_gmsh_cursor.cpp
     test_gmsh_reader.cpp
