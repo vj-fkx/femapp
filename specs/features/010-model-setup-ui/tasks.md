@@ -304,9 +304,12 @@ Regras:
   8. Desfazer e refazer alternando desenho e modelo.
   9. FPS com o pórtico do `bench_line_mesh` e 10⁴ cargas (≥ 30).
   Cobre: 09, 19, 21, 22, 23, N01.
-- [ ] **T24** Documentação: `architecture.md` (o `setup` feito, a §5 do
+- [x] **T24** Documentação: `architecture.md` (o `setup` feito, a §5 do
   `app` com a árvore, o painel e a conferência); README (o menu Model, as
   unidades, os casos e as combinações). Cobre: 01.
+  Nota: `architecture.md` ganhou a §3c (o `setup`), os símbolos na §4 e o
+  modelo na §5; o README, a seção "O modelo (menu Model)". A T23 (roteiro
+  manual) ficou para depois, a pedido do mantenedor.
 - [ ] **T25** Cobertura de `src/setup/` ≥ 80% no CI, num terceiro `gcovr`.
   Arquivo: `.github/workflows/ci.yml`. Cobre: N03.
 - [ ] **T90** [M] Build e testes verdes nos jobs do CI, inclusive a

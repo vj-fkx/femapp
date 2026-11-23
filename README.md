@@ -144,6 +144,39 @@ Por ora os textos do `MESH` ficam em inglês. O `bench_line_mesh` mede a
 geração de um pórtico com cerca de 100 mil trechos:
 `build/release/bin/bench_line_mesh`.
 
+### O modelo (menu Model)
+
+Sobre o desenho ou a malha, o menu **Model** prepara a análise (feature
+010). Cada mudança pode ser desfeita com Ctrl+Z, misturada às do desenho.
+
+- **Unidades**: Model ▸ Units… escolhe entre N-m, kN-m, N-mm, kgf-cm e lbf-in.
+  O sistema corrente aparece na barra de status. Trocar de sistema converte
+  os valores do modelo; o desenho fica como está, lido na nova unidade de
+  comprimento.
+- **Materiais e seções**: New material… copia um material da biblioteca, por
+  norma (Eurocódigos, ABNT NBR 6118 e 8800, ACI 318, AISC 360), ou cria um vazio. New section… cria uma
+  seção genérica, paramétrica, de paredes finas ou um polígono maciço a
+  partir das polilinhas fechadas selecionadas. O painel Properties mostra as
+  propriedades calculadas e o desenho da seção.
+- **Atribuições**: Assign bars…, Beam details ▸ … e Supports ▸ … valem para a
+  seleção do viewport (linhas e pontos do desenho, ou elementos e nós da
+  malha). Sem seleção, o diálogo oferece os grupos da malha. Uma atribuição
+  nova sobre o mesmo alvo substitui a anterior.
+- **Casos e combinações**: Load cases… cria, ativa e classifica os casos pela
+  norma e pela categoria da ação, com os ψ. Add load ▸ … põe uma carga no
+  caso ativo. New combination… soma casos com fatores. Uma combinação ativa
+  pode ser analisada como um caso.
+- **Símbolos**: os apoios e as cargas do caso ativo aparecem no viewport,
+  com tamanho constante na tela. Show symbols liga e desliga os símbolos;
+  Show local axes mostra os eixos das barras selecionadas ou de todas.
+- **Conferência**: Check model lista num dock os problemas e os avisos. Um
+  clique seleciona o item na árvore, ou realça os elementos e nós de um
+  problema da análise.
+
+A árvore Model, à esquerda, mostra tudo isso e a malha. Um duplo clique ativa
+um caso, e o menu de contexto renomeia, duplica, copia cargas e apaga. Os
+textos do menu Model ficam em inglês por ora.
+
 Para malhas grandes (centenas de milhares de elementos ou mais), use o build
 de Release (`cmake --preset release` e `cmake --build --preset release`): o
 build `dev` é de depuração e chega a ser dez vezes mais lento. O

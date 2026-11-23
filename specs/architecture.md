@@ -304,6 +304,42 @@ Ainda não há progresso nem cancelamento: a geração de 100 mil trechos leva
 Erros: `std::expected`-like (`tl::expected` enquanto C++23 não for o piso) para
 falhas esperadas (arquivo inválido, modelo singular); exceções apenas para bugs.
 
+## 3c. Documento do modelo (`setup`)
+
+**Já implementado (feature 010, ADR 0010):** o `setup` (`fem::setup`, sem
+Qt) guarda o que o usuário prepara sobre o desenho e a malha, e monta dele o
+`core::Model` de um caso ou de uma combinação.
+
+- **`Document`**: tipo valor com os itens em ordem de id. Os itens são os
+  próprios tipos do `core` mais os alvos:
+  - materiais, com norma, classe e propriedades informativas;
+  - seções;
+  - atribuições de barra;
+  - ligações, excentricidades, base elástica e pontas de empenamento;
+  - apoios por GDL;
+  - casos de carga, com norma e categoria da ação;
+  - cargas;
+  - combinações.
+- **Alvos (`Targets`)**: entidades do desenho pelo id estável, grupos da
+  malha por nome e dimensão, ou elementos e nós escolhidos numa geração da
+  malha pelos ids externos.
+- **Edições** (`editing.hpp`): cada operação devolve um `DocumentEdit`
+  (removidos, acrescentados, unidades e caso ativo antes e depois) ou uma
+  recusa (`InUse`, `DuplicateName`, `NotFound`, `NoTargets`, `Unsupported`).
+  O `app` embrulha cada edição num `QUndoCommand` na pilha de desfazer do
+  desenho.
+- **Unidades** (`units.hpp`): cinco sistemas coerentes; cada grandeza é um
+  conjunto de expoentes de força, comprimento, tempo e temperatura. A troca
+  de sistema converte o documento inteiro numa edição. O desenho não é
+  convertido.
+- **Tabelas por norma** (`library.hpp`, `actions.hpp`): a biblioteca de
+  materiais e as categorias de ação com os ψ. Uma norma, um material ou uma
+  categoria nova é uma linha a mais.
+- **Montagem** (`build.hpp`): `buildModel` lê o mapa do `MESH` (entidade →
+  elementos e nós) uma vez e emite os alvos por ids. Uma combinação vira a
+  soma ponderada das ações. Os problemas voltam como `BuildIssue` com o
+  item. `checkModel` acrescenta os do `core::validate`.
+
 ## 4. Renderização (`render`)
 
 - **`Viewport`** (`QRhiWidget`) — dono do `QRhi`, do laço de render e dos eventos de entrada.
@@ -314,6 +350,12 @@ falhas esperadas (arquivo inválido, modelo singular); exceções apenas para bu
   grupo; `MeshGpu` envia-a à GPU (feature 004).
 - **Passes**: faces sombreadas → arestas (wireframe sem z-fighting) →
   realce de seleção → sobreposições (eixos, legenda).
+- **Símbolos** (feature 010, `SymbolLayer`): apoios (engaste, articulação,
+  rolete, genérico), forças, momentos, cargas distribuídas e eixos locais.
+  Cada glifo é um molde de linhas de tamanho unitário, e cada símbolo é uma
+  instância dele (posição, base, tamanho em pixels). O vertex shader escala o
+  molde pelo `w` do clip para manter o tamanho na tela. Há um draw por molde,
+  por cima do modelo. O `Viewport` recebe o `SymbolSet` por `setSymbols`.
 - **Resultados**: escalar por vértice + textura 1D de colormap, mapeada no
   fragment shader; deformada = posição + escala × deslocamento no vertex shader
   (sem reenviar a malha).
@@ -343,6 +385,27 @@ falhas esperadas (arquivo inválido, modelo singular); exceções apenas para bu
   elástica e marcadores de snap (grips na feature 017). O `Viewport` tem o modo
   "pedir ponto" e o alvo da seleção (desenho ou malha).
 - **Painel de camadas** e barra de status com alternadores (snap, grade, orto, polar).
+- **Modelo (feature 010)**:
+  - O `ModelController` guarda o `setup::Document` e a malha corrente
+    (com a geração e o mapa do `MESH`). Cada edição vai para a pilha de
+    desfazer compartilhada com o desenho. Os símbolos são refeitos uma vez
+    por volta do laço de eventos, depois de cada mudança.
+  - A árvore do modelo (`ModelTree`, um `QAbstractItemModel`) agrupa os
+    itens:
+    - unidades, materiais, seções, barras, detalhes e apoios;
+    - casos, com o ativo em negrito;
+    - combinações e malha.
+  - O estado dos alvos aparece em cada item. Selecionar um item realça os
+    alvos dele no viewport.
+  - O painel de propriedades monta o formulário a partir de descritores de
+    campo (`fields.hpp`, sem widgets): cada edição é um `changeItem`. As
+    seções mostram as propriedades do `core`, o desenho da seção e o editor
+    de paredes finas.
+  - Os diálogos do menu Model (material, seção, barras, detalhes, apoios,
+    cargas, casos e combinações) usam os mesmos campos.
+  - O dock da conferência lista os problemas da montagem e os do
+    `core::validate` com a gravidade e o item. Um clique seleciona o item ou
+    realça os elementos e nós citados.
 - **`MeshRunner`**: mesma mecânica do `AnalysisRunner`, para os geradores de malha.
 - **`AnalysisRunner`**: executa `core::Analysis` em thread de trabalho; comunica
   progresso/conclusão por sinais Qt (conexão enfileirada). A UI nunca acessa o
