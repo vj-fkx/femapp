@@ -48,7 +48,7 @@ Regras:
     `DocumentEdit`).
   Arquivos: `src/setup/include/fem/setup/document.hpp`, `document.cpp`,
   `tests/unit/setup/test_document.cpp`. Cobre: 01, 23.
-- [ ] **T05** Conversão dos tipos do `core` (design §5.1):
+- [x] **T05** Conversão dos tipos do `core` (design §5.1):
   - testes primeiro: um documento com cada campo de cada tipo não nulo,
     convertido e de volta em 1e−12, e cada campo que tem grandeza mudando
     na ida;

@@ -1,7 +1,9 @@
 # Feature 010 (ADR 0010): the model document, without Qt.
 femapp_add_module(setup
     SOURCES
+        convert.cpp
         document.cpp
+        editing.cpp
         units.cpp
     PUBLIC_DEPS
         fem::core
