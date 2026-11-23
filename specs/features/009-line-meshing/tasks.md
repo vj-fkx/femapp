@@ -108,7 +108,7 @@ Regras:
 
 ## Fase 3 — Comando MESH no app
 
-- [ ] **T11** `LineMeshJob`:
+- [x] **T11** `LineMeshJob`:
   - cópia do desenho e da revisão;
   - `meshLines` e `render::buildMeshScene` no `QThreadPool`;
   - sinais `finished`/`failed` na thread do objeto;

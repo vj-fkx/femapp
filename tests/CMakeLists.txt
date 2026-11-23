@@ -171,10 +171,17 @@ target_link_libraries(bench_frame PRIVATE fem::core)
 femapp_set_warnings(bench_frame)
 
 # REQ-004-03: command line parsing of the application, built on its own.
-add_executable(test_app unit/app/test_cli_options.cpp "${PROJECT_SOURCE_DIR}/src/app/cli_options.cpp")
+# Feature 009: also the mesh job of the MESH command, with a QCoreApplication.
+add_executable(test_app
+    unit/app/test_cli_options.cpp
+    unit/app/test_line_mesh_job.cpp
+    "${PROJECT_SOURCE_DIR}/src/app/cli_options.cpp"
+    "${PROJECT_SOURCE_DIR}/src/app/line_mesh_job.cpp"
+    "${PROJECT_SOURCE_DIR}/src/app/line_mesh_job.hpp")
+set_target_properties(test_app PROPERTIES AUTOMOC ON)
 target_include_directories(test_app PRIVATE "${PROJECT_SOURCE_DIR}/src/app")
 target_compile_features(test_app PRIVATE cxx_std_20)
-target_link_libraries(test_app PRIVATE Catch2::Catch2WithMain)
+target_link_libraries(test_app PRIVATE fem::mesher fem::render Qt6::Core Catch2::Catch2WithMain)
 femapp_set_warnings(test_app)
 catch_discover_tests(test_app DISCOVERY_MODE PRE_TEST)
 
