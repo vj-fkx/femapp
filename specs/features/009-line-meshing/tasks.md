@@ -165,9 +165,9 @@ Regras:
   em Release fica registrada nas notas, ≤ 2 s. Arquivos:
   `tests/perf/bench_line_mesh.cpp`, `tests/perf/CMakeLists.txt`. Cobre:
   N01.
-- [ ] **T16** Cobertura de `src/mesher/` ≥ 80% no job de cobertura do CI,
+- [x] **T16** Cobertura de `src/mesher/` ≥ 80% no job de cobertura do CI,
   com um segundo `gcovr`. Arquivo: `.github/workflows/ci.yml`. Cobre: N03.
-- [ ] **T17** Documentação: `architecture.md` §3b com o `LineMesher` feito
+- [x] **T17** Documentação: `architecture.md` §3b com o `LineMesher` feito
   e o comando MESH no `app`; `README.md` com o MESH na lista de comandos.
   Cobre: 17.
 - [ ] **T90** [M] Build e testes verdes nos jobs do CI, inclusive a

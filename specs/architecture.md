@@ -270,6 +270,33 @@ Todos produzem `core::Mesh` com grupos ligados às entidades de `geom`, reportam
 progresso e aceitam cancelamento. `DelaunayMesher3D` é o componente de maior
 risco técnico do projeto.
 
+**Já implementado (feature 009):** `meshLines` (`line_mesher.hpp`) divide as
+linhas e polilinhas retas do desenho em `Line2` ou `Line3`, e os pontos viram
+`Point1`. Ele:
+
+- acha os contatos por uma BVH das caixas dos trechos (`detail/segment_bvh`,
+  pares em paralelo e ordenados);
+- classifica cada contato pela distância entre segmentos 3D em coordenadas
+  relativas (`detail/segment_geometry`): cruzamento, nó em T, ponta com
+  ponta ou sobreposição, que é recusada;
+- divide os trechos nos contatos e nos pontos;
+- funde os nós a menos da tolerância do desenho (grade de hash e
+  union-find, posição do primeiro desenhado);
+- divide cada trecho por contagem ou comprimento alvo, com graduação
+  geométrica para a ponta final ou simétrica.
+
+O resultado é determinístico em qualquer número de threads, com um grupo por
+entidade (`entity <id>`), o mapa de elementos e nós para as entidades e um
+relatório. Os erros saem como dados, e o `app` os escreve. O comando `MESH`
+é do `app`, porque `geom` não pode depender de `mesher`:
+
+- o `DraftingController` faz o pedido de tamanho;
+- o `LineMeshJob` gera a malha e a cena numa thread de trabalho;
+- o `line_mesh_text` tem os textos, em inglês por ora.
+
+Ainda não há progresso nem cancelamento: a geração de 100 mil trechos leva
+0,64 s.
+
 Erros: `std::expected`-like (`tl::expected` enquanto C++23 não for o piso) para
 falhas esperadas (arquivo inválido, modelo singular); exceções apenas para bugs.
 

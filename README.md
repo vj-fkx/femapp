@@ -120,6 +120,7 @@ AutoCAD:
 | `COPY` | `CO` | Copia, quantas vezes quiser, até Enter |
 | `ERASE` | `E` ou Delete | Apaga os objetos selecionados |
 | `UNDO` / `REDO` | Ctrl+Z / Ctrl+Y | Desfaz e refaz um comando inteiro |
+| `MESH` | `ME` | Gera a malha de barras do desenho (feature 009) |
 
 Pontos digitados: `x,y` ou `x,y,z` (absoluto), `@dx,dy[,dz]` (relativo ao
 último ponto), `d<ângulo` e `@d<ângulo` (polar, ângulo em graus a partir de
@@ -130,6 +131,18 @@ completa o nome; as setas percorrem o histórico. F3 liga o snap a objetos
 ▸ Configurações de desenho) e F8 o modo ortogonal. O mouse marca pontos no
 plano Z = 0. Editar ▸ Alvo da seleção escolhe se a seleção sem comando pega o
 desenho ou a malha.
+
+O `MESH` pede o tamanho dos elementos (Enter: um elemento por trecho, o que
+basta para as vigas exatas) e gera a malha do desenho inteiro fora da thread
+da interface. As linhas e polilinhas viram barras, os pontos viram nós, e os
+nós coincidentes se fundem. As linhas se dividem onde outra termina no meio
+delas (nó em T), onde se cruzam e onde há um ponto sobre elas. Linhas
+sobrepostas são recusadas. A malha aparece com o desenho, o relatório vai
+para a linha de comando, e uma edição depois da malha avisa que ela ficou
+desatualizada. Cada entidade vira um grupo da malha chamado `entity <id>`.
+Por ora os textos do `MESH` ficam em inglês. O `bench_line_mesh` mede a
+geração de um pórtico com cerca de 100 mil trechos:
+`build/release/bin/bench_line_mesh`.
 
 Para malhas grandes (centenas de milhares de elementos ou mais), use o build
 de Release (`cmake --preset release` e `cmake --build --preset release`): o

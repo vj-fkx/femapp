@@ -181,6 +181,12 @@ jobs:
           # those lines are skipped instead of failing the report.
           gcovr --root . --filter 'src/core/' --gcov-ignore-parse-errors=all --print-summary --fail-under-line 80 build/${{ matrix.preset }}
 
+      # NFR-009-03: line coverage of mesher, at least 80% as for core.
+      - name: Coverage of mesher
+        if: matrix.coverage
+        run: |
+          gcovr --root . --filter 'src/mesher/' --gcov-ignore-parse-errors=all --print-summary --fail-under-line 80 build/${{ matrix.preset }}
+
   format:
     name: format
     runs-on: ubuntu-24.04
