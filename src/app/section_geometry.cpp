@@ -115,6 +115,67 @@ Eigen::Vector2d toDrawing(const core::SectionProperties& properties,
            V(c * principal.x() - s * principal.y(), s * principal.x() + c * principal.y());
 }
 
+core::Section newSection(const std::string& name, int shape, setup::UnitSystem units)
+{
+    namespace q = setup::quantity;
+    const double k = setup::conversionFactor(setup::UnitSystem::NewtonMetre, units, q::kLength);
+    core::Section section;
+    section.name = name;
+    switch (shape) {
+    case 0:
+        section.shape = core::Rectangle{.b = 0.3 * k, .h = 0.5 * k};
+        break;
+    case 1:
+        section.shape = core::Circle{.d = 0.3 * k};
+        break;
+    case 2:
+        section.shape = core::CircularTube{.d = 0.2 * k, .t = 0.01 * k};
+        break;
+    case 3:
+        section.shape = core::RectangularTube{.b = 0.2 * k, .h = 0.3 * k, .t = 0.01 * k};
+        break;
+    case 4: // IPE 300
+        section.shape =
+            core::ISection{.h = 0.3 * k, .bf = 0.15 * k, .tf = 0.0107 * k, .tw = 0.0071 * k};
+        break;
+    case 5:
+        section.shape = core::Angle{.b = 0.1 * k, .h = 0.1 * k, .t = 0.01 * k};
+        break;
+    case 6:
+        section.shape = core::Channel{.h = 0.3 * k, .bf = 0.1 * k, .tf = 0.016 * k, .tw = 0.01 * k};
+        break;
+    case 7:
+        section.shape = core::Tee{.h = 0.2 * k, .bf = 0.2 * k, .tf = 0.015 * k, .tw = 0.009 * k};
+        break;
+    case 8: { // a channel by its mid-line
+        core::ThinWalled thin;
+        thin.points = {V(0.15 * k, 0.1 * k), V(0.15 * k, 0.0), V(-0.15 * k, 0.0),
+                       V(-0.15 * k, 0.1 * k)};
+        thin.walls = {{.from = 0, .to = 1, .t = 0.01 * k},
+                      {.from = 1, .to = 2, .t = 0.01 * k},
+                      {.from = 2, .to = 3, .t = 0.01 * k}};
+        section.shape = std::move(thin);
+        break;
+    }
+    case 9: {
+        core::SolidPolygon solid;
+        core::SolidPolygon::Region region;
+        region.outline = {V(-0.15 * k, -0.15 * k), V(0.15 * k, -0.15 * k), V(0.15 * k, 0.15 * k),
+                          V(-0.15 * k, 0.15 * k)};
+        solid.regions.push_back(std::move(region));
+        section.shape = std::move(solid);
+        break;
+    }
+    default: // generic: the properties of the 0.3 m by 0.5 m rectangle
+        section.area = 0.15 * k * k;
+        section.inertiaY = 0.5 * 0.3 * 0.3 * 0.3 / 12.0 * k * k * k * k;
+        section.inertiaZ = 0.3 * 0.5 * 0.5 * 0.5 / 12.0 * k * k * k * k;
+        section.torsionConstant = 0.196 * 0.5 * 0.3 * 0.3 * 0.3 * k * k * k * k;
+        break;
+    }
+    return section;
+}
+
 std::variant<core::SolidPolygon, std::string>
 solidFromPolylines(const geom::Drawing& drawing, std::span<const geom::EntityId> entities)
 {

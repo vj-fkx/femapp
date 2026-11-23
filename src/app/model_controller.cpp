@@ -65,6 +65,59 @@ void ModelController::push(setup::DocumentEdit edit, const QString& text)
     m_undo->push(new DocumentUndoCommand(*this, std::move(edit), text));
 }
 
+setup::Targets ModelController::targetsFrom(std::span<const geom::EntityId> entities,
+                                            const render::SelectionItems& picked) const
+{
+    setup::Targets targets;
+    if (!entities.empty()) {
+        targets.entities.assign(entities.begin(), entities.end());
+        return targets;
+    }
+    if (!m_mesh.mesh) {
+        return targets;
+    }
+    const core::Mesh& mesh = *m_mesh.mesh;
+    for (const int e : picked[render::SelectionKind::Element]) {
+        if (e >= 0 && e < mesh.elementCount()) {
+            targets.elements.push_back(mesh.elementId(e));
+        }
+    }
+    for (const int n : picked[render::SelectionKind::Node]) {
+        if (n >= 0 && n < mesh.nodeCount()) {
+            targets.nodes.push_back(mesh.nodeId(n));
+        }
+    }
+    targets.meshGeneration = m_mesh.generation;
+    return targets;
+}
+
+std::vector<setup::GroupTarget> ModelController::meshGroups(int dimension) const
+{
+    std::vector<setup::GroupTarget> groups;
+    if (m_mesh.mesh) {
+        for (const core::Group& group : m_mesh.mesh->groups()) {
+            if (group.dimension == dimension) {
+                groups.push_back({.name = group.name, .dimension = group.dimension});
+            }
+        }
+    }
+    return groups;
+}
+
+std::optional<setup::ItemId> ModelController::add(setup::Item item, const QString& text)
+{
+    const setup::EditResult edit = setup::addItem(m_document, std::move(item));
+    if (!edit || edit->added.empty()) {
+        if (!edit) {
+            emit refused(edit.error());
+        }
+        return std::nullopt;
+    }
+    const setup::ItemId id = setup::idOf(edit->added.front());
+    push(*edit, text);
+    return id;
+}
+
 std::optional<QString>
 ModelController::setSolidFromPolylines(setup::ItemId id, std::span<const geom::EntityId> entities)
 {

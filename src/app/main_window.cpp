@@ -5,8 +5,10 @@
 #include "drafting_settings_dialog.hpp"
 #include "mesh_import.hpp"
 #include "model_controller.hpp"
+#include "model_dialogs.hpp"
 #include "model_tree.hpp"
 #include "property_panel.hpp"
+#include "section_geometry.hpp"
 
 #include <fem/core/version.hpp>
 #include <fem/render/camera.hpp>
@@ -442,6 +444,92 @@ void MainWindow::createModelMenu()
 {
     QMenu* menu = menuBar()->addMenu(tr("&Model"));
     menu->addAction(tr("&Units..."), this, &MainWindow::chooseUnits);
+    menu->addSeparator();
+    menu->addAction(tr("New &material..."), this, &MainWindow::newMaterial);
+    menu->addAction(tr("New &section..."), this, &MainWindow::newSection);
+    menu->addSeparator();
+    menu->addAction(tr("Assign &bars..."), this, &MainWindow::assignBars);
+}
+
+void MainWindow::selectItem(setup::ItemId id)
+{
+    const QModelIndex index = m_tree->indexOf(id);
+    if (index.isValid()) {
+        m_treeView->setCurrentIndex(index);
+        m_treeView->scrollTo(index);
+    }
+}
+
+setup::Targets MainWindow::selectedTargets() const
+{
+    if (m_viewport.isNull()) {
+        return {};
+    }
+    if (m_viewport->selectionTarget() == render::SelectionTarget::Drawing) {
+        return m_model->targetsFrom(m_viewport->drawingSelection(), {});
+    }
+    // Picked in the mesh shown, only if it is the model's.
+    const auto& scene = m_viewport->scene();
+    if (!scene || !m_model->mesh().mesh || scene->sharedMesh() != m_model->mesh().mesh) {
+        return {};
+    }
+    render::SelectionItems picked;
+    for (const render::SelectionKind kind :
+         {render::SelectionKind::Element, render::SelectionKind::Node}) {
+        picked[kind] = m_viewport->selection().items(kind);
+    }
+    return m_model->targetsFrom({}, picked);
+}
+
+void MainWindow::newMaterial()
+{
+    auto material = chooseMaterial(this, m_model->document().units());
+    if (!material) {
+        return;
+    }
+    material->data.name = setup::freeName(m_model->document(), *material, material->data.name);
+    if (const auto id = m_model->add(std::move(*material), tr("new material"))) {
+        selectItem(*id);
+    }
+}
+
+void MainWindow::newSection()
+{
+    const auto shape = chooseSectionShape(this);
+    if (!shape) {
+        return;
+    }
+    setup::SectionItem section{.id = {}, .data = {}};
+    const std::string name = setup::freeName(m_model->document(), section, "Section");
+    section.data = app::newSection(name, *shape, m_model->document().units());
+    const auto id = m_model->add(std::move(section), tr("new section"));
+    if (!id) {
+        return;
+    }
+    // REQ-010-05: a solid polygon takes the closed polylines selected, if any.
+    if (*shape == static_cast<int>(std::variant_size_v<core::SectionShape>) - 1 &&
+        !m_viewport.isNull() && !m_viewport->drawingSelection().empty()) {
+        if (const auto problem =
+                m_model->setSolidFromPolylines(*id, m_viewport->drawingSelection())) {
+            showMessage(tr("Section from polylines"), *problem, true);
+        }
+    }
+    selectItem(*id);
+}
+
+void MainWindow::assignBars()
+{
+    const setup::Targets targets = selectedTargets();
+    const std::vector<setup::GroupTarget> groups = m_model->meshGroups(1);
+    auto choice = chooseBars(this, m_model->document(), targets, groups);
+    if (!choice) {
+        return;
+    }
+    setup::BarAssignment bars{.id = {}, .targets = targets, .data = std::move(choice->data)};
+    if (bars.targets.empty()) {
+        bars.targets.groups = std::move(choice->groups);
+    }
+    m_model->push(setup::assign(m_model->documentForIds(), std::move(bars)), tr("assign bars"));
 }
 
 void MainWindow::showUnits()

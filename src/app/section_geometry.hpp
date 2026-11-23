@@ -6,6 +6,7 @@
 
 #include <fem/core/section.hpp>
 #include <fem/geom/drawing.hpp>
+#include <fem/setup/units.hpp>
 
 #include <Eigen/Core>
 #include <span>
@@ -40,5 +41,11 @@ struct Ring
 // was given.
 [[nodiscard]] std::variant<core::SolidPolygon, std::string>
 solidFromPolylines(const geom::Drawing& drawing, std::span<const geom::EntityId> entities);
+
+// REQ-010-05: a new section named `name`, of the shape at `shape` in
+// core::SectionShape, or generic for -1, with dimensions of a common
+// profile (a 0.3 m by 0.5 m rectangle, an IPE 300...) in `units`, ready to
+// be edited in the panel.
+[[nodiscard]] core::Section newSection(const std::string& name, int shape, setup::UnitSystem units);
 
 } // namespace fem::app

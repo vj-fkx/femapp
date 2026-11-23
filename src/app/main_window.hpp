@@ -1,6 +1,7 @@
 #pragma once
 
 #include <fem/render/display_options.hpp>
+#include <fem/setup/document.hpp>
 
 #include <QList>
 #include <QMainWindow>
@@ -82,6 +83,14 @@ private:
     void createModelMenu();
     // REQ-010-03: the unit system, chosen and converted after a warning.
     void chooseUnits();
+    // REQ-010-04, 05, 07: the items made from the Model menu.
+    void newMaterial();
+    void newSection();
+    void assignBars();
+    // The new item selected in the tree, for its properties.
+    void selectItem(setup::ItemId id);
+    // REQ-010-12: the targets of the viewport selection.
+    [[nodiscard]] setup::Targets selectedTargets() const;
     void showUnits();
     void showModelMenu(const QPoint& position);
     void activateItem(const QModelIndex& index);

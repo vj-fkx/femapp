@@ -127,3 +127,43 @@ TEST_CASE("a solid polygon section from closed polylines", "[app][model][section
     CHECK(controller.setSolidFromPolylines(section, {}).has_value());
     CHECK(undo.count() == 2);
 }
+
+TEST_CASE("the targets of an assignment from the viewport selection", "[app][model]")
+{
+    // Feature 010, T17: REQ-010-12.
+    Drawing drawing;
+    fem::geom::DrawingEdit edit;
+    const fem::geom::EntityId line = drawing.nextId();
+    edit.added.push_back(fem::geom::Entity{
+        .id = line, .shape = fem::geom::LineEntity{.start = Vec3(0, 0, 0), .end = Vec3(2, 0, 0)}});
+    drawing.apply(edit);
+    QUndoStack undo;
+    fem::app::ModelController controller(&undo, drawing);
+    const auto scene = sceneOf(drawing);
+    controller.meshGenerated(scene, nullptr, drawing.revision());
+    const fem::core::Mesh& mesh = *scene->sharedMesh();
+
+    // Entities of the drawing win over the mesh.
+    fem::render::SelectionItems picked;
+    picked[fem::render::SelectionKind::Element] = {0};
+    picked[fem::render::SelectionKind::Node] = {1};
+    const std::array<fem::geom::EntityId, 1> entities{line};
+    const s::Targets fromDrawing = controller.targetsFrom(entities, picked);
+    CHECK(fromDrawing.entities == std::vector<fem::geom::EntityId>{line});
+    CHECK(fromDrawing.elements.empty());
+
+    // Picked in the mesh: by the external ids, in this generation.
+    const s::Targets fromMesh = controller.targetsFrom({}, picked);
+    CHECK(fromMesh.entities.empty());
+    CHECK(fromMesh.elements == std::vector<fem::core::ExternalId>{mesh.elementId(0)});
+    CHECK(fromMesh.nodes == std::vector<fem::core::ExternalId>{mesh.nodeId(1)});
+    CHECK(fromMesh.meshGeneration == controller.mesh().generation);
+
+    // The groups of the mesh, by dimension.
+    std::size_t lines = 0;
+    for (const fem::core::Group& g : mesh.groups()) {
+        lines += g.dimension == 1 ? 1 : 0;
+    }
+    CHECK(controller.meshGroups(1).size() == lines);
+    CHECK(controller.meshGroups(3).empty());
+}

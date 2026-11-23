@@ -17,6 +17,8 @@ qt_add_executable(femapp WIN32 MACOSX_BUNDLE
     main_window.cpp
     model_controller.cpp
     model_controller.hpp
+    model_dialogs.cpp
+    model_dialogs.hpp
     model_tree.cpp
     model_tree.hpp
     property_panel.cpp

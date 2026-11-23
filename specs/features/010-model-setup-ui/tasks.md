@@ -198,7 +198,7 @@ Regras:
 
 ## Fase 5 — App: criar e atribuir
 
-- [ ] **T17** O menu Model, primeira parte:
+- [x] **T17** O menu Model, primeira parte:
   - New material (biblioteca), New section;
   - Assign bars (tipo, material, seção, teoria, orientação,
     empenamento, formulação), sobre a seleção do desenho ou da malha, ou
@@ -206,6 +206,12 @@ Regras:
   - o aviso de treliça no painel.
   Arquivos: `src/app/model_dialogs.*`, `model_controller.cpp`,
   `main_window.cpp`. Cobre: 04, 05, 07, 10, 12.
+  Nota: as seções novas saem com as medidas de um perfil comum nas
+  unidades do modelo (`newSection`, em `section_geometry.*`); os alvos
+  vêm de `ModelController::targetsFrom` (o desenho, ou os elementos e nós
+  da malha do modelo) e, sem seleção, dos grupos 1D marcados no diálogo.
+  Testados: `newSection`, `targetsFrom`, `meshGroups` e o aviso de
+  treliça; os diálogos ficam para o roteiro T23.
 - [ ] **T18** Detalhes de viga e apoios: os diálogos de ligações (por ponta
   e esforço), excentricidades, base elástica, pontas de empenamento e
   apoios (engaste, articulação, rolete, por GDL). Arquivos:

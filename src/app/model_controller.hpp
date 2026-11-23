@@ -7,6 +7,7 @@
 #include <fem/geom/drawing.hpp>
 #include <fem/mesher/line_mesher.hpp>
 #include <fem/render/mesh_scene.hpp>
+#include <fem/render/selection.hpp>
 #include <fem/setup/build.hpp>
 #include <fem/setup/document.hpp>
 #include <fem/setup/editing.hpp>
@@ -51,6 +52,16 @@ public:
     // polylines `entities` of the drawing (the largest the outline, the
     // others its holes), one step of undo. The problem as a text when it is
     // not a section or the entities are not closed polylines.
+    // REQ-010-12: the targets of an assignment from the selection of the
+    // viewport: the drawing entities, or else the elements and nodes picked
+    // in the mesh (indices of the current mesh), by their external ids.
+    [[nodiscard]] setup::Targets targetsFrom(std::span<const geom::EntityId> entities,
+                                             const render::SelectionItems& picked) const;
+    // The groups of dimension `dimension` of the current mesh.
+    [[nodiscard]] std::vector<setup::GroupTarget> meshGroups(int dimension) const;
+    // An item added as one step of undo: its id, or none when refused.
+    std::optional<setup::ItemId> add(setup::Item item, const QString& text);
+
     std::optional<QString> setSolidFromPolylines(setup::ItemId id,
                                                  std::span<const geom::EntityId> entities);
 

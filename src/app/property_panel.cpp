@@ -257,7 +257,9 @@ void PropertyPanel::addField(QFormLayout* form, const Field& field, const setup:
     case FieldKind::Info: {
         const auto* shown = std::get_if<QString>(&value);
         if (shown != nullptr && !shown->isEmpty()) {
-            form->addRow(field.label, new QLabel(*shown, m_body));
+            auto* label = new QLabel(*shown, m_body);
+            label->setWordWrap(true);
+            form->addRow(field.label, label);
         }
         break;
     }

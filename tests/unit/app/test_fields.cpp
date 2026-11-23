@@ -157,3 +157,22 @@ TEST_CASE("numbers typed in a field", "[app][fields]")
     CHECK(fem::app::formatNumber(0.1 + 0.2) == QStringLiteral("0.3"));
     CHECK(fem::app::formatNumber(210000.0) == QStringLiteral("210000"));
 }
+
+TEST_CASE("a truss assignment warns of buckling between its nodes", "[app][fields]")
+{
+    // Feature 010, T17: REQ-010-10.
+    const s::Document document;
+    const auto warning = [&](c::ElementKind kind) {
+        const s::Item item =
+            s::BarAssignment{.id = s::ItemId{1}, .targets = {}, .data = {.kind = kind}};
+        for (const Field& f : fem::app::fieldsOf(item, document)) {
+            if (f.label.toStdString() == "Warning") {
+                return std::get<QString>(f.get(item));
+            }
+        }
+        return QString();
+    };
+    CHECK_FALSE(warning(c::ElementKind::Truss2D).isEmpty());
+    CHECK_FALSE(warning(c::ElementKind::Truss3D).isEmpty());
+    CHECK(warning(c::ElementKind::Beam3D).isEmpty());
+}

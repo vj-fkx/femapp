@@ -419,6 +419,15 @@ void barFields(std::vector<Field>& out, const setup::BarAssignment& item,
         FieldText::tr("Curved beams"), {FieldText::tr("Arc"), FieldText::tr("Isoparametric")},
         [](const auto& b) { return indexOf(b.data.curved); },
         [](auto& b, int i) { b.data.curved = fromIndex<core::CurvedFormulation>(i); });
+    // REQ-010-10: the limit of the truss element of the 008c.
+    f.info(FieldText::tr("Warning"), [](const auto& b) {
+        const bool truss =
+            b.data.kind == core::ElementKind::Truss2D || b.data.kind == core::ElementKind::Truss3D;
+        return truss ? FieldText::tr("A truss bar does not buckle between its nodes in the "
+                                     "second order or the buckling analysis: model it as a "
+                                     "beam for that.")
+                     : QString();
+    });
 }
 
 void detailFields(std::vector<Field>& out, const setup::Item& item)

@@ -113,3 +113,23 @@ TEST_CASE("a solid polygon from closed polylines", "[app][section]")
     CHECK(std::holds_alternative<std::string>(fem::app::solidFromPolylines(drawing, wrong)));
     CHECK(std::holds_alternative<std::string>(fem::app::solidFromPolylines(drawing, {})));
 }
+
+TEST_CASE("a new section of each shape is valid, in the units of the model", "[app][section]")
+{
+    // Feature 010, T17: REQ-010-05.
+    for (int shape = -1; shape < static_cast<int>(std::variant_size_v<c::SectionShape>); ++shape) {
+        INFO(shape);
+        const c::Section section =
+            fem::app::newSection("s", shape, fem::setup::UnitSystem::NewtonMillimetre);
+        CHECK(section.name == "s");
+        CHECK(section.shape.has_value() == (shape >= 0));
+        CHECK(c::sectionProperties(section).has_value());
+    }
+    // 0.3 m by 0.5 m, in millimetres.
+    const c::Section mm = fem::app::newSection("r", 0, fem::setup::UnitSystem::NewtonMillimetre);
+    const auto& r = std::get<c::Rectangle>(mm.shape.value_or(c::SectionShape{}));
+    CHECK(std::abs(r.b - 300.0) <= 1e-9);
+    CHECK(std::abs(r.h - 500.0) <= 1e-9);
+    const c::Section m = fem::app::newSection("g", -1, fem::setup::UnitSystem::NewtonMetre);
+    CHECK(std::abs(m.area.value_or(0.0) - 0.15) <= 1e-15);
+}
