@@ -159,7 +159,9 @@ using Action = std::variant<core::NodalForce, core::DistributedLoad, core::Conce
                             SelfWeight, core::TemperatureChange, core::TemperatureGradient,
                             core::InitialStrain, Settlement>;
 struct LoadItem { ItemId id{}; ItemId loadCase{}; Targets targets; Action action; };
-struct LoadCase { ItemId id{}; std::string name; };
+// REQ-010-26: the standard and the category of the action of the case
+// (keys of actionCategories(), design §5.10); empty for none.
+struct LoadCase { ItemId id{}; std::string name; std::string standard; std::string category; };
 struct Combination { ItemId id{}; std::string name; std::vector<std::pair<ItemId, double>> terms; };
 
 using Item = std::variant<MaterialItem, SectionItem, BarAssignment, ConnectionItem, OffsetItem,
@@ -499,6 +501,67 @@ ganho.
     ortotrópico.
   - Os valores vêm do conhecimento das normas, não dos textos, que são
     pagos. O mantenedor os conferiu na aprovação (2026-11-23).
+
+### 5.10 Categorias de ação por norma (REQ-010-26)
+
+*Ampliada na implementação (2026-11-23), por decisão do mantenedor.*
+
+- **Dados, como a biblioteca de materiais (§5.9):** `actionCategories()`
+  devolve uma lista de `ActionCategory` (norma, código, nome, natureza, ψ0,
+  ψ1, ψ2 opcionais), uma função por norma. `findCategory(norma, código)`
+  acha uma categoria.
+  - **Uma norma nova** é uma função a mais.
+  - **Uma categoria nova** é uma linha a mais.
+- **No caso de carga:** ele guarda `standard` e `category` (o código). A
+  classificação não entra na montagem; os γ e a geração das combinações
+  ficam para uma feature futura.
+- **Tabela:**
+
+| Norma | Código | Ação | Natureza | ψ0 | ψ1 | ψ2 |
+|-------|--------|------|----------|----|----|----|
+| ABNT NBR 8681 | g1 | Peso próprio da estrutura | permanente | — | — | — |
+| ABNT NBR 8681 | g2 | Elementos construtivos e instalações permanentes | permanente | — | — | — |
+| ABNT NBR 8681 | ε | Ações permanentes indiretas (recalques, retração, protensão) | permanente | — | — | — |
+| ABNT NBR 8681 | q1 | Uso, locais sem predominância de equipamentos fixos nem altas concentrações de pessoas (residenciais) | variável | 0,5 | 0,4 | 0,3 |
+| ABNT NBR 8681 | q2 | Uso, locais com predominância de equipamentos fixos ou altas concentrações de pessoas (comerciais, escritórios) | variável | 0,7 | 0,6 | 0,4 |
+| ABNT NBR 8681 | q3 | Uso, bibliotecas, arquivos, oficinas e garagens | variável | 0,8 | 0,7 | 0,6 |
+| ABNT NBR 8681 | v | Vento | variável | 0,6 | 0,3 | 0 |
+| ABNT NBR 8681 | t | Temperatura (variações uniformes) | variável | 0,6 | 0,5 | 0,3 |
+| ABNT NBR 8681 | e | Excepcional | excepcional | — | — | — |
+| ABNT NBR 8681 | s | Sísmica (ABNT NBR 15421) | sísmica | — | — | — |
+| EN 1990 | G | Permanent | permanente | — | — | — |
+| EN 1990 | P | Prestress | permanente | — | — | — |
+| EN 1990 | Q-A | Imposed, category A: domestic, residential | variável | 0,7 | 0,5 | 0,3 |
+| EN 1990 | Q-B | Imposed, category B: offices | variável | 0,7 | 0,5 | 0,3 |
+| EN 1990 | Q-C | Imposed, category C: congregation areas | variável | 0,7 | 0,7 | 0,6 |
+| EN 1990 | Q-D | Imposed, category D: shopping areas | variável | 0,7 | 0,7 | 0,6 |
+| EN 1990 | Q-E | Imposed, category E: storage areas | variável | 1,0 | 0,9 | 0,8 |
+| EN 1990 | Q-F | Imposed, category F: traffic, vehicles ≤ 30 kN | variável | 0,7 | 0,7 | 0,6 |
+| EN 1990 | Q-G | Imposed, category G: traffic, 30 to 160 kN | variável | 0,7 | 0,5 | 0,3 |
+| EN 1990 | Q-H | Imposed, category H: roofs | variável | 0 | 0 | 0 |
+| EN 1990 | Q-S | Snow (altitude ≤ 1000 m, outside Finland, Iceland, Norway, Sweden) | variável | 0,5 | 0,2 | 0 |
+| EN 1990 | Q-W | Wind | variável | 0,6 | 0,2 | 0 |
+| EN 1990 | Q-T | Temperature (non-fire) | variável | 0,6 | 0,5 | 0 |
+| EN 1990 | A | Accidental | excepcional | — | — | — |
+| EN 1990 | AE | Seismic | sísmica | — | — | — |
+| ASCE 7 | D | Dead | permanente | — | — | — |
+| ASCE 7 | L | Live | variável | — | — | — |
+| ASCE 7 | Lr | Roof live | variável | — | — | — |
+| ASCE 7 | S | Snow | variável | — | — | — |
+| ASCE 7 | R | Rain | variável | — | — | — |
+| ASCE 7 | W | Wind | variável | — | — | — |
+| ASCE 7 | E | Earthquake | sísmica | — | — | — |
+| ASCE 7 | H | Lateral earth pressure | permanente | — | — | — |
+| ASCE 7 | F | Fluids | permanente | — | — | — |
+| ASCE 7 | T | Self-straining | variável | — | — | — |
+
+- **Fontes:**
+  - os ψ da NBR são os da tabela 11.2 da ABNT NBR 6118, que reproduz os
+    da ABNT NBR 8681;
+  - os do EN 1990 são os da tabela A1.1;
+  - o ASCE 7 combina por fatores de carga, sem ψ.
+- **Ressalva:** como na §5.9, os valores vêm do conhecimento das normas, e
+  o mantenedor os confere.
 
 ## 6. Fluxo
 

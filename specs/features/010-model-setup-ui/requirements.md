@@ -96,6 +96,7 @@ A análise (execução, progresso, resultados) fica para a 011 e a 012.
 | REQ-010-16 | O sistema DEVE manter casos de carga com nome, um deles ativo. Cada caso DEVE aceitar todas as ações do `core`: <br>• forças, momentos e bimomentos nodais; <br>• cargas distribuídas (globais ou locais, uniformes ou trapezoidais, inteiras ou parciais, com torque e ponto de aplicação na seção); <br>• cargas concentradas no vão; <br>• peso próprio (vetor de aceleração); <br>• variação de temperatura e gradiente; <br>• deformação inicial; <br>• recalques. | US-4 |
 | REQ-010-17 | O sistema DEVE manter combinações com nome, cada uma uma soma de casos multiplicados por fatores. Uma combinação DEVE poder ser usada onde um caso é usado: na montagem do REQ-010-20 ela vira um único conjunto de ações, a soma ponderada, válida também para a segunda ordem e a flambagem, que não superpõem resultados. | US-4 |
 | REQ-010-18 | O sistema DEVE permitir criar, editar, copiar entre casos e apagar cargas e apoios, pela árvore e pelo painel. | US-4 |
+| REQ-010-26 | Cada caso de carga DEVE poder ser classificado pela norma e pela categoria da ação que representa: ABNT NBR 8681, EN 1990, e ASCE 7 (as categorias que o AISC 360 e o ACI 318 usam). Cada categoria tem código, nome, natureza (permanente, variável, excepcional, sísmica) e, quando a norma os dá, os fatores ψ0, ψ1 e ψ2 (design §5.10). A classificação é informativa: não entra na análise, e as cargas do caso a herdam. As categorias DEVEM ser uma tabela de dados, em que uma norma ou uma categoria nova se acrescenta sem mudar o resto. Os γ e a geração das combinações por norma ficam para uma feature futura *(ampliado na implementação, 2026-11-23, decidido pelo mantenedor)*. | US-4 |
 
 ### Interface
 
@@ -158,14 +159,16 @@ A análise (execução, progresso, resultados) fica para a 011 e a 012.
     devolve;
   - uma malha `.msh` importada aceita atribuições por grupo e por
     seleção.
-- [ ] **AC-5** (REQ-010-15, 16, 17, 18) Casos e combinações:
+- [ ] **AC-5** (REQ-010-15, 16, 17, 18, 26) Casos e combinações:
   - um caso com cada tipo de ação do `core`, montado igual ao `core::Model`
     feito à mão;
   - uma combinação 1,4·G + 1,5·Q montada como a soma das ações, e a
     segunda ordem dela igual à segunda ordem do modelo com as ações já
     somadas;
   - recalques por caso;
-  - copiar cargas entre casos.
+  - copiar cargas entre casos;
+  - a classificação dos casos por norma e categoria, com os ψ da tabela
+    do design §5.10.
 - [ ] **AC-6** (REQ-010-19, 21, 22, 23, roteiro manual com os passos em
   `tasks.md`):
   - a árvore e o painel;

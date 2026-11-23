@@ -123,6 +123,19 @@ Regras:
   - depois as ações e a soma.
   Arquivos: `build.cpp`, `tests/unit/setup/test_build.cpp`. Cobre: 15, 16,
   17, 20.
+- [ ] **T10b** Categorias de ação por norma (design §5.10, ampliada na
+  implementação a pedido do mantenedor):
+  - testes primeiro:
+    - cada categoria contra a tabela;
+    - códigos únicos por norma;
+    - `findCategory`;
+    - o caso de carga com norma e categoria nas edições (criar, mudar,
+      duplicar);
+  - depois `LoadCase::standard` e `category`, e
+    `actions.hpp/.cpp` como tabela de dados.
+  Arquivos: `src/setup/include/fem/setup/document.hpp`,
+  `src/setup/include/fem/setup/actions.hpp`, `actions.cpp`,
+  `tests/unit/setup/test_actions.cpp`. Cobre: 26.
 - [ ] **T11** Conferência:
   - testes primeiro: `checkModel` com os problemas da montagem (com o
     item), os do `core::validate` (sem item) e o aviso de treliça por
@@ -193,10 +206,12 @@ Regras:
   apoios (engaste, articulação, rolete, por GDL). Arquivos:
   `model_dialogs.*`, `model_controller.cpp`. Cobre: 08, 15.
 - [ ] **T19** Casos, cargas e combinações:
-  - o diálogo dos casos (criar, renomear, ativar);
+  - o diálogo dos casos (criar, renomear, ativar, classificar pela norma
+    e pela categoria, mostrando os ψ);
   - Add load com cada ação, sobre a seleção, no caso ativo;
   - o diálogo das combinações (casos e fatores).
-  Arquivos: `model_dialogs.*`, `model_controller.cpp`. Cobre: 16, 17, 18.
+  Arquivos: `model_dialogs.*`, `model_controller.cpp`. Cobre: 16, 17, 18,
+  26.
 
 ## Fase 6 — Símbolos no viewport
 
@@ -284,6 +299,7 @@ Regras:
 | REQ-010-23 | T04, T06, T13, T23 | `test_document.cpp`, `test_editing.cpp`, roteiro T23 |
 | REQ-010-24 | todas as de app | revisão |
 | REQ-010-25 | T01 | `test_mesh.cpp`, suítes 003 a 009 |
+| REQ-010-26 | T10b, T19 | `test_actions.cpp`, roteiro T23 |
 | NFR-010-01 | T06, T12, T23 | `bench_setup`, roteiro T23 (FPS) |
 | NFR-010-02 | T03, T05 | `test_units.cpp` |
 | NFR-010-03 | T25, T90 | Job de cobertura no CI |
@@ -294,7 +310,7 @@ Regras:
 | AC-2 | T06, T07, T16, T17, T23 |
 | AC-3 | T08, T09, T17, T18, T21 |
 | AC-4 | T08, T09, T13, T14 |
-| AC-5 | T06, T10, T19 |
+| AC-5 | T06, T10, T10b, T19 |
 | AC-6 | T14, T15, T20, T21, T22, T23 |
 | AC-7 | T01, T12, T23, T25, T90, T91 |
 
