@@ -1,4 +1,5 @@
 #include <fem/core/mesh_builder.hpp>
+#include <fem/core/stability_analysis.hpp>
 #include <fem/core/static_analysis.hpp>
 #include <fem/mesher/line_mesher.hpp>
 #include <fem/setup/build.hpp>
@@ -546,4 +547,219 @@ TEST_CASE("targets on an imported mesh", "[setup][build]")
         added(d, s::assign(d, s::FoundationItem{.id = {}, .targets = nope, .data = {}}));
     CHECK(has(s::buildModel(d, drawing, mesh, {.item = loadCase}).issues, IssueKind::MissingGroup,
               missing));
+}
+
+// AC-5: REQ-010-15, 16, 20 — every action of the core in one load case.
+TEST_CASE("every action of a load case", "[setup][build][actions]")
+{
+    Drawing drawing;
+    const EntityId first = addLine(drawing, Vec3(0, 0, 0), Vec3(3, 0, 0));
+    const EntityId second = addLine(drawing, Vec3(3, 0, 0), Vec3(6, 0, 0));
+    const EntityId root = addPoint(drawing, Vec3(0, 0, 0));
+    const EntityId tip = addPoint(drawing, Vec3(6, 0, 0));
+    // The warping dof is where the two collinear bars meet.
+    const EntityId middle = addPoint(drawing, Vec3(3, 0, 0));
+    const s::MeshContext mesh = meshOf(drawing);
+
+    s::Document d;
+    added(d, s::addItem(d, s::MaterialItem{.id = {},
+                                           .data = {.name = "steel",
+                                                    .youngsModulus = 2.1e8,
+                                                    .poissonsRatio = 0.3,
+                                                    .density = 7.85,
+                                                    .thermalExpansion = 1.2e-5}}));
+    const c::ISection shape{.h = 0.3, .bf = 0.15, .tf = 0.0107, .tw = 0.0071};
+    added(d, s::addItem(d, s::SectionItem{.id = {}, .data = {.name = "I", .shape = shape}}));
+    added(d, s::assign(d, s::BarAssignment{.id = {},
+                                           .targets = entities({first, second}),
+                                           .data = {.kind = c::ElementKind::Beam3D,
+                                                    .material = "steel",
+                                                    .section = "I",
+                                                    .warping = true}}));
+    s::SupportItem fixed{.id = {}, .targets = entities({root}), .held = {}};
+    for (const auto dof : {c::DofType::U, c::DofType::V, c::DofType::W, c::DofType::RX,
+                           c::DofType::RY, c::DofType::RZ}) {
+        fixed.held[static_cast<std::size_t>(dof)] = true;
+    }
+    added(d, s::assign(d, fixed));
+    const s::ItemId all = added(d, s::addItem(d, s::LoadCase{.id = {}, .name = "all"}));
+    const auto load = [&](s::Targets targets, s::Action action) {
+        added(d, s::addItem(d, s::LoadItem{.id = {},
+                                           .loadCase = all,
+                                           .targets = std::move(targets),
+                                           .action = std::move(action)}));
+    };
+    load(entities({tip}), c::NodalForce{.force = Vec3(1, 2, -3), .moment = Vec3(0.4, 0.5, 0.6)});
+    load(entities({middle}), c::NodalForce{.bimoment = 0.07});
+    load(entities({first}), c::DistributedLoad{.axes = c::Axes::Local,
+                                               .startValue = Vec3(0, 0.5, -1.0),
+                                               .endValue = Vec3(0, 1.5, -2.0),
+                                               .from = {.value = 0.5, .fraction = false},
+                                               .to = {.value = 0.9, .fraction = true},
+                                               .startTorque = 0.1,
+                                               .endTorque = 0.2,
+                                               .point = Eigen::Vector2d(0.15, 0.0)});
+    load(entities({second}), c::ConcentratedLoad{.force = Vec3(0, -4, 1),
+                                                 .moment = Vec3(0.2, 0, 0),
+                                                 .at = {.value = 0.25, .fraction = true}});
+    load({}, s::SelfWeight{.acceleration = Vec3(0, 0, -9.81)});
+    load(entities({second}), c::TemperatureChange{.deltaT = 20.0});
+    load(entities({first}), c::TemperatureGradient{.alongY = 15.0, .alongZ = -10.0});
+    load(entities({second}), c::InitialStrain{.strain = 2e-4});
+    load(entities({root}), s::Settlement{.dof = c::DofType::W, .value = -0.002});
+
+    const s::BuildResult built = s::buildModel(d, drawing, mesh, {.item = all});
+    CHECK(built.issues.empty());
+
+    c::Model hand;
+    hand.mesh = mesh.mesh;
+    hand.materials.push_back({.name = "steel",
+                              .youngsModulus = 2.1e8,
+                              .poissonsRatio = 0.3,
+                              .density = 7.85,
+                              .thermalExpansion = 1.2e-5});
+    hand.sections.push_back({.name = "I", .shape = shape});
+    hand.assignments.push_back({.elements = c::ElementIds{{1, 2}},
+                                .kind = c::ElementKind::Beam3D,
+                                .material = "steel",
+                                .section = "I",
+                                .warping = true});
+    for (const auto dof :
+         {c::DofType::U, c::DofType::V, c::DofType::RX, c::DofType::RY, c::DofType::RZ}) {
+        hand.restraints.push_back({.nodes = c::NodeIds{{1}}, .dof = dof, .value = 0.0});
+    }
+    hand.restraints.push_back({.nodes = c::NodeIds{{1}}, .dof = c::DofType::W, .value = -0.002});
+    hand.nodalForces.push_back(
+        {.nodes = c::NodeIds{{3}}, .force = Vec3(1, 2, -3), .moment = Vec3(0.4, 0.5, 0.6)});
+    hand.nodalForces.push_back({.nodes = c::NodeIds{{2}}, .bimoment = 0.07});
+    hand.distributedLoads.push_back({.elements = c::ElementIds{{1}},
+                                     .axes = c::Axes::Local,
+                                     .startValue = Vec3(0, 0.5, -1.0),
+                                     .endValue = Vec3(0, 1.5, -2.0),
+                                     .from = {.value = 0.5, .fraction = false},
+                                     .to = {.value = 0.9, .fraction = true},
+                                     .startTorque = 0.1,
+                                     .endTorque = 0.2,
+                                     .point = Eigen::Vector2d(0.15, 0.0)});
+    hand.concentratedLoads.push_back({.elements = c::ElementIds{{2}},
+                                      .force = Vec3(0, -4, 1),
+                                      .moment = Vec3(0.2, 0, 0),
+                                      .at = {.value = 0.25, .fraction = true}});
+    hand.gravity = Vec3(0, 0, -9.81);
+    hand.temperatureChanges.push_back({.elements = c::ElementIds{{2}}, .deltaT = 20.0});
+    hand.temperatureGradients.push_back(
+        {.elements = c::ElementIds{{1}}, .alongY = 15.0, .alongZ = -10.0});
+    hand.initialStrains.push_back({.elements = c::ElementIds{{2}}, .strain = 2e-4});
+    sameResults(built.model, hand);
+}
+
+// AC-5: REQ-010-17 — 1.4 G + 1.5 Q as the sum of the actions, also in the
+// second order, which does not superpose.
+TEST_CASE("a combination is the sum of its actions", "[setup][build][actions]")
+{
+    Frame f;
+    drawFrame(f);
+    Setup setup;
+    prepare(setup, f); // "lateral": 10, -20 at the top corner
+    s::Document& d = setup.document;
+    // G: the frame's own weight and a load on the upper beams.
+    {
+        s::MaterialItem steel = std::get<s::MaterialItem>(d.items().front());
+        steel.data.density = 7.85;
+        REQUIRE(s::changeItem(d, steel).has_value());
+        d.apply(*s::changeItem(d, steel));
+    }
+    const s::ItemId g = added(d, s::addItem(d, s::LoadCase{.id = {}, .name = "G"}));
+    added(d,
+          s::addItem(d, s::LoadItem{.id = {},
+                                    .loadCase = g,
+                                    .targets = {},
+                                    .action = s::SelfWeight{.acceleration = Vec3(0, -9.81, 0)}}));
+    added(d, s::addItem(d, s::LoadItem{.id = {},
+                                       .loadCase = g,
+                                       .targets = entities({f.bars[8], f.bars[9]}),
+                                       .action = c::DistributedLoad{.startValue = Vec3(0, -6, 0),
+                                                                    .endValue = Vec3(0, -6, 0)}}));
+    const s::ItemId uls = added(
+        d, s::addItem(d, s::Combination{
+                             .id = {}, .name = "ULS", .terms = {{g, 1.4}, {setup.loadCase, 1.5}}}));
+    const s::BuildResult built = s::buildModel(d, f.drawing, meshOf(f.drawing), {.item = uls});
+    CHECK(built.issues.empty());
+    CHECK(built.model.gravity == Vec3(0, -1.4 * 9.81, 0));
+
+    // By hand: the same frame with the actions already summed.
+    c::Model hand = handFrame();
+    hand.materials.front().density = 7.85;
+    hand.gravity = Vec3(0, -1.4 * 9.81, 0);
+    hand.nodalForces.front().force *= 1.5;
+    // The upper beams by hand are elements 508 and 509 (009 T10 order).
+    hand.distributedLoads.push_back({.elements = c::ElementIds{{508, 509}},
+                                     .startValue = Vec3(0, -6 * 1.4, 0),
+                                     .endValue = Vec3(0, -6 * 1.4, 0)});
+    sameAnalysis(built.model, hand);
+
+    const auto a = c::runSecondOrderStatic(built.model);
+    const auto b = c::runSecondOrderStatic(hand);
+    REQUIRE(a.has_value());
+    REQUIRE(b.has_value());
+    const c::Mesh& ma = *built.model.mesh;
+    const c::Mesh& mb = *hand.mesh;
+    double largest = 0.0;
+    for (const Vec3& u : b->result.displacements) {
+        largest = std::max(largest, u.norm());
+    }
+    for (c::NodeIndex n = 0; n < ma.nodeCount(); ++n) {
+        c::NodeIndex m = 0;
+        while ((mb.nodeCoordinates(m) - ma.nodeCoordinates(n)).norm() > 1e-12) {
+            ++m;
+        }
+        CHECK((a->result.displacements[static_cast<std::size_t>(n)] -
+               b->result.displacements[static_cast<std::size_t>(m)])
+                  .norm() <= 1e-10 * largest);
+    }
+}
+
+// REQ-010-15, 17: settlements add up by node and dof; one where nothing is
+// held is an issue.
+TEST_CASE("settlements in a combination", "[setup][build][actions]")
+{
+    Frame f;
+    drawFrame(f);
+    Setup setup;
+    prepare(setup, f);
+    s::Document& d = setup.document;
+    const s::ItemId one = added(d, s::addItem(d, s::LoadCase{.id = {}, .name = "one"}));
+    const s::ItemId two = added(d, s::addItem(d, s::LoadCase{.id = {}, .name = "two"}));
+    added(d, s::addItem(
+                 d, s::LoadItem{.id = {},
+                                .loadCase = one,
+                                .targets = entities({f.bases[1]}),
+                                .action = s::Settlement{.dof = c::DofType::V, .value = -0.01}}));
+    added(d, s::addItem(
+                 d, s::LoadItem{.id = {},
+                                .loadCase = two,
+                                .targets = entities({f.bases[1]}),
+                                .action = s::Settlement{.dof = c::DofType::V, .value = -0.004}}));
+    const s::ItemId both = added(
+        d,
+        s::addItem(d, s::Combination{.id = {}, .name = "both", .terms = {{one, 1.0}, {two, 2.0}}}));
+    const s::BuildResult built = s::buildModel(d, f.drawing, meshOf(f.drawing), {.item = both});
+    CHECK(built.issues.empty());
+    // The middle base is node 4 (009 numbering): V at -0.01 - 2 * 0.004.
+    const auto settled = std::ranges::find_if(built.model.restraints, [](const c::Restraint& r) {
+        return r.dof == c::DofType::V && r.value != 0.0;
+    });
+    REQUIRE(settled != built.model.restraints.end());
+    CHECK(std::abs(settled->value - (-0.01 - 2.0 * 0.004)) <= 1e-15);
+    CHECK(std::get<c::NodeIds>(settled->nodes).ids == std::vector<c::ExternalId>{4});
+
+    // A settlement where nothing is held.
+    const s::ItemId wrong = added(
+        d,
+        s::addItem(d, s::LoadItem{.id = {},
+                                  .loadCase = one,
+                                  .targets = entities({f.top}),
+                                  .action = s::Settlement{.dof = c::DofType::U, .value = 0.001}}));
+    CHECK(has(s::buildModel(d, f.drawing, meshOf(f.drawing), {.item = one}).issues,
+              IssueKind::SettlementNotHeld, wrong));
 }

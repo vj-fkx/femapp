@@ -110,7 +110,7 @@ Regras:
   - depois o resto da montagem dos alvos.
   Arquivos: `build.cpp`, `tests/unit/setup/test_build.cpp`. Cobre: 08, 12,
   13.
-- [ ] **T10** Ações, casos e combinações:
+- [x] **T10** Ações, casos e combinações:
   - testes primeiro:
     - um caso com cada ação do `core` (nodal com momento e bimomento,
       distribuída local parcial trapezoidal com torque e ponto,
@@ -326,3 +326,10 @@ Regras:
   e por seleção já tinha sido escrita na T08, junto com o resto da
   montagem. Por isso os testes da T09 passaram de primeira e não foram
   vistos falhando antes do código.
+- T10 (2026-11-23): como a T09, os testes confirmaram o código da T08 sem
+  fase vermelha própria. Duas falhas foram do teste, não da montagem:
+  - o empenamento só existe onde as duas barras colineares se encontram;
+    apoiar o GDL de empenamento na ponta livre foi recusado pelo `core`,
+    com razão. O bimomento foi para um ponto no meio;
+  - a soma dos recalques, comparada com `==`, passou a ser comparada com
+    tolerância de 1e−15.
