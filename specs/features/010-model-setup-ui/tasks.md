@@ -87,7 +87,7 @@ Regras:
 
 ## Fase 3 — Montagem do `core::Model`
 
-- [ ] **T08** Alvos e montagem básica (design §5.3, §5.4):
+- [x] **T08** Alvos e montagem básica (design §5.3, §5.4):
   - testes primeiro:
     - o pórtico 2×2 da T10 da 009 preparado pelo documento (materiais,
       seções, vigas por entidade, apoios em pontos, a carga) dá a mesma

@@ -85,6 +85,7 @@ femapp_add_test(mesher SOURCES
 target_include_directories(test_mesher PRIVATE "${PROJECT_SOURCE_DIR}/src/mesher")
 # Feature 010: the model document.
 femapp_add_test(setup SOURCES
+    test_build.cpp
     test_convert.cpp
     test_document.cpp
     test_editing.cpp
