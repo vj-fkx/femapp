@@ -170,7 +170,7 @@ Regras:
     atualização numa edição).
   Arquivos: `src/app/model_tree.hpp/.cpp`, `main_window.*`,
   `tests/unit/app/test_model_tree.cpp`. Cobre: 13, 14, 18, 19.
-- [ ] **T15** O painel de propriedades:
+- [x] **T15** O painel de propriedades:
   - os descritores de campo de cada tipo de item, com grandeza e
     validação;
   - o formulário; cada edição como `changeItem`;

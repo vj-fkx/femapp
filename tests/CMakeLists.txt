@@ -195,11 +195,13 @@ femapp_set_warnings(bench_frame)
 # Feature 009: also the mesh job of the MESH command, with a QCoreApplication.
 add_executable(test_app
     unit/app/test_cli_options.cpp
+    unit/app/test_fields.cpp
     unit/app/test_line_mesh_job.cpp
     unit/app/test_line_mesh_text.cpp
     unit/app/test_model_controller.cpp
     unit/app/test_model_tree.cpp
     "${PROJECT_SOURCE_DIR}/src/app/cli_options.cpp"
+    "${PROJECT_SOURCE_DIR}/src/app/fields.cpp"
     "${PROJECT_SOURCE_DIR}/src/app/line_mesh_job.cpp"
     "${PROJECT_SOURCE_DIR}/src/app/line_mesh_job.hpp"
     "${PROJECT_SOURCE_DIR}/src/app/line_mesh_text.cpp"

@@ -6,6 +6,7 @@
 #include "mesh_import.hpp"
 #include "model_controller.hpp"
 #include "model_tree.hpp"
+#include "property_panel.hpp"
 
 #include <fem/core/version.hpp>
 #include <fem/render/camera.hpp>
@@ -105,6 +106,7 @@ MainWindow::MainWindow(QWidget* parent)
     createEditMenu();
     createViewMenu();
     createDraftingMenus();
+    createModelMenu();
 
     QMenu* helpMenu = menuBar()->addMenu(tr("&Help"));
     QAction* aboutAction = helpMenu->addAction(tr("&About femapp"), this, &MainWindow::showAbout);
@@ -378,7 +380,10 @@ void MainWindow::createModelUi()
     connect(m_treeView, &QTreeView::customContextMenuRequested, this, &MainWindow::showModelMenu);
     connect(m_treeView, &QTreeView::doubleClicked, this, &MainWindow::activateItem);
     connect(m_treeView->selectionModel(), &QItemSelectionModel::currentChanged, this,
-            [this](const QModelIndex& current) { highlightTargets(current); });
+            [this](const QModelIndex& current) {
+                highlightTargets(current);
+                m_properties->showItem(m_tree->itemAt(current));
+            });
     connect(m_model, &ModelController::refused, this, [this](const setup::EditRefusal& refusal) {
         QString text;
         switch (refusal.kind) {
@@ -408,6 +413,73 @@ void MainWindow::createModelUi()
     dock->setObjectName(QStringLiteral("modelTree"));
     dock->setWidget(m_treeView);
     addDockWidget(Qt::LeftDockWidgetArea, dock);
+
+    // REQ-010-19: the properties of the item selected, on the right.
+    // NOLINTBEGIN(cppcoreguidelines-owning-memory): owned by their Qt parents.
+    m_properties = new PropertyPanel(m_model, this);
+    auto* properties = new QDockWidget(tr("Properties"), this);
+    m_units = new QLabel(this);
+    // NOLINTEND(cppcoreguidelines-owning-memory)
+    properties->setObjectName(QStringLiteral("properties"));
+    properties->setWidget(m_properties);
+    addDockWidget(Qt::RightDockWidgetArea, properties);
+    // REQ-010-02: the unit system always in sight.
+    statusBar()->addPermanentWidget(m_units);
+    connect(m_model, &ModelController::documentChanged, this, &MainWindow::showUnits);
+    showUnits();
+}
+
+void MainWindow::createModelMenu()
+{
+    QMenu* menu = menuBar()->addMenu(tr("&Model"));
+    menu->addAction(tr("&Units..."), this, &MainWindow::chooseUnits);
+}
+
+void MainWindow::showUnits()
+{
+    const setup::UnitNames names = setup::unitNames(m_model->document().units());
+    m_units->setText(
+        tr("Units: %1, %2, %3, %4, %5")
+            .arg(QString::fromStdString(names.force), QString::fromStdString(names.length),
+                 QString::fromStdString(names.mass), QString::fromStdString(names.time),
+                 QString::fromStdString(names.temperature)));
+}
+
+void MainWindow::chooseUnits()
+{
+    QStringList labels;
+    for (const setup::UnitSystem system : setup::kUnitSystems) {
+        const setup::UnitNames n = setup::unitNames(system);
+        labels.append(QStringLiteral("%1, %2, %3, %4, %5")
+                          .arg(QString::fromStdString(n.force), QString::fromStdString(n.length),
+                               QString::fromStdString(n.mass), QString::fromStdString(n.time),
+                               QString::fromStdString(n.temperature)));
+    }
+    const setup::UnitSystem current = m_model->document().units();
+    const auto currentIndex = static_cast<int>(std::ranges::find(setup::kUnitSystems, current) -
+                                               setup::kUnitSystems.begin());
+    bool ok = false;
+    const QString chosen = QInputDialog::getItem(this, tr("Units"), tr("Unit system:"), labels,
+                                                 currentIndex, false, &ok);
+    if (!ok) {
+        return;
+    }
+    const auto at = static_cast<std::size_t>(labels.indexOf(chosen));
+    const setup::UnitSystem to = setup::kUnitSystems.at(at);
+    if (to == current) {
+        return;
+    }
+    // REQ-010-03: the values of the model are converted, the drawing is not.
+    const QString length = QString::fromStdString(setup::unitNames(to).length);
+    const auto answer = QMessageBox::question(
+        this, tr("Change the units"),
+        tr("The values of the model will be converted to the new units. The drawing is not "
+           "converted: its coordinates stay as drawn, read in %1 from now on. Change the "
+           "units?")
+            .arg(length));
+    if (answer == QMessageBox::Yes) {
+        m_model->push(setup::changeUnits(m_model->document(), to), tr("change units"));
+    }
 }
 
 void MainWindow::activateItem(const QModelIndex& index)

@@ -29,6 +29,7 @@ class CommandLineWidget;
 class DraftingController;
 class ModelController;
 class ModelTree;
+class PropertyPanel;
 class MeshImport;
 
 class MainWindow : public QMainWindow
@@ -78,6 +79,10 @@ private:
     // Feature 010: the model tree dock, its menu and the highlight of the
     // targets of the item selected.
     void createModelUi();
+    void createModelMenu();
+    // REQ-010-03: the unit system, chosen and converted after a warning.
+    void chooseUnits();
+    void showUnits();
     void showModelMenu(const QPoint& position);
     void activateItem(const QModelIndex& index);
     void highlightTargets(const QModelIndex& index);
@@ -97,6 +102,8 @@ private:
     ModelController* m_model = nullptr;
     ModelTree* m_tree = nullptr;
     QTreeView* m_treeView = nullptr;
+    PropertyPanel* m_properties = nullptr;
+    QLabel* m_units = nullptr;
     bool m_quietMessages = false;
 };
 
