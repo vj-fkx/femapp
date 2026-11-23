@@ -319,7 +319,20 @@ Regras:
   Cobre: N03.
 - [ ] **T91** `clang-format` e `clang-tidy` sem pendências (também o do
   Linux); `core`, `geom`, `mesher` e `setup` sem headers Qt. Cobre: 01.
+  Estado (2026-11-23): no Windows, `clang-tidy` limpo nos 45 arquivos
+  `.cpp` que a 010 mudou, `clang-format` limpo nos 259 do repositório e o
+  `check_no_qt_includes` passando. Falta o `clang-tidy` do Linux, que só
+  roda no CI (T90).
 - [ ] **T92** Conferir os sete critérios de aceite.
+  Estado (2026-11-23):
+  - AC-4 e AC-5 cobertos pelos testes automáticos (`test_build`,
+    `test_editing`, `test_actions`).
+  - AC-1, AC-2 e AC-3 cobertos nos testes, menos as partes visuais (o
+    aviso do desenho e a barra de status, o desenho da seção, os eixos
+    no viewport), que ficam para a T23.
+  - AC-6 depende da T23 (adiada pelo mantenedor).
+  - AC-7: `resolve` e os benchmarks feitos (T12); faltam os FPS à mão
+    (T23), a cobertura do `setup` e o CI verde (T90).
 - [ ] **T93** Atualizar `specs/roadmap.md` para `concluída`.
 
 ## Matriz de rastreabilidade
