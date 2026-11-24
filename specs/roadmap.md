@@ -32,7 +32,7 @@ cargas, resolver e ver diagramas de esforços.
 | 008c | beam-second-order | Estática de segunda ordem (P-Δ e P-δ exato na barra, iterativa) e flambagem linear de treliças e vigas retas e curvas | 008b | concluída |
 | 009 | line-meshing | Divisão de linhas em elementos (contagem, tamanho, graduação; Line2 ou Line3), nós coincidentes fundidos, divisão em nós em T e cruzamentos, grupos por entidade; comando MESH | 005, 003 | implementando |
 | 010 | model-setup-ui | Árvore do modelo, propriedades, materiais, seções, apoios, cargas nodais e distribuídas, undo/redo | 004, 005, 008 | implementando |
-| 011 | analysis-runner | Execução assíncrona, progresso, cancelamento, validação do modelo | 008, 010 | design |
+| 011 | analysis-runner | Execução assíncrona, progresso, cancelamento, validação do modelo | 008, 010 | tarefas |
 | 012 | results-visualization | Deformada com escala, mapa de cores, legenda, consulta de valores, reações de apoio | 004, 011 | planejada |
 | 013 | frame-postprocessing | Diagramas N/V/M, seção extrudada no viewport | 012 | planejada |
 | 014 | project-files | Salvar/abrir projeto `.femapp`, exportar `.vtu`; medir o NFR-005-02 (FPS com 100 mil trechos e a malha de 1 milhão de Tet4) | 010, 012 | planejada |
