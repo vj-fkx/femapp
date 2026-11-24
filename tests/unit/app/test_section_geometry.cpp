@@ -127,7 +127,7 @@ TEST_CASE("a new section of each shape is valid, in the units of the model", "[a
     }
     // 0.3 m by 0.5 m, in millimetres.
     const c::Section mm = fem::app::newSection("r", 0, fem::setup::UnitSystem::NewtonMillimetre);
-    const auto& r = std::get<c::Rectangle>(mm.shape.value_or(c::SectionShape{}));
+    const auto r = std::get<c::Rectangle>(mm.shape.value_or(c::SectionShape{}));
     CHECK(std::abs(r.b - 300.0) <= 1e-9);
     CHECK(std::abs(r.h - 500.0) <= 1e-9);
     const c::Section m = fem::app::newSection("g", -1, fem::setup::UnitSystem::NewtonMetre);

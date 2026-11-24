@@ -41,15 +41,22 @@ TEST_CASE("document edits go through the undo stack", "[app][model]")
                      [&refusals](const s::EditRefusal&) { ++refusals; });
 
     s::Document& ids = controller.documentForIds();
-    CHECK(controller.push(s::addItem(ids, s::MaterialItem{.id = {}, .data = {.name = "steel"}}),
+    CHECK(controller.push(s::addItem(ids, s::MaterialItem{.id = {},
+                                                          .data = {.name = "steel"},
+                                                          .standard = {},
+                                                          .grade = {},
+                                                          .properties = {}}),
                           QStringLiteral("material")));
     CHECK(controller.document().size() == 1);
     CHECK(changes == 1);
     CHECK(undo.count() == 1);
     // A refused edit changes nothing and is not on the stack.
-    CHECK_FALSE(
-        controller.push(s::addItem(ids, s::MaterialItem{.id = {}, .data = {.name = "steel"}}),
-                        QStringLiteral("again")));
+    CHECK_FALSE(controller.push(s::addItem(ids, s::MaterialItem{.id = {},
+                                                                .data = {.name = "steel"},
+                                                                .standard = {},
+                                                                .grade = {},
+                                                                .properties = {}}),
+                                QStringLiteral("again")));
     CHECK(refusals == 1);
     CHECK(undo.count() == 1);
     undo.undo();

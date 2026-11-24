@@ -238,28 +238,37 @@ std::vector<s::Item> everything()
     for (const auto& shape : shapes) {
         items.emplace_back(s::SectionItem{.id = next(), .data = {.name = "shape", .shape = shape}});
     }
-    items.emplace_back(
-        s::BarAssignment{.id = next(),
-                         .targets = {},
-                         .data = {.reference = Eigen::Vector3d(0.0, 0.6, 0.8), .rollAngle = 0.4}});
+    items.emplace_back(s::BarAssignment{.id = next(),
+                                        .targets = {},
+                                        .data = {.elements = {},
+                                                 .material = {},
+                                                 .section = {},
+                                                 .reference = Eigen::Vector3d(0.0, 0.6, 0.8),
+                                                 .rollAngle = 0.4}});
     c::EndConnection connection;
     connection.stiffness = {1e3, 2e3, 3e3, 4e3, 5e3, 6e3};
     items.emplace_back(s::ConnectionItem{.id = next(), .targets = {}, .data = connection});
     items.emplace_back(s::OffsetItem{.id = next(),
                                      .targets = {},
-                                     .data = {.start = Eigen::Vector3d(0.1, 0.2, 0.3),
+                                     .data = {.elements = {},
+                                              .start = Eigen::Vector3d(0.1, 0.2, 0.3),
                                               .end = Eigen::Vector3d(-0.1, 0.05, 0.5)}});
-    items.emplace_back(s::FoundationItem{
-        .id = next(),
-        .targets = {},
-        .data = {.translational = Eigen::Vector3d(1e4, 2e4, 3e4), .torsional = 5e2}});
-    items.emplace_back(s::WarpingEndItem{.id = next(), .targets = {}, .data = {.stiffness = 7.5}});
+    items.emplace_back(s::FoundationItem{.id = next(),
+                                         .targets = {},
+                                         .data = {.elements = {},
+                                                  .translational = Eigen::Vector3d(1e4, 2e4, 3e4),
+                                                  .torsional = 5e2}});
+    items.emplace_back(
+        s::WarpingEndItem{.id = next(), .targets = {}, .data = {.elements = {}, .stiffness = 7.5}});
     const s::ItemId loadCase = next();
-    items.emplace_back(s::LoadCase{.id = loadCase, .name = "G"});
+    items.emplace_back(s::LoadCase{.id = loadCase, .name = "G", .standard = {}, .category = {}});
     const std::vector<s::Action> actions{
-        c::NodalForce{
-            .force = Eigen::Vector3d(1, 2, 3), .moment = Eigen::Vector3d(4, 5, 6), .bimoment = 7},
-        c::DistributedLoad{.axes = c::Axes::Local,
+        c::NodalForce{.nodes = {},
+                      .force = Eigen::Vector3d(1, 2, 3),
+                      .moment = Eigen::Vector3d(4, 5, 6),
+                      .bimoment = 7},
+        c::DistributedLoad{.elements = {},
+                           .axes = c::Axes::Local,
                            .startValue = Eigen::Vector3d(1, 2, 3),
                            .endValue = Eigen::Vector3d(4, 5, 6),
                            .from = {.value = 0.5, .fraction = false},
@@ -267,14 +276,15 @@ std::vector<s::Item> everything()
                            .startTorque = 0.2,
                            .endTorque = 0.3,
                            .point = Eigen::Vector2d(0.1, 0.05)},
-        c::ConcentratedLoad{.force = Eigen::Vector3d(7, 8, 9),
+        c::ConcentratedLoad{.elements = {},
+                            .force = Eigen::Vector3d(7, 8, 9),
                             .moment = Eigen::Vector3d(1, 1, 2),
                             .at = {.value = 1.5, .fraction = false},
                             .point = Eigen::Vector2d(-0.1, 0.02)},
         s::SelfWeight{.acceleration = Eigen::Vector3d(0.1, 0.2, -9.81)},
-        c::TemperatureChange{.deltaT = 30.0},
-        c::TemperatureGradient{.alongY = 10.0, .alongZ = -5.0},
-        c::InitialStrain{.strain = 1e-4},
+        c::TemperatureChange{.elements = {}, .deltaT = 30.0},
+        c::TemperatureGradient{.elements = {}, .alongY = 10.0, .alongZ = -5.0},
+        c::InitialStrain{.elements = {}, .strain = 1e-4},
         s::Settlement{.dof = c::DofType::W, .value = -0.01},
         s::Settlement{.dof = c::DofType::RY, .value = 0.002},
     };
@@ -318,8 +328,12 @@ TEST_CASE("every field of every item is converted", "[setup][units][convert]")
 TEST_CASE("a value converted is the physical quantity", "[setup][units][convert]")
 {
     // 210 GPa in N-mm is 210 000 N/mm²; a 9.81 m/s² gravity is 9810 mm/s².
-    s::Item material = s::MaterialItem{
-        .id = s::ItemId{1}, .data = {.name = "m", .youngsModulus = 2.1e11, .density = 7850.0}};
+    s::Item material =
+        s::MaterialItem{.id = s::ItemId{1},
+                        .data = {.name = "m", .youngsModulus = 2.1e11, .density = 7850.0},
+                        .standard = {},
+                        .grade = {},
+                        .properties = {}};
     s::convertItem(material, UnitSystem::NewtonMetre, UnitSystem::NewtonMillimetre);
     const auto& m = std::get<s::MaterialItem>(material).data;
     CHECK(close(*m.youngsModulus, 2.1e5));

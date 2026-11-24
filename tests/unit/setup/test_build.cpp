@@ -112,16 +112,20 @@ struct Setup
 void prepare(Setup& setup, const Frame& f)
 {
     s::Document& d = setup.document;
-    added(d, s::addItem(
-                 d, s::MaterialItem{
-                        .id = {},
-                        .data = {.name = "steel", .youngsModulus = 2.0e8, .poissonsRatio = 0.3}}));
+    added(d,
+          s::addItem(d, s::MaterialItem{
+                            .id = {},
+                            .data = {.name = "steel", .youngsModulus = 2.0e8, .poissonsRatio = 0.3},
+                            .standard = {},
+                            .grade = {},
+                            .properties = {}}));
     added(d, s::addItem(d, s::SectionItem{.id = {},
                                           .data = {.name = "bar",
                                                    .shape = c::Rectangle{.b = 0.3, .h = 0.5}}}));
     added(d, s::assign(d, s::BarAssignment{.id = {},
                                            .targets = entities(f.bars),
-                                           .data = {.kind = c::ElementKind::Beam2D,
+                                           .data = {.elements = {},
+                                                    .kind = c::ElementKind::Beam2D,
                                                     .material = "steel",
                                                     .section = "bar"}}));
     s::SupportItem fixed{.id = {}, .targets = entities(f.bases), .held = {}};
@@ -129,11 +133,13 @@ void prepare(Setup& setup, const Frame& f)
     fixed.held[static_cast<std::size_t>(c::DofType::V)] = true;
     fixed.held[static_cast<std::size_t>(c::DofType::RZ)] = true;
     added(d, s::assign(d, fixed));
-    setup.loadCase = added(d, s::addItem(d, s::LoadCase{.id = {}, .name = "lateral"}));
+    setup.loadCase = added(
+        d, s::addItem(d, s::LoadCase{.id = {}, .name = "lateral", .standard = {}, .category = {}}));
     added(d, s::addItem(d, s::LoadItem{.id = {},
                                        .loadCase = setup.loadCase,
                                        .targets = entities({f.top}),
-                                       .action = c::NodalForce{.force = Vec3(10.0, -20.0, 0.0)}}));
+                                       .action = c::NodalForce{.nodes = {},
+                                                               .force = Vec3(10.0, -20.0, 0.0)}}));
 }
 
 // The same frame built by hand (009 T10): nodes numbered backwards from
@@ -290,7 +296,8 @@ TEST_CASE("the problems of a build", "[setup][build]")
         const s::ItemId wrong =
             added(d, s::assign(d, s::BarAssignment{.id = {},
                                                    .targets = entities({f.bars.front()}),
-                                                   .data = {.kind = c::ElementKind::Beam2D,
+                                                   .data = {.elements = {},
+                                                            .kind = c::ElementKind::Beam2D,
                                                             .material = "concrete",
                                                             .section = "box"}}));
         const auto issues = s::buildModel(d, f.drawing, meshOf(f.drawing), load).issues;
@@ -367,10 +374,13 @@ TEST_CASE("beam details prepared in the document", "[setup][build]")
     const s::MeshContext mesh = meshOf(drawing);
 
     s::Document d;
-    added(d, s::addItem(
-                 d, s::MaterialItem{
-                        .id = {},
-                        .data = {.name = "steel", .youngsModulus = 2.1e8, .poissonsRatio = 0.3}}));
+    added(d,
+          s::addItem(d, s::MaterialItem{
+                            .id = {},
+                            .data = {.name = "steel", .youngsModulus = 2.1e8, .poissonsRatio = 0.3},
+                            .standard = {},
+                            .grade = {},
+                            .properties = {}}));
     added(d, s::addItem(d, s::SectionItem{
                                .id = {},
                                .data = {.name = "I",
@@ -378,7 +388,8 @@ TEST_CASE("beam details prepared in the document", "[setup][build]")
                                             .h = 0.3, .bf = 0.15, .tf = 0.0107, .tw = 0.0071}}}));
     added(d, s::assign(d, s::BarAssignment{.id = {},
                                            .targets = entities({first, second}),
-                                           .data = {.kind = c::ElementKind::Beam3D,
+                                           .data = {.elements = {},
+                                                    .kind = c::ElementKind::Beam3D,
                                                     .material = "steel",
                                                     .section = "I",
                                                     .warping = true}}));
@@ -389,15 +400,17 @@ TEST_CASE("beam details prepared in the document", "[setup][build]")
           s::assign(d, s::ConnectionItem{.id = {}, .targets = entities({first}), .data = spring}));
     added(d, s::assign(d, s::OffsetItem{.id = {},
                                         .targets = entities({second}),
-                                        .data = {.end = Vec3(0, 0, 0.05)}}));
-    added(d, s::assign(d, s::FoundationItem{
-                              .id = {},
-                              .targets = entities({first, second}),
-                              .data = {.translational = Vec3(0, 50, 80), .torsional = 10}}));
+                                        .data = {.elements = {}, .end = Vec3(0, 0, 0.05)}}));
+    added(d, s::assign(d, s::FoundationItem{.id = {},
+                                            .targets = entities({first, second}),
+                                            .data = {.elements = {},
+                                                     .translational = Vec3(0, 50, 80),
+                                                     .torsional = 10}}));
     added(d,
           s::assign(d, s::WarpingEndItem{.id = {},
                                          .targets = entities({first}),
-                                         .data = {.end = c::BarEnd::Start,
+                                         .data = {.elements = {},
+                                                  .end = c::BarEnd::Start,
                                                   .condition = c::WarpingCondition::Restrained}}));
     s::SupportItem fixed{.id = {}, .targets = entities({root}), .held = {}};
     for (const auto dof : {c::DofType::U, c::DofType::V, c::DofType::W, c::DofType::RX,
@@ -405,11 +418,13 @@ TEST_CASE("beam details prepared in the document", "[setup][build]")
         fixed.held[static_cast<std::size_t>(dof)] = true;
     }
     added(d, s::assign(d, fixed));
-    const s::ItemId loadCase = added(d, s::addItem(d, s::LoadCase{.id = {}, .name = "tip"}));
+    const s::ItemId loadCase = added(
+        d, s::addItem(d, s::LoadCase{.id = {}, .name = "tip", .standard = {}, .category = {}}));
     added(d, s::addItem(d, s::LoadItem{.id = {},
                                        .loadCase = loadCase,
                                        .targets = entities({tip}),
-                                       .action = c::NodalForce{.force = Vec3(0, 1, -2),
+                                       .action = c::NodalForce{.nodes = {},
+                                                               .force = Vec3(0, 1, -2),
                                                                .moment = Vec3(0.3, 0, 0)}}));
     const s::BuildResult built = s::buildModel(d, drawing, mesh, {.item = loadCase});
     for (const s::BuildIssue& issue : built.issues) {
@@ -472,10 +487,13 @@ TEST_CASE("targets on an imported mesh", "[setup][build]")
 
     const Drawing drawing;
     s::Document d;
-    added(d, s::addItem(
-                 d, s::MaterialItem{
-                        .id = {},
-                        .data = {.name = "steel", .youngsModulus = 2.0e8, .poissonsRatio = 0.3}}));
+    added(d,
+          s::addItem(d, s::MaterialItem{
+                            .id = {},
+                            .data = {.name = "steel", .youngsModulus = 2.0e8, .poissonsRatio = 0.3},
+                            .standard = {},
+                            .grade = {},
+                            .properties = {}}));
     added(d, s::addItem(d, s::SectionItem{
                                .id = {},
                                .data = {.name = "R", .shape = c::Rectangle{.b = 0.2, .h = 0.4}}}));
@@ -483,7 +501,8 @@ TEST_CASE("targets on an imported mesh", "[setup][build]")
     beam.groups = {{.name = "beam", .dimension = 1}};
     added(d, s::assign(d, s::BarAssignment{.id = {},
                                            .targets = beam,
-                                           .data = {.kind = c::ElementKind::Beam2D,
+                                           .data = {.elements = {},
+                                                    .kind = c::ElementKind::Beam2D,
                                                     .material = "steel",
                                                     .section = "R"}}));
     s::Targets root;
@@ -493,15 +512,17 @@ TEST_CASE("targets on an imported mesh", "[setup][build]")
     fixed.held[static_cast<std::size_t>(c::DofType::V)] = true;
     fixed.held[static_cast<std::size_t>(c::DofType::RZ)] = true;
     added(d, s::assign(d, fixed));
-    const s::ItemId loadCase = added(d, s::addItem(d, s::LoadCase{.id = {}, .name = "tip"}));
+    const s::ItemId loadCase = added(
+        d, s::addItem(d, s::LoadCase{.id = {}, .name = "tip", .standard = {}, .category = {}}));
     s::Targets tip;
     tip.nodes = {30};
     tip.meshGeneration = 3;
-    const s::ItemId load =
-        added(d, s::addItem(d, s::LoadItem{.id = {},
-                                           .loadCase = loadCase,
-                                           .targets = tip,
-                                           .action = c::NodalForce{.force = Vec3(0, -5, 0)}}));
+    const s::ItemId load = added(
+        d,
+        s::addItem(d, s::LoadItem{.id = {},
+                                  .loadCase = loadCase,
+                                  .targets = tip,
+                                  .action = c::NodalForce{.nodes = {}, .force = Vec3(0, -5, 0)}}));
     // A distributed load on a picked element.
     s::Targets second;
     second.elements = {2};
@@ -509,7 +530,8 @@ TEST_CASE("targets on an imported mesh", "[setup][build]")
     added(d, s::addItem(d, s::LoadItem{.id = {},
                                        .loadCase = loadCase,
                                        .targets = second,
-                                       .action = c::DistributedLoad{.startValue = Vec3(0, -1, 0),
+                                       .action = c::DistributedLoad{.elements = {},
+                                                                    .startValue = Vec3(0, -1, 0),
                                                                     .endValue = Vec3(0, -1, 0)}}));
 
     const s::BuildResult result = s::buildModel(d, drawing, mesh, {.item = loadCase});
@@ -568,12 +590,16 @@ TEST_CASE("every action of a load case", "[setup][build][actions]")
                                                     .youngsModulus = 2.1e8,
                                                     .poissonsRatio = 0.3,
                                                     .density = 7.85,
-                                                    .thermalExpansion = 1.2e-5}}));
+                                                    .thermalExpansion = 1.2e-5},
+                                           .standard = {},
+                                           .grade = {},
+                                           .properties = {}}));
     const c::ISection shape{.h = 0.3, .bf = 0.15, .tf = 0.0107, .tw = 0.0071};
     added(d, s::addItem(d, s::SectionItem{.id = {}, .data = {.name = "I", .shape = shape}}));
     added(d, s::assign(d, s::BarAssignment{.id = {},
                                            .targets = entities({first, second}),
-                                           .data = {.kind = c::ElementKind::Beam3D,
+                                           .data = {.elements = {},
+                                                    .kind = c::ElementKind::Beam3D,
                                                     .material = "steel",
                                                     .section = "I",
                                                     .warping = true}}));
@@ -583,16 +609,19 @@ TEST_CASE("every action of a load case", "[setup][build][actions]")
         fixed.held[static_cast<std::size_t>(dof)] = true;
     }
     added(d, s::assign(d, fixed));
-    const s::ItemId all = added(d, s::addItem(d, s::LoadCase{.id = {}, .name = "all"}));
+    const s::ItemId all = added(
+        d, s::addItem(d, s::LoadCase{.id = {}, .name = "all", .standard = {}, .category = {}}));
     const auto load = [&](s::Targets targets, s::Action action) {
         added(d, s::addItem(d, s::LoadItem{.id = {},
                                            .loadCase = all,
                                            .targets = std::move(targets),
                                            .action = std::move(action)}));
     };
-    load(entities({tip}), c::NodalForce{.force = Vec3(1, 2, -3), .moment = Vec3(0.4, 0.5, 0.6)});
-    load(entities({middle}), c::NodalForce{.bimoment = 0.07});
-    load(entities({first}), c::DistributedLoad{.axes = c::Axes::Local,
+    load(entities({tip}),
+         c::NodalForce{.nodes = {}, .force = Vec3(1, 2, -3), .moment = Vec3(0.4, 0.5, 0.6)});
+    load(entities({middle}), c::NodalForce{.nodes = {}, .bimoment = 0.07});
+    load(entities({first}), c::DistributedLoad{.elements = {},
+                                               .axes = c::Axes::Local,
                                                .startValue = Vec3(0, 0.5, -1.0),
                                                .endValue = Vec3(0, 1.5, -2.0),
                                                .from = {.value = 0.5, .fraction = false},
@@ -600,13 +629,15 @@ TEST_CASE("every action of a load case", "[setup][build][actions]")
                                                .startTorque = 0.1,
                                                .endTorque = 0.2,
                                                .point = Eigen::Vector2d(0.15, 0.0)});
-    load(entities({second}), c::ConcentratedLoad{.force = Vec3(0, -4, 1),
+    load(entities({second}), c::ConcentratedLoad{.elements = {},
+                                                 .force = Vec3(0, -4, 1),
                                                  .moment = Vec3(0.2, 0, 0),
                                                  .at = {.value = 0.25, .fraction = true}});
     load({}, s::SelfWeight{.acceleration = Vec3(0, 0, -9.81)});
-    load(entities({second}), c::TemperatureChange{.deltaT = 20.0});
-    load(entities({first}), c::TemperatureGradient{.alongY = 15.0, .alongZ = -10.0});
-    load(entities({second}), c::InitialStrain{.strain = 2e-4});
+    load(entities({second}), c::TemperatureChange{.elements = {}, .deltaT = 20.0});
+    load(entities({first}),
+         c::TemperatureGradient{.elements = {}, .alongY = 15.0, .alongZ = -10.0});
+    load(entities({second}), c::InitialStrain{.elements = {}, .strain = 2e-4});
     load(entities({root}), s::Settlement{.dof = c::DofType::W, .value = -0.002});
 
     const s::BuildResult built = s::buildModel(d, drawing, mesh, {.item = all});
@@ -670,7 +701,8 @@ TEST_CASE("a combination is the sum of its actions", "[setup][build][actions]")
         REQUIRE(s::changeItem(d, steel).has_value());
         d.apply(*s::changeItem(d, steel));
     }
-    const s::ItemId g = added(d, s::addItem(d, s::LoadCase{.id = {}, .name = "G"}));
+    const s::ItemId g =
+        added(d, s::addItem(d, s::LoadCase{.id = {}, .name = "G", .standard = {}, .category = {}}));
     added(d,
           s::addItem(d, s::LoadItem{.id = {},
                                     .loadCase = g,
@@ -679,7 +711,8 @@ TEST_CASE("a combination is the sum of its actions", "[setup][build][actions]")
     added(d, s::addItem(d, s::LoadItem{.id = {},
                                        .loadCase = g,
                                        .targets = entities({f.bars[8], f.bars[9]}),
-                                       .action = c::DistributedLoad{.startValue = Vec3(0, -6, 0),
+                                       .action = c::DistributedLoad{.elements = {},
+                                                                    .startValue = Vec3(0, -6, 0),
                                                                     .endValue = Vec3(0, -6, 0)}}));
     const s::ItemId uls = added(
         d, s::addItem(d, s::Combination{
@@ -729,8 +762,10 @@ TEST_CASE("settlements in a combination", "[setup][build][actions]")
     Setup setup;
     prepare(setup, f);
     s::Document& d = setup.document;
-    const s::ItemId one = added(d, s::addItem(d, s::LoadCase{.id = {}, .name = "one"}));
-    const s::ItemId two = added(d, s::addItem(d, s::LoadCase{.id = {}, .name = "two"}));
+    const s::ItemId one = added(
+        d, s::addItem(d, s::LoadCase{.id = {}, .name = "one", .standard = {}, .category = {}}));
+    const s::ItemId two = added(
+        d, s::addItem(d, s::LoadCase{.id = {}, .name = "two", .standard = {}, .category = {}}));
     added(d, s::addItem(
                  d, s::LoadItem{.id = {},
                                 .loadCase = one,
@@ -805,7 +840,8 @@ TEST_CASE("the check of a model", "[setup][build][check]")
         const s::ItemId truss =
             added(d, s::assign(d, s::BarAssignment{.id = {},
                                                    .targets = entities({f.bars.back()}),
-                                                   .data = {.kind = c::ElementKind::Truss2D,
+                                                   .data = {.elements = {},
+                                                            .kind = c::ElementKind::Truss2D,
                                                             .material = "steel",
                                                             .section = "bar"}}));
         const auto issues = s::checkModel(d, f.drawing, meshOf(f.drawing), load);

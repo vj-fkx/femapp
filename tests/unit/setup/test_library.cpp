@@ -37,6 +37,13 @@ const s::LibraryMaterial& find(const std::string& standard, const std::string& g
     throw std::logic_error("unreachable");
 }
 
+// For two literals: the strings live in this call, not in the caller's
+// statement (as g++ -Wdangling-reference fears for a temporary there).
+const s::LibraryMaterial& find(const char* standard, const char* grade)
+{
+    return find(std::string(standard), std::string(grade));
+}
+
 std::optional<double> propertyOf(const std::vector<s::MaterialProperty>& properties,
                                  std::string_view key)
 {

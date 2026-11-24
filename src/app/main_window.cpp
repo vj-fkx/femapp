@@ -897,7 +897,10 @@ void MainWindow::showModelMenu(const QPoint& position)
                                       &ok);
             if (ok && !name.isEmpty()) {
                 m_model->push(setup::addItem(m_model->documentForIds(),
-                                             setup::LoadCase{.id = {}, .name = name.toStdString()}),
+                                             setup::LoadCase{.id = {},
+                                                             .name = name.toStdString(),
+                                                             .standard = {},
+                                                             .category = {}}),
                               tr("new load case"));
             }
         });

@@ -69,12 +69,19 @@ std::vector<std::uint64_t> ids(const s::Targets& targets)
 TEST_CASE("items are made, changed and duplicated", "[setup][editing]")
 {
     Document document;
-    applied(document, s::addItem(document, s::MaterialItem{.id = {}, .data = {.name = "steel"}}));
+    applied(document, s::addItem(document, s::MaterialItem{.id = {},
+                                                           .data = {.name = "steel"},
+                                                           .standard = {},
+                                                           .grade = {},
+                                                           .properties = {}}));
     const ItemId steel = lastId(document);
     CHECK(static_cast<std::uint64_t>(steel) != 0);
 
     // A second material with the same name is refused; freeName offers one.
-    const auto again = s::addItem(document, s::MaterialItem{.id = {}, .data = {.name = "steel"}});
+    const auto again = s::addItem(
+        document,
+        s::MaterialItem{
+            .id = {}, .data = {.name = "steel"}, .standard = {}, .grade = {}, .properties = {}});
     REQUIRE_FALSE(again.has_value());
     CHECK(again.error().kind == EditRefusal::Kind::DuplicateName);
     CHECK(again.error().items == std::vector<ItemId>{steel});
@@ -84,11 +91,19 @@ TEST_CASE("items are made, changed and duplicated", "[setup][editing]")
     CHECK(s::addItem(document, s::SectionItem{.id = {}, .data = {.name = "steel"}}).has_value());
 
     // Changed in place.
-    applied(document, s::changeItem(document, s::MaterialItem{.id = steel,
-                                                              .data = {.name = "steel",
-                                                                       .youngsModulus = 2.1e8}}));
+    applied(document, s::changeItem(document, s::MaterialItem{
+                                                  .id = steel,
+                                                  .data = {.name = "steel", .youngsModulus = 2.1e8},
+                                                  .standard = {},
+                                                  .grade = {},
+                                                  .properties = {}}));
     CHECK(std::get<s::MaterialItem>(*document.find(steel)).data.youngsModulus == 2.1e8);
-    CHECK_FALSE(s::changeItem(document, s::MaterialItem{.id = ItemId{99}, .data = {}}).has_value());
+    CHECK_FALSE(s::changeItem(document, s::MaterialItem{.id = ItemId{99},
+                                                        .data = {},
+                                                        .standard = {},
+                                                        .grade = {},
+                                                        .properties = {}})
+                    .has_value());
 
     // Duplicated with a new name.
     applied(document, s::duplicateItem(document, steel));
@@ -101,16 +116,25 @@ TEST_CASE("items are made, changed and duplicated", "[setup][editing]")
 TEST_CASE("renaming a material or section renames it where it is used", "[setup][editing]")
 {
     Document document;
-    applied(document, s::addItem(document, s::MaterialItem{.id = {}, .data = {.name = "steel"}}));
+    applied(document, s::addItem(document, s::MaterialItem{.id = {},
+                                                           .data = {.name = "steel"},
+                                                           .standard = {},
+                                                           .grade = {},
+                                                           .properties = {}}));
     const ItemId steel = lastId(document);
     applied(document, s::addItem(document, s::SectionItem{.id = {}, .data = {.name = "IPE"}}));
     const ItemId ipe = lastId(document);
-    applied(document,
-            s::assign(document, s::BarAssignment{.id = {},
-                                                 .targets = entities({1, 2}),
-                                                 .data = {.material = "steel", .section = "IPE"}}));
-    const auto rename = applied(
-        document, s::changeItem(document, s::MaterialItem{.id = steel, .data = {.name = "S355"}}));
+    applied(document, s::assign(document, s::BarAssignment{.id = {},
+                                                           .targets = entities({1, 2}),
+                                                           .data = {.elements = {},
+                                                                    .material = "steel",
+                                                                    .section = "IPE"}}));
+    const auto rename =
+        applied(document, s::changeItem(document, s::MaterialItem{.id = steel,
+                                                                  .data = {.name = "S355"},
+                                                                  .standard = {},
+                                                                  .grade = {},
+                                                                  .properties = {}}));
     CHECK(all<s::BarAssignment>(document).front()->data.material == "S355");
     applied(document,
             s::changeItem(document, s::SectionItem{.id = ipe, .data = {.name = "IPE 300"}}));
@@ -124,14 +148,19 @@ TEST_CASE("renaming a material or section renames it where it is used", "[setup]
 TEST_CASE("items in use cannot be removed", "[setup][editing]")
 {
     Document document;
-    applied(document, s::addItem(document, s::MaterialItem{.id = {}, .data = {.name = "steel"}}));
+    applied(document, s::addItem(document, s::MaterialItem{.id = {},
+                                                           .data = {.name = "steel"},
+                                                           .standard = {},
+                                                           .grade = {},
+                                                           .properties = {}}));
     const ItemId steel = lastId(document);
     applied(document, s::addItem(document, s::SectionItem{.id = {}, .data = {.name = "IPE"}}));
     const ItemId ipe = lastId(document);
-    applied(document,
-            s::assign(document, s::BarAssignment{.id = {},
-                                                 .targets = entities({1}),
-                                                 .data = {.material = "steel", .section = "IPE"}}));
+    applied(document, s::assign(document, s::BarAssignment{.id = {},
+                                                           .targets = entities({1}),
+                                                           .data = {.elements = {},
+                                                                    .material = "steel",
+                                                                    .section = "IPE"}}));
     const ItemId bars = lastId(document);
     for (const ItemId used : {steel, ipe}) {
         const auto refused = s::removeItem(document, used);
@@ -149,11 +178,15 @@ TEST_CASE("items in use cannot be removed", "[setup][editing]")
 TEST_CASE("load cases, their loads and combinations", "[setup][editing]")
 {
     Document document;
-    applied(document, s::addItem(document, s::LoadCase{.id = {}, .name = "G"}));
+    applied(
+        document,
+        s::addItem(document, s::LoadCase{.id = {}, .name = "G", .standard = {}, .category = {}}));
     const ItemId g = lastId(document);
     // The first case is the active one.
     CHECK(document.activeCase() == g);
-    applied(document, s::addItem(document, s::LoadCase{.id = {}, .name = "Q"}));
+    applied(
+        document,
+        s::addItem(document, s::LoadCase{.id = {}, .name = "Q", .standard = {}, .category = {}}));
     const ItemId q = lastId(document);
     CHECK(document.activeCase() == g);
 
@@ -163,7 +196,8 @@ TEST_CASE("load cases, their loads and combinations", "[setup][editing]")
                 s::addItem(document, s::LoadItem{.id = {},
                                                  .loadCase = g,
                                                  .targets = entities({7}),
-                                                 .action = c::NodalForce{.force = {0, 0, -10}}}));
+                                                 .action = c::NodalForce{.nodes = {},
+                                                                         .force = {0, 0, -10}}}));
     }
     applied(
         document,
@@ -228,14 +262,18 @@ TEST_CASE("load cases, their loads and combinations", "[setup][editing]")
 TEST_CASE("an assignment takes its targets from the older ones", "[setup][editing]")
 {
     Document document;
-    applied(document, s::assign(document, s::BarAssignment{.id = {},
-                                                           .targets = entities({1, 2, 3}),
-                                                           .data = {.section = "A"}}));
+    applied(document,
+            s::assign(document,
+                      s::BarAssignment{.id = {},
+                                       .targets = entities({1, 2, 3}),
+                                       .data = {.elements = {}, .material = {}, .section = "A"}}));
     const ItemId first = lastId(document);
-    const auto second =
-        applied(document, s::assign(document, s::BarAssignment{.id = {},
-                                                               .targets = entities({2, 3, 4}),
-                                                               .data = {.section = "B"}}));
+    const auto second = applied(
+        document,
+        s::assign(document,
+                  s::BarAssignment{.id = {},
+                                   .targets = entities({2, 3, 4}),
+                                   .data = {.elements = {}, .material = {}, .section = "B"}}));
     const auto bars = all<s::BarAssignment>(document);
     REQUIRE(bars.size() == 2);
     CHECK(bars[0]->id == first);
@@ -243,8 +281,10 @@ TEST_CASE("an assignment takes its targets from the older ones", "[setup][editin
     CHECK(ids(bars[1]->targets) == std::vector<std::uint64_t>{2, 3, 4});
     // An item left without targets goes.
     applied(document,
-            s::assign(document, s::BarAssignment{
-                                    .id = {}, .targets = entities({1}), .data = {.section = "C"}}));
+            s::assign(document,
+                      s::BarAssignment{.id = {},
+                                       .targets = entities({1}),
+                                       .data = {.elements = {}, .material = {}, .section = "C"}}));
     CHECK(document.find(first) == nullptr);
     CHECK(all<s::BarAssignment>(document).size() == 2);
     // Other kinds are not touched.

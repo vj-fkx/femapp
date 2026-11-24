@@ -178,7 +178,8 @@ std::optional<setup::MaterialItem> chooseMaterial(QWidget* parent, setup::UnitSy
     }
     const QListWidgetItem* chosen = grades->currentItem();
     if (standard->currentText() == custom || chosen == nullptr) {
-        return setup::MaterialItem{.id = {}, .data = {.name = "Material"}};
+        return setup::MaterialItem{
+            .id = {}, .data = {.name = "Material"}, .standard = {}, .grade = {}, .properties = {}};
     }
     return setup::fromLibrary(
         library.at(static_cast<std::size_t>(chosen->data(Qt::UserRole).toInt())), units);

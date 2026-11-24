@@ -15,12 +15,12 @@ namespace fem::core {
 struct Material
 {
     std::string name;
-    std::optional<double> youngsModulus;    // E
-    std::optional<double> poissonsRatio;    // nu
-    std::optional<double> density;          // rho
-    std::optional<double> thermalExpansion; // alpha
-    std::optional<double> conductivity;     // k
-    std::optional<double> specificHeat;     // c
+    std::optional<double> youngsModulus = std::nullopt;    // E
+    std::optional<double> poissonsRatio = std::nullopt;    // nu
+    std::optional<double> density = std::nullopt;          // rho
+    std::optional<double> thermalExpansion = std::nullopt; // alpha
+    std::optional<double> conductivity = std::nullopt;     // k
+    std::optional<double> specificHeat = std::nullopt;     // c
 };
 
 } // namespace fem::core

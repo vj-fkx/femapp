@@ -66,31 +66,38 @@ void build(Portal& p)
     p.top = addEntity(p.drawing, fem::geom::PointEntity{.position = Vec3(0, 3, 0)});
     s::Document& d = p.document;
     // The model built on the mesh keeps only assignments it can analyse.
-    added(d, s::addItem(
-                 d, s::MaterialItem{
-                        .id = {},
-                        .data = {.name = "steel", .youngsModulus = 2.0e8, .poissonsRatio = 0.3}}));
+    added(d,
+          s::addItem(d, s::MaterialItem{
+                            .id = {},
+                            .data = {.name = "steel", .youngsModulus = 2.0e8, .poissonsRatio = 0.3},
+                            .standard = {},
+                            .grade = {},
+                            .properties = {}}));
     added(d, s::addItem(d, s::SectionItem{.id = {},
                                           .data = {.name = "bar",
                                                    .shape = c::Rectangle{.b = 0.3, .h = 0.5}}}));
     added(d, s::assign(d, s::BarAssignment{.id = {},
                                            .targets = on({p.column, p.beam}),
-                                           .data = {.kind = c::ElementKind::Beam2D,
+                                           .data = {.elements = {},
+                                                    .kind = c::ElementKind::Beam2D,
                                                     .material = "steel",
                                                     .section = "bar"}}));
     s::SupportItem pinned{.id = {}, .targets = on({p.base}), .held = {}};
     pinned.held[static_cast<std::size_t>(c::DofType::U)] = true;
     pinned.held[static_cast<std::size_t>(c::DofType::V)] = true;
     added(d, s::assign(d, pinned));
-    p.loadCase = added(d, s::addItem(d, s::LoadCase{.id = {}, .name = "live"}));
-    added(d, s::addItem(d, s::LoadItem{.id = {},
-                                       .loadCase = p.loadCase,
-                                       .targets = on({p.top}),
-                                       .action = c::NodalForce{.force = Vec3(5, 0, 0)}}));
+    p.loadCase = added(
+        d, s::addItem(d, s::LoadCase{.id = {}, .name = "live", .standard = {}, .category = {}}));
+    added(d,
+          s::addItem(d, s::LoadItem{.id = {},
+                                    .loadCase = p.loadCase,
+                                    .targets = on({p.top}),
+                                    .action = c::NodalForce{.nodes = {}, .force = Vec3(5, 0, 0)}}));
     added(d, s::addItem(d, s::LoadItem{.id = {},
                                        .loadCase = p.loadCase,
                                        .targets = on({p.beam}),
-                                       .action = c::DistributedLoad{.startValue = Vec3(0, -2, 0),
+                                       .action = c::DistributedLoad{.elements = {},
+                                                                    .startValue = Vec3(0, -2, 0),
                                                                     .endValue = Vec3(0, -2, 0)}}));
 }
 

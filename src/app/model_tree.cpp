@@ -245,10 +245,10 @@ QString ModelTree::infoText(Group group) const
 
 QString ModelTree::label(const setup::Item& item) const
 {
-    const auto targets = [this](const setup::Targets& t) {
+    const auto targets = [](const setup::Targets& t) {
         return tr("%n target(s)", nullptr, targetCount(t));
     };
-    const auto end = [this](core::BarEnd e) {
+    const auto end = [](core::BarEnd e) {
         return e == core::BarEnd::Start ? tr("start") : tr("end");
     };
     return std::visit(
@@ -300,7 +300,7 @@ QString ModelTree::label(const setup::Item& item) const
                 return tr("%1 [%2 %3]").arg(text(i.name), text(i.standard), text(i.category));
             } else if constexpr (std::is_same_v<T, setup::LoadItem>) {
                 QString kind = std::visit(
-                    [this](const auto& a) -> QString {
+                    [](const auto& a) -> QString {
                         using A = std::decay_t<decltype(a)>;
                         if constexpr (std::is_same_v<A, core::NodalForce>) {
                             return tr("Nodal force");

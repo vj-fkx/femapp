@@ -25,7 +25,11 @@ std::vector<Item> oneOfEach(Document& document)
 {
     namespace s = fem::setup;
     std::vector<Item> items;
-    items.emplace_back(s::MaterialItem{.id = document.nextId(), .data = {.name = "steel"}});
+    items.emplace_back(s::MaterialItem{.id = document.nextId(),
+                                       .data = {.name = "steel"},
+                                       .standard = {},
+                                       .grade = {},
+                                       .properties = {}});
     items.emplace_back(s::SectionItem{.id = document.nextId(), .data = {.name = "I"}});
     s::Targets beams;
     beams.entities = {fem::geom::EntityId{1}, fem::geom::EntityId{2}};
@@ -39,7 +43,7 @@ std::vector<Item> oneOfEach(Document& document)
     nodes.meshGeneration = 2;
     items.emplace_back(s::SupportItem{.id = document.nextId(), .targets = nodes, .held = {}});
     const ItemId dead = document.nextId();
-    items.emplace_back(s::LoadCase{.id = dead, .name = "G"});
+    items.emplace_back(s::LoadCase{.id = dead, .name = "G", .standard = {}, .category = {}});
     items.emplace_back(s::LoadItem{.id = document.nextId(),
                                    .loadCase = dead,
                                    .targets = {},
@@ -59,7 +63,8 @@ TEST_CASE("ids are fresh and never come back", "[setup][document]")
     CHECK(value(a) == 1);
     CHECK(value(b) == 2);
     DocumentEdit edit;
-    edit.added.emplace_back(fem::setup::LoadCase{.id = b, .name = "Q"});
+    edit.added.emplace_back(
+        fem::setup::LoadCase{.id = b, .name = "Q", .standard = {}, .category = {}});
     document.apply(edit);
     document.revert(edit);
     // Undone, the id is not handed out again.
@@ -135,7 +140,8 @@ TEST_CASE("the units and the active case in an edit", "[setup][document]")
     CHECK_FALSE(document.activeCase().has_value());
     const ItemId g = document.nextId();
     DocumentEdit edit;
-    edit.added.emplace_back(fem::setup::LoadCase{.id = g, .name = "G"});
+    edit.added.emplace_back(
+        fem::setup::LoadCase{.id = g, .name = "G", .standard = {}, .category = {}});
     edit.units = std::pair{fem::setup::UnitSystem::KilonewtonMetre,
                            fem::setup::UnitSystem::NewtonMillimetre};
     edit.activeCase = std::pair{std::optional<ItemId>{}, std::optional<ItemId>{g}};

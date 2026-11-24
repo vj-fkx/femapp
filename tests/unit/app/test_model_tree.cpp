@@ -45,7 +45,11 @@ TEST_CASE("the rows of the model tree", "[app][model][tree]")
 
     // Items appear in their groups as the document changes.
     s::Document& ids = controller.documentForIds();
-    controller.push(s::addItem(ids, s::MaterialItem{.id = {}, .data = {.name = "steel"}}),
+    controller.push(s::addItem(ids, s::MaterialItem{.id = {},
+                                                    .data = {.name = "steel"},
+                                                    .standard = {},
+                                                    .grade = {},
+                                                    .properties = {}}),
                     QStringLiteral("material"));
     controller.push(
         s::addItem(
@@ -61,7 +65,8 @@ TEST_CASE("the rows of the model tree", "[app][model][tree]")
                     QStringLiteral("load"));
     controller.push(s::assign(ids, s::BarAssignment{.id = {},
                                                     .targets = beam,
-                                                    .data = {.kind = fem::core::ElementKind::Beam2D,
+                                                    .data = {.elements = {},
+                                                             .kind = fem::core::ElementKind::Beam2D,
                                                              .material = "steel",
                                                              .section = "IPE"}}),
                     QStringLiteral("bars"));

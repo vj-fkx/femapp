@@ -20,7 +20,7 @@ using fem::app::Field;
 using fem::app::FieldKind;
 using fem::app::FieldValue;
 
-const Field& field(const std::vector<Field>& fields, const std::string& label)
+const Field& field(const std::vector<Field>& fields, const char* label)
 {
     const auto it = std::ranges::find_if(
         fields, [&](const Field& f) { return f.label.toStdString() == label; });
@@ -74,12 +74,22 @@ TEST_CASE("the fields of an assignment choose among the names", "[app][fields]")
 {
     s::Document document;
     s::DocumentEdit edit;
-    edit.added = {s::MaterialItem{.id = s::ItemId{1}, .data = {.name = "steel"}},
-                  s::MaterialItem{.id = s::ItemId{2}, .data = {.name = "concrete"}},
+    edit.added = {s::MaterialItem{.id = s::ItemId{1},
+                                  .data = {.name = "steel"},
+                                  .standard = {},
+                                  .grade = {},
+                                  .properties = {}},
+                  s::MaterialItem{.id = s::ItemId{2},
+                                  .data = {.name = "concrete"},
+                                  .standard = {},
+                                  .grade = {},
+                                  .properties = {}},
                   s::SectionItem{.id = s::ItemId{3}, .data = {.name = "IPE"}}};
     document.apply(edit);
-    s::Item item = s::BarAssignment{
-        .id = s::ItemId{4}, .targets = {}, .data = {.material = "concrete", .section = "gone"}};
+    s::Item item =
+        s::BarAssignment{.id = s::ItemId{4},
+                         .targets = {},
+                         .data = {.elements = {}, .material = "concrete", .section = "gone"}};
     const auto fields = fem::app::fieldsOf(item, document);
     const Field& material = field(fields, "Material");
     REQUIRE(material.kind == FieldKind::Choice);
@@ -102,10 +112,11 @@ TEST_CASE("the fields of an assignment choose among the names", "[app][fields]")
 TEST_CASE("the fields of loads and supports", "[app][fields]")
 {
     const s::Document document;
-    s::Item nodal = s::LoadItem{.id = s::ItemId{1},
-                                .loadCase = s::ItemId{2},
-                                .targets = {},
-                                .action = c::NodalForce{.force = Eigen::Vector3d(1, 2, 3)}};
+    s::Item nodal =
+        s::LoadItem{.id = s::ItemId{1},
+                    .loadCase = s::ItemId{2},
+                    .targets = {},
+                    .action = c::NodalForce{.nodes = {}, .force = Eigen::Vector3d(1, 2, 3)}};
     const auto nodalFields = fem::app::fieldsOf(nodal, document);
     const Field& force = field(nodalFields, "Force");
     CHECK(force.kind == FieldKind::Vector);
@@ -167,7 +178,9 @@ TEST_CASE("a truss assignment warns of buckling between its nodes", "[app][field
     const s::Document document;
     const auto warning = [&](c::ElementKind kind) {
         const s::Item item =
-            s::BarAssignment{.id = s::ItemId{1}, .targets = {}, .data = {.kind = kind}};
+            s::BarAssignment{.id = s::ItemId{1},
+                             .targets = {},
+                             .data = {.elements = {}, .kind = kind, .material = {}, .section = {}}};
         for (const Field& f : fem::app::fieldsOf(item, document)) {
             if (f.label.toStdString() == "Warning") {
                 return std::get<QString>(f.get(item));

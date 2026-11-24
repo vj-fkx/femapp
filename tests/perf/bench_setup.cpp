@@ -125,7 +125,10 @@ int run(int argc, char** argv)
                                                          .data = {.name = "steel",
                                                                   .youngsModulus = 2.1e8,
                                                                   .poissonsRatio = 0.3,
-                                                                  .density = 7.85}}));
+                                                                  .density = 7.85},
+                                                         .standard = {},
+                                                         .grade = {},
+                                                         .properties = {}}));
     apply(document,
           s::addItem(
               document,
@@ -138,7 +141,8 @@ int run(int argc, char** argv)
     start = Clock::now();
     const auto edit = s::assign(document, s::BarAssignment{.id = {},
                                                            .targets = targetsOf(b.all),
-                                                           .data = {.kind = c::ElementKind::Beam3D,
+                                                           .data = {.elements = {},
+                                                                    .kind = c::ElementKind::Beam3D,
                                                                     .material = "steel",
                                                                     .section = "I"}});
     if (!edit) {
@@ -153,7 +157,8 @@ int run(int argc, char** argv)
     start = Clock::now();
     const auto again = s::assign(document, s::BarAssignment{.id = {},
                                                             .targets = targetsOf(half),
-                                                            .data = {.kind = c::ElementKind::Beam3D,
+                                                            .data = {.elements = {},
+                                                                     .kind = c::ElementKind::Beam3D,
                                                                      .material = "steel",
                                                                      .section = "I"}});
     if (!again) {
@@ -172,9 +177,15 @@ int run(int argc, char** argv)
                 assigned, reassigned, undone, redone);
 
     // NFR-010-01: the build of a combination of three cases.
-    const s::ItemId g = apply(document, s::addItem(document, s::LoadCase{.id = {}, .name = "G"}));
-    const s::ItemId q = apply(document, s::addItem(document, s::LoadCase{.id = {}, .name = "Q"}));
-    const s::ItemId w = apply(document, s::addItem(document, s::LoadCase{.id = {}, .name = "W"}));
+    const s::ItemId g = apply(
+        document,
+        s::addItem(document, s::LoadCase{.id = {}, .name = "G", .standard = {}, .category = {}}));
+    const s::ItemId q = apply(
+        document,
+        s::addItem(document, s::LoadCase{.id = {}, .name = "Q", .standard = {}, .category = {}}));
+    const s::ItemId w = apply(
+        document,
+        s::addItem(document, s::LoadCase{.id = {}, .name = "W", .standard = {}, .category = {}}));
     apply(document,
           s::addItem(document,
                      s::LoadItem{.id = {},
@@ -186,14 +197,16 @@ int run(int argc, char** argv)
                      s::LoadItem{.id = {},
                                  .loadCase = q,
                                  .targets = targetsOf(b.beams),
-                                 .action = c::DistributedLoad{.startValue = Vec3(0, 0, -5),
+                                 .action = c::DistributedLoad{.elements = {},
+                                                              .startValue = Vec3(0, 0, -5),
                                                               .endValue = Vec3(0, 0, -5)}}));
     apply(
         document,
         s::addItem(document, s::LoadItem{.id = {},
                                          .loadCase = w,
                                          .targets = targetsOf(b.columns),
-                                         .action = c::DistributedLoad{.startValue = Vec3(1, 0, 0),
+                                         .action = c::DistributedLoad{.elements = {},
+                                                                      .startValue = Vec3(1, 0, 0),
                                                                       .endValue = Vec3(1, 0, 0)}}));
     const s::ItemId combination = apply(
         document, s::addItem(document, s::Combination{.id = {},
