@@ -70,17 +70,20 @@ TEST_CASE("the report of a mesh", "[app][mesh]")
     CHECK(text(lines[3]) == "  Crossing at (2, 2.5, 0): entities 3, 7");
     CHECK(text(lines.back()).find("3 more") != std::string::npos);
     // Without splits: only the counts.
-    CHECK(fem::app::meshReportLines({.nodes = 2, .elements = 1}).size() == 2);
+    CHECK(fem::app::meshReportLines(
+              {.nodes = 2, .elements = 1, .splits = {}, .mergedNodes = 0, .ignored = {}})
+              .size() == 2);
 }
 
 TEST_CASE("why a drawing could not be meshed", "[app][mesh]")
 {
-    const QStringList none =
-        fem::app::meshErrorLines({.kind = fem::mesher::LineMeshError::Kind::NoLines});
+    const QStringList none = fem::app::meshErrorLines(
+        {.kind = fem::mesher::LineMeshError::Kind::NoLines, .overlaps = {}, .items = {}});
     REQUIRE(none.size() == 1);
     CHECK(text(none[0]) == "Could not mesh the drawing: the drawing has no lines.");
 
-    fem::mesher::LineMeshError overlaps{.kind = fem::mesher::LineMeshError::Kind::Overlaps};
+    fem::mesher::LineMeshError overlaps{
+        .kind = fem::mesher::LineMeshError::Kind::Overlaps, .overlaps = {}, .items = {}};
     overlaps.overlaps.push_back({.first = EntityId{12},
                                  .second = EntityId{15},
                                  .from = Vec3(2, 0, 0),

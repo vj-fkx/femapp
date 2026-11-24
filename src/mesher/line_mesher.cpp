@@ -155,7 +155,7 @@ entitiesOf(const geom::Drawing& drawing, const LineMeshOptions& options)
         }
         return out;
     }
-    LineMeshError unknown{.kind = LineMeshError::Kind::UnknownEntity};
+    LineMeshError unknown{.kind = LineMeshError::Kind::UnknownEntity, .overlaps = {}, .items = {}};
     std::vector<std::uint64_t> wanted;
     for (const geom::EntityId id : options.entities) {
         if (drawing.find(id) == nullptr) {
@@ -340,10 +340,11 @@ tl::expected<LineMeshResult, LineMeshError> meshLines(const geom::Drawing& drawi
     }
     // REQ-009-06: the sizing of every entity meshed, checked first.
     if (!valid(options.defaults)) {
-        return tl::unexpected(LineMeshError{.kind = LineMeshError::Kind::InvalidSizing});
+        return tl::unexpected(
+            LineMeshError{.kind = LineMeshError::Kind::InvalidSizing, .overlaps = {}, .items = {}});
     }
     std::vector<const LineSizing*> sizingOf(entities->size(), &options.defaults);
-    LineMeshError invalid{.kind = LineMeshError::Kind::InvalidSizing};
+    LineMeshError invalid{.kind = LineMeshError::Kind::InvalidSizing, .overlaps = {}, .items = {}};
     for (std::size_t e = 0; e < entities->size(); ++e) {
         const auto own = options.sizing.find(static_cast<std::uint64_t>((*entities)[e]->id));
         if (own != options.sizing.end()) {
@@ -396,14 +397,15 @@ tl::expected<LineMeshResult, LineMeshError> meshLines(const geom::Drawing& drawi
         }
     }
     if (!anyPiece) {
-        return tl::unexpected(LineMeshError{.kind = LineMeshError::Kind::NoLines});
+        return tl::unexpected(
+            LineMeshError{.kind = LineMeshError::Kind::NoLines, .overlaps = {}, .items = {}});
     }
 
     // 2. Contacts (design §5.2, §5.3): where the pieces are split, and by
     // which node candidate.
     std::vector<std::vector<std::pair<double, std::int32_t>>> splitsOf(pieces.size());
     std::vector<SplitEvent> events;
-    LineMeshError overlaps{.kind = LineMeshError::Kind::Overlaps};
+    LineMeshError overlaps{.kind = LineMeshError::Kind::Overlaps, .overlaps = {}, .items = {}};
     {
         std::vector<std::size_t> live; // the pieces that are not ignored
         std::vector<detail::Box3> boxes;

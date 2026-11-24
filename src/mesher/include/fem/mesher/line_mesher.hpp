@@ -26,9 +26,9 @@ enum class Grading : std::uint8_t {
 // divisions or length: one element per piece.
 struct LineSizing
 {
-    std::optional<int> divisions; // per piece, >= 1
-    std::optional<double> length; // target length, > 0 (divisions win if both)
-    double ratio = 1.0;           // > 0; 1 is uniform
+    std::optional<int> divisions = std::nullopt; // per piece, >= 1
+    std::optional<double> length = std::nullopt; // target length, > 0 (divisions win if both)
+    double ratio = 1.0;                          // > 0; 1 is uniform
     Grading grading = Grading::TowardEnd;
     bool quadratic = false; // REQ-009-07: Line3 instead of Line2
 };
