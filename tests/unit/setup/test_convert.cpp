@@ -336,8 +336,8 @@ TEST_CASE("a value converted is the physical quantity", "[setup][units][convert]
                         .properties = {}};
     s::convertItem(material, UnitSystem::NewtonMetre, UnitSystem::NewtonMillimetre);
     const auto& m = std::get<s::MaterialItem>(material).data;
-    CHECK(close(*m.youngsModulus, 2.1e5));
-    CHECK(close(*m.density, 7.85e-9));
+    CHECK(close(m.youngsModulus.value_or(0.0), 2.1e5));
+    CHECK(close(m.density.value_or(0.0), 7.85e-9));
     s::Item weight = s::LoadItem{.id = s::ItemId{2},
                                  .loadCase = s::ItemId{3},
                                  .targets = {},
@@ -381,7 +381,8 @@ TEST_CASE("the units of a document are changed in one edit", "[setup][units][con
     document.apply(change);
     CHECK(document.units() == UnitSystem::NewtonMillimetre);
     // E: 2.1e8 kN/m² is 2.1e5 N/mm².
-    CHECK(close(*std::get<s::MaterialItem>(document.items()[0]).data.youngsModulus, 2.1e5));
+    CHECK(close(std::get<s::MaterialItem>(document.items()[0]).data.youngsModulus.value_or(0.0),
+                2.1e5));
 
     document.revert(change);
     CHECK(document.units() == UnitSystem::KilonewtonMetre);

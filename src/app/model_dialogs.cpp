@@ -507,8 +507,8 @@ void editLoadCases(QWidget* parent, ModelController* model)
         setup::LoadCase c{.id = {}, .name = {}, .standard = {}, .category = {}};
         c.name = setup::freeName(model->document(), c, "Load case");
         if (const auto id = model->add(std::move(c), Text::tr("new load case"))) {
-            fill(*id);
-            panel->showItem(*id);
+            fill(id);
+            panel->showItem(id);
         }
     });
     QObject::connect(activate, &QPushButton::clicked, &dialog, [model, selected] {

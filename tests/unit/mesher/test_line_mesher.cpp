@@ -11,12 +11,22 @@
 #include <cstdint>
 #include <limits>
 #include <memory>
+#include <optional>
 #include <random>
 #include <span>
 #include <utility>
 #include <vector>
 
 namespace {
+
+// The value of an optional the test requires: REQUIRE, then value_or, so
+// that static analysis sees the check (clang-tidy 19 on Linux).
+template <typename T>
+T required(const std::optional<T>& value)
+{
+    REQUIRE(value.has_value());
+    return value.value_or(T{});
+}
 
 using fem::core::ElementType;
 using fem::geom::Drawing;
@@ -63,7 +73,7 @@ Vec3 nodeAt(const fem::core::Mesh& mesh, fem::core::ExternalId id)
 {
     const auto node = mesh.findNode(id);
     REQUIRE(node.has_value());
-    return mesh.nodeCoordinates(*node);
+    return mesh.nodeCoordinates(required(node));
 }
 
 // The external ids of the nodes of the element with external id `id`.
@@ -73,7 +83,7 @@ std::vector<fem::core::ExternalId> elementNodeIds(const fem::core::Mesh& mesh,
     const auto element = mesh.findElement(id);
     REQUIRE(element.has_value());
     std::vector<fem::core::ExternalId> ids;
-    for (const fem::core::NodeIndex n : mesh.elementNodes(*element)) {
+    for (const fem::core::NodeIndex n : mesh.elementNodes(required(element))) {
         ids.push_back(mesh.nodeId(n));
     }
     return ids;
@@ -164,11 +174,11 @@ TEST_CASE("a frame of lines touching at their ends", "[mesher][line]")
     REQUIRE(result->map.nodes.size() == 9);
     const auto first = mesh.findElement(1);
     REQUIRE(first.has_value());
-    CHECK(result->map.elements[static_cast<std::size_t>(*first)].entity == f.columns[0]);
-    CHECK(result->map.elements[static_cast<std::size_t>(*first)].segment == 0);
+    CHECK(result->map.elements[static_cast<std::size_t>(required(first))].entity == f.columns[0]);
+    CHECK(result->map.elements[static_cast<std::size_t>(required(first))].segment == 0);
     const auto corner = mesh.findNode(2);
     REQUIRE(corner.has_value());
-    const auto& origin = result->map.nodes[static_cast<std::size_t>(*corner)];
+    const auto& origin = result->map.nodes[static_cast<std::size_t>(required(corner))];
     // Through (0, 3): both columns of the first line and the first beam.
     CHECK(origin.entities == std::vector<EntityId>{f.columns[0], f.columns[1], f.beams[0]});
     const auto vertex = origin.vertex.value_or(std::pair{EntityId{}, -1});
@@ -204,11 +214,11 @@ TEST_CASE("polylines, open and closed, and points", "[mesher][line]")
     // The map of the last segment of the closed polyline, and of the point.
     const auto closing = mesh.findElement(6);
     REQUIRE(closing.has_value());
-    CHECK(result->map.elements[static_cast<std::size_t>(*closing)].entity == closed);
-    CHECK(result->map.elements[static_cast<std::size_t>(*closing)].segment == 3);
+    CHECK(result->map.elements[static_cast<std::size_t>(required(closing))].entity == closed);
+    CHECK(result->map.elements[static_cast<std::size_t>(required(closing))].segment == 3);
     const auto pointNode = mesh.findNode(8);
     REQUIRE(pointNode.has_value());
-    const auto& origin = result->map.nodes[static_cast<std::size_t>(*pointNode)];
+    const auto& origin = result->map.nodes[static_cast<std::size_t>(required(pointNode))];
     CHECK(origin.entities == std::vector<EntityId>{point});
     const auto vertex = origin.vertex.value_or(std::pair{EntityId{}, -1});
     CHECK(vertex.first == point);
@@ -398,7 +408,7 @@ TEST_CASE("a point on a beam", "[mesher][line][contact]")
     // The node of the point lies on the beam, and comes from the point.
     const auto node = result->mesh.findNode(2);
     REQUIRE(node.has_value());
-    const auto& origin = result->map.nodes[static_cast<std::size_t>(*node)];
+    const auto& origin = result->map.nodes[static_cast<std::size_t>(required(node))];
     CHECK(origin.entities == std::vector<EntityId>{beam, point});
     CHECK(origin.vertex.value_or(std::pair{EntityId{}, -1}).first == point);
 }
@@ -803,7 +813,7 @@ fem::core::Model handFrame()
             bar(Vec3(4.0 * b, 3.0 * s, 0.0), Vec3(4.0 * (b + 1), 3.0 * s, 0.0));
         }
     }
-    REQUIRE(builder.addGroup("bars", 1, std::move(bars)).has_value());
+    REQUIRE(builder.addGroup("bars", 1, bars).has_value());
     auto mesh = builder.build();
     REQUIRE(mesh.has_value());
     fem::core::Model model;

@@ -4,6 +4,7 @@
 
 #include <array>
 #include <cmath>
+#include <optional>
 #include <string>
 
 // Feature 009, T02 (design §5.3): the closest points and the contacts of
@@ -12,6 +13,15 @@
 // scaled (NFR-009-02).
 
 namespace {
+
+// The value of an optional the test requires: REQUIRE, then value_or, so
+// that static analysis sees the check (clang-tidy 19 on Linux).
+template <typename T>
+T required(const std::optional<T>& value)
+{
+    REQUIRE(value.has_value());
+    return value.value_or(T{});
+}
 
 using fem::mesher::detail::classify;
 using fem::mesher::detail::closestPoints;
@@ -73,7 +83,7 @@ TEST_CASE("a point on the interior of a segment", "[mesher][segment]")
     const Vec3 b(4, 0, 0);
     const auto on = interiorParameter({1, 0, 0}, a, b, kTol);
     REQUIRE(on.has_value());
-    CHECK(near(*on, 0.25));
+    CHECK(near(required(on), 0.25));
     CHECK(interiorParameter({1, 0.5e-9, 0}, a, b, kTol).has_value());
     CHECK_FALSE(interiorParameter({1, 2e-9, 0}, a, b, kTol).has_value());
     // Within the tolerance of an end: an end, not the interior.
@@ -90,8 +100,8 @@ TEST_CASE("the contact of two pieces", "[mesher][segment]")
         CHECK(c.kind == ContactKind::Crossing);
         REQUIRE(c.splitFirst.has_value());
         REQUIRE(c.splitSecond.has_value());
-        CHECK(near(*c.splitFirst, 0.5));
-        CHECK(near(*c.splitSecond, 0.25));
+        CHECK(near(required(c.splitFirst), 0.5));
+        CHECK(near(required(c.splitSecond), 0.25));
         CHECK(near(c.position, Vec3(1, 0, 0)));
     }
     SECTION("crossing in 3D")
@@ -106,7 +116,7 @@ TEST_CASE("the contact of two pieces", "[mesher][segment]")
         CHECK(c.kind == ContactKind::TJoint);
         REQUIRE(c.splitFirst.has_value());
         CHECK_FALSE(c.splitSecond.has_value());
-        CHECK(near(*c.splitFirst, 0.25));
+        CHECK(near(required(c.splitFirst), 0.25));
         CHECK(near(c.position, Vec3(1, 0, 0)));
     }
     SECTION("the end of the first on the second")
@@ -115,7 +125,7 @@ TEST_CASE("the contact of two pieces", "[mesher][segment]")
         CHECK(c.kind == ContactKind::TJoint);
         CHECK_FALSE(c.splitFirst.has_value());
         REQUIRE(c.splitSecond.has_value());
-        CHECK(near(*c.splitSecond, 0.25));
+        CHECK(near(required(c.splitSecond), 0.25));
         CHECK(near(c.position, Vec3(1, 0, 0)));
     }
     SECTION("nearly a T: within the tolerance, and beyond it")

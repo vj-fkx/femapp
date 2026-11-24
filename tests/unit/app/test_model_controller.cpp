@@ -6,6 +6,7 @@
 
 #include <array>
 #include <memory>
+#include <optional>
 #include <variant>
 #include <vector>
 
@@ -13,6 +14,15 @@
 // undo stack of the drawing, and the generations of the mesh.
 
 namespace {
+
+// The value of an optional the test requires: REQUIRE, then value_or, so
+// that static analysis sees the check (clang-tidy 19 on Linux).
+template <typename T>
+T required(const std::optional<T>& value)
+{
+    REQUIRE(value.has_value());
+    return value.value_or(T{});
+}
 
 namespace s = fem::setup;
 using fem::geom::Drawing;
@@ -124,7 +134,7 @@ TEST_CASE("a solid polygon section from closed polylines", "[app][model][section
     CHECK(made.data.name == "slab");
     CHECK_FALSE(made.data.area.has_value());
     REQUIRE(made.data.shape.has_value());
-    const auto& solid = std::get<fem::core::SolidPolygon>(*made.data.shape);
+    const auto solid = std::get<fem::core::SolidPolygon>(required(made.data.shape));
     CHECK(solid.regions.front().holes.size() == 1);
     // One step of undo brings the generic section back.
     undo.undo();

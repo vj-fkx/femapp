@@ -605,32 +605,33 @@ void MainWindow::addLoad(LoadKind kind, const QString& title)
 {
     // The active load case; the first one is made when there is none.
     const setup::Document& document = m_model->document();
-    std::optional<setup::ItemId> loadCase = document.activeCase();
-    const setup::Item* active = loadCase ? document.find(*loadCase) : nullptr;
+    const std::optional<setup::ItemId> activeCase = document.activeCase();
+    const setup::Item* active = activeCase ? document.find(*activeCase) : nullptr;
     if (active != nullptr && !std::holds_alternative<setup::LoadCase>(*active)) {
         showMessage(tr("Add load"),
                     tr("A combination is active: activate the load case to add the load to."),
                     true);
         return;
     }
+    std::optional<setup::ItemId> made;
     if (active == nullptr) {
         setup::LoadCase first{.id = {}, .name = {}, .standard = {}, .category = {}};
         first.name = setup::freeName(document, first, "Load case");
-        loadCase = m_model->add(std::move(first), tr("new load case"));
-        if (!loadCase) {
-            return;
-        }
+        made = m_model->add(std::move(first), tr("new load case"));
     }
+    const std::optional<setup::ItemId> chosen = active != nullptr ? activeCase : made;
+    if (!chosen) {
+        return;
+    }
+    const setup::ItemId loadCase = *chosen;
     const bool onNodes = loadOnNodes(kind);
     const bool needsTargets = kind != LoadKind::SelfWeight;
     const setup::Targets targets = needsTargets ? selectedTargets() : setup::Targets{};
     const std::vector<setup::GroupTarget> groups = m_model->meshGroups(onNodes ? 0 : 1);
-    const setup::Item item = setup::LoadItem{.id = {},
-                                             .loadCase = *loadCase,
-                                             .targets = {},
-                                             .action = newAction(kind, document.units())};
+    const setup::Item item = setup::LoadItem{
+        .id = {}, .loadCase = loadCase, .targets = {}, .action = newAction(kind, document.units())};
     const QString caseName =
-        QString::fromStdString(setup::nameOf(*m_model->document().find(*loadCase)));
+        QString::fromStdString(setup::nameOf(*m_model->document().find(loadCase)));
     auto choice = chooseDetail(this, tr("%1 in %2").arg(title, caseName), item, m_model->document(),
                                targets, groups, needsTargets);
     if (!choice) {
@@ -907,7 +908,7 @@ void MainWindow::showModelMenu(const QPoint& position)
         });
     }
     if (item != nullptr) {
-        const setup::ItemId itemId = *id;
+        const setup::ItemId itemId = id.value_or(setup::ItemId{});
         if (std::holds_alternative<setup::LoadCase>(*item) ||
             std::holds_alternative<setup::Combination>(*item)) {
             menu.addAction(tr("Activate"), this, [this, index] { activateItem(index); });

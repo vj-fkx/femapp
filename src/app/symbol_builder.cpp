@@ -173,14 +173,18 @@ std::uint8_t heldBits(const setup::SupportItem& support)
 std::vector<std::pair<setup::ItemId, double>> activeTerms(const setup::Document& document)
 {
     const auto active = document.activeCase();
-    const setup::Item* item = active ? document.find(*active) : nullptr;
+    if (!active) {
+        return {};
+    }
+    const setup::ItemId id = *active;
+    const setup::Item* item = document.find(id);
     if (item == nullptr) {
         return {};
     }
     if (const auto* c = std::get_if<setup::Combination>(item)) {
         return c->terms;
     }
-    return {{*active, 1.0}};
+    return {{id, 1.0}};
 }
 
 // ---- On the mesh: the model built. ----

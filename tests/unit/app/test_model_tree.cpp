@@ -5,12 +5,22 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <optional>
 #include <string>
 
 // Feature 010, T14 (design §5.5): REQ-010-13, 14, 18, 19. The rows of the
 // model tree over a document (without a view: no fonts or icons).
 
 namespace {
+
+// The value of an optional the test requires: REQUIRE, then value_or, so
+// that static analysis sees the check (clang-tidy 19 on Linux).
+template <typename T>
+T required(const std::optional<T>& value)
+{
+    REQUIRE(value.has_value());
+    return value.value_or(T{});
+}
 
 namespace s = fem::setup;
 using fem::app::ModelTree;
@@ -95,7 +105,7 @@ TEST_CASE("the rows of the model tree", "[app][model][tree]")
     // Items are found by id, and rows give their item.
     const auto id = tree.itemAt(bars);
     REQUIRE(id.has_value());
-    CHECK(tree.indexOf(*id) == bars);
+    CHECK(tree.indexOf(required(id)) == bars);
     CHECK_FALSE(tree.itemAt(materials).has_value());
     CHECK(tree.groupAt(bars) == Group::Bars);
 

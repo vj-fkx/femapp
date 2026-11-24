@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <optional>
 #include <string>
 #include <utility>
 #include <variant>
@@ -13,6 +14,15 @@
 // and write them, and refuse invalid values, without widgets.
 
 namespace {
+
+// The value of an optional the test requires: REQUIRE, then value_or, so
+// that static analysis sees the check (clang-tidy 19 on Linux).
+template <typename T>
+T required(const std::optional<T>& value)
+{
+    REQUIRE(value.has_value());
+    return value.value_or(T{});
+}
 
 namespace s = fem::setup;
 namespace c = fem::core;
@@ -163,8 +173,8 @@ TEST_CASE("the fields of loads and supports", "[app][fields]")
 
 TEST_CASE("numbers typed in a field", "[app][fields]")
 {
-    CHECK(std::get<double>(*fem::app::parseNumber(QStringLiteral(" 2.5e3 "))) == 2500.0);
-    CHECK(std::holds_alternative<std::monostate>(*fem::app::parseNumber(QString())));
+    CHECK(std::get<double>(required(fem::app::parseNumber(QStringLiteral(" 2.5e3 ")))) == 2500.0);
+    CHECK(std::holds_alternative<std::monostate>(required(fem::app::parseNumber(QString()))));
     // The point is the decimal separator, whatever the locale.
     CHECK_FALSE(fem::app::parseNumber(QStringLiteral("2,5")).has_value());
     CHECK_FALSE(fem::app::parseNumber(QStringLiteral("abc")).has_value());

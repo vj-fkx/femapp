@@ -178,7 +178,7 @@ c::Model handFrame()
             bar(Vec3(4.0 * b, 3.0 * st, 0.0), Vec3(4.0 * (b + 1), 3.0 * st, 0.0));
         }
     }
-    REQUIRE(builder.addGroup("bars", 1, std::move(bars)).has_value());
+    REQUIRE(builder.addGroup("bars", 1, bars).has_value());
     auto mesh = builder.build();
     REQUIRE(mesh.has_value());
     c::Model model;
@@ -544,8 +544,13 @@ TEST_CASE("targets on an imported mesh", "[setup][build]")
                                 .kind = c::ElementKind::Beam2D,
                                 .material = "steel",
                                 .section = "R"});
+    // Field by field: g++ 13 at -O2 takes the variant of a temporary
+    // initializer for uninitialized (-Wmaybe-uninitialized).
     for (const auto dof : {c::DofType::U, c::DofType::V, c::DofType::RZ}) {
-        hand.restraints.push_back({.nodes = c::GroupRef{"root"}, .dof = dof, .value = 0.0});
+        c::Restraint restraint;
+        restraint.nodes = c::GroupRef{"root"};
+        restraint.dof = dof;
+        hand.restraints.push_back(restraint);
     }
     hand.nodalForces.push_back({.nodes = c::NodeIds{{30}}, .force = Vec3(0, -5, 0)});
     hand.distributedLoads.push_back(
