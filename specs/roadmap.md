@@ -122,6 +122,7 @@ tarefas da feature indicada (ou de uma nova) quando ela for especificada.
 | 008c | Combinações de casos de carga (a segunda ordem não superpõe) | 010 / 011 |
 | 008c | Flambagem da própria barra de treliça entre os nós (hoje: modelar como viga) | 010 (aviso ou opção na atribuição) |
 | 009, 010 | Tradução pt_BR dos textos do comando MESH (009) e da preparação do modelo (010), já por `tr()` | Uma passada de traduções |
+| 009, 010 | Roteiros manuais na interface, adiados pelo mantenedor em 2026-11-24 (código, testes e CI prontos): o MESH (009 T14) e a preparação do modelo (010 T23, com os FPS de 10⁴ cargas). As duas features só passam a `concluída` depois deles | Uma sessão de testes manuais, antes de fechar a v0.2 |
 
 ## Pós-1.0
 
