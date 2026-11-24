@@ -32,8 +32,10 @@ public slots:
     void check();
 
 signals:
-    // A problem clicked: its item, to select in the tree...
-    void itemRequested(fem::setup::ItemId id);
+    // A problem clicked: its item (a setup::ItemId, as quint64: the moc
+    // needs a type QDataStream knows on every platform), to select in the
+    // tree...
+    void itemRequested(quint64 id);
     // ...or the elements and nodes a problem of the core names.
     void idsRequested(const fem::app::NamedIds& ids);
 

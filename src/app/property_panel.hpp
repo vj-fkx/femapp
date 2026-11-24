@@ -31,7 +31,8 @@ public:
 signals:
     // REQ-010-05: the outline of a solid polygon section from the closed
     // polylines selected in the drawing.
-    void solidFromSelectionRequested(fem::setup::ItemId id);
+    // (A setup::ItemId as quint64, a type the moc handles everywhere.)
+    void solidFromSelectionRequested(quint64 id);
 
 private:
     void rebuild();

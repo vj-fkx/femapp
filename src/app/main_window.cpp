@@ -426,14 +426,14 @@ void MainWindow::createModelUi()
     properties->setObjectName(QStringLiteral("properties"));
     properties->setWidget(m_properties);
     // REQ-010-05: a solid polygon from the polylines selected in the drawing.
-    connect(m_properties, &PropertyPanel::solidFromSelectionRequested, this,
-            [this](setup::ItemId id) {
-                const std::vector<geom::EntityId> selected =
-                    m_viewport ? m_viewport->drawingSelection() : std::vector<geom::EntityId>{};
-                if (const auto problem = m_model->setSolidFromPolylines(id, selected)) {
-                    showMessage(tr("Section from polylines"), *problem, true);
-                }
-            });
+    connect(m_properties, &PropertyPanel::solidFromSelectionRequested, this, [this](quint64 id) {
+        const std::vector<geom::EntityId> selected =
+            m_viewport ? m_viewport->drawingSelection() : std::vector<geom::EntityId>{};
+        if (const auto problem =
+                m_model->setSolidFromPolylines(static_cast<setup::ItemId>(id), selected)) {
+            showMessage(tr("Section from polylines"), *problem, true);
+        }
+    });
     addDockWidget(Qt::RightDockWidgetArea, properties);
     // REQ-010-21: the check of the model, at the bottom, shown on demand.
     // NOLINTBEGIN(cppcoreguidelines-owning-memory): owned by their Qt parents.
@@ -444,7 +444,8 @@ void MainWindow::createModelUi()
     m_checkDock->setWidget(m_check);
     addDockWidget(Qt::BottomDockWidgetArea, m_checkDock);
     m_checkDock->hide();
-    connect(m_check, &CheckPanel::itemRequested, this, &MainWindow::selectItem);
+    connect(m_check, &CheckPanel::itemRequested, this,
+            [this](quint64 id) { selectItem(static_cast<setup::ItemId>(id)); });
     connect(m_check, &CheckPanel::idsRequested, this, &MainWindow::highlightIds);
     // REQ-010-02: the unit system always in sight.
     statusBar()->addPermanentWidget(m_units);

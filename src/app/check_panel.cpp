@@ -50,7 +50,7 @@ CheckPanel::CheckPanel(ModelController* controller, const ModelTree* tree, QWidg
         }
         const setup::BuildIssue& issue = m_issues[static_cast<std::size_t>(at)];
         if (issue.item) {
-            emit itemRequested(*issue.item);
+            emit itemRequested(static_cast<quint64>(*issue.item));
         } else if (issue.kind == setup::IssueKind::Core) {
             const NamedIds ids = idsInMessage(issue.detail);
             if (!ids.elements.empty() || !ids.nodes.empty()) {

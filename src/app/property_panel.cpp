@@ -93,7 +93,7 @@ void PropertyPanel::addSection(QFormLayout* form, const setup::SectionItem& sect
                             "outline, the others are holes. The drawing x and y are the y and z "
                             "of the section."));
         connect(from, &QPushButton::clicked, this,
-                [this, id] { emit solidFromSelectionRequested(id); });
+                [this, id] { emit solidFromSelectionRequested(static_cast<quint64>(id)); });
         form->addRow(from);
     }
 
