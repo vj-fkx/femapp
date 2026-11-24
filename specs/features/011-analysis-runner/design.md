@@ -1,6 +1,6 @@
 # Design — 011 analysis-runner
 
-Status: rascunho · Data: 2026-11-24
+Status: aprovado · Data: 2026-11-24
 Requisitos: [requirements.md](requirements.md)
 
 ## 1. Resumo da abordagem

@@ -1,6 +1,6 @@
 # ADR 0011 — Controle de execução das análises no `core`
 
-Status: proposta · Data: 2026-11-24
+Status: aceita · Data: 2026-11-24
 
 ## Contexto
 
