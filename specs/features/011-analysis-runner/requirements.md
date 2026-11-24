@@ -1,6 +1,6 @@
 # Requisitos — 011 analysis-runner
 
-Status: rascunho · Data: 2026-11-24
+Status: aprovado · Data: 2026-11-24
 
 ## 1. Contexto e objetivo
 
