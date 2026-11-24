@@ -314,10 +314,15 @@ Regras:
   Arquivo: `.github/workflows/ci.yml`. Cobre: N03.
   Nota: o passo "Coverage of setup" foi acrescentado; a medida em si só
   sai no CI (T90), que não rodou ainda.
-- [ ] **T90** [M] Build e testes verdes nos jobs do CI, inclusive a
+- [x] **T90** [M] Build e testes verdes nos jobs do CI, inclusive a
   cobertura de `core`, `mesher` e `setup`; push com sua confirmação.
   Cobre: N03.
-- [ ] **T91** `clang-format` e `clang-tidy` sem pendências (também o do
+  Feito (2026-11-24): CI verde nos seis jobs (windows, macos, linux-gcc,
+  linux-clang com o clang-tidy 19, coverage e format) no commit
+  `647f1bb`, depois de corrigir avisos que só o Linux acusa
+  (-Wmissing-field-initializers, -Wmaybe-uninitialized com -O2, o moc com
+  `ItemId` de 64 bits e o clang-tidy 19).
+- [x] **T91** `clang-format` e `clang-tidy` sem pendências (também o do
   Linux); `core`, `geom`, `mesher` e `setup` sem headers Qt. Cobre: 01.
   Estado (2026-11-23): no Windows, `clang-tidy` limpo nos 45 arquivos
   `.cpp` que a 010 mudou, `clang-format` limpo nos 259 do repositório e o
@@ -331,8 +336,8 @@ Regras:
     aviso do desenho e a barra de status, o desenho da seção, os eixos
     no viewport), que ficam para a T23.
   - AC-6 depende da T23 (adiada pelo mantenedor).
-  - AC-7: `resolve` e os benchmarks feitos (T12); faltam os FPS à mão
-    (T23), a cobertura do `setup` e o CI verde (T90).
+  - AC-7: `resolve`, os benchmarks (T12), a cobertura do `setup` ≥ 80% e o
+    CI verde (T90) feitos; faltam os FPS à mão (T23).
 - [ ] **T93** Atualizar `specs/roadmap.md` para `concluída`.
 
 ## Matriz de rastreabilidade

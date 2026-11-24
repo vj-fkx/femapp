@@ -170,12 +170,19 @@ Regras:
 - [x] **T17** Documentação: `architecture.md` §3b com o `LineMesher` feito
   e o comando MESH no `app`; `README.md` com o MESH na lista de comandos.
   Cobre: 17.
-- [ ] **T90** [M] Build e testes verdes nos jobs do CI, inclusive a
+- [x] **T90** [M] Build e testes verdes nos jobs do CI, inclusive a
   cobertura de `core` e de `mesher` ≥ 80%; push com sua confirmação.
   Cobre: N03.
-- [ ] **T91** `clang-format` e `clang-tidy` sem pendências (também o do
+  Feito (2026-11-24): CI verde nos seis jobs (windows, macos, linux-gcc,
+  linux-clang com o clang-tidy 19, coverage e format) no commit
+  `647f1bb`, depois de corrigir avisos que só o Linux acusa
+  (-Wmissing-field-initializers, -Wmaybe-uninitialized com -O2, o moc com
+  `ItemId` de 64 bits e o clang-tidy 19).
+- [x] **T91** `clang-format` e `clang-tidy` sem pendências (também o do
   Linux, pelo CI); `mesher` e `geom` sem headers Qt. Cobre: 17.
 - [ ] **T92** Conferir os sete critérios de aceite de `requirements.md`.
+  Estado (2026-11-24): pendente da conferência manual dos comandos de
+  malha (T14), adiada pelo mantenedor para quando houver malhas 2D e 3D.
 - [ ] **T93** Atualizar `specs/roadmap.md` para `concluída`.
 
 ## Matriz de rastreabilidade
