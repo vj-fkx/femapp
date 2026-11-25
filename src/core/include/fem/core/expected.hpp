@@ -13,6 +13,7 @@ namespace fem::core {
 struct Error
 {
     std::string message;
+    bool cancelled = false; // REQ-011-08: stopped by RunControl, not a failure
 };
 
 // Value or Error. Exceptions are reserved for programming errors
@@ -22,7 +23,14 @@ using Expected = tl::expected<T, Error>;
 
 [[nodiscard]] inline tl::unexpected<Error> makeError(std::string message)
 {
-    return tl::unexpected<Error>(Error{.message = std::move(message)});
+    return tl::unexpected<Error>(Error{.message = std::move(message), .cancelled = false});
+}
+
+// REQ-011-08: the failure an analysis returns when its RunControl is cancelled.
+[[nodiscard]] inline tl::unexpected<Error> makeCancelled()
+{
+    return tl::unexpected<Error>(
+        Error{.message = "The analysis was cancelled.", .cancelled = true});
 }
 
 } // namespace fem::core

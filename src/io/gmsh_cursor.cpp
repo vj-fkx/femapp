@@ -261,7 +261,8 @@ std::string GmshCursor::position() const
 
 core::Error GmshCursor::error(std::string_view what) const
 {
-    return core::Error{.message = m_source + ", " + position() + ": " + std::string(what)};
+    return core::Error{.message = m_source + ", " + position() + ": " + std::string(what),
+                       .cancelled = false};
 }
 
 } // namespace fem::io::detail

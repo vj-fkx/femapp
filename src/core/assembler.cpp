@@ -170,7 +170,8 @@ Expected<void> forEachElement(const Mesh& mesh, std::span<const ElementSet> sets
                                 firstError =
                                     Error{.message = "Element " +
                                                      std::to_string(mesh.elementId(item.element)) +
-                                                     ": " + result.error().message};
+                                                     ": " + result.error().message,
+                                          .cancelled = false};
                             }
                             failed = true;
                             return;

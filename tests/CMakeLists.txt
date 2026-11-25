@@ -47,6 +47,7 @@ femapp_add_test(core SOURCES
     test_model.cpp
     test_poisson.cpp
     test_quadrature.cpp
+    test_run_control.cpp
     test_second_order_analysis.cpp
     test_section.cpp
     test_section_mesh.cpp

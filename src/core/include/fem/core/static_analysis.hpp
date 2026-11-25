@@ -4,6 +4,7 @@
 #include <fem/core/expected.hpp>
 #include <fem/core/mesh.hpp>
 #include <fem/core/model.hpp>
+#include <fem/core/run_control.hpp>
 
 #include <Eigen/Core>
 #include <memory>
@@ -48,7 +49,8 @@ struct StaticResult
 
 struct StaticOptions
 {
-    int threads = 0; // 0: all cores; 1: sequential
+    int threads = 0;      // 0: all cores; 1: sequential
+    RunControl control{}; // REQ-011-09; second order and buckling carry it in `base`
 };
 
 // REQ-007-12, 13, 15: linear static analysis of the model, which is only

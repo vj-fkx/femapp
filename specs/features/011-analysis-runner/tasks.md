@@ -1,6 +1,6 @@
 # Tarefas — 011 analysis-runner
 
-Status: aprovado
+Status: em andamento
 Design: [design.md](design.md) · Requisitos: [requirements.md](requirements.md)
 
 Regras:
@@ -19,7 +19,7 @@ Regras:
 
 ## Fase 1 — Controle de execução no `core` (ADR 0011)
 
-- [ ] **T01** O `RunControl` e o cancelamento no `Error`:
+- [x] **T01** O `RunControl` e o cancelamento no `Error`:
   - `run_control.hpp` (`RunStage`, `RunProgress`, `RunControl` com
     `cancelled()` e `report()`);
   - `Error::cancelled` e `makeCancelled()`;

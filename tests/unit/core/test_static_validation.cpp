@@ -288,7 +288,7 @@ TEST_CASE("the analysis leaves the model as it was", "[core][analysis]")
     CHECK(model.temperatureChanges.front().deltaT == before.temperatureChanges.front().deltaT);
 
     // The same model gives the same result, sequential or parallel.
-    const auto second = fem::core::runLinearStatic(model, {.threads = 1});
+    const auto second = fem::core::runLinearStatic(model, {.threads = 1, .control = {}});
     REQUIRE(second.has_value());
     for (std::size_t n = 0; n < first->displacements.size(); ++n) {
         CHECK((first->displacements[n] - second->displacements[n]).norm() < 1e-15);
