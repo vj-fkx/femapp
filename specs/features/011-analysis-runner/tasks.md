@@ -144,7 +144,7 @@ Regras:
   passou para `tests/unit/setup/frame_document.hpp`, e a conferência do
   `core` para `src/setup/detail/check.hpp`, para o `runCase` montar o
   modelo uma vez só. Cobre: 02, 05, 10.
-- [ ] **T09** `ResultSet` e `isCurrent`:
+- [x] **T09** `ResultSet` e `isCurrent`:
   - testes: `put` substitui, `erase`, `all` em ordem de item;
     `isCurrent` com as três partes do estado; desfazer até o estado
     analisado torna atual; refazer não (o limite do design §5.3);

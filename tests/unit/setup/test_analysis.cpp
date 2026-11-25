@@ -13,6 +13,7 @@
 #include <atomic>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -386,4 +387,112 @@ TEST_CASE("the warnings of the check come with the result", "[setup][analysis]")
     };
     CHECK(warned(resultOf(outcome).warnings));
     CHECK(warned(outcome.issues));
+}
+
+namespace {
+
+s::AnalysisResult resultFor(std::uint64_t item, double factor)
+{
+    c::BucklingResult data;
+    data.modes.push_back(
+        {.factor = factor, .displacements = {}, .rotations = {}, .warping = {}, .beams = {}});
+    return {.item = s::ItemId{item},
+            .settings = {.type = s::AnalysisType::Buckling},
+            .state = {},
+            .mesh = nullptr,
+            .data = std::move(data),
+            .warnings = {}};
+}
+
+double factorOf(const s::AnalysisResult* r)
+{
+    REQUIRE(r != nullptr);
+    if (r == nullptr) {
+        throw std::logic_error("no result");
+    }
+    return std::get<c::BucklingResult>(r->data).modes.front().factor;
+}
+
+} // namespace
+
+// T09: REQ-011-11.
+TEST_CASE("one result per item, in the order of the items", "[setup][analysis][results]")
+{
+    s::ResultSet results;
+    CHECK(results.all().empty());
+    results.put(resultFor(7, 1.0));
+    results.put(resultFor(3, 2.0));
+    results.put(resultFor(5, 3.0));
+    REQUIRE(results.all().size() == 3);
+    CHECK(results.all()[0].item == s::ItemId{3});
+    CHECK(results.all()[1].item == s::ItemId{5});
+    CHECK(results.all()[2].item == s::ItemId{7});
+
+    // A new analysis of an item replaces its result.
+    results.put(resultFor(5, 4.0));
+    CHECK(results.all().size() == 3);
+    CHECK(factorOf(results.find(s::ItemId{5})) == 4.0);
+    CHECK(results.find(s::ItemId{4}) == nullptr);
+
+    results.erase(s::ItemId{3});
+    results.erase(s::ItemId{9}); // not there: nothing
+    REQUIRE(results.all().size() == 2);
+    CHECK(results.find(s::ItemId{3}) == nullptr);
+    CHECK(results.all()[0].item == s::ItemId{5});
+    CHECK(factorOf(results.find(s::ItemId{7})) == 1.0);
+}
+
+// T09: REQ-011-12.
+TEST_CASE("a result is current while the state analysed is the state now",
+          "[setup][analysis][results]")
+{
+    Prepared p;
+    prepared(p);
+    s::Document& d = p.setup.document;
+    const auto now = [&] {
+        return s::AnalysedState{.documentRevision = d.revision(),
+                                .drawingRevision = p.frame.drawing.revision(),
+                                .meshGeneration = p.mesh.generation};
+    };
+    const s::AnalysisResult result = resultOf(run(p, p.setup.loadCase));
+    CHECK(s::ResultSet::isCurrent(result, now()));
+
+    SECTION("the document: undo back to it makes it current, redo does not")
+    {
+        const s::DocumentEdit edit =
+            s::changeAnalysis(d, {.type = s::AnalysisType::Buckling, .modes = 2});
+        d.apply(edit);
+        CHECK_FALSE(s::ResultSet::isCurrent(result, now()));
+        d.revert(edit);
+        CHECK(s::ResultSet::isCurrent(result, now()));
+
+        // Analysed after the edit, then undone and redone: the redo gives a
+        // new revision, so that result is out of date although the
+        // document is the same (the limit of design §5.3).
+        d.apply(edit);
+        const s::AnalysisResult edited = resultOf(run(p, p.setup.loadCase));
+        CHECK(s::ResultSet::isCurrent(edited, now()));
+        d.revert(edit);
+        d.apply(edit);
+        CHECK_FALSE(s::ResultSet::isCurrent(edited, now()));
+        // The first one is still back one undo away.
+        d.revert(edit);
+        CHECK(s::ResultSet::isCurrent(result, now()));
+    }
+    SECTION("the drawing")
+    {
+        fem::geom::DrawingEdit edit;
+        edit.added.push_back(fem::geom::Entity{
+            .id = p.frame.drawing.nextId(),
+            .shape = fem::geom::LineEntity{.start = Vec3(0, 0, 0), .end = Vec3(-1, 0, 0)}});
+        p.frame.drawing.apply(edit);
+        CHECK_FALSE(s::ResultSet::isCurrent(result, now()));
+        p.frame.drawing.revert(edit);
+        CHECK(s::ResultSet::isCurrent(result, now()));
+    }
+    SECTION("the mesh")
+    {
+        p.mesh.generation += 1;
+        CHECK_FALSE(s::ResultSet::isCurrent(result, now()));
+    }
 }

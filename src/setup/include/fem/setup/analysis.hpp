@@ -16,6 +16,7 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <span>
 #include <variant>
 #include <vector>
 
@@ -56,5 +57,26 @@ struct CaseOutcome
 [[nodiscard]] CaseOutcome runCase(const Document& document, const geom::Drawing& drawing,
                                   const MeshContext& mesh, ItemId item,
                                   const core::RunControl& control);
+
+// REQ-011-11, 12: the results by item, one each, in the order of the items'
+// ids, and whether each is current.
+class ResultSet
+{
+public:
+    void put(AnalysisResult result); // replaces the item's
+    void erase(ItemId item);         // the item left the document
+    [[nodiscard]] const AnalysisResult* find(ItemId item) const;
+    [[nodiscard]] std::span<const AnalysisResult> all() const noexcept { return m_results; }
+    // Current while the state analysed is the state now: undoing back to it
+    // makes a result current again (a redo gives new revisions: design §5.3).
+    [[nodiscard]] static bool isCurrent(const AnalysisResult& result,
+                                        const AnalysedState& now) noexcept
+    {
+        return result.state == now;
+    }
+
+private:
+    std::vector<AnalysisResult> m_results; // sorted by item
+};
 
 } // namespace fem::setup

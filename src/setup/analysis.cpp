@@ -64,4 +64,28 @@ CaseOutcome runCase(const Document& document, const geom::Drawing& drawing, cons
     return outcome;
 }
 
+void ResultSet::put(AnalysisResult result)
+{
+    const auto at = std::ranges::lower_bound(m_results, result.item, {}, &AnalysisResult::item);
+    if (at != m_results.end() && at->item == result.item) {
+        *at = std::move(result);
+    } else {
+        m_results.insert(at, std::move(result));
+    }
+}
+
+void ResultSet::erase(ItemId item)
+{
+    const auto at = std::ranges::lower_bound(m_results, item, {}, &AnalysisResult::item);
+    if (at != m_results.end() && at->item == item) {
+        m_results.erase(at);
+    }
+}
+
+const AnalysisResult* ResultSet::find(ItemId item) const
+{
+    const auto at = std::ranges::lower_bound(m_results, item, {}, &AnalysisResult::item);
+    return at != m_results.end() && at->item == item ? &*at : nullptr;
+}
+
 } // namespace fem::setup
