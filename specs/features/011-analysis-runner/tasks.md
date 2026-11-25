@@ -42,7 +42,7 @@ Regras:
     verificações entre as etapas e a recuperação.
   Arquivos: `assembler.hpp/.cpp`, `static_analysis.cpp`,
   `test_run_control.cpp`. Cobre: 07, 08, 09.
-- [ ] **T03** A segunda ordem e a flambagem com controle:
+- [x] **T03** A segunda ordem e a flambagem com controle:
   - testes primeiro: com controle, bit a bit iguais a sem controle; o progresso traz
     `Iteration` com i = 1, 2…; o cancelamento na iteração k da segunda
     ordem, numa iteração de subespaço e na bisseção de Sturm da

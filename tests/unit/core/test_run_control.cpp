@@ -17,12 +17,14 @@
 #include <utility>
 #include <vector>
 
+using fem::core::BucklingResult;
 using fem::core::DofType;
 using fem::core::ElementKind;
 using fem::core::Model;
 using fem::core::RunControl;
 using fem::core::RunProgress;
 using fem::core::RunStage;
+using fem::core::SecondOrderResult;
 using fem::core::StaticResult;
 using fem::core::test::TrussSpec;
 
@@ -49,9 +51,9 @@ Model portal()
     Model model = fem::core::test::beamModel(spec, ElementKind::Beam2D);
     fem::core::test::fixAll(model, {1, 4}, ElementKind::Beam2D);
     model.nodalForces.push_back({.nodes = fem::core::NodeIds{{2}},
-                            .force = Eigen::Vector3d(5.0e3, 0, 0),
-                            .moment = Eigen::Vector3d::Zero(),
-                            .bimoment = 0.0});
+                                 .force = Eigen::Vector3d(5.0e3, 0, 0),
+                                 .moment = Eigen::Vector3d::Zero(),
+                                 .bimoment = 0.0});
     model.distributedLoads.push_back({.elements = fem::core::ElementIds{{2}},
                                       .startValue = Eigen::Vector3d(0, -2.0e3, 0),
                                       .endValue = Eigen::Vector3d(0, -6.0e3, 0)});
@@ -70,9 +72,9 @@ Model truss()
     fem::core::test::restrain(model, {1}, {DofType::U, DofType::V});
     fem::core::test::restrain(model, {2}, {DofType::V});
     model.nodalForces.push_back({.nodes = fem::core::NodeIds{{3}},
-                            .force = Eigen::Vector3d(1.0e3, -8.0e3, 0),
-                            .moment = Eigen::Vector3d::Zero(),
-                            .bimoment = 0.0});
+                                 .force = Eigen::Vector3d(1.0e3, -8.0e3, 0),
+                                 .moment = Eigen::Vector3d::Zero(),
+                                 .bimoment = 0.0});
     return model;
 }
 
@@ -165,6 +167,66 @@ struct Recorder
                 }};
     }
 };
+
+// A cantilever column of `bars` beams along y, compressed at the top by
+// 0.4 of its critical load, with a small lateral force there.
+Model column(int bars, double lateral)
+{
+    TrussSpec spec;
+    for (int i = 0; i <= bars; ++i) {
+        spec.nodes.emplace_back(0, 4.0 * i / bars, 0);
+    }
+    for (int j = 0; j < bars; ++j) {
+        spec.bars.push_back({j, j + 1});
+    }
+    Model model = fem::core::test::beamModel(spec, ElementKind::Beam2D);
+    fem::core::test::fixAll(model, {1}, ElementKind::Beam2D);
+    model.nodalForces.push_back({.nodes = fem::core::NodeIds{{bars + 1}},
+                                 .force = Eigen::Vector3d(lateral, -1.0e6, 0),
+                                 .moment = Eigen::Vector3d::Zero(),
+                                 .bimoment = 0.0});
+    return model;
+}
+
+SecondOrderResult requiredSecond(fem::core::Expected<SecondOrderResult> result)
+{
+    if (!result) {
+        INFO(result.error().message);
+        REQUIRE(result.has_value());
+    }
+    return std::move(result).value_or(SecondOrderResult{});
+}
+
+BucklingResult requiredBuckling(fem::core::Expected<BucklingResult> result)
+{
+    if (!result) {
+        INFO(result.error().message);
+        REQUIRE(result.has_value());
+    }
+    return std::move(result).value_or(BucklingResult{});
+}
+
+// The Iteration reports, in order.
+std::vector<int> iterationsOf(const std::vector<RunProgress>& seen)
+{
+    std::vector<int> out;
+    for (const RunProgress& p : seen) {
+        if (p.stage == RunStage::Iteration) {
+            out.push_back(p.iteration);
+        }
+    }
+    return out;
+}
+
+// A control that cancels at the Iteration report number `at`.
+RunControl cancelAtIteration(std::atomic<bool>& flag, int at)
+{
+    return {.cancel = &flag, .progress = [&flag, at](const RunProgress& p) {
+                if (p.stage == RunStage::Iteration && p.iteration == at) {
+                    flag = true;
+                }
+            }};
+}
 
 } // namespace
 
@@ -296,5 +358,114 @@ TEST_CASE("A cancelled static analysis returns a cancellation", "[core][run_cont
             CHECK(result.error().cancelled);
             CHECK(result.error().message == "The analysis was cancelled.");
         }
+    }
+}
+// REQ-011-07, 09, AC-4: second order and buckling with a control that never
+// cancels give the same numbers bit for bit as without control.
+TEST_CASE("Second order and buckling with a control give the same numbers bit for bit",
+          "[core][run_control]")
+{
+    const Model model = column(8, 1.0e4);
+    for (const int threads : {1, 0}) {
+        const std::atomic<bool> never{false};
+        Recorder recorder;
+        const SecondOrderResult reference = requiredSecond(fem::core::runSecondOrderStatic(
+            model,
+            {.base = {.threads = threads, .control = {}}, .tolerance = 1e-8, .maxIterations = 50}));
+        const SecondOrderResult controlled = requiredSecond(fem::core::runSecondOrderStatic(
+            model, {.base = {.threads = threads, .control = recorder.control(&never)},
+                    .tolerance = 1e-8,
+                    .maxIterations = 50}));
+        CHECK(reference.iterations == controlled.iterations);
+        CHECK(same(reference.change, controlled.change));
+        checkIdentical(reference.result, controlled.result);
+
+        Recorder bucklingRecorder;
+        const BucklingResult first = requiredBuckling(fem::core::runLinearBuckling(
+            model, {.base = {.threads = threads, .control = {}}, .count = 2, .tolerance = 1e-10}));
+        const BucklingResult second = requiredBuckling(fem::core::runLinearBuckling(
+            model, {.base = {.threads = threads, .control = bucklingRecorder.control(&never)},
+                    .count = 2,
+                    .tolerance = 1e-10}));
+        REQUIRE(first.modes.size() == second.modes.size());
+        REQUIRE_FALSE(first.modes.empty());
+        for (std::size_t m = 0; m < first.modes.size(); ++m) {
+            CHECK(same(first.modes[m].factor, second.modes[m].factor));
+            REQUIRE(first.modes[m].displacements.size() == second.modes[m].displacements.size());
+            for (std::size_t n = 0; n < first.modes[m].displacements.size(); ++n) {
+                CHECK(same(first.modes[m].displacements[n], second.modes[m].displacements[n]));
+                CHECK(same(first.modes[m].rotations[n], second.modes[m].rotations[n]));
+            }
+        }
+        CHECK(first.note == second.note);
+    }
+}
+
+// REQ-011-07, 09: the iterations are reported as 1, 2, ...
+TEST_CASE("Second order and buckling report their iterations", "[core][run_control]")
+{
+    const Model model = column(8, 1.0e4);
+    Recorder second;
+    const SecondOrderResult result = requiredSecond(
+        fem::core::runSecondOrderStatic(model, {.base = {.threads = 1, .control = second.control()},
+                                                .tolerance = 1e-8,
+                                                .maxIterations = 50}));
+    const std::vector<int> iterations = iterationsOf(second.seen);
+    REQUIRE(static_cast<int>(iterations.size()) == result.iterations);
+    REQUIRE(result.iterations >= 2);
+    for (std::size_t k = 0; k < iterations.size(); ++k) {
+        CHECK(iterations[k] == static_cast<int>(k) + 1);
+    }
+    for (const RunProgress& p : second.seen) {
+        if (p.stage == RunStage::Iteration) {
+            CHECK(p.fraction == static_cast<double>(p.iteration) / 50.0);
+        }
+    }
+
+    Recorder buckling;
+    REQUIRE(
+        fem::core::runLinearBuckling(
+            model,
+            {.base = {.threads = 1, .control = buckling.control()}, .count = 2, .tolerance = 1e-10})
+            .has_value());
+    const std::vector<int> steps = iterationsOf(buckling.seen);
+    REQUIRE(steps.size() > 2);
+    for (std::size_t k = 0; k < steps.size(); ++k) {
+        CHECK(steps[k] == static_cast<int>(k) + 1);
+    }
+}
+
+// REQ-011-08, 09: cancelled at an iteration of the second order and at
+// every step of the buckling search (the subspace iterations, the Sturm
+// counts and their bisections), the analyses return a cancellation.
+TEST_CASE("Cancelled second order and buckling return a cancellation", "[core][run_control]")
+{
+    const Model model = column(8, 1.0e4);
+    for (const int at : {1, 2}) {
+        std::atomic<bool> flag{false};
+        const auto result = fem::core::runSecondOrderStatic(
+            model, {.base = {.threads = 0, .control = cancelAtIteration(flag, at)},
+                    .tolerance = 1e-8,
+                    .maxIterations = 50});
+        REQUIRE_FALSE(result.has_value());
+        CHECK(result.error().cancelled);
+    }
+
+    Recorder recorder;
+    REQUIRE(
+        fem::core::runLinearBuckling(
+            model,
+            {.base = {.threads = 1, .control = recorder.control()}, .count = 2, .tolerance = 1e-10})
+            .has_value());
+    const auto steps = static_cast<int>(iterationsOf(recorder.seen).size());
+    for (int at = 1; at <= steps; ++at) {
+        std::atomic<bool> flag{false};
+        const auto result = fem::core::runLinearBuckling(
+            model, {.base = {.threads = 0, .control = cancelAtIteration(flag, at)},
+                    .count = 2,
+                    .tolerance = 1e-10});
+        INFO("step " << at << " of " << steps);
+        REQUIRE_FALSE(result.has_value());
+        CHECK(result.error().cancelled);
     }
 }

@@ -202,11 +202,14 @@ double relativeChange(const Eigen::VectorXd& now, const Eigen::VectorXd& before)
     return size > 0.0 ? (now - before).norm() / size : (now - before).norm();
 }
 
-} // namespace
-
-Expected<SecondOrderResult> runSecondOrderStatic(const Model& model,
-                                                 const SecondOrderOptions& options)
+Expected<SecondOrderResult> secondOrder(const Model& model, const SecondOrderOptions& options)
 {
+    // REQ-011-08, 09: the control is checked between the stages and at each
+    // iteration; the assemblies check it by blocks of elements.
+    const RunControl& control = options.base.control;
+    if (control.cancelled()) {
+        return makeCancelled();
+    }
     auto prepared = StaticProblem::prepare(model, options.base, true);
     if (!prepared) {
         return tl::unexpected(prepared.error());
@@ -221,6 +224,10 @@ Expected<SecondOrderResult> runSecondOrderStatic(const Model& model,
     if (auto stable = problem.checkDiagonal(system->matrix); !stable) {
         return tl::unexpected(stable.error());
     }
+    control.report({.stage = RunStage::Factorization, .fraction = -1.0, .iteration = 0});
+    if (control.cancelled()) {
+        return makeCancelled();
+    }
     auto preconditioner = std::make_unique<SparseCholesky>();
     if (auto factorized = preconditioner->factorize(system->matrix); !factorized) {
         const auto eq = preconditioner->singularEquation();
@@ -229,6 +236,10 @@ Expected<SecondOrderResult> runSecondOrderStatic(const Model& model,
         }
         return makeError("The structure is a mechanism: " + problem.equationLabel(*eq) +
                          " can move without resistance (a support may be missing).");
+    }
+    control.report({.stage = RunStage::Solution, .fraction = -1.0, .iteration = 0});
+    if (control.cancelled()) {
+        return makeCancelled();
     }
     auto linear = preconditioner->solve(system->rhs);
     if (!linear) {
@@ -265,6 +276,12 @@ Expected<SecondOrderResult> runSecondOrderStatic(const Model& model,
     int halvings = 0;
     double change = 0.0;
     for (int k = 1; k <= options.maxIterations; ++k) {
+        control.report({.stage = RunStage::Iteration,
+                        .fraction = static_cast<double>(k) / options.maxIterations,
+                        .iteration = k});
+        if (control.cancelled()) {
+            return makeCancelled();
+        }
         problem.setReference(unflatten(x, flat));
         system = problem.assemble();
         if (!system) {
@@ -338,6 +355,19 @@ Expected<SecondOrderResult> runSecondOrderStatic(const Model& model,
     return makeError("The second-order analysis did not converge in " +
                      std::to_string(options.maxIterations) + " iterations (last change " +
                      text.data() + ").");
+}
+
+} // namespace
+
+Expected<SecondOrderResult> runSecondOrderStatic(const Model& model,
+                                                 const SecondOrderOptions& options)
+{
+    // REQ-011-08: an error met after a cancellation is the cancellation.
+    auto result = secondOrder(model, options);
+    if (!result && options.base.control.cancelled()) {
+        return makeCancelled();
+    }
+    return result;
 }
 
 } // namespace fem::core

@@ -79,10 +79,24 @@ Eigen::VectorXd times(const SparseMatrix& lower, const Eigen::VectorXd& x)
 class Pencil
 {
 public:
-    Pencil(StaticProblem& problem, std::vector<ReferenceProfile> reference)
+    Pencil(StaticProblem& problem, std::vector<ReferenceProfile> reference,
+           const RunControl& control)
         : m_problem(problem)
         , m_reference(std::move(reference))
+        , m_control(control)
     {}
+
+    // REQ-011-08, 09: one step of the search (a subspace iteration, a Sturm
+    // count): reports it as an Iteration and stops at a cancellation.
+    [[nodiscard]] Expected<void> step()
+    {
+        ++m_steps;
+        m_control.report({.stage = RunStage::Iteration, .fraction = -1.0, .iteration = m_steps});
+        if (m_control.cancelled()) {
+            return makeCancelled();
+        }
+        return {};
+    }
 
     [[nodiscard]] Expected<SparseMatrix> at(double lambda, std::int64_t* internal = nullptr)
     {
@@ -104,6 +118,8 @@ public:
 private:
     StaticProblem& m_problem;
     std::vector<ReferenceProfile> m_reference;
+    const RunControl& m_control;
+    int m_steps = 0;
 };
 
 // J(lambda): the factors below lambda (design 008c §5.4); the factorization
@@ -114,6 +130,9 @@ private:
 Expected<std::int64_t> sturmCount(Pencil& pencil, double lambda,
                                   std::unique_ptr<SparseCholesky>* keep = nullptr)
 {
+    if (auto going = pencil.step(); !going) {
+        return tl::unexpected(going.error());
+    }
     const double start = lambda;
     double step = 1e-8;
     for (int attempt = 0; attempt < 4; ++attempt) {
@@ -242,10 +261,14 @@ Expected<bool> refine(Pencil& pencil, const SparseCholesky& shifted, const Spars
     return false;
 }
 
-} // namespace
-
-Expected<BucklingResult> runLinearBuckling(const Model& model, const BucklingOptions& options)
+Expected<BucklingResult> buckling(const Model& model, const BucklingOptions& options)
 {
+    // REQ-011-08, 09: the control is checked between the stages and at each
+    // step of the search; the assemblies check it by blocks of elements.
+    const RunControl& control = options.base.control;
+    if (control.cancelled()) {
+        return makeCancelled();
+    }
     auto prepared = StaticProblem::prepare(model, options.base, true);
     if (!prepared) {
         return tl::unexpected(prepared.error());
@@ -261,6 +284,10 @@ Expected<BucklingResult> runLinearBuckling(const Model& model, const BucklingOpt
         return tl::unexpected(stable.error());
     }
     const SparseMatrix k0 = system->matrix;
+    control.report({.stage = RunStage::Factorization, .fraction = -1.0, .iteration = 0});
+    if (control.cancelled()) {
+        return makeCancelled();
+    }
     SparseCholesky base;
     if (auto factorized = base.factorize(k0); !factorized) {
         const auto eq = base.singularEquation();
@@ -269,6 +296,10 @@ Expected<BucklingResult> runLinearBuckling(const Model& model, const BucklingOpt
         }
         return makeError("The structure is a mechanism: " + problem.equationLabel(*eq) +
                          " can move without resistance (a support may be missing).");
+    }
+    control.report({.stage = RunStage::Solution, .fraction = -1.0, .iteration = 0});
+    if (control.cancelled()) {
+        return makeCancelled();
     }
     auto linear = base.solve(system->rhs);
     if (!linear) {
@@ -294,7 +325,7 @@ Expected<BucklingResult> runLinearBuckling(const Model& model, const BucklingOpt
         return makeError(
             "No bar is compressed, bent or twisted by these loads: there is no buckling factor.");
     }
-    Pencil pencil(problem, reference);
+    Pencil pencil(problem, reference, control);
     const Eigen::Index n = k0.rows();
     const int wanted = std::max(1, options.count);
     BucklingResult out;
@@ -347,6 +378,9 @@ Expected<BucklingResult> runLinearBuckling(const Model& model, const BucklingOpt
     // Estimates: subspace iteration on K0 phi = mu G phi (design 008c §5.6).
     std::vector<double> last;
     for (int iteration = 0; linearized && iteration < kSubspaceIterations; ++iteration) {
+        if (auto going = pencil.step(); !going) {
+            return tl::unexpected(going.error());
+        }
         Eigen::MatrixXd y(n, p);
         for (Eigen::Index c = 0; c < p; ++c) {
             auto solved = base.solve(times(g, x.col(c)));
@@ -400,6 +434,9 @@ Expected<BucklingResult> runLinearBuckling(const Model& model, const BucklingOpt
     }
     last.clear();
     for (int iteration = 0; useQuadratic && iteration < kSubspaceIterations; ++iteration) {
+        if (auto going = pencil.step(); !going) {
+            return tl::unexpected(going.error());
+        }
         const Eigen::Index columns = std::min<Eigen::Index>(2 * p, n);
         Eigen::MatrixXd y(n, columns);
         for (Eigen::Index c = 0; c < columns; ++c) {
@@ -916,6 +953,19 @@ Expected<BucklingResult> runLinearBuckling(const Model& model, const BucklingOpt
                     "the search.";
     }
     return out;
+}
+
+} // namespace
+
+Expected<BucklingResult> runLinearBuckling(const Model& model, const BucklingOptions& options)
+{
+    // REQ-011-08: an error met after a cancellation (some steps of the search
+    // step around a failed count) is the cancellation.
+    auto result = buckling(model, options);
+    if (!result && options.base.control.cancelled()) {
+        return makeCancelled();
+    }
+    return result;
 }
 
 } // namespace fem::core
