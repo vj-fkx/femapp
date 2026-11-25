@@ -92,7 +92,7 @@ Regras:
   - depois `unstableSite` e a mensagem.
   Arquivos: `instability.cpp`, `second_order.cpp`,
   `tests/unit/core/test_instability.cpp`. Cobre: 18.
-- [ ] **T24** [P] `idsInMessage` lê as mensagens novas: os nós e os
+- [x] **T24** [P] `idsInMessage` lê as mensagens novas: os nós e os
   elementos citados, sem a contagem. Arquivo:
   `tests/unit/app/test_check_issues.cpp` (e o parser, se precisar).
   Cobre: 18.

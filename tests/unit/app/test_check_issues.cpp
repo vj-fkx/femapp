@@ -35,6 +35,38 @@ TEST_CASE("the elements and nodes a problem of the core names", "[app][check]")
     CHECK(typed.elements == Ids{5});
 }
 
+// REQ-011-18: the instability messages of the core name the node and the
+// elements involved; a count, an iteration and a dof are not ids.
+TEST_CASE("the elements and nodes an instability message names", "[app][check]")
+{
+    const auto mechanism = fem::app::idsInMessage(
+        "The structure is a mechanism: the node 12 in v can move without resistance, with "
+        "the elements 3, 4, 7 and 2 more (a support may be missing).");
+    CHECK(mechanism.nodes == Ids{12});
+    CHECK(mechanism.elements == Ids{3, 4, 7});
+
+    const auto diagonal = fem::app::idsInMessage(
+        "The structure is unstable: no bar gives stiffness to\n"
+        "- the node 3 in w (elements 2, 5)\n"
+        "- the node 8 in rz (element 6)\n"
+        "(A rotation without stiffness: restrain it, or keep one beam at the node connected.)");
+    CHECK(diagonal.nodes == Ids{3, 8});
+    CHECK(diagonal.elements == Ids{2, 5, 6});
+
+    const auto secondOrder = fem::app::idsInMessage(
+        "The structure is unstable under these loads: the second-order stiffness lost its "
+        "stability at iteration 4: the node 7 in u moves the most, and the elements 2, 3 "
+        "drive it.");
+    CHECK(secondOrder.nodes == Ids{7});
+    CHECK(secondOrder.elements == Ids{2, 3});
+
+    const auto inside = fem::app::idsInMessage(
+        "The structure is unstable under these loads: the second-order stiffness lost its "
+        "stability at iteration 2 (inside the element 5, buckling in its local y direction).");
+    CHECK(inside.nodes.empty());
+    CHECK(inside.elements == Ids{5});
+}
+
 TEST_CASE("the text of each problem of the build", "[app][check]")
 {
     using K = fem::setup::IssueKind;
