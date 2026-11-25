@@ -58,10 +58,15 @@ Regras:
   - depois o campo e a soma do vetor de cargas.
   Arquivos: `static_analysis.hpp/.cpp`,
   `tests/unit/core/test_static_validation.cpp`. Cobre: 13.
-- [ ] **T05** `bench_run_control`: o pórtico do `bench_frame` (ou o maior
+- [x] **T05** `bench_run_control`: o pórtico do `bench_frame` (ou o maior
   pórtico de barras da suíte de perf), com e sem controle, em Release;
   a diferença ≤ 2%. Arquivo: `tests/perf/bench_run_control.cpp`.
   Cobre: N03.
+  - Medido em 2026-11-25, máquina do mantenedor: 4 961 nós, 13 640 barras,
+    medianas de 7 rodadas intercaladas, cerca de 12 300 chamadas de
+    progresso por análise; diferença de −0,6% e −0,8% em duas execuções
+    (ruído). O prédio do `bench_frame` passou para
+    `tests/perf/frame_building.hpp`, usado pelos dois.
 
 ## Fase 1b — Onde está a instabilidade (REQ-011-18, design §5.2a)
 

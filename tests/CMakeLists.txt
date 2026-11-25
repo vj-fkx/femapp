@@ -194,6 +194,11 @@ add_executable(bench_frame perf/bench_frame.cpp)
 target_link_libraries(bench_frame PRIVATE fem::core)
 femapp_set_warnings(bench_frame)
 
+# NFR-011-03: cost of the run control, run by hand on a Release build.
+add_executable(bench_run_control perf/bench_run_control.cpp)
+target_link_libraries(bench_run_control PRIVATE fem::core)
+femapp_set_warnings(bench_run_control)
+
 # REQ-004-03: command line parsing of the application, built on its own.
 # Feature 009: also the mesh job of the MESH command, with a QCoreApplication.
 add_executable(test_app
