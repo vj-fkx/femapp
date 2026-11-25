@@ -272,9 +272,15 @@ TEST_CASE("the problems of a build", "[setup][build]")
     SECTION("the drawing changed after the mesh")
     {
         const s::MeshContext mesh = meshOf(f.drawing);
-        addLine(f.drawing, Vec3(20, 0, 0), Vec3(21, 0, 0));
+        const EntityId extra = addLine(f.drawing, Vec3(20, 0, 0), Vec3(21, 0, 0));
         CHECK(has(s::buildModel(setup.document, f.drawing, mesh, load).issues,
                   IssueKind::MeshOutOfDate));
+        // REQ-011-12: undoing that edit makes the mesh current again.
+        const Entity* line = f.drawing.find(extra);
+        REQUIRE(line != nullptr);
+        f.drawing.revert(DrawingEdit{.removed = {}, .added = {*line}});
+        CHECK_FALSE(has(s::buildModel(setup.document, f.drawing, mesh, load).issues,
+                        IssueKind::MeshOutOfDate));
     }
     SECTION("an entity that is gone, and one that was never meshed")
     {

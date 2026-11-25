@@ -298,3 +298,35 @@ TEST_CASE("ERASE removes, and undo brings the same ids back", "[geom][commands]"
         CHECK(drawing.find(ids[1]) != nullptr);
     }
 }
+
+// REQ-011-12 (design 011 §5.3): a command of several edits is one revision
+// step; one that cancels out leaves the revision as it was.
+TEST_CASE("a command is one revision step", "[geom][commands]")
+{
+    Drawing drawing;
+    CommandSession session(drawing);
+    const auto before = drawing.revision();
+    session.start(CommandName::Line);
+    session.feedText("0,0");
+    session.feedText("@4,0");
+    session.feedText("@0,3");
+    session.feedText("@-4,0");
+    session.enter();
+    const auto edits = session.takeFinishedEdits();
+    REQUIRE(edits.size() == 1);
+    CHECK(drawing.revision() != before);
+    drawing.revert(edits[0]);
+    CHECK(drawing.empty());
+    CHECK(drawing.revision() == before);
+
+    // Undone with U back to the first point: nothing to undo, as before.
+    session.start(CommandName::Line);
+    session.feedText("0,0");
+    session.feedText("@4,0");
+    session.feedText("@0,3");
+    session.feedText("U");
+    session.feedText("U");
+    session.enter();
+    CHECK(session.takeFinishedEdits().empty());
+    CHECK(drawing.revision() == before);
+}

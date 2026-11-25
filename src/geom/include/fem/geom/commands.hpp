@@ -3,6 +3,7 @@
 #include <fem/geom/command_input.hpp>
 #include <fem/geom/drawing.hpp>
 
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <span>
@@ -118,6 +119,7 @@ private:
     std::optional<Vec3> m_base;      // MOVE and COPY base point
     std::optional<Vec3> m_lastPoint; // last point given, for @ between commands
     DrawingEdit m_edit;              // everything the running command changed
+    std::size_t m_applies = 0;       // the applies of the running command
     int m_count = 0;                 // entities made, moved or erased
 
     std::vector<Message> m_messages;

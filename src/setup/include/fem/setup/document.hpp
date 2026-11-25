@@ -199,7 +199,9 @@ class Document
 public:
     [[nodiscard]] UnitSystem units() const noexcept { return m_units; }
     [[nodiscard]] std::optional<ItemId> activeCase() const noexcept { return m_activeCase; }
-    // Changes on every apply and revert.
+    // REQ-011-12 (design 011 §5.3): one per state. apply() gives a revision
+    // never seen before; revert() brings back the one before the edit it
+    // reverts (the undo is LIFO).
     [[nodiscard]] std::uint64_t revision() const noexcept { return m_revision; }
 
     // Reserves a fresh id.
@@ -224,6 +226,8 @@ private:
     std::optional<ItemId> m_activeCase;
     std::uint64_t m_lastId = 0;
     std::uint64_t m_revision = 0;
+    std::uint64_t m_lastRevision = 0;     // the revisions handed out so far
+    std::vector<std::uint64_t> m_earlier; // the revision before each apply
 };
 
 } // namespace fem::setup

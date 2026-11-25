@@ -162,3 +162,63 @@ TEST_CASE("bounds and tolerance follow the drawing size", "[geom][drawing]")
     CHECK(box.value_or(fem::geom::Box{}).max == Vec3(3000, 4000, 0));
     CHECK_THAT(drawing.tolerance(), Catch::Matchers::WithinRel(5e-6, 1e-12));
 }
+
+// REQ-011-12 (design 011 §5.3): undoing an edit brings its revision back;
+// a new edit gets a revision never seen before.
+TEST_CASE("undo brings the revision back", "[geom][drawing]")
+{
+    Drawing drawing;
+    const auto r0 = drawing.revision();
+    const DrawingEdit first{.removed = {},
+                            .added = {line(drawing.nextId(), Vec3(0, 0, 0), Vec3(1, 0, 0))}};
+    drawing.apply(first);
+    const auto r1 = drawing.revision();
+    const DrawingEdit second{.removed = {},
+                             .added = {line(drawing.nextId(), Vec3(0, 1, 0), Vec3(1, 1, 0))}};
+    drawing.apply(second);
+    const auto r2 = drawing.revision();
+    CHECK(r1 != r0);
+    CHECK(r2 != r1);
+
+    drawing.revert(second);
+    CHECK(drawing.revision() == r1);
+    drawing.revert(first);
+    CHECK(drawing.revision() == r0);
+
+    // Redone, and another edit: new revisions, different from all.
+    drawing.apply(first);
+    const auto r3 = drawing.revision();
+    CHECK(r3 != r0);
+    CHECK(r3 != r1);
+    CHECK(r3 != r2);
+    drawing.revert(first);
+    CHECK(drawing.revision() == r0);
+}
+
+// REQ-011-12: the applies of a command fold into one undo step; applies
+// that cancel out bring the revision back at once.
+TEST_CASE("the applies of a command fold into one step", "[geom][drawing]")
+{
+    Drawing drawing;
+    const auto r0 = drawing.revision();
+    DrawingEdit whole;
+    for (int i = 0; i < 3; ++i) {
+        const DrawingEdit part{.removed = {},
+                               .added = {line(drawing.nextId(), Vec3(i, 0, 0), Vec3(i + 1, 0, 0))}};
+        drawing.apply(part);
+        whole.append(part);
+    }
+    const auto r3 = drawing.revision();
+    drawing.foldApplies(3, false);
+    CHECK(drawing.revision() == r3);
+    drawing.revert(whole);
+    CHECK(drawing.revision() == r0);
+
+    // Applies that cancel out: back at once.
+    const Entity made = line(drawing.nextId(), Vec3(0, 5, 0), Vec3(1, 5, 0));
+    drawing.apply({.removed = {}, .added = {made}});
+    drawing.apply({.removed = {made}, .added = {}});
+    CHECK(drawing.revision() != r0);
+    drawing.foldApplies(2, true);
+    CHECK(drawing.revision() == r0);
+}

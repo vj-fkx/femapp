@@ -104,7 +104,7 @@ Regras:
 
 ## Fase 2 — Revisões que voltam com o desfazer
 
-- [ ] **T06** `Document` e `Drawing`: `apply` empilha a revisão e dá uma
+- [x] **T06** `Document` e `Drawing`: `apply` empilha a revisão e dá uma
   nova; `revert` restaura a anterior (design §5.3):
   - testes primeiro: aplicar, desfazer volta a revisão; aplicar de novo
     dá uma revisão nova, diferente de todas; a malha da 010 volta a ser

@@ -153,3 +153,32 @@ TEST_CASE("the units and the active case in an edit", "[setup][document]")
     CHECK_FALSE(document.activeCase().has_value());
     CHECK(document.size() == 0);
 }
+
+// REQ-011-12 (design 011 §5.3): undoing an edit brings its revision back;
+// a new edit gets a revision never seen before.
+TEST_CASE("undo brings the revision of the document back", "[setup][document]")
+{
+    Document document;
+    const std::uint64_t r0 = document.revision();
+    DocumentEdit first;
+    first.added = oneOfEach(document);
+    document.apply(first);
+    const std::uint64_t r1 = document.revision();
+    DocumentEdit second;
+    second.units = {document.units(), fem::setup::UnitSystem::NewtonMillimetre};
+    document.apply(second);
+    const std::uint64_t r2 = document.revision();
+    CHECK(r1 != r0);
+    CHECK(r2 != r1);
+
+    document.revert(second);
+    CHECK(document.revision() == r1);
+    document.revert(first);
+    CHECK(document.revision() == r0);
+
+    document.apply(first);
+    const std::uint64_t r3 = document.revision();
+    CHECK(r3 != r0);
+    CHECK(r3 != r1);
+    CHECK(r3 != r2);
+}

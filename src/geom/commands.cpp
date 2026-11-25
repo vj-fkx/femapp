@@ -347,6 +347,9 @@ void CommandSession::finish()
     if (m_command == CommandName::Copy && m_count > 0) {
         message(MessageId::EntitiesCopied, m_count);
     }
+    // REQ-011-12: the command is one revision step.
+    m_drawing.foldApplies(m_applies, m_edit.empty());
+    m_applies = 0;
     if (!m_edit.empty()) {
         m_finished.push_back(std::move(m_edit));
     }
@@ -364,6 +367,7 @@ void CommandSession::apply(const DrawingEdit& edit)
 {
     m_drawing.apply(edit);
     m_edit.append(edit);
+    ++m_applies;
 }
 
 void CommandSession::message(MessageId id, int count)

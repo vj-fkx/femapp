@@ -1,6 +1,7 @@
 #include <fem/geom/drawing.hpp>
 
 #include <algorithm>
+#include <cstddef>
 #include <type_traits>
 #include <utility>
 
@@ -74,7 +75,8 @@ void Drawing::apply(const DrawingEdit& edit)
     for (const Entity& entity : edit.added) {
         insert(entity);
     }
-    ++m_revision;
+    m_earlier.push_back(m_revision);
+    m_revision = ++m_lastRevision;
 }
 
 void Drawing::revert(const DrawingEdit& edit)
@@ -85,7 +87,27 @@ void Drawing::revert(const DrawingEdit& edit)
     for (const Entity& entity : edit.removed) {
         insert(entity);
     }
-    ++m_revision;
+    if (m_earlier.empty()) {
+        m_revision = ++m_lastRevision; // not the inverse of an apply here
+    } else {
+        m_revision = m_earlier.back();
+        m_earlier.pop_back();
+    }
+}
+
+void Drawing::foldApplies(std::size_t applies, bool empty)
+{
+    const std::size_t n = std::min(applies, m_earlier.size());
+    if (n == 0) {
+        return;
+    }
+    const std::size_t first = m_earlier.size() - n;
+    if (empty) {
+        m_revision = m_earlier[first];
+        m_earlier.resize(first);
+    } else {
+        m_earlier.resize(first + 1);
+    }
 }
 
 void Drawing::insert(const Entity& entity)

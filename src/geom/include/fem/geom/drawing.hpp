@@ -83,7 +83,9 @@ public:
     [[nodiscard]] std::span<const Entity> entities() const noexcept { return m_entities; }
     [[nodiscard]] std::size_t size() const noexcept { return m_entities.size(); }
     [[nodiscard]] bool empty() const noexcept { return m_entities.empty(); }
-    // Changes on every edit.
+    // REQ-011-12 (design 011 §5.3): one per state. apply() gives a revision
+    // never seen before; revert() brings back the one before the edit it
+    // reverts (the undo is LIFO).
     [[nodiscard]] std::uint64_t revision() const noexcept { return m_revision; }
     [[nodiscard]] std::optional<Box> bounds() const;
     // Distance under which two points are the same: 1e-9 x max(1, diagonal).
@@ -93,6 +95,11 @@ public:
     void apply(const DrawingEdit& edit);
     // The inverse of apply.
     void revert(const DrawingEdit& edit);
+    // The last `applies` applies of a drafting command become one undo
+    // step: the next revert() brings back the revision from before the
+    // first. With `empty` (they cancelled out, and there is no undo step),
+    // that revision comes back now.
+    void foldApplies(std::size_t applies, bool empty);
 
 private:
     void insert(const Entity& entity);
@@ -102,6 +109,8 @@ private:
     std::unordered_map<std::uint64_t, std::size_t> m_index;
     std::uint64_t m_lastId = 0;
     std::uint64_t m_revision = 0;
+    std::uint64_t m_lastRevision = 0;     // the revisions handed out so far
+    std::vector<std::uint64_t> m_earlier; // the revision before each apply
 };
 
 // Straight pieces: none for a point, one for a line, n - 1 (open) or n
