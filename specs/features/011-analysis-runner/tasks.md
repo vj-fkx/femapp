@@ -28,11 +28,12 @@ Regras:
     nada; com a bandeira, `cancelled()` a segue.
   Arquivos: `core/include/fem/core/run_control.hpp`, `expected.hpp`,
   `static_analysis.hpp`, `tests/unit/core/test_run_control.cpp`. Cobre: 09.
-- [ ] **T02** A estática linear com controle (design §5.1):
+- [x] **T02** A estática linear com controle (design §5.1):
   - testes primeiro:
-    - sem controle, o pórtico, a treliça e uma viga com cargas no vão dão
-      exatamente os mesmos vetores de antes (igualdade bit a bit contra
-      uma execução de referência gravada no próprio teste);
+    - com um controle que nunca cancela, o pórtico, a treliça e uma viga
+      com cargas no vão dão exatamente os mesmos vetores que sem controle
+      (igualdade bit a bit no mesmo binário, com 1 thread e com todas;
+      números gravados no teste mudariam entre compiladores e com FMA);
     - o progresso passa por Assembly, Factorization, Solution e Recovery,
       com frações em [0, 1] crescentes na montagem;
     - o cancelamento ligado antes, na primeira chamada de progresso da
@@ -42,7 +43,7 @@ Regras:
   Arquivos: `assembler.hpp/.cpp`, `static_analysis.cpp`,
   `test_run_control.cpp`. Cobre: 07, 08, 09.
 - [ ] **T03** A segunda ordem e a flambagem com controle:
-  - testes primeiro: sem controle, iguais a antes; o progresso traz
+  - testes primeiro: com controle, bit a bit iguais a sem controle; o progresso traz
     `Iteration` com i = 1, 2…; o cancelamento na iteração k da segunda
     ordem, numa iteração de subespaço e na bisseção de Sturm da
     flambagem devolve `cancelled`;

@@ -406,7 +406,7 @@ F5 / Run all
 
 | Teste | Tipo | Requisito | Referência/tolerância |
 |-------|------|-----------|-----------------------|
-| Sem controle, as três análises dão os mesmos números que hoje | unitário (core) | REQ-011-09, AC-4 | igualdade bit a bit nos vetores de resultado |
+| Com um controle que não cancela, as três análises dão os mesmos números que sem controle | unitário (core) | REQ-011-09, AC-4 | igualdade bit a bit nos vetores de resultado, no mesmo binário |
 | O cancelamento ligado antes da montagem, durante (pela primeira chamada de progresso) e na iteração k da segunda ordem e da flambagem devolve `cancelled` | unitário (core) | REQ-011-08, 09 | — |
 | O progresso passa por Assembly → Factorization → Solution → Recovery, com frações crescentes; Iteration com i = 1, 2… | unitário (core) | REQ-011-07, 09 | — |
 | `appliedForce` + Σ reações = 0 no pórtico, em cargas nodais, no vão e no peso próprio | unitário (core) | REQ-011-13 | 1e−9 relativo |
