@@ -223,3 +223,62 @@ TEST_CASE("the direct solver points at the singular equation", "[core][solver]")
     REQUIRE(solver.factorize(floating).has_value());
     CHECK_FALSE(solver.singularEquation().has_value());
 }
+
+// REQ-011-18: the energy u_e^T K_e u_e of each element, by hand on two bars;
+// zero for a rigid motion.
+TEST_CASE("element energies by hand", "[core][assembly]")
+{
+    const fem::core::Mesh mesh = bars();
+    const PoissonElement element;
+    const std::vector<ElementIndex> all = {0, 1};
+    const std::vector<ElementSet> sets = {{.elements = all, .formulation = &element}};
+    DofMap dofs = DofMap::build(mesh, sets);
+    REQUIRE(dofs.prescribe(0, DofType::T, 0.0).has_value());
+
+    const Eigen::Vector3d values(0.0, 1.0, 4.0);
+    const auto energies = fem::core::elementEnergies(mesh, dofs, sets, values);
+    REQUIRE(energies.has_value());
+    REQUIRE(energies->size() == 2);
+    CHECK(std::abs((*energies)[0] - 1.0) < 1e-14); // (1 - 0)^2 / 1
+    CHECK(std::abs((*energies)[1] - 4.5) < 1e-14); // (4 - 1)^2 / 2
+
+    const auto rigid = fem::core::elementEnergies(mesh, dofs, sets, Eigen::Vector3d(2.0, 2.0, 2.0));
+    REQUIRE(rigid.has_value());
+    CHECK(std::abs((*rigid)[0]) < 1e-14);
+    CHECK(std::abs((*rigid)[1]) < 1e-14);
+}
+
+// REQ-011-18: the energies add up to u^T K u, and the parallel ones are the
+// sequential ones (each element is computed on its own).
+TEST_CASE("element energies add up to the energy of the system", "[core][assembly]")
+{
+    const auto unit = fem::core::test::unitMesh(ElementType::Tet4, 6, 0.03);
+    const PoissonElement element;
+    const std::vector<ElementSet> sets = {{.elements = unit.elements, .formulation = &element}};
+    const DofMap dofs = DofMap::build(unit.mesh, sets);
+    Eigen::VectorXd values(dofs.size());
+    for (Eigen::Index i = 0; i < values.size(); ++i) {
+        values[i] = std::sin(0.7 * static_cast<double>(i) + 0.3);
+    }
+
+    const auto sequential = fem::core::elementEnergies(unit.mesh, dofs, sets, values, 1);
+    const auto parallel = fem::core::elementEnergies(unit.mesh, dofs, sets, values, 0);
+    REQUIRE(sequential.has_value());
+    REQUIRE(parallel.has_value());
+    CHECK(*sequential == *parallel);
+
+    // Every dof is free: the equation of a dof is its index.
+    const auto system = fem::core::assemble(unit.mesh, dofs, sets, {}, 1);
+    REQUIRE(system.has_value());
+    REQUIRE(system->matrix.rows() == values.size());
+    Eigen::VectorXd free(values.size());
+    for (fem::core::DofIndex d = 0; d < dofs.size(); ++d) {
+        free[dofs.equation(d)] = values[d];
+    }
+    const double total = free.dot(system->matrix.selfadjointView<Eigen::Lower>() * free);
+    double sum = 0.0;
+    for (const double e : *sequential) {
+        sum += e;
+    }
+    CHECK(std::abs(sum - total) <= 1e-12 * std::abs(total));
+}

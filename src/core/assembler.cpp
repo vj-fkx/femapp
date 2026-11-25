@@ -389,4 +389,31 @@ Expected<Eigen::VectorXd> reactions(const Mesh& mesh, const DofMap& dofs,
     return result;
 }
 
+Expected<std::vector<double>> elementEnergies(const Mesh& mesh, const DofMap& dofs,
+                                              std::span<const ElementSet> sets,
+                                              const Eigen::VectorXd& values, int threads)
+{
+    std::vector<double> energies(static_cast<std::size_t>(mesh.elementCount()), 0.0);
+    auto done = forEachElement(
+        mesh, sets, threads, nullptr, RunStage::Recovery,
+        [&](const ElementSet& set, ElementIndex element, Workspace& ws) -> Expected<void> {
+            const auto size = computeLocal(mesh, dofs, set, element, ws);
+            if (!size) {
+                return tl::unexpected(size.error());
+            }
+            Eigen::Matrix<double, Eigen::Dynamic, 1, 0, kMaxElementDofs, 1> local(*size);
+            for (int a = 0; a < *size; ++a) {
+                const DofIndex da = ws.dofs.at(static_cast<std::size_t>(a));
+                local[a] = da < 0 ? 0.0 : values[da];
+            }
+            energies[static_cast<std::size_t>(element)] =
+                local.dot(ws.matrix.topLeftCorner(*size, *size) * local);
+            return {};
+        });
+    if (!done) {
+        return tl::unexpected(done.error());
+    }
+    return energies;
+}
+
 } // namespace fem::core

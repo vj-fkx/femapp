@@ -67,7 +67,7 @@ Regras:
 
 *Acrescentada em 2026-11-25.*
 
-- [ ] **T21** `elementEnergies` no `assembler`:
+- [x] **T21** `elementEnergies` no `assembler`:
   - testes primeiro: numa barra, igual a uᵀKu da matriz montada; zero
     num movimento de corpo rígido; o mesmo com 1 thread e com todas;
   - depois a função.

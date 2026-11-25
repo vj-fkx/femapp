@@ -10,6 +10,7 @@
 #include <Eigen/SparseCore>
 #include <cstdint>
 #include <span>
+#include <vector>
 
 namespace fem::core {
 
@@ -49,5 +50,14 @@ struct AssembledSystem
 reactions(const Mesh& mesh, const DofMap& dofs, std::span<const ElementSet> sets,
           std::span<const NodalLoad> loads, const Eigen::VectorXd& values, int threads = 0,
           const RunControl* control = nullptr, Eigen::VectorXd* applied = nullptr);
+
+// REQ-011-18: u_e^T K_e u_e of every element for the values of all dofs
+// (per DofIndex), by ElementIndex; zero for the elements of no set. In
+// parallel by colours; each element is computed on its own, so the result
+// does not depend on `threads`.
+[[nodiscard]] Expected<std::vector<double>> elementEnergies(const Mesh& mesh, const DofMap& dofs,
+                                                            std::span<const ElementSet> sets,
+                                                            const Eigen::VectorXd& values,
+                                                            int threads = 0);
 
 } // namespace fem::core
