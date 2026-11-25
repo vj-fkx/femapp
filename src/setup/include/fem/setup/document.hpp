@@ -6,6 +6,7 @@
 #include <fem/core/mesh.hpp>
 #include <fem/core/model.hpp>
 #include <fem/geom/drawing.hpp>
+#include <fem/setup/analysis_settings.hpp>
 #include <fem/setup/units.hpp>
 
 #include <Eigen/Core>
@@ -177,18 +178,19 @@ using Item =
 [[nodiscard]] Targets* targetsOf(Item& item);
 
 // REQ-010-23: one reversible change: the items taken out and put in (the
-// same id in both is a change of that item), and the unit system and the
-// active case before and after.
+// same id in both is a change of that item), and the unit system, the
+// active case and the options of the analysis before and after.
 struct DocumentEdit
 {
     std::vector<Item> removed;
     std::vector<Item> added;
     std::optional<std::pair<UnitSystem, UnitSystem>> units;
     std::optional<std::pair<std::optional<ItemId>, std::optional<ItemId>>> activeCase;
+    std::optional<std::pair<AnalysisSettings, AnalysisSettings>> analysis; // REQ-011-01
 
     [[nodiscard]] bool empty() const noexcept
     {
-        return removed.empty() && added.empty() && !units && !activeCase;
+        return removed.empty() && added.empty() && !units && !activeCase && !analysis;
     }
 };
 
@@ -199,6 +201,8 @@ class Document
 public:
     [[nodiscard]] UnitSystem units() const noexcept { return m_units; }
     [[nodiscard]] std::optional<ItemId> activeCase() const noexcept { return m_activeCase; }
+    // REQ-011-01: the analysis run for every case.
+    [[nodiscard]] const AnalysisSettings& analysis() const noexcept { return m_analysis; }
     // REQ-011-12 (design 011 §5.3): one per state. apply() gives a revision
     // never seen before; revert() brings back the one before the edit it
     // reverts (the undo is LIFO).
@@ -211,8 +215,8 @@ public:
     [[nodiscard]] std::span<const Item> items() const noexcept { return m_items; }
     [[nodiscard]] std::size_t size() const noexcept { return m_items.size(); }
 
-    // Takes out `edit.removed`, puts in `edit.added`, then sets the units and
-    // the active case to their values after.
+    // Takes out `edit.removed`, puts in `edit.added`, then sets the units,
+    // the active case and the analysis to their values after.
     void apply(const DocumentEdit& edit);
     // The inverse of apply.
     void revert(const DocumentEdit& edit);
@@ -224,6 +228,7 @@ private:
     std::vector<Item> m_items; // sorted by id
     UnitSystem m_units = UnitSystem::KilonewtonMetre;
     std::optional<ItemId> m_activeCase;
+    AnalysisSettings m_analysis;
     std::uint64_t m_lastId = 0;
     std::uint64_t m_revision = 0;
     std::uint64_t m_lastRevision = 0;     // the revisions handed out so far

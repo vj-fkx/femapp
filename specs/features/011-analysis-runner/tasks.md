@@ -121,15 +121,17 @@ Regras:
 
 ## Fase 3 — `setup`: opções, execução, resultados e resumo
 
-- [ ] **T07** As opções no documento:
-  - `AnalysisSettings` e `AnalysisType` em `analysis.hpp`;
+- [x] **T07** As opções no documento:
+  - `AnalysisSettings` e `AnalysisType` em `analysis_settings.hpp` (à parte
+    do `analysis.hpp`, que inclui o `build.hpp`, que inclui o documento);
   - `Document::analysis()`, `DocumentEdit::analysis` e
     `changeAnalysis`, aplicados e revertidos como as unidades;
   - testes: padrões do `core`, a troca desfeita e refeita, a edição vazia
     quando igual, a conversão de unidades sem efeito.
-  Arquivos: `setup/include/fem/setup/analysis.hpp`, `analysis.cpp`,
-  `document.hpp/.cpp`, `editing.hpp/.cpp`, `convert.cpp`,
-  `tests/unit/setup/test_analysis.cpp`. Cobre: 01.
+  Arquivos: `setup/include/fem/setup/analysis_settings.hpp`,
+  `document.hpp/.cpp`, `editing.hpp/.cpp`,
+  `tests/unit/setup/test_analysis.cpp` (o `convert.cpp` não precisou mudar:
+  as opções não têm unidade). Cobre: 01.
 - [ ] **T08** `runCase` (design §4, §5.4):
   - testes primeiro: no pórtico 2×2 da 010 (o `Frame` de
     `test_build.cpp`), as três análises iguais às chamadas diretas do

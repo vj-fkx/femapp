@@ -56,7 +56,8 @@ um resultado volta a ser atual quando o estado analisado volta.
 | core | `second_order.cpp`, `buckling.cpp` | alterado | Verificação e progresso a cada iteração (das duas análises); as mensagens de instabilidade pelo diagnóstico (REQ-011-18) |
 | core | `detail/instability.hpp`, `instability.cpp` | novo | O modo do mecanismo ou da instabilidade, o nó e o GDL, os elementos envolvidos e o texto (REQ-011-18, §5.9) |
 | core | `static_analysis.cpp`, `assembler.hpp/.cpp` | alterado | `checkDiagonal` com os elementos do nó; `elementEnergies` (REQ-011-18) |
-| setup | `include/fem/setup/analysis.hpp`, `analysis.cpp` | novo | `AnalysisSettings`, `runCase`, `AnalysisResult`, `ResultSet`, `summarize` (REQ-011-01, 02, 05, 11, 12, 13) |
+| setup | `include/fem/setup/analysis_settings.hpp` | novo | `AnalysisType`, `AnalysisSettings`, à parte porque o `document.hpp` os inclui e o `analysis.hpp` inclui o `build.hpp` (REQ-011-01) *(T07)* |
+| setup | `include/fem/setup/analysis.hpp`, `analysis.cpp` | novo | `runCase`, `AnalysisResult`, `ResultSet`, `summarize` (REQ-011-01, 02, 05, 11, 12, 13) |
 | setup | `document.hpp/.cpp` | alterado | As opções no documento e no `DocumentEdit`; a revisão que volta com o `revert` |
 | setup | `convert.cpp` | alterado | Nada a converter (opções sem unidade): só o teste diz isso |
 | geom | `drawing.hpp/.cpp` | alterado | A revisão que volta com o `revert` (como no documento) |

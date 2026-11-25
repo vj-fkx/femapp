@@ -88,6 +88,9 @@ void Document::apply(const DocumentEdit& edit)
     if (edit.activeCase) {
         m_activeCase = edit.activeCase->second;
     }
+    if (edit.analysis) {
+        m_analysis = edit.analysis->second;
+    }
     m_earlier.push_back(m_revision);
     m_revision = ++m_lastRevision;
 }
@@ -105,6 +108,9 @@ void Document::revert(const DocumentEdit& edit)
     }
     if (edit.activeCase) {
         m_activeCase = edit.activeCase->first;
+    }
+    if (edit.analysis) {
+        m_analysis = edit.analysis->first;
     }
     if (m_earlier.empty()) {
         m_revision = ++m_lastRevision; // not the inverse of an apply here

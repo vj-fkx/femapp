@@ -4,6 +4,7 @@
 // step (design 010 §4, §5.2; REQ-010-23). They build the edit; the caller
 // applies it (and keeps it for undo).
 
+#include <fem/setup/analysis_settings.hpp>
 #include <fem/setup/document.hpp>
 #include <fem/setup/units.hpp>
 
@@ -66,5 +67,9 @@ using EditResult = tl::expected<DocumentEdit, EditRefusal>;
 // REQ-010-03: every value converted to `to`, as one edit; empty when the
 // document is already in `to`.
 [[nodiscard]] DocumentEdit changeUnits(const Document& document, UnitSystem to);
+// REQ-011-01: the type and options of the analysis; empty when the document
+// already has them. Nothing is converted.
+[[nodiscard]] DocumentEdit changeAnalysis(const Document& document,
+                                          const AnalysisSettings& settings);
 
 } // namespace fem::setup

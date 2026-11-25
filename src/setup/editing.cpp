@@ -457,4 +457,13 @@ DocumentEdit changeUnits(const Document& document, UnitSystem to)
     return edit;
 }
 
+DocumentEdit changeAnalysis(const Document& document, const AnalysisSettings& settings)
+{
+    DocumentEdit edit;
+    if (document.analysis() != settings) {
+        edit.analysis = std::pair{document.analysis(), settings};
+    }
+    return edit;
+}
+
 } // namespace fem::setup
