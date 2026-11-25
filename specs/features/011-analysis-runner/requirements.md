@@ -64,6 +64,7 @@ diagramas de esforços para a 013. Ambas leem os resultados guardados aqui.
 | REQ-011-08 | QUANDO o usuário cancelar, O sistema DEVE parar o cálculo no `core` na próxima verificação entre etapas, liberar a thread e manter os resultados anteriores do caso em andamento. No Run all, os casos já concluídos guardam o seu resultado, e os seguintes não rodam. | US-4 |
 | REQ-011-09 | O `core` DEVE aceitar, em todas as análises, um sinal de cancelamento e um retorno de progresso opcionais, sem Qt. Sem eles, o comportamento e o resultado DEVEM ser os de hoje. O cancelamento DEVE ser verificado: <br>• entre a montagem e a fatoração; <br>• entre a fatoração e a solução; <br>• a cada iteração da segunda ordem e da flambagem; <br>• ao longo da montagem, por bloco de elementos. <br>Uma fatoração já iniciada termina antes da parada. | US-4 |
 | REQ-011-10 | SE o `core` falhar (mecanismo, carga crítica, falta de convergência, nenhuma barra comprimida na flambagem), ENTÃO O sistema DEVE: <br>• mostrar a mensagem do `core` no console e na conferência; <br>• realçar no viewport os nós e elementos que ela cita, como na 010 (REQ-010-21); <br>• manter o resultado anterior daquele caso, marcado como desatualizado. | US-5 |
+| REQ-011-18 | SE o `core` recusar a análise por instabilidade, ENTÃO a mensagem DEVE indicar onde está a causa: o nó e o GDL, e os elementos envolvidos, pelos ids externos: <br>• **GDL sem rigidez:** cada nó e GDL, com os elementos ligados ao nó; <br>• **mecanismo:** o nó e o GDL que mais se movem no modo do mecanismo (o deslocamento sem resistência), e os elementos que se movem nele; <br>• **perda da estabilidade na segunda ordem:** o nó e o GDL que mais se movem no modo da instabilidade, e os elementos que a provocam (os de energia negativa nesse modo); <br>• **instabilidade dentro de uma barra:** o elemento e o plano local (y ou z) em que ela flamba. <br>As listas de elementos param em 10 ids, seguidos de "and N more". Os nós e elementos citados são realçados como no REQ-011-10. *(Acrescentado em 2026-11-25, a pedido do mantenedor.)* | US-5 |
 
 ### Resultados
 
@@ -110,6 +111,12 @@ diagramas de esforços para a 013. Ambas leem os resultados guardados aqui.
   - sem material, a conferência abre e nada roda;
   - um mecanismo dá a mensagem do `core` com o nó realçado e mantém o
     resultado anterior;
+  - (REQ-011-18) no quadrado articulado sem diagonal, a mensagem cita um
+    nó que se move e exatamente as três barras que se movem; um pilar
+    acima da carga crítica cita a direção lateral e os elementos
+    comprimidos, e não os descarregados; a instabilidade dentro de uma
+    barra cita o elemento e o plano; os ids citados são os que o
+    `idsInMessage` extrai;
   - a segunda ordem acima da carga crítica e a flambagem sem compressão
     falham com a mensagem do `core`.
 - [ ] **AC-4** (REQ-011-06, 07, 08, 09, NFR-011-01, 02) Execução:

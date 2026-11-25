@@ -53,7 +53,9 @@ um resultado volta a ser atual quando o estado analisado volta.
 | core | `include/fem/core/expected.hpp` | alterado | `Error::cancelled` e `makeCancelled()` |
 | core | `include/fem/core/static_analysis.hpp`, `static_analysis.cpp` | alterado | `StaticOptions::control`; verificações e progresso na montagem, fatoração, solução e recuperação; `StaticResult::appliedForce` (REQ-011-13) |
 | core | `assembler.hpp/.cpp` | alterado | A montagem recebe o controle: cancelamento e fração por bloco |
-| core | `second_order.cpp`, `buckling.cpp` | alterado | Verificação e progresso a cada iteração (das duas análises) |
+| core | `second_order.cpp`, `buckling.cpp` | alterado | Verificação e progresso a cada iteração (das duas análises); as mensagens de instabilidade pelo diagnóstico (REQ-011-18) |
+| core | `detail/instability.hpp`, `instability.cpp` | novo | O modo do mecanismo ou da instabilidade, o nó e o GDL, os elementos envolvidos e o texto (REQ-011-18, §5.9) |
+| core | `static_analysis.cpp`, `assembler.hpp/.cpp` | alterado | `checkDiagonal` com os elementos do nó; `elementEnergies` (REQ-011-18) |
 | setup | `include/fem/setup/analysis.hpp`, `analysis.cpp` | novo | `AnalysisSettings`, `runCase`, `AnalysisResult`, `ResultSet`, `summarize` (REQ-011-01, 02, 05, 11, 12, 13) |
 | setup | `document.hpp/.cpp` | alterado | As opções no documento e no `DocumentEdit`; a revisão que volta com o `revert` |
 | setup | `convert.cpp` | alterado | Nada a converter (opções sem unidade): só o teste diz isso |
@@ -258,6 +260,88 @@ equivalentes das cargas no vão e o peso próprio, que preservam a resultante.
 Os recalques ficam de fora, porque são deslocamentos impostos. Em equilíbrio,
 a soma das reações mais `appliedForce` dá zero.
 
+### 5.2a Onde está a instabilidade (REQ-011-18)
+
+*Acrescentado em 2026-11-25.* Hoje o `core` cita só o nó e o GDL do pivô
+nulo, que pode cair longe da causa por causa da ordem AMD (risco da 007). O
+diagnóstico passa a vir do **modo**: o deslocamento que a matriz deixa
+acontecer sem resistência. Ele só é calculado quando a análise já falhou,
+então não custa nada a uma análise que dá certo.
+
+**Interface (detalhe do `core`, sem Qt):**
+
+```cpp
+// ---- core: src/core/detail/instability.hpp ----
+namespace fem::core::detail {
+
+// REQ-011-18: where a matrix that is singular or not positive definite
+// lets the structure move.
+struct InstabilitySite
+{
+    DofIndex dof = -1;                 // the dof that moves the most (scaled, below)
+    std::vector<ElementIndex> elements; // the elements involved, the most first
+};
+
+// The mode: a few inverse iterations on K + delta D (D the diagonal of K),
+// from a fixed start vector; values per DofIndex, prescribed ones zero.
+[[nodiscard]] Expected<Eigen::VectorXd> instabilityMode(const StaticProblem& problem,
+                                                        const SparseMatrix& matrix,
+                                                        double delta);
+
+// Mechanism: the elements that move in the mode. Second order: the
+// elements of negative energy in the mode, the most negative first.
+[[nodiscard]] InstabilitySite mechanismSite(const StaticProblem& problem,
+                                            const Eigen::VectorXd& mode);
+[[nodiscard]] Expected<InstabilitySite> unstableSite(const StaticProblem& problem,
+                                                     const Eigen::VectorXd& mode);
+
+// "the node 12 in v ... with the elements 3, 4, 7 and 2 more"
+[[nodiscard]] std::string siteText(const StaticProblem& problem, const InstabilitySite& site);
+
+} // namespace fem::core::detail
+
+// ---- core: assembler.hpp ----
+// REQ-011-18: u_e^T K_e u_e of every element (by ElementIndex; zero for the
+// elements of no set), in parallel by colours.
+[[nodiscard]] Expected<std::vector<double>> elementEnergies(const Mesh& mesh, const DofMap& dofs,
+                                                            std::span<const ElementSet> sets,
+                                                            const Eigen::VectorXd& values,
+                                                            int threads = 0);
+```
+
+**Algoritmo (§5.9 em detalhe):**
+1. **O modo.** Fatora `K + δ·D`, com `D` a diagonal de `K` (os zeros
+   trocados pelo maior termo) e `δ = 1e−8`, pelo `factorizeIndefinite`.
+   Na segunda ordem, tenta antes `δ = 0` (a tangente indefinida já fatora).
+   Três iterações inversas `x ← (K + δD)⁻¹ x`, normalizadas, a partir de um
+   vetor fixo gerado por fórmula (não por `<random>`, cujas distribuições
+   mudam entre bibliotecas padrão). Com `δ` pequeno, o modo de energia
+   nula (ou o autovalor mais perto de zero, na segunda ordem) domina já na
+   primeira iteração.
+2. **O GDL que mais se move.** As rotações são multiplicadas pela diagonal
+   da caixa da malha, e o empenamento pelo quadrado dela, para comparar com
+   as translações. O maior em módulo é o GDL citado.
+3. **Os elementos.**
+   - **Mecanismo:** os elementos com algum GDL (escalado) acima de 1e−3 do
+     maior, ordenados pelo maior movimento. Num mecanismo, toda barra tem
+     energia nula no modo, então o movimento é o que distingue.
+   - **Segunda ordem:** `elementEnergies` na tangente; os de energia
+     negativa, do mais negativo. Sem nenhum negativo (não deveria
+     acontecer), os que se movem.
+   - **Dentro de uma barra** (`unstableElement`): o elemento, e o plano pelo
+     `internalMode`, comparando o maior |v| e o maior |w| locais.
+4. **O texto**, no formato que o `idsInMessage` da 010 já lê (palavras
+   "node" e "elements" seguidas dos ids; "and N more" é uma contagem):
+   - "The structure is a mechanism: the node 12 in v moves without
+     resistance, with the elements 3, 4, 7 and 2 more (a support may be
+     missing)."
+   - "- the node 3 in w (elements 2, 5)" em cada linha do GDL sem rigidez.
+   - "… lost its stability at iteration 4: the node 7 in u moves the most,
+     and the elements 2, 3 drive it."
+   - "… inside the element 5, buckling in its local y direction."
+5. A estática linear, a segunda ordem e a flambagem usam a mesma função; as
+   três mensagens de mecanismo de hoje passam a ser uma só.
+
 ### 5.3 Opções e revisões no documento (REQ-011-01, 12)
 
 - As opções ficam no `Document`. O `DocumentEdit` ganha
@@ -396,6 +480,7 @@ F5 / Run all
 |----------|---------------|-----------|
 | Erros da conferência (sem material, alvos inválidos, sem malha) | O item não roda, a conferência abre com os problemas e o resultado anterior fica | REQ-011-05 |
 | Mecanismo, carga crítica, sem convergência, flambagem sem compressão | A mensagem do `core` vai ao console e à conferência, os ids são realçados e o resultado anterior fica (desatualizado) | REQ-011-10 |
+| Instabilidade (GDL sem rigidez, mecanismo, segunda ordem, dentro da barra) | A mensagem cita o nó e o GDL e os elementos envolvidos (§5.2a); se o cálculo do modo falhar, a mensagem de hoje, com o nó e o GDL do pivô | REQ-011-18 |
 | Cancelamento | Volta `Error{cancelled = true}`: no console "Cancelled", sem resultado novo, e o Run all para | REQ-011-08 |
 | Pedido durante uma execução | Recusado, com aviso na barra de status | REQ-011-07 |
 | Item apagado durante a execução | O resultado que chega é guardado só se o item ainda existe | REQ-011-11 |
@@ -410,6 +495,8 @@ F5 / Run all
 | O cancelamento ligado antes da montagem, durante (pela primeira chamada de progresso) e na iteração k da segunda ordem e da flambagem devolve `cancelled` | unitário (core) | REQ-011-08, 09 | — |
 | O progresso passa por Assembly → Factorization → Solution → Recovery, com frações crescentes; Iteration com i = 1, 2… | unitário (core) | REQ-011-07, 09 | — |
 | `appliedForce` + Σ reações = 0 no pórtico, em cargas nodais, no vão e no peso próprio | unitário (core) | REQ-011-13 | 1e−9 relativo |
+| `test_instability`: quadrado articulado sem diagonal (um nó que se move, exatamente as três barras que se movem); um mecanismo localizado num vão de um pórtico longo (só as barras do vão); GDL sem rigidez com os elementos do nó; pilar acima da crítica ao lado de um descarregado (direção lateral, só os comprimidos); instabilidade dentro de uma barra (elemento e plano); a mesma mensagem com 1 thread e com todas | unitário (core) | REQ-011-18, AC-3 | ids exatos |
+| `idsInMessage` nas mensagens novas dá os nós e elementos citados | unitário (app) | REQ-011-18 | — |
 | `runCase` no pórtico 2×2 da 010: as três análises iguais às chamadas diretas do `core` sobre o modelo montado | unitário (setup) | REQ-011-02, AC-1 | 1e−12 |
 | Recusa pela conferência, falha do `core` e cancelamento em `CaseOutcome` | unitário (setup) | REQ-011-05, 10, AC-3 | — |
 | `ResultSet`: substituir, apagar, `isCurrent` com as revisões; desfazer volta a revisão e torna atual; refazer não | unitário (setup, geom) | REQ-011-11, 12, AC-5 | — |
@@ -452,6 +539,17 @@ F5 / Run all
   Uma cópia por execução, liberada ao fim. Para 10⁵ entidades, alguns MB.
 - **A ordem de `caseFinished` e `finished`** entre threads. → Conexões
   enfileiradas para o mesmo objeto preservam a ordem. O teste do job confere.
+
+- **O modo de um mecanismo múltiplo** (vários mecanismos independentes) sai
+  como uma combinação deles. → A mensagem cita os elementos de todos, o que
+  ainda aponta a causa; o teste usa um mecanismo só.
+- **`δ` mal escolhido** mistura modos de rigidez pequena mas legítima. → O
+  mesmo critério relativo da 006 (1e−14 de pivô) separa o mecanismo; com
+  `δ = 1e−8` e três iterações, um modo com rigidez 1e−4 da maior pesa
+  1e−12 no resultado. O teste com razão de rigidez 1e6 da 007 continua.
+- **A estrutura inteira solta** (sem apoio nenhum) move todos os
+  elementos. → A lista para em 10 com "and N more", e a dica do apoio
+  continua na mensagem.
 
 ## 11. Novas dependências
 

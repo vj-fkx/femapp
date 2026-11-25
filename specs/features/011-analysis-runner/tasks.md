@@ -63,6 +63,40 @@ Regras:
   a diferença ≤ 2%. Arquivo: `tests/perf/bench_run_control.cpp`.
   Cobre: N03.
 
+## Fase 1b — Onde está a instabilidade (REQ-011-18, design §5.2a)
+
+*Acrescentada em 2026-11-25.*
+
+- [ ] **T21** `elementEnergies` no `assembler`:
+  - testes primeiro: numa barra, igual a uᵀKu da matriz montada; zero
+    num movimento de corpo rígido; o mesmo com 1 thread e com todas;
+  - depois a função.
+  Arquivos: `assembler.hpp/.cpp`, `tests/unit/core/test_assembler.cpp`.
+  Cobre: 18.
+- [ ] **T22** O modo e o sítio do mecanismo, e o GDL sem rigidez com os
+  elementos do nó:
+  - testes primeiro: quadrado articulado sem diagonal (exatamente as três
+    barras que se movem); mecanismo num vão de um pórtico longo (só as
+    barras do vão); GDL sem rigidez com os elementos do nó; a mesma
+    mensagem com 1 thread e com todas;
+  - depois `instability.hpp/.cpp` e as três mensagens de mecanismo (linear,
+    segunda ordem, flambagem) pela mesma função.
+  Arquivos: `src/core/detail/instability.hpp`, `src/core/instability.cpp`,
+  `static_analysis.cpp`, `second_order.cpp`, `buckling.cpp`,
+  `tests/unit/core/test_instability.cpp`; os testes de mensagem da 007 e
+  da 008 ajustados ao texto novo. Cobre: 18.
+- [ ] **T23** A segunda ordem:
+  - testes primeiro: pilar acima da crítica ao lado de um descarregado (a
+    direção lateral, só os elementos comprimidos); instabilidade dentro
+    de uma barra (o elemento e o plano y ou z);
+  - depois `unstableSite` e a mensagem.
+  Arquivos: `instability.cpp`, `second_order.cpp`,
+  `tests/unit/core/test_instability.cpp`. Cobre: 18.
+- [ ] **T24** [P] `idsInMessage` lê as mensagens novas: os nós e os
+  elementos citados, sem a contagem. Arquivo:
+  `tests/unit/app/test_check_issues.cpp` (e o parser, se precisar).
+  Cobre: 18.
+
 ## Fase 2 — Revisões que voltam com o desfazer
 
 - [ ] **T06** `Document` e `Drawing`: `apply` empilha a revisão e dá uma
@@ -220,6 +254,7 @@ Regras:
 | REQ-011-15 | T17, T18 | `test_results_model.cpp`, roteiro T19 |
 | REQ-011-16 | T16, T18 | `test_model_tree.cpp`, roteiro T19 |
 | REQ-011-17 | T15, T20 | roteiro T19 |
+| REQ-011-18 | T21, T22, T23, T24 | `test_assembler.cpp`, `test_instability.cpp`, `test_check_issues.cpp` |
 | NFR-011-01 | T14, T19 | `bench_analysis_job.cpp`, roteiro T19 |
 | NFR-011-02 | T11, T14 | `test_analysis_job.cpp`, `bench_analysis_job.cpp` |
 | NFR-011-03 | T05 | `bench_run_control.cpp` |
@@ -230,7 +265,7 @@ Regras:
 |----------|---------|
 | AC-1 | T08, T10 |
 | AC-2 | T09, T11 |
-| AC-3 | T08, T15 |
+| AC-3 | T08, T15, T22, T23, T24 |
 | AC-4 | T02, T03, T11, T14 |
 | AC-5 | T06, T09, T16 |
 | AC-6 | T15 a T19 |
