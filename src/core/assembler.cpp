@@ -134,10 +134,12 @@ Expected<Colouring> colour(const Mesh& mesh, const std::vector<Item>& items)
 }
 
 // Runs `work` over every element, colour by colour, in parallel within a
-// colour. Stops at the first element error.
+// colour. Stops at the first element error. With a control (REQ-011-09),
+// each block checks the cancel flag first and reports the fraction of
+// elements done in `stage` after its work.
 template <typename Work>
 Expected<void> forEachElement(const Mesh& mesh, std::span<const ElementSet> sets, int threads,
-                              Work&& work)
+                              const RunControl* control, RunStage stage, Work&& work)
 {
     const auto coloured = colour(mesh, itemsOf(sets));
     if (!coloured) {
@@ -147,6 +149,10 @@ Expected<void> forEachElement(const Mesh& mesh, std::span<const ElementSet> sets
     std::atomic<bool> failed{false};
     std::mutex errorMutex;
     std::optional<Error> firstError;
+    const bool watched =
+        control != nullptr && (control->cancel != nullptr || control->progress != nullptr);
+    const std::size_t total = coloured->items.size();
+    std::atomic<std::size_t> finished{0};
 
     tbb::task_arena arena(threads > 0 ? threads : tbb::task_arena::automatic);
     arena.execute([&] {
@@ -156,6 +162,10 @@ Expected<void> forEachElement(const Mesh& mesh, std::span<const ElementSet> sets
             tbb::parallel_for(
                 tbb::blocked_range<std::size_t>(begin, end),
                 [&](const tbb::blocked_range<std::size_t>& range) {
+                    if (watched && control->cancelled()) {
+                        failed = true;
+                        return;
+                    }
                     Workspace& ws = workspaces.local();
                     for (std::size_t i = range.begin(); i != range.end(); ++i) {
                         if (failed) {
@@ -177,11 +187,21 @@ Expected<void> forEachElement(const Mesh& mesh, std::span<const ElementSet> sets
                             return;
                         }
                     }
+                    if (watched) {
+                        const std::size_t done = finished.fetch_add(range.size()) + range.size();
+                        control->report(
+                            {.stage = stage,
+                             .fraction = static_cast<double>(done) / static_cast<double>(total),
+                             .iteration = 0});
+                    }
                 });
         }
     });
     if (firstError) {
         return tl::unexpected(*firstError);
+    }
+    if (watched && control->cancelled()) {
+        return makeCancelled();
     }
     return {};
 }
@@ -267,7 +287,8 @@ double& entry(SparseMatrix& matrix, std::int32_t row, std::int32_t column)
 
 Expected<AssembledSystem> assemble(const Mesh& mesh, const DofMap& dofs,
                                    std::span<const ElementSet> sets,
-                                   std::span<const NodalLoad> loads, int threads)
+                                   std::span<const NodalLoad> loads, int threads,
+                                   const RunControl* control)
 {
     AssembledSystem system;
     const std::int32_t n = dofs.freeCount(); // numbers the equations before going parallel
@@ -275,7 +296,7 @@ Expected<AssembledSystem> assemble(const Mesh& mesh, const DofMap& dofs,
     system.rhs = Eigen::VectorXd::Zero(n);
 
     auto done = forEachElement(
-        mesh, sets, threads,
+        mesh, sets, threads, control, RunStage::Assembly,
         [&](const ElementSet& set, ElementIndex element, Workspace& ws) -> Expected<void> {
             const auto size = computeLocal(mesh, dofs, set, element, ws);
             if (!size) {
@@ -323,11 +344,11 @@ Expected<AssembledSystem> assemble(const Mesh& mesh, const DofMap& dofs,
 Expected<Eigen::VectorXd> reactions(const Mesh& mesh, const DofMap& dofs,
                                     std::span<const ElementSet> sets,
                                     std::span<const NodalLoad> loads, const Eigen::VectorXd& values,
-                                    int threads)
+                                    int threads, const RunControl* control)
 {
     Eigen::VectorXd result = Eigen::VectorXd::Zero(dofs.size());
     auto done = forEachElement(
-        mesh, sets, threads,
+        mesh, sets, threads, control, RunStage::Recovery,
         [&](const ElementSet& set, ElementIndex element, Workspace& ws) -> Expected<void> {
             const auto size = computeLocal(mesh, dofs, set, element, ws);
             if (!size) {

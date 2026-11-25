@@ -104,7 +104,7 @@ public:
     [[nodiscard]] int internalCount(ElementIndex element, const ReferenceProfile& reference) const;
 
 private:
-    StaticProblem(const Model& model, const StaticOptions& options);
+    StaticProblem(const Model& model, StaticOptions options);
     // The values of the element's dofs, node by node in its order.
     [[nodiscard]] std::vector<double> nodeValues(ElementIndex element, int nodes,
                                                  const Eigen::VectorXd& values) const;

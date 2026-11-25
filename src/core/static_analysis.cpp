@@ -335,9 +335,9 @@ std::string dofLabel(const Mesh& mesh, const DofMap& dofs, DofIndex dof)
 
 namespace detail {
 
-StaticProblem::StaticProblem(const Model& model, const StaticOptions& options)
+StaticProblem::StaticProblem(const Model& model, StaticOptions options)
     : m_model(model)
-    , m_options(options)
+    , m_options(std::move(options))
 {}
 
 StaticProblem::~StaticProblem() = default;
@@ -465,7 +465,7 @@ StaticProblem::prepare(const Model& model, const StaticOptions& options, bool se
 Expected<AssembledSystem> StaticProblem::assemble() const
 {
     std::ranges::fill(m_negative, 0);
-    return core::assemble(mesh(), m_dofs, m_sets, m_loads, m_options.threads);
+    return core::assemble(mesh(), m_dofs, m_sets, m_loads, m_options.threads, &m_options.control);
 }
 
 Expected<void> StaticProblem::checkDiagonal(const SparseMatrix& matrix) const
@@ -828,8 +828,8 @@ Expected<StaticResult> StaticProblem::recover(const Eigen::VectorXd& values, boo
     const Beams& beams = m_beams;
     const std::vector<BarData>& bars = m_bars;
     const std::vector<ElementKind>& kindOf = m_kindOf;
-    auto forces =
-        reactions(mesh, dofs, m_sets, loaded ? m_loads : noNodalLoads, values, m_options.threads);
+    auto forces = reactions(mesh, dofs, m_sets, loaded ? m_loads : noNodalLoads, values,
+                            m_options.threads, &m_options.control);
     if (!forces) {
         return tl::unexpected(forces.error());
     }
@@ -959,15 +959,24 @@ Expected<StaticResult> StaticProblem::recover(const Eigen::VectorXd& values, boo
         result.strain[e] = n / bars[e].axialStiffness;
         result.stress[e] = n / detail::sectionArea(*model.findSection(assignment.section));
     };
+    // REQ-011-09: the blocks stop at a cancellation (the reactions above
+    // reported the Recovery fraction).
+    const RunControl& control = m_options.control;
     tbb::task_arena arena(m_options.threads > 0 ? m_options.threads : tbb::task_arena::automatic);
     arena.execute([&] {
         tbb::parallel_for(tbb::blocked_range<std::size_t>(0, elementCount),
                           [&](const tbb::blocked_range<std::size_t>& range) {
+                              if (control.cancelled()) {
+                                  return;
+                              }
                               for (std::size_t e = range.begin(); e != range.end(); ++e) {
                                   resultOf(e);
                               }
                           });
     });
+    if (control.cancelled()) {
+        return makeCancelled();
+    }
     return result;
 }
 
@@ -975,6 +984,12 @@ Expected<StaticResult> StaticProblem::recover(const Eigen::VectorXd& values, boo
 
 Expected<StaticResult> runLinearStatic(const Model& model, const StaticOptions& options)
 {
+    // REQ-011-08, 09: the control is checked between the stages; the
+    // assembly and the recovery check it by blocks of elements.
+    const RunControl& control = options.control;
+    if (control.cancelled()) {
+        return makeCancelled();
+    }
     auto prepared = detail::StaticProblem::prepare(model, options, false);
     if (!prepared) {
         return tl::unexpected(prepared.error());
@@ -987,6 +1002,10 @@ Expected<StaticResult> runLinearStatic(const Model& model, const StaticOptions& 
     if (auto stable = problem.checkDiagonal(system->matrix); !stable) {
         return tl::unexpected(stable.error());
     }
+    control.report({.stage = RunStage::Factorization, .fraction = -1.0, .iteration = 0});
+    if (control.cancelled()) {
+        return makeCancelled();
+    }
     SparseCholesky solver;
     if (auto factorized = solver.factorize(system->matrix); !factorized) {
         const auto eq = solver.singularEquation();
@@ -996,9 +1015,16 @@ Expected<StaticResult> runLinearStatic(const Model& model, const StaticOptions& 
         return makeError("The structure is a mechanism: " + problem.equationLabel(*eq) +
                          " can move without resistance (a support may be missing).");
     }
+    control.report({.stage = RunStage::Solution, .fraction = -1.0, .iteration = 0});
+    if (control.cancelled()) {
+        return makeCancelled();
+    }
     auto free = solver.solve(system->rhs);
     if (!free) {
         return tl::unexpected(free.error());
+    }
+    if (control.cancelled()) {
+        return makeCancelled();
     }
     return problem.recover(problem.valuesOf(*free));
 }
