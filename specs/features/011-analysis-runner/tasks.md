@@ -1,6 +1,6 @@
 # Tarefas — 011 analysis-runner
 
-Status: rascunho
+Status: aprovado
 Design: [design.md](design.md) · Requisitos: [requirements.md](requirements.md)
 
 Regras:
