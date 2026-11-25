@@ -45,6 +45,10 @@ struct StaticResult
     std::vector<double> stress;     // N / A
     // Per element: the forces along each beam; empty for the others.
     std::vector<std::optional<BeamResult>> beams;
+    // REQ-011-13: the resultant of the loads (the assembled load vector
+    // summed over the u, v, w dofs, settlements apart), which the reactions
+    // balance; zero for a buckling mode.
+    Eigen::Vector3d appliedForce = Eigen::Vector3d::Zero();
 };
 
 struct StaticOptions

@@ -43,10 +43,11 @@ struct AssembledSystem
 // REQ-006-17: K_e u_e - f_e summed over the elements at the prescribed dofs,
 // minus the loads there: the reactions, per DofIndex (zero at free dofs).
 // REQ-011-09: `control` as in assemble(), with the Recovery stage.
-[[nodiscard]] Expected<Eigen::VectorXd> reactions(const Mesh& mesh, const DofMap& dofs,
-                                                  std::span<const ElementSet> sets,
-                                                  std::span<const NodalLoad> loads,
-                                                  const Eigen::VectorXd& values, int threads = 0,
-                                                  const RunControl* control = nullptr);
+// REQ-011-13: with `applied`, also the element vectors and the loads at every
+// dof, per DofIndex (the load vector before the supports, settlements apart).
+[[nodiscard]] Expected<Eigen::VectorXd>
+reactions(const Mesh& mesh, const DofMap& dofs, std::span<const ElementSet> sets,
+          std::span<const NodalLoad> loads, const Eigen::VectorXd& values, int threads = 0,
+          const RunControl* control = nullptr, Eigen::VectorXd* applied = nullptr);
 
 } // namespace fem::core

@@ -9,6 +9,7 @@
 #endif
 
 #include "bar_meshes.hpp"
+#include "beam_models.hpp"
 
 #include <fem/core/static_analysis.hpp>
 
@@ -349,4 +350,75 @@ TEST_CASE("a mechanism is reported with a node and a direction", "[core][analysi
     model.mesh = fem::core::test::trussMesh(spec);
     model.assignments.front().elements = ElementIds{{1, 2, 3, 4, 5}};
     CHECK(fem::core::runLinearStatic(model).has_value());
+}
+
+// REQ-011-13: the resultant of the loads balances the reactions, with nodal
+// loads (one on a support), distributed and concentrated loads in the span
+// and the weight; a settlement adds nothing to it.
+TEST_CASE("the applied force balances the reactions", "[core][analysis]")
+{
+    using Vec = Eigen::Vector3d;
+    const TrussSpec spec{.nodes = {Vec(0, 0, 0), Vec(0, 0, 3), Vec(4, 0, 3), Vec(4, 0, 0)},
+                         .bars = {{0, 1}, {1, 2}, {2, 3}},
+                         .lineGroups = {},
+                         .pointGroups = {}};
+    Model model = fem::core::test::beamModel(spec, ElementKind::Beam3D);
+    fem::core::test::fixAll(model, {1}, ElementKind::Beam3D);
+    fem::core::test::restrain(model, {4},
+                              {DofType::U, DofType::V, DofType::RX, DofType::RY, DofType::RZ});
+    fem::core::test::restrain(model, {4}, {DofType::W}, -0.002); // a settlement
+
+    // The settlement alone: no applied force, reactions in balance.
+    {
+        const fem::core::StaticResult settled = fem::core::test::solve(model);
+        CHECK(settled.appliedForce == Vec::Zero());
+        Vec sum = Vec::Zero();
+        for (const Vec& r : settled.reactions) {
+            sum += r;
+        }
+        double scale = 0.0;
+        for (const Vec& r : settled.reactions) {
+            scale = std::max(scale, r.cwiseAbs().maxCoeff());
+        }
+        REQUIRE(scale > 0.0);
+        CHECK(sum.cwiseAbs().maxCoeff() <= 1e-9 * scale);
+    }
+
+    model.nodalForces.push_back({.nodes = NodeIds{{2}},
+                                 .force = Vec(5.0e3, 1.0e3, -2.0e3),
+                                 .moment = Vec(0, 300.0, 0),
+                                 .bimoment = 0.0});
+    model.nodalForces.push_back({.nodes = NodeIds{{1}},
+                                 .force = Vec(0, -7.0e2, 0),
+                                 .moment = Vec::Zero(),
+                                 .bimoment = 0.0});
+    model.distributedLoads.push_back({.elements = ElementIds{{2}},
+                                      .axes = fem::core::Axes::Global,
+                                      .startValue = Vec(0, -2.0e3, -3.0e3),
+                                      .endValue = Vec(0, -6.0e3, -1.0e3),
+                                      .from = {.value = 0.0, .fraction = true},
+                                      .to = {.value = 1.0, .fraction = true},
+                                      .startTorque = 0.0,
+                                      .endTorque = 0.0,
+                                      .point = std::nullopt});
+    model.concentratedLoads.push_back({.elements = ElementIds{{3}},
+                                       .axes = fem::core::Axes::Global,
+                                       .force = Vec(1.0e3, 0, 5.0e2),
+                                       .moment = Vec::Zero(),
+                                       .at = {.value = 0.3, .fraction = true},
+                                       .point = std::nullopt});
+    model.gravity = Vec(0, 0, -9.81);
+
+    const fem::core::StaticResult result = fem::core::test::solve(model);
+    const double weight = 7850.0 * fem::core::test::kArea * (3.0 + 4.0 + 3.0) * 9.81;
+    const Vec expected = Vec(5.0e3, 1.0e3, -2.0e3) + Vec(0, -7.0e2, 0) +
+                         4.0 * Vec(0, -4.0e3, -2.0e3) + Vec(1.0e3, 0, 5.0e2) + Vec(0, 0, -weight);
+    const double scale = expected.cwiseAbs().maxCoeff();
+    INFO("applied " << result.appliedForce.transpose() << ", expected " << expected.transpose());
+    CHECK((result.appliedForce - expected).cwiseAbs().maxCoeff() <= 1e-9 * scale);
+    Vec sum = result.appliedForce;
+    for (const Vec& r : result.reactions) {
+        sum += r;
+    }
+    CHECK(sum.cwiseAbs().maxCoeff() <= 1e-9 * scale);
 }

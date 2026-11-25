@@ -828,8 +828,9 @@ Expected<StaticResult> StaticProblem::recover(const Eigen::VectorXd& values, boo
     const Beams& beams = m_beams;
     const std::vector<BarData>& bars = m_bars;
     const std::vector<ElementKind>& kindOf = m_kindOf;
+    Eigen::VectorXd applied;
     auto forces = reactions(mesh, dofs, m_sets, loaded ? m_loads : noNodalLoads, values,
-                            m_options.threads, &m_options.control);
+                            m_options.threads, &m_options.control, loaded ? &applied : nullptr);
     if (!forces) {
         return tl::unexpected(forces.error());
     }
@@ -844,6 +845,14 @@ Expected<StaticResult> StaticProblem::recover(const Eigen::VectorXd& values, boo
     result.reactionMoments.assign(nodeCount, Eigen::Vector3d::Zero());
     result.warping.assign(nodeCount, 0.0);
     result.reactionBimoments.assign(nodeCount, 0.0);
+    if (loaded) {
+        for (DofIndex d = 0; d < dofs.size(); ++d) {
+            const auto type = static_cast<Eigen::Index>(dofs.typeOf(d));
+            if (type < 3) { // u, v, w
+                result.appliedForce[type] += applied[d];
+            }
+        }
+    }
     for (DofIndex d = 0; d < dofs.size(); ++d) {
         const auto node = static_cast<std::size_t>(dofs.nodeOf(d));
         if (dofs.typeOf(d) == DofType::Warp) {

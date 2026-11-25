@@ -51,7 +51,7 @@ Regras:
     `buckling.cpp`.
   Arquivos: `second_order.cpp`, `buckling.cpp`, `test_run_control.cpp`.
   Cobre: 07, 08, 09.
-- [ ] **T04** A resultante das cargas (design §5.2):
+- [x] **T04** A resultante das cargas (design §5.2):
   - testes primeiro: `appliedForce` + Σ reações = 0 em 1e−9 com cargas
     nodais, distribuídas, concentradas no vão e peso próprio; um recalque
     não entra;

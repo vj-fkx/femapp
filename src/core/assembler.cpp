@@ -344,9 +344,13 @@ Expected<AssembledSystem> assemble(const Mesh& mesh, const DofMap& dofs,
 Expected<Eigen::VectorXd> reactions(const Mesh& mesh, const DofMap& dofs,
                                     std::span<const ElementSet> sets,
                                     std::span<const NodalLoad> loads, const Eigen::VectorXd& values,
-                                    int threads, const RunControl* control)
+                                    int threads, const RunControl* control,
+                                    Eigen::VectorXd* applied)
 {
     Eigen::VectorXd result = Eigen::VectorXd::Zero(dofs.size());
+    if (applied != nullptr) {
+        *applied = Eigen::VectorXd::Zero(dofs.size());
+    }
     auto done = forEachElement(
         mesh, sets, threads, control, RunStage::Recovery,
         [&](const ElementSet& set, ElementIndex element, Workspace& ws) -> Expected<void> {
@@ -356,6 +360,9 @@ Expected<Eigen::VectorXd> reactions(const Mesh& mesh, const DofMap& dofs,
             }
             for (int a = 0; a < *size; ++a) {
                 const DofIndex da = ws.dofs.at(static_cast<std::size_t>(a));
+                if (applied != nullptr) {
+                    (*applied)[da] += ws.vector[a]; // colours: no other element writes here
+                }
                 if (!dofs.isPrescribed(da)) {
                     continue;
                 }
@@ -372,6 +379,9 @@ Expected<Eigen::VectorXd> reactions(const Mesh& mesh, const DofMap& dofs,
     }
     for (const NodalLoad& load : loads) {
         const auto dof = dofs.find(load.node, load.type);
+        if (dof && applied != nullptr) {
+            (*applied)[*dof] += load.value;
+        }
         if (dof && dofs.isPrescribed(*dof)) {
             result[*dof] -= load.value;
         }
