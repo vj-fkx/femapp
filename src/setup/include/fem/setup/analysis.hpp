@@ -13,10 +13,13 @@
 #include <fem/setup/build.hpp>
 #include <fem/setup/document.hpp>
 
+#include <Eigen/Core>
+#include <array>
 #include <cstdint>
 #include <memory>
 #include <optional>
 #include <span>
+#include <string>
 #include <variant>
 #include <vector>
 
@@ -78,5 +81,31 @@ public:
 private:
     std::vector<AnalysisResult> m_results; // sorted by item
 };
+
+// REQ-011-13: the numbers of the summary; the app writes them. A value is
+// signed; the largest magnitude wins, equal ones (to 1e-12) by the smaller
+// id.
+struct Extreme
+{
+    double value = 0.0;
+    core::ExternalId id = 0; // node or element
+    int direction = 0;       // 0..2: x, y, z (or the force: N, Vy, Vz, T, My, Mz: 0..5)
+};
+
+struct Summary
+{
+    // Static and second order: per node, the largest component.
+    std::optional<Extreme> displacement;
+    std::optional<Extreme> rotation;
+    Eigen::Vector3d reactions = Eigen::Vector3d::Zero(); // their sum
+    Eigen::Vector3d applied = Eigen::Vector3d::Zero();   // the loads' sum
+    std::array<std::optional<Extreme>, 6> barForces;     // N, Vy, Vz, T, My, Mz over the bar ends
+    int iterations = 0;                                  // second order
+    double change = 0.0;
+    std::vector<double> factors; // buckling
+    std::string note;
+};
+
+[[nodiscard]] Summary summarize(const AnalysisResult& result);
 
 } // namespace fem::setup

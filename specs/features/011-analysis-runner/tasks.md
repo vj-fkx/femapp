@@ -150,7 +150,7 @@ Regras:
     analisado torna atual; refazer não (o limite do design §5.3);
   - depois a classe.
   Arquivos: `analysis.hpp/.cpp`, `test_analysis.cpp`. Cobre: 11, 12.
-- [ ] **T10** `summarize` (design §5.6):
+- [x] **T10** `summarize` (design §5.6):
   - testes com valores conhecidos: o balanço com carga na ponta
     (deslocamento e momento máximos à mão), o pórtico (equilíbrio), a
     segunda ordem (iterações), a flambagem (fatores e nota);

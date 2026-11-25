@@ -3,6 +3,9 @@
 #include <fem/setup/analysis.hpp>
 
 #include <algorithm>
+#include <array>
+#include <cmath>
+#include <cstddef>
 #include <utility>
 
 namespace fem::setup {
@@ -86,6 +89,85 @@ const AnalysisResult* ResultSet::find(ItemId item) const
 {
     const auto at = std::ranges::lower_bound(m_results, item, {}, &AnalysisResult::item);
     return at != m_results.end() && at->item == item ? &*at : nullptr;
+}
+
+namespace {
+
+// Keeps the value of largest magnitude; equal ones by the smaller id.
+void keep(std::optional<Extreme>& best, double value, core::ExternalId id, int direction)
+{
+    if (!std::isfinite(value)) {
+        return;
+    }
+    constexpr double kEqual = 1e-12;
+    const double size = std::abs(value);
+    if (best) {
+        const double was = std::abs(best->value);
+        const bool larger = size > was * (1.0 + kEqual);
+        const bool tie = !larger && size >= was * (1.0 - kEqual) && id < best->id;
+        if (!larger && !tie) {
+            return;
+        }
+    }
+    best = Extreme{.value = value, .id = id, .direction = direction};
+}
+
+void nodal(std::optional<Extreme>& best, const std::vector<Eigen::Vector3d>& values,
+           const core::Mesh& mesh)
+{
+    for (std::size_t n = 0; n < values.size(); ++n) {
+        const core::ExternalId id = mesh.nodeId(static_cast<core::NodeIndex>(n));
+        for (int d = 0; d < 3; ++d) {
+            keep(best, values[n][d], id, d);
+        }
+    }
+}
+
+void staticPart(Summary& summary, const core::StaticResult& r, const core::Mesh* analysed)
+{
+    const core::Mesh* mesh = r.mesh ? r.mesh.get() : analysed;
+    if (mesh == nullptr) {
+        return;
+    }
+    nodal(summary.displacement, r.displacements, *mesh);
+    nodal(summary.rotation, r.rotations, *mesh);
+    for (const Eigen::Vector3d& reaction : r.reactions) {
+        summary.reactions += reaction;
+    }
+    summary.applied = r.appliedForce;
+    for (std::size_t e = 0; e < r.beams.size(); ++e) {
+        const core::ExternalId id = mesh->elementId(static_cast<core::ElementIndex>(e));
+        if (const auto& beam = r.beams[e]) {
+            for (const core::BeamForces* f : {&beam->start(), &beam->end()}) {
+                const std::array<double, 6> values{f->n, f->vy, f->vz, f->t, f->my, f->mz};
+                for (std::size_t k = 0; k < values.size(); ++k) {
+                    keep(summary.barForces[k], values[k], id, static_cast<int>(k));
+                }
+            }
+        } else if (e < r.axialForce.size()) {
+            keep(summary.barForces[0], r.axialForce[e], id, 0); // a truss: N alone
+        }
+    }
+}
+
+} // namespace
+
+Summary summarize(const AnalysisResult& result)
+{
+    Summary summary;
+    if (const auto* linear = std::get_if<core::StaticResult>(&result.data)) {
+        staticPart(summary, *linear, result.mesh.get());
+    } else if (const auto* second = std::get_if<core::SecondOrderResult>(&result.data)) {
+        staticPart(summary, second->result, result.mesh.get());
+        summary.iterations = second->iterations;
+        summary.change = second->change;
+    } else if (const auto* buckling = std::get_if<core::BucklingResult>(&result.data)) {
+        for (const core::BucklingMode& mode : buckling->modes) {
+            summary.factors.push_back(mode.factor);
+        }
+        summary.note = buckling->note;
+    }
+    return summary;
 }
 
 } // namespace fem::setup

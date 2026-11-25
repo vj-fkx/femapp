@@ -14,6 +14,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -404,6 +405,15 @@ s::AnalysisResult resultFor(std::uint64_t item, double factor)
             .warnings = {}};
 }
 
+const s::Extreme& extreme(const std::optional<s::Extreme>& value)
+{
+    REQUIRE(value.has_value());
+    if (!value) {
+        throw std::logic_error("no extreme");
+    }
+    return *value;
+}
+
 double factorOf(const s::AnalysisResult* r)
 {
     REQUIRE(r != nullptr);
@@ -495,4 +505,127 @@ TEST_CASE("a result is current while the state analysed is the state now",
         p.mesh.generation += 1;
         CHECK_FALSE(s::ResultSet::isCurrent(result, now()));
     }
+}
+
+// T10: REQ-011-13. A cantilever of 3 m along x, fixed at x = 0, with the
+// load (10, -20) of the frame at its tip: by hand, the tip moves
+// v = P L^3 / (3 EI) and turns P L^2 / (2 EI); the base carries M = P L,
+// V = P and N = 10.
+TEST_CASE("the summary of a cantilever, by hand", "[setup][analysis][summary]")
+{
+    constexpr double kL = 3.0;
+    Frame cantilever;
+    cantilever.bars = {
+        fem::setup::test::addLine(cantilever.drawing, Vec3(0, 0, 0), Vec3(kL, 0, 0))};
+    cantilever.bases = {fem::setup::test::addPoint(cantilever.drawing, Vec3(0, 0, 0))};
+    cantilever.top = fem::setup::test::addPoint(cantilever.drawing, Vec3(kL, 0, 0));
+    Setup setup;
+    prepare(setup, cantilever);
+    const s::MeshContext mesh = meshOf(cantilever.drawing);
+    const s::CaseOutcome outcome =
+        s::runCase(setup.document, cantilever.drawing, mesh, setup.loadCase, {});
+    const s::Summary summary = s::summarize(resultOf(outcome));
+
+    const auto properties =
+        c::sectionProperties(c::Section{.name = "bar", .shape = c::Rectangle{.b = 0.3, .h = 0.5}});
+    REQUIRE(properties.has_value());
+    const double ei = 2.0e8 * properties->inertiaZ;
+    constexpr double kP = -20.0;
+    const auto close = [](double a, double b) { return std::abs(a - b) <= 1e-9 * std::abs(b); };
+
+    // The tip: its node id.
+    const c::Mesh& m = *mesh.mesh;
+    c::ExternalId tip = 0;
+    for (c::NodeIndex n = 0; n < m.nodeCount(); ++n) {
+        if ((m.nodeCoordinates(n) - Vec3(kL, 0, 0)).norm() < 1e-12) {
+            tip = m.nodeId(n);
+        }
+    }
+    REQUIRE(summary.displacement.has_value());
+    CHECK(extreme(summary.displacement).id == tip);
+    CHECK(extreme(summary.displacement).direction == 1);
+    CHECK(close(extreme(summary.displacement).value, kP * kL * kL * kL / (3.0 * ei)));
+    REQUIRE(summary.rotation.has_value());
+    CHECK(extreme(summary.rotation).id == tip);
+    CHECK(extreme(summary.rotation).direction == 2);
+    CHECK(close(extreme(summary.rotation).value, kP * kL * kL / (2.0 * ei)));
+
+    // The loads and the reactions balance.
+    CHECK((summary.applied - Vec3(10, -20, 0)).norm() <= 1e-12 * 20.0);
+    CHECK((summary.reactions + summary.applied).norm() <= 1e-9 * 20.0);
+
+    // The forces: N, V and M (the moment at the base, the largest).
+    REQUIRE(summary.barForces[0].has_value());
+    CHECK(close(extreme(summary.barForces[0]).value, 10.0));
+    CHECK(extreme(summary.barForces[0]).direction == 0);
+    REQUIRE(summary.barForces[1].has_value());
+    CHECK(close(std::abs(extreme(summary.barForces[1]).value), 20.0));
+    REQUIRE(summary.barForces[5].has_value());
+    CHECK(close(std::abs(extreme(summary.barForces[5]).value), 20.0 * kL));
+    CHECK(extreme(summary.barForces[5]).direction == 5);
+    // ... in the element at the base.
+    bool atBase = false;
+    for (c::ElementIndex e = 0; e < m.elementCount(); ++e) {
+        if (m.elementId(e) == extreme(summary.barForces[5]).id) {
+            for (const c::NodeIndex n : m.elementNodes(e)) {
+                atBase = atBase || m.nodeCoordinates(n).norm() < 1e-12;
+            }
+        }
+    }
+    CHECK(atBase);
+    CHECK(summary.iterations == 0);
+    CHECK(summary.factors.empty());
+}
+
+TEST_CASE("the summary of the frame balances, and of the second order",
+          "[setup][analysis][summary]")
+{
+    Prepared p;
+    prepared(p);
+    SECTION("linear")
+    {
+        const s::Summary summary = s::summarize(resultOf(run(p, p.setup.loadCase)));
+        CHECK((summary.applied - Vec3(10, -20, 0)).norm() <= 1e-12 * 20.0);
+        CHECK((summary.reactions + summary.applied).norm() <= 1e-9 * 20.0);
+        CHECK(summary.iterations == 0);
+    }
+    SECTION("second order")
+    {
+        choose(p.setup.document, {.type = s::AnalysisType::SecondOrder});
+        const s::AnalysisResult result = resultOf(run(p, p.setup.loadCase));
+        const auto& data = std::get<c::SecondOrderResult>(result.data);
+        const s::Summary summary = s::summarize(result);
+        CHECK(summary.iterations == data.iterations);
+        CHECK(summary.iterations > 1);
+        CHECK(summary.change == data.change);
+        CHECK((summary.reactions + summary.applied).norm() <= 1e-9 * 20.0);
+        REQUIRE(summary.displacement.has_value());
+        CHECK(summary.factors.empty());
+    }
+}
+
+TEST_CASE("the summary of a buckling analysis", "[setup][analysis][summary]")
+{
+    Prepared p;
+    prepared(p);
+    choose(p.setup.document, {.type = s::AnalysisType::Buckling, .modes = 2});
+    const s::AnalysisResult result = resultOf(run(p, p.setup.loadCase));
+    const auto& data = std::get<c::BucklingResult>(result.data);
+    const s::Summary summary = s::summarize(result);
+    REQUIRE(summary.factors.size() == 2);
+    CHECK(summary.factors[0] == data.modes[0].factor);
+    CHECK(summary.factors[1] == data.modes[1].factor);
+    CHECK(summary.factors[0] > 0.0);
+    CHECK(summary.factors[0] <= summary.factors[1]);
+    CHECK(summary.note.empty());
+    // Nothing static in a mode.
+    CHECK_FALSE(summary.displacement.has_value());
+    CHECK_FALSE(summary.barForces[0].has_value());
+
+    // Fewer factors than asked: the note of the core.
+    s::AnalysisResult fewer = resultFor(4, 2.5);
+    std::get<c::BucklingResult>(fewer.data).note = "Only 1 factor was found.";
+    const s::Summary noted = s::summarize(fewer);
+    CHECK(noted.factors == std::vector<double>{2.5});
+    CHECK(noted.note == "Only 1 factor was found.");
 }
