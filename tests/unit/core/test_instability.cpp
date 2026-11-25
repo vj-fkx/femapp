@@ -11,10 +11,13 @@
 
 #include "beam_models.hpp"
 
+#include <fem/core/stability_analysis.hpp>
 #include <fem/core/static_analysis.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <cstddef>
+#include <numbers>
 #include <string>
 #include <utility>
 #include <vector>
@@ -138,4 +141,125 @@ TEST_CASE("a dof without stiffness names the elements at its node", "[core][inst
     fem::core::test::restrain(model, {2}, {DofType::V, DofType::W});
     CHECK(failure(model) == "The structure is unstable: no bar gives stiffness to\n"
                             "- the node 3 in w (elements 2, 3)");
+}
+
+namespace {
+
+// The ids in the "elements a, b, c" list after `marker` in `message`.
+std::vector<int> listedAfter(const std::string& message, const std::string& marker)
+{
+    std::vector<int> ids;
+    const auto at = message.find(marker);
+    if (at == std::string::npos) {
+        return ids;
+    }
+    std::size_t i = at + marker.size();
+    while (i < message.size()) {
+        std::size_t end = i;
+        while (end < message.size() && message[end] >= '0' && message[end] <= '9') {
+            ++end;
+        }
+        if (end == i) {
+            break;
+        }
+        ids.push_back(std::stoi(message.substr(i, end - i)));
+        if (message.compare(end, 2, ", ") != 0) {
+            break;
+        }
+        i = end + 2;
+    }
+    return ids;
+}
+
+// A portal of 2D beams: columns of 4 bars each at x = 0 (bars 1 to 4, nodes
+// 1 to 5) and x = 4 (bars 6 to 9, nodes 6 to 10, from the top down), a beam
+// 5 (nodes 5 and 6) on top; fixed at nodes 1 and 10. Only the left column is
+// loaded, at `factor` times the Euler load of a column held at both ends.
+Model portal(double factor)
+{
+    TrussSpec spec;
+    const double h = 4.0;
+    for (int i = 0; i <= 4; ++i) {
+        spec.nodes.emplace_back(0, h * i / 4, 0);
+    }
+    for (int i = 0; i <= 4; ++i) {
+        spec.nodes.emplace_back(4, h * (4 - i) / 4, 0);
+    }
+    for (int i = 0; i < 9; ++i) {
+        spec.bars.push_back({i, i + 1});
+    }
+    Model model = fem::core::test::beamModel(spec, ElementKind::Beam2D);
+    fem::core::test::fixAll(model, {1, 10}, ElementKind::Beam2D);
+    const double euler =
+        std::numbers::pi * std::numbers::pi * fem::core::test::kE * fem::core::test::kIz / (h * h);
+    model.nodalForces.push_back({.nodes = NodeIds{{5}},
+                                 .force = Vec(1.0e3, -factor * euler, 0),
+                                 .moment = Vec::Zero(),
+                                 .bimoment = 0.0});
+    return model;
+}
+
+} // namespace
+
+// REQ-011-18: beyond its critical load, the second order names the lateral
+// dof that moves the most and only the compressed elements that drive it.
+TEST_CASE("an unstable second order names the dof and the compressed elements",
+          "[core][instability]")
+{
+    const auto result = fem::core::runSecondOrderStatic(
+        portal(3.0),
+        {.base = {.threads = 0, .control = {}}, .tolerance = 1e-8, .maxIterations = 50});
+    REQUIRE_FALSE(result.has_value());
+    const std::string& message = result.error().message;
+    INFO(message);
+    CHECK(message.starts_with("The structure is unstable under these loads: the second-order "
+                              "stiffness lost its stability at iteration "));
+    CHECK(message.find(" in u moves the most, and the element") != std::string::npos);
+    CHECK(message.ends_with(" it."));
+    std::vector<int> ids = listedAfter(message, "the elements ");
+    if (ids.empty()) {
+        ids = listedAfter(message, "the element ");
+    }
+    REQUIRE_FALSE(ids.empty());
+    for (const int id : ids) {
+        CHECK(id >= 1);
+        CHECK(id <= 4); // the loaded column only
+    }
+
+    // The same message with one thread.
+    const auto sequential = fem::core::runSecondOrderStatic(
+        portal(3.0),
+        {.base = {.threads = 1, .control = {}}, .tolerance = 1e-8, .maxIterations = 50});
+    REQUIRE_FALSE(sequential.has_value());
+    CHECK(sequential.error().message == message);
+}
+
+// REQ-011-18: an instability inside a bar names the element and the local
+// plane of its buckling.
+TEST_CASE("an instability inside a bar names the element and the plane", "[core][instability]")
+{
+    const double l = 4.0;
+    const TrussSpec spec{.nodes = {Vec(0, 0, 0), Vec(0, l, 0)},
+                         .bars = {{0, 1}},
+                         .lineGroups = {},
+                         .pointGroups = {}};
+    Model model = fem::core::test::beamModel(spec, ElementKind::Beam2D);
+    fem::core::test::restrain(model, {1}, {DofType::U, DofType::V, DofType::RZ});
+    fem::core::test::restrain(model, {2}, {DofType::U, DofType::RZ});
+    for (const auto end : {fem::core::BarEnd::Start, fem::core::BarEnd::End}) {
+        fem::core::EndConnection hinge{.elements = ElementIds{{1}}, .end = end};
+        hinge.stiffness[5] = 0.0;
+        model.endConnections.push_back(hinge);
+    }
+    const double euler =
+        std::numbers::pi * std::numbers::pi * fem::core::test::kE * fem::core::test::kIz / (l * l);
+    model.nodalForces.push_back({.nodes = NodeIds{{2}},
+                                 .force = Vec(0, -1.05 * euler, 0),
+                                 .moment = Vec::Zero(),
+                                 .bimoment = 0.0});
+    const auto result = fem::core::runSecondOrderStatic(model);
+    REQUIRE_FALSE(result.has_value());
+    INFO(result.error().message);
+    CHECK(result.error().message.ends_with(
+        "(inside the element 1, buckling in its local y direction)."));
 }

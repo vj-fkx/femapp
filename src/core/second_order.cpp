@@ -246,26 +246,9 @@ Expected<SecondOrderResult> secondOrder(const Model& model, const SecondOrderOpt
     Eigen::VectorXd x = flatten(problem.profilesOf(problem.valuesOf(u)), flat);
     Eigen::VectorXd stableX = x;
 
-    // REQ-008c-08: the instability, at a node and direction or in a bar.
+    // REQ-008c-08, REQ-011-18: the instability, where it is.
     const auto unstable = [&](int iteration, const SparseCholesky* factorization) {
-        std::string where;
-        if (factorization != nullptr) {
-            auto eq = factorization->firstNegativeEquation();
-            if (!eq) {
-                eq = factorization->singularEquation();
-            }
-            if (eq) {
-                where = "at " + problem.equationLabel(*eq);
-            }
-        }
-        if (where.empty() && problem.unstableElement() >= 0) {
-            where = "inside the element " +
-                    std::to_string(problem.mesh().elementId(problem.unstableElement()));
-        }
-        return makeError("The structure is unstable under these loads: the second-order "
-                         "stiffness lost its stability at iteration " +
-                         std::to_string(iteration) + (where.empty() ? "" : " (" + where + ")") +
-                         ".");
+        return secondOrderError(problem, system->matrix, iteration, factorization);
     };
 
     Anderson anderson;

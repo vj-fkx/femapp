@@ -320,7 +320,11 @@ struct InstabilitySite
    primeira iteração.
 2. **O GDL que mais se move.** As rotações são multiplicadas pela diagonal
    da caixa da malha, e o empenamento pelo quadrado dela, para comparar com
-   as translações. O maior em módulo é o GDL citado.
+   as translações; essa escala decide quais elementos se movem. O GDL
+   citado é a maior translação, que é o que o usuário procura; uma rotação
+   ou o empenamento só quando nenhuma translação se move (acima de 1e−3 do
+   maior). *(Ajustado na T23: com a escala pela caixa, a rotação no topo de
+   um pilar passava a frente do deslocamento lateral.)*
 3. **Os elementos.**
    - **Mecanismo:** os elementos com algum GDL (escalado) acima de 1e−3 do
      maior, ordenados pelo maior movimento. Num mecanismo, toda barra tem

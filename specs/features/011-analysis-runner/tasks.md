@@ -85,7 +85,7 @@ Regras:
   `static_analysis.cpp`, `second_order.cpp`, `buckling.cpp`,
   `tests/unit/core/test_instability.cpp`; os testes de mensagem da 007 e
   da 008 ajustados ao texto novo. Cobre: 18.
-- [ ] **T23** A segunda ordem:
+- [x] **T23** A segunda ordem:
   - testes primeiro: pilar acima da crítica ao lado de um descarregado (a
     direção lateral, só os elementos comprimidos); instabilidade dentro
     de uma barra (o elemento e o plano y ou z);

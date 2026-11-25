@@ -43,6 +43,12 @@ struct InstabilitySite
 [[nodiscard]] InstabilitySite mechanismSite(const StaticProblem& problem,
                                             const Eigen::VectorXd& mode);
 
+// Second order: the dof that moves the most and the elements of negative
+// energy u_e^T K_e u_e in the mode, the most negative first (those that
+// move, if none is negative).
+[[nodiscard]] Expected<InstabilitySite> unstableSite(const StaticProblem& problem,
+                                                     const Eigen::VectorXd& mode);
+
 // "elements 3, 4, 7 and 2 more" (or "element 3"): the external ids, at most
 // kListedElements.
 [[nodiscard]] std::string elementList(const Mesh& mesh, const std::vector<ElementIndex>& elements);
@@ -58,5 +64,14 @@ struct InstabilitySite
                                                    const SparseMatrix& matrix,
                                                    const SparseCholesky& failed,
                                                    const Error& fallback);
+
+// REQ-008c-08, REQ-011-18: the second-order stiffness `matrix` lost its
+// stability at `iteration`. With a negative or zero pivot in
+// `factorization`: the dof that moves the most in the mode and the elements
+// that drive it (the dof of the pivot if the mode cannot be computed);
+// otherwise, inside the bar with the most negative pivots, with its plane.
+[[nodiscard]] tl::unexpected<Error> secondOrderError(const StaticProblem& problem,
+                                                     const SparseMatrix& matrix, int iteration,
+                                                     const SparseCholesky* factorization);
 
 } // namespace fem::core::detail

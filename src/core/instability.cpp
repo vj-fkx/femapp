@@ -1,9 +1,12 @@
 #include "detail/instability.hpp"
 
+#include <fem/core/beam_result.hpp>
+
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -109,10 +112,22 @@ InstabilitySite mechanismSite(const StaticProblem& problem, const Eigen::VectorX
     if (!(largest > 0.0)) {
         return site;
     }
-    site.dof = static_cast<DofIndex>(most);
-
     const Mesh& mesh = problem.mesh();
     const DofMap& dofs = problem.dofs();
+    // The dof cited is the largest translation, which is what a user looks
+    // for; a rotation or the warping only when no translation moves.
+    site.dof = static_cast<DofIndex>(most);
+    double translation = 0.0;
+    for (DofIndex d = 0; d < dofs.size(); ++d) {
+        const DofType type = dofs.typeOf(d);
+        const bool moves = type == DofType::U || type == DofType::V || type == DofType::W;
+        if (moves && movement[d] > translation) {
+            translation = movement[d];
+            if (translation > kMoving * largest) {
+                site.dof = d;
+            }
+        }
+    }
     std::vector<double> ofNode(static_cast<std::size_t>(mesh.nodeCount()), 0.0);
     for (DofIndex d = 0; d < dofs.size(); ++d) {
         double& node = ofNode[static_cast<std::size_t>(dofs.nodeOf(d))];
@@ -196,6 +211,93 @@ tl::unexpected<Error> mechanismError(const StaticProblem& problem, const SparseM
     }
     return makeError("The structure is a mechanism: " + problem.equationLabel(*eq) +
                      " can move without resistance (a support may be missing).");
+}
+
+Expected<InstabilitySite> unstableSite(const StaticProblem& problem, const Eigen::VectorXd& mode)
+{
+    InstabilitySite site = mechanismSite(problem, mode);
+    auto energies =
+        elementEnergies(problem.mesh(), problem.dofs(), problem.sets(), mode, problem.threads());
+    if (!energies) {
+        return tl::unexpected(energies.error());
+    }
+    const double most = std::ranges::min(*energies);
+    if (!(most < 0.0)) {
+        return site; // no element of negative energy: those that move
+    }
+    const Mesh& mesh = problem.mesh();
+    std::vector<std::pair<double, ElementIndex>> negative;
+    for (std::size_t e = 0; e < energies->size(); ++e) {
+        const double energy = (*energies)[e];
+        if (energy < -kMoving * -most) {
+            // Equal energies (to 1e-6 of the most negative) tie, broken by id.
+            negative.emplace_back(std::round(energy / -most * kTieScale),
+                                  static_cast<ElementIndex>(e));
+        }
+    }
+    std::ranges::sort(negative, [&](const auto& a, const auto& b) {
+        if (a.first != b.first) {
+            return a.first < b.first;
+        }
+        return mesh.elementId(a.second) < mesh.elementId(b.second);
+    });
+    site.elements.clear();
+    for (const auto& [energy, e] : negative) {
+        site.elements.push_back(e);
+    }
+    return site;
+}
+
+tl::unexpected<Error> secondOrderError(const StaticProblem& problem, const SparseMatrix& matrix,
+                                       int iteration, const SparseCholesky* factorization)
+{
+    const std::string head = "The structure is unstable under these loads: the second-order "
+                             "stiffness lost its stability at iteration " +
+                             std::to_string(iteration);
+    std::optional<std::int32_t> eq;
+    if (factorization != nullptr) {
+        eq = factorization->firstNegativeEquation();
+        if (!eq) {
+            eq = factorization->singularEquation();
+        }
+    }
+    if (eq) {
+        // The mode of the eigenvalue nearest zero; shifted if K is singular.
+        auto mode = instabilityMode(problem, matrix, 0.0);
+        if (!mode) {
+            mode = instabilityMode(problem, matrix, kMechanismShift);
+        }
+        if (mode) {
+            const auto site = unstableSite(problem, *mode);
+            if (site && site->dof >= 0 && !site->elements.empty()) {
+                return makeError(head + ": " + problem.dofLabel(site->dof) +
+                                 " moves the most, and the " +
+                                 elementList(problem.mesh(), site->elements) +
+                                 (site->elements.size() == 1 ? " drives" : " drive") + " it.");
+            }
+        }
+        return makeError(head + " (at " + problem.equationLabel(*eq) + ").");
+    }
+    const ElementIndex element = problem.unstableElement();
+    if (element >= 0) {
+        std::string plane;
+        if (const auto shape = problem.internalMode(element)) {
+            // The largest local displacement across the bar: y or z.
+            double y = 0.0;
+            double z = 0.0;
+            constexpr int kSamples = 64;
+            for (int i = 0; i <= kSamples; ++i) {
+                const Eigen::Vector3d d = shape->at(shape->length() * i / kSamples).displacement;
+                y = std::max(y, std::abs(d.y()));
+                z = std::max(z, std::abs(d.z()));
+            }
+            plane = y >= z ? ", buckling in its local y direction"
+                           : ", buckling in its local z direction";
+        }
+        return makeError(head + " (inside the element " +
+                         std::to_string(problem.mesh().elementId(element)) + plane + ").");
+    }
+    return makeError(head + ".");
 }
 
 } // namespace fem::core::detail
