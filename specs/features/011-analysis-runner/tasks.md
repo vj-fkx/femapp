@@ -108,9 +108,13 @@ Regras:
   nova; `revert` restaura a anterior (design §5.3):
   - testes primeiro: aplicar, desfazer volta a revisão; aplicar de novo
     dá uma revisão nova, diferente de todas; a malha da 010 volta a ser
-    atual ao desfazer a edição que a desatualizou;
-  - depois as pilhas nos dois tipos.
+    atual ao desfazer a edição que a desatualizou; um comando de várias
+    edições (LINE com três segmentos) desfeito volta à revisão de antes
+    dele, e um comando que se anula (LINE desfeito com U) volta na hora;
+  - depois as pilhas nos dois tipos e `Drawing::foldApplies`, chamada por
+    `CommandSession::finish` *(acrescentado na T06, 2026-11-25)*.
   Arquivos: `geom/include/fem/geom/drawing.hpp`, `drawing.cpp`,
+  `geom/commands.hpp`, `commands.cpp`, `tests/unit/geom/test_commands.cpp`,
   `setup/include/fem/setup/document.hpp`, `document.cpp`,
   `tests/unit/geom/test_drawing.cpp`, `tests/unit/setup/test_document.cpp`,
   `tests/unit/setup/test_build.cpp`. Cobre: 12.

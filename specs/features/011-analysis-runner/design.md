@@ -209,6 +209,8 @@ struct Summary
 //   changeAnalysis(document, settings) -> DocumentEdit, empty when equal.
 //   Document::revision() and geom::Drawing::revision(): unique per state;
 //   revert() restores the revision before the edit it reverts (LIFO).
+//   Drawing::foldApplies(n, empty): the last n applies of a drafting
+//   command become one undo step (see §5.3).
 
 // ---- app ----
 class AnalysisJob : public QObject
@@ -360,6 +362,18 @@ struct InstabilitySite
     que só cresce);
   - `revert` desempilha e restaura a revisão anterior. O desfazer é LIFO,
     então a revisão volta ao estado anterior à edição desfeita.
+- **Comandos de desenho** *(acrescentado na T06, 2026-11-25)*. Um comando
+  do desenho (LINE, MOVE, COPY…) aplica as suas edições uma a uma, para o
+  desenho mudar enquanto se desenha. No fim, o desfazer as reverte de uma
+  vez, como um único passo. Sem cuidado, a pilha guardaria uma revisão por
+  edição, e o desfazer pararia numa revisão intermediária. Um cache feito
+  no meio do comando (o do snap, o da GPU) seria tomado como atual.
+  - `Drawing::foldApplies(n, empty)` junta os últimos `n` applies num só
+    passo: só fica a revisão de antes do primeiro.
+  - Com `empty` (as edições se anularam, como um LINE desfeito com U até o
+    começo), não há passo de desfazer, e a revisão de antes volta na hora.
+  - `CommandSession::finish` chama a função com o número de applies do
+    comando.
 - **Efeito na 011:** um resultado volta a ser atual quando se desfaz até o
   estado analisado.
 - **Efeito na 009 e na 010:** desfazer a edição que deixou a malha
