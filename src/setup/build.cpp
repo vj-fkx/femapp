@@ -1,3 +1,5 @@
+#include "detail/check.hpp"
+
 #include <fem/core/static_analysis.hpp>
 #include <fem/setup/build.hpp>
 
@@ -408,20 +410,28 @@ BuildResult buildModel(const Document& document, const geom::Drawing& drawing,
     return result;
 }
 
-std::vector<BuildIssue> checkModel(const Document& document, const geom::Drawing& drawing,
-                                   const MeshContext& mesh, LoadSelection load)
+namespace detail {
+
+void addCoreIssues(BuildResult& built)
 {
-    BuildResult built = buildModel(document, drawing, mesh, load);
-    if (!mesh.mesh) {
-        return std::move(built.issues);
-    }
-    // REQ-010-21: then the core's own validation of the model built. Its
-    // issues name elements and nodes, not items of the document.
+    // The core's own validation of the model built. Its issues name elements
+    // and nodes, not items of the document.
     for (core::ModelIssue& issue : core::validate(built.model)) {
         built.issues.push_back({.severity = Severity::Error,
                                 .kind = IssueKind::Core,
                                 .item = std::nullopt,
                                 .detail = std::move(issue.message)});
+    }
+}
+
+} // namespace detail
+
+std::vector<BuildIssue> checkModel(const Document& document, const geom::Drawing& drawing,
+                                   const MeshContext& mesh, LoadSelection load)
+{
+    BuildResult built = buildModel(document, drawing, mesh, load);
+    if (mesh.mesh) {
+        detail::addCoreIssues(built);
     }
     return std::move(built.issues);
 }

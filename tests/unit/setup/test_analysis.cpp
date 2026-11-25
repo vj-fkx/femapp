@@ -1,15 +1,138 @@
+#include "frame_document.hpp"
+
 #include <fem/core/stability_analysis.hpp>
+#include <fem/core/static_analysis.hpp>
+#include <fem/setup/analysis.hpp>
+#include <fem/setup/build.hpp>
 #include <fem/setup/document.hpp>
 #include <fem/setup/editing.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
+#include <atomic>
+#include <cmath>
+#include <cstddef>
+#include <stdexcept>
+#include <string>
+#include <utility>
+#include <variant>
+#include <vector>
+
 // Feature 011, T07 (design §4, §5.3): REQ-011-01. The type and the options
-// of the analysis, in the document.
+// of the analysis, in the document. T08 (design §4, §5.4): REQ-011-02, 05,
+// 10. runCase on the 2 x 2 frame of 010.
 
 namespace {
 
 namespace s = fem::setup;
+namespace c = fem::core;
+using fem::geom::Vec3;
+using fem::setup::test::added;
+using fem::setup::test::drawFrame;
+using fem::setup::test::entities;
+using fem::setup::test::Frame;
+using fem::setup::test::meshOf;
+using fem::setup::test::prepare;
+using fem::setup::test::Setup;
+
+// The same values at every node, to 1e-12 of the largest.
+void same(const std::vector<Vec3>& a, const std::vector<Vec3>& b)
+{
+    REQUIRE(a.size() == b.size());
+    double largest = 0.0;
+    for (const Vec3& v : b) {
+        largest = std::max(largest, v.norm());
+    }
+    for (std::size_t i = 0; i < a.size(); ++i) {
+        CHECK((a[i] - b[i]).norm() <= 1e-12 * largest);
+    }
+}
+
+void same(const c::StaticResult& a, const c::StaticResult& b)
+{
+    same(a.displacements, b.displacements);
+    same(a.rotations, b.rotations);
+    same(a.reactions, b.reactions);
+    same(a.reactionMoments, b.reactionMoments);
+    REQUIRE(a.axialForce.size() == b.axialForce.size());
+    for (std::size_t e = 0; e < a.axialForce.size(); ++e) {
+        const double x = a.axialForce[e];
+        const double y = b.axialForce[e];
+        if (std::isnan(y)) {
+            CHECK(std::isnan(x)); // not a bar
+        } else {
+            CHECK(std::abs(x - y) <= 1e-12 * std::max(1.0, std::abs(y)));
+        }
+    }
+}
+
+void choose(s::Document& document, const s::AnalysisSettings& settings)
+{
+    document.apply(s::changeAnalysis(document, settings));
+}
+
+// The frame, its document and its mesh.
+struct Prepared
+{
+    Frame frame;
+    Setup setup;
+    s::MeshContext mesh;
+};
+
+void prepared(Prepared& p)
+{
+    drawFrame(p.frame);
+    prepare(p.setup, p.frame);
+    p.mesh = meshOf(p.frame.drawing);
+}
+
+s::CaseOutcome run(const Prepared& p, s::ItemId item, const c::RunControl& control = {})
+{
+    return s::runCase(p.setup.document, p.frame.drawing, p.mesh, item, control);
+}
+
+c::Model built(const Prepared& p, s::ItemId item)
+{
+    s::BuildResult b = s::buildModel(p.setup.document, p.frame.drawing, p.mesh, {.item = item});
+    REQUIRE(b.issues.empty());
+    return std::move(b.model);
+}
+
+template <typename T>
+T itemOfKind(const s::Document& document)
+{
+    const auto found = std::ranges::find_if(
+        document.items(), [](const s::Item& i) { return std::holds_alternative<T>(i); });
+    REQUIRE(found != document.items().end());
+    return std::get<T>(*found);
+}
+
+// The result or the error of an outcome, which the test requires.
+const s::AnalysisResult& resultOf(const s::CaseOutcome& outcome)
+{
+    REQUIRE(outcome.result.has_value());
+    if (!outcome.result) {
+        throw std::logic_error("no result");
+    }
+    return *outcome.result;
+}
+
+const c::Error& errorOf(const s::CaseOutcome& outcome)
+{
+    REQUIRE(outcome.error.has_value());
+    if (!outcome.error) {
+        throw std::logic_error("no error");
+    }
+    return *outcome.error;
+}
+
+void change(s::Document& document, const s::Item& item)
+{
+    const auto edit = s::changeItem(document, item);
+    REQUIRE(edit.has_value());
+    document.apply(*edit);
+}
 
 } // namespace
 
@@ -75,4 +198,192 @@ TEST_CASE("a change of units leaves the analysis alone", "[setup][analysis]")
     CHECK(document.analysis() == settings);
     document.revert(units);
     CHECK(document.analysis() == settings);
+}
+
+TEST_CASE("the three analyses of a case are those of the core", "[setup][analysis]")
+{
+    Prepared p;
+    prepared(p);
+    const s::ItemId item = p.setup.loadCase;
+    const c::Model model = built(p, item);
+
+    SECTION("linear")
+    {
+        const s::CaseOutcome outcome = run(p, item);
+        REQUIRE(outcome.result.has_value());
+        CHECK_FALSE(outcome.error.has_value());
+        CHECK(outcome.issues.empty());
+        const s::AnalysisResult& r = resultOf(outcome);
+        CHECK(r.item == item);
+        CHECK(r.settings == s::AnalysisSettings{});
+        CHECK(r.state == s::AnalysedState{.documentRevision = p.setup.document.revision(),
+                                          .drawingRevision = p.frame.drawing.revision(),
+                                          .meshGeneration = p.mesh.generation});
+        CHECK(r.mesh == p.mesh.mesh);
+        CHECK(r.warnings.empty());
+        REQUIRE(std::holds_alternative<c::StaticResult>(r.data));
+        const auto direct = c::runLinearStatic(model);
+        REQUIRE(direct.has_value());
+        same(std::get<c::StaticResult>(r.data), *direct);
+    }
+    SECTION("second order, with its options")
+    {
+        choose(p.setup.document,
+               {.type = s::AnalysisType::SecondOrder, .tolerance = 1e-10, .maxIterations = 30});
+        const s::CaseOutcome outcome = run(p, item);
+        REQUIRE(outcome.result.has_value());
+        CHECK(resultOf(outcome).settings.type == s::AnalysisType::SecondOrder);
+        REQUIRE(std::holds_alternative<c::SecondOrderResult>(resultOf(outcome).data));
+        const auto& r = std::get<c::SecondOrderResult>(resultOf(outcome).data);
+        const auto direct =
+            c::runSecondOrderStatic(model, {.base = {}, .tolerance = 1e-10, .maxIterations = 30});
+        REQUIRE(direct.has_value());
+        CHECK(r.iterations == direct->iterations);
+        CHECK(r.change == direct->change);
+        same(r.result, direct->result);
+    }
+    SECTION("buckling, with its modes")
+    {
+        choose(p.setup.document, {.type = s::AnalysisType::Buckling, .modes = 3});
+        const s::CaseOutcome outcome = run(p, item);
+        REQUIRE(outcome.result.has_value());
+        REQUIRE(std::holds_alternative<c::BucklingResult>(resultOf(outcome).data));
+        const auto& r = std::get<c::BucklingResult>(resultOf(outcome).data);
+        const auto direct = c::runLinearBuckling(model, {.base = {}, .count = 3});
+        REQUIRE(direct.has_value());
+        REQUIRE(r.modes.size() == direct->modes.size());
+        CHECK(r.modes.size() == 3);
+        CHECK(r.note == direct->note);
+        for (std::size_t m = 0; m < r.modes.size(); ++m) {
+            CHECK(std::abs(r.modes[m].factor - direct->modes[m].factor) <=
+                  1e-12 * direct->modes[m].factor);
+            same(r.modes[m].displacements, direct->modes[m].displacements);
+        }
+    }
+}
+
+TEST_CASE("a combination is analysed as one case", "[setup][analysis]")
+{
+    Prepared p;
+    prepared(p);
+    s::Document& d = p.setup.document;
+    const s::ItemId g =
+        added(d, s::addItem(d, s::LoadCase{.id = {}, .name = "G", .standard = {}, .category = {}}));
+    added(d, s::addItem(d, s::LoadItem{.id = {},
+                                       .loadCase = g,
+                                       .targets = entities({p.frame.bars[8], p.frame.bars[9]}),
+                                       .action = c::DistributedLoad{.elements = {},
+                                                                    .startValue = Vec3(0, -6, 0),
+                                                                    .endValue = Vec3(0, -6, 0)}}));
+    const s::ItemId uls =
+        added(d, s::addItem(d, s::Combination{.id = {},
+                                              .name = "ULS",
+                                              .terms = {{g, 1.35}, {p.setup.loadCase, 1.5}}}));
+    choose(d, {.type = s::AnalysisType::SecondOrder});
+    const s::CaseOutcome outcome = run(p, uls);
+    REQUIRE(outcome.result.has_value());
+    CHECK(resultOf(outcome).item == uls);
+    const auto direct = c::runSecondOrderStatic(built(p, uls));
+    REQUIRE(direct.has_value());
+    same(std::get<c::SecondOrderResult>(resultOf(outcome).data).result, direct->result);
+}
+
+TEST_CASE("errors of the check refuse a case", "[setup][analysis]")
+{
+    Prepared p;
+    prepared(p);
+    s::Document& d = p.setup.document;
+    // The assignment names a material that is not there.
+    auto bars = itemOfKind<s::BarAssignment>(d);
+    bars.data.material = "aluminium";
+    change(d, bars);
+    const s::CaseOutcome outcome = run(p, p.setup.loadCase);
+    CHECK_FALSE(outcome.result.has_value());
+    CHECK_FALSE(outcome.error.has_value());
+    CHECK(std::ranges::any_of(outcome.issues, [](const s::BuildIssue& i) {
+        return i.severity == s::Severity::Error && i.kind == s::IssueKind::UnknownMaterial;
+    }));
+
+    // Without a mesh: NoMesh, and nothing runs.
+    const s::CaseOutcome noMesh = s::runCase(d, p.frame.drawing, {}, p.setup.loadCase, {});
+    CHECK_FALSE(noMesh.result.has_value());
+    CHECK_FALSE(noMesh.error.has_value());
+    REQUIRE(noMesh.issues.size() == 1);
+    CHECK(noMesh.issues.front().kind == s::IssueKind::NoMesh);
+}
+
+TEST_CASE("a failure of the core comes back as its error", "[setup][analysis]")
+{
+    SECTION("a mechanism")
+    {
+        Prepared p;
+        prepared(p);
+        s::Document& d = p.setup.document;
+        // The bases hold v alone: the frame slides in x.
+        auto support = itemOfKind<s::SupportItem>(d);
+        support.held = {};
+        support.held[static_cast<std::size_t>(c::DofType::V)] = true;
+        change(d, support);
+        const s::CaseOutcome outcome = run(p, p.setup.loadCase);
+        CHECK_FALSE(outcome.result.has_value());
+        REQUIRE(outcome.error.has_value());
+        CHECK_FALSE(errorOf(outcome).cancelled);
+        CHECK(errorOf(outcome).message.starts_with("The structure is a mechanism"));
+    }
+    SECTION("buckling without a compressed bar")
+    {
+        // A single column, fixed at its base, pulled up at its top.
+        Frame column;
+        column.bars = {fem::setup::test::addLine(column.drawing, Vec3(0, 0, 0), Vec3(0, 3, 0))};
+        column.bases = {fem::setup::test::addPoint(column.drawing, Vec3(0, 0, 0))};
+        column.top = fem::setup::test::addPoint(column.drawing, Vec3(0, 3, 0));
+        Setup setup;
+        prepare(setup, column);
+        s::Document& d = setup.document;
+        auto load = itemOfKind<s::LoadItem>(d);
+        load.action = c::NodalForce{.nodes = {}, .force = Vec3(0, 10, 0)};
+        change(d, load);
+        choose(d, {.type = s::AnalysisType::Buckling});
+        const s::CaseOutcome outcome =
+            s::runCase(d, column.drawing, meshOf(column.drawing), setup.loadCase, {});
+        CHECK_FALSE(outcome.result.has_value());
+        REQUIRE(outcome.error.has_value());
+        CHECK(errorOf(outcome).message.starts_with("No bar is compressed"));
+    }
+}
+
+TEST_CASE("a cancelled case has no result", "[setup][analysis]")
+{
+    Prepared p;
+    prepared(p);
+    const std::atomic<bool> cancel{true};
+    const s::CaseOutcome outcome =
+        run(p, p.setup.loadCase, c::RunControl{.cancel = &cancel, .progress = {}});
+    CHECK_FALSE(outcome.result.has_value());
+    REQUIRE(outcome.error.has_value());
+    CHECK(errorOf(outcome).cancelled);
+}
+
+TEST_CASE("the warnings of the check come with the result", "[setup][analysis]")
+{
+    Prepared p;
+    prepared(p);
+    s::Document& d = p.setup.document;
+    const s::ItemId truss =
+        added(d, s::assign(d, s::BarAssignment{.id = {},
+                                               .targets = entities({p.frame.bars.back()}),
+                                               .data = {.elements = {},
+                                                        .kind = c::ElementKind::Truss2D,
+                                                        .material = "steel",
+                                                        .section = "bar"}}));
+    const s::CaseOutcome outcome = run(p, p.setup.loadCase);
+    REQUIRE(outcome.result.has_value());
+    const auto warned = [&](const std::vector<s::BuildIssue>& issues) {
+        return std::ranges::any_of(issues, [&](const s::BuildIssue& i) {
+            return i.severity == s::Severity::Warning && i.kind == s::IssueKind::TrussBuckling &&
+                   i.item == truss;
+        });
+    };
+    CHECK(warned(resultOf(outcome).warnings));
+    CHECK(warned(outcome.issues));
 }

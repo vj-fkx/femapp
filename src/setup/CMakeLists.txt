@@ -2,6 +2,7 @@
 femapp_add_module(setup
     SOURCES
         actions.cpp
+        analysis.cpp
         build.cpp
         convert.cpp
         document.cpp

@@ -132,7 +132,7 @@ Regras:
   `document.hpp/.cpp`, `editing.hpp/.cpp`,
   `tests/unit/setup/test_analysis.cpp` (o `convert.cpp` não precisou mudar:
   as opções não têm unidade). Cobre: 01.
-- [ ] **T08** `runCase` (design §4, §5.4):
+- [x] **T08** `runCase` (design §4, §5.4):
   - testes primeiro: no pórtico 2×2 da 010 (o `Frame` de
     `test_build.cpp`), as três análises iguais às chamadas diretas do
     `core` sobre o modelo montado, em 1e−12; uma combinação; a recusa
@@ -140,7 +140,10 @@ Regras:
     falha do `core` (mecanismo, flambagem sem compressão) no `error`; o
     cancelamento; os avisos (treliça) num resultado;
   - depois a função.
-  Arquivos: `analysis.hpp/.cpp`, `test_analysis.cpp`. Cobre: 02, 05, 10.
+  Arquivos: `analysis.hpp/.cpp`, `test_analysis.cpp`; o pórtico da 010
+  passou para `tests/unit/setup/frame_document.hpp`, e a conferência do
+  `core` para `src/setup/detail/check.hpp`, para o `runCase` montar o
+  modelo uma vez só. Cobre: 02, 05, 10.
 - [ ] **T09** `ResultSet` e `isCurrent`:
   - testes: `put` substitui, `erase`, `all` em ordem de item;
     `isCurrent` com as três partes do estado; desfazer até o estado
