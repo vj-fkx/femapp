@@ -23,6 +23,7 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -61,6 +62,8 @@ public:
 
     [[nodiscard]] const Mesh& mesh() const { return *m_model.mesh; }
     [[nodiscard]] const DofMap& dofs() const { return m_dofs; }
+    [[nodiscard]] std::span<const ElementSet> sets() const { return m_sets; }
+    [[nodiscard]] int threads() const { return m_options.threads; }
 
     // The matrix and the load vector on the free dofs; the negative pivots
     // of the elements' internal condensations go to negativePivots().
@@ -72,6 +75,8 @@ public:
     [[nodiscard]] std::string warpingHint(const Eigen::VectorXd& diagonal, double largest) const;
     // "the node 12 in v" for an equation of the system.
     [[nodiscard]] std::string equationLabel(std::int32_t equation) const;
+    // "the node 12 in v" for a dof.
+    [[nodiscard]] std::string dofLabel(DofIndex dof) const;
     // The values of all dofs from those of the free ones; the prescribed
     // ones at their values, or at zero (a buckling mode).
     [[nodiscard]] Eigen::VectorXd valuesOf(const Eigen::VectorXd& free,

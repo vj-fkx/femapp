@@ -332,10 +332,13 @@ struct InstabilitySite
      `internalMode`, comparando o maior |v| e o maior |w| locais.
 4. **O texto**, no formato que o `idsInMessage` da 010 já lê (palavras
    "node" e "elements" seguidas dos ids; "and N more" é uma contagem):
-   - "The structure is a mechanism: the node 12 in v moves without
+   - "The structure is a mechanism: the node 12 in v can move without
      resistance, with the elements 3, 4, 7 and 2 more (a support may be
      missing)."
-   - "- the node 3 in w (elements 2, 5)" em cada linha do GDL sem rigidez.
+   - "- the node 3 in w (elements 2, 5)" em cada linha do GDL sem rigidez
+     ("element 2" quando é um só).
+   - Movimentos iguais (a 1e−6 do maior) empatam e vão pela ordem dos ids,
+     para a mensagem não depender de arredondamentos.
    - "… lost its stability at iteration 4: the node 7 in u moves the most,
      and the elements 2, 3 drive it."
    - "… inside the element 5, buckling in its local y direction."

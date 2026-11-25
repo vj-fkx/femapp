@@ -41,6 +41,7 @@ femapp_add_test(core SOURCES
     test_id_ranges.cpp
     test_isoparametric.cpp
     test_linear_solver.cpp
+    test_instability.cpp
     test_mesh.cpp
     test_mesh_measure.cpp
     test_mesh_surface.cpp

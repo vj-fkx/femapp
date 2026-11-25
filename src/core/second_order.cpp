@@ -7,6 +7,7 @@
 // iteration on the forces; a final factorization checks by its
 // inertia that the structure is stable (Sturm count, ADR 0007).
 
+#include "detail/instability.hpp"
 #include "detail/static_stages.hpp"
 
 #include <fem/core/linear_solver.hpp>
@@ -230,12 +231,7 @@ Expected<SecondOrderResult> secondOrder(const Model& model, const SecondOrderOpt
     }
     auto preconditioner = std::make_unique<SparseCholesky>();
     if (auto factorized = preconditioner->factorize(system->matrix); !factorized) {
-        const auto eq = preconditioner->singularEquation();
-        if (!eq) {
-            return tl::unexpected(factorized.error());
-        }
-        return makeError("The structure is a mechanism: " + problem.equationLabel(*eq) +
-                         " can move without resistance (a support may be missing).");
+        return mechanismError(problem, system->matrix, *preconditioner, factorized.error());
     }
     control.report({.stage = RunStage::Solution, .fraction = -1.0, .iteration = 0});
     if (control.cancelled()) {

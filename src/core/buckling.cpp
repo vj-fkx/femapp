@@ -14,6 +14,7 @@
 //  - a final Sturm count (Wittrick-Williams) above the last factor: it
 //    must equal the factors found, or the missing ones are bisected.
 
+#include "detail/instability.hpp"
 #include "detail/static_stages.hpp"
 
 #include <fem/core/beam_state.hpp>
@@ -290,12 +291,7 @@ Expected<BucklingResult> buckling(const Model& model, const BucklingOptions& opt
     }
     SparseCholesky base;
     if (auto factorized = base.factorize(k0); !factorized) {
-        const auto eq = base.singularEquation();
-        if (!eq) {
-            return tl::unexpected(factorized.error());
-        }
-        return makeError("The structure is a mechanism: " + problem.equationLabel(*eq) +
-                         " can move without resistance (a support may be missing).");
+        return mechanismError(problem, k0, base, factorized.error());
     }
     control.report({.stage = RunStage::Solution, .fraction = -1.0, .iteration = 0});
     if (control.cancelled()) {

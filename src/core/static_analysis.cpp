@@ -1,3 +1,4 @@
+#include "detail/instability.hpp"
 #include "detail/model_validation.hpp"
 #include "detail/static_stages.hpp"
 
@@ -478,7 +479,11 @@ Expected<void> StaticProblem::checkDiagonal(const SparseMatrix& matrix) const
     std::string list;
     for (Eigen::Index eq = 0; eq < diagonal.size(); ++eq) {
         if (!(diagonal[eq] > kNoStiffness * largest)) {
-            list += "\n- " + equationLabel(static_cast<std::int32_t>(eq));
+            // REQ-011-18: with the elements at the node.
+            const DofIndex dof = m_dofOfEquation[static_cast<std::size_t>(eq)];
+            const auto at = elementsAtNode(*this, m_dofs.nodeOf(dof));
+            list += "\n- " + equationLabel(static_cast<std::int32_t>(eq)) +
+                    (at.empty() ? "" : " (" + elementList(mesh(), at) + ")");
         }
     }
     if (list.empty()) {
@@ -529,7 +534,12 @@ std::string StaticProblem::warpingHint(const Eigen::VectorXd& diagonal, double l
 
 std::string StaticProblem::equationLabel(std::int32_t equation) const
 {
-    return dofLabel(mesh(), m_dofs, m_dofOfEquation[static_cast<std::size_t>(equation)]);
+    return core::dofLabel(mesh(), m_dofs, m_dofOfEquation[static_cast<std::size_t>(equation)]);
+}
+
+std::string StaticProblem::dofLabel(DofIndex dof) const
+{
+    return core::dofLabel(mesh(), m_dofs, dof);
 }
 
 Eigen::VectorXd StaticProblem::valuesOf(const Eigen::VectorXd& free, bool prescribed) const
@@ -1017,12 +1027,7 @@ Expected<StaticResult> runLinearStatic(const Model& model, const StaticOptions& 
     }
     SparseCholesky solver;
     if (auto factorized = solver.factorize(system->matrix); !factorized) {
-        const auto eq = solver.singularEquation();
-        if (!eq) {
-            return tl::unexpected(factorized.error());
-        }
-        return makeError("The structure is a mechanism: " + problem.equationLabel(*eq) +
-                         " can move without resistance (a support may be missing).");
+        return mechanismError(problem, system->matrix, solver, factorized.error());
     }
     control.report({.stage = RunStage::Solution, .fraction = -1.0, .iteration = 0});
     if (control.cancelled()) {

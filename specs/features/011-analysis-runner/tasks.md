@@ -73,7 +73,7 @@ Regras:
   - depois a função.
   Arquivos: `assembler.hpp/.cpp`, `tests/unit/core/test_assembler.cpp`.
   Cobre: 18.
-- [ ] **T22** O modo e o sítio do mecanismo, e o GDL sem rigidez com os
+- [x] **T22** O modo e o sítio do mecanismo, e o GDL sem rigidez com os
   elementos do nó:
   - testes primeiro: quadrado articulado sem diagonal (exatamente as três
     barras que se movem); mecanismo num vão de um pórtico longo (só as

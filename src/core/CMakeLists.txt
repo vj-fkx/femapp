@@ -19,6 +19,7 @@ femapp_add_module(core
         element_reference_coordinates.inc
         element_type.cpp
         id_ranges.cpp
+        instability.cpp
         isoparametric.cpp
         linear_solver.cpp
         linear_static.cpp

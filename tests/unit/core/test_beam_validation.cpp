@@ -369,9 +369,10 @@ TEST_CASE("a mechanism of rotation names the node", "[core][analysis][beam]")
     model.endConnections.push_back(hinge);
     const auto result = fem::core::runLinearStatic(model);
     REQUIRE_FALSE(result.has_value());
-    CHECK(result.error().message ==
-          "The structure is unstable: no bar gives stiffness to\n- the node 2 in rz\n"
-          "(A rotation without stiffness: restrain it, or keep one beam at the node connected.)");
+    CHECK(
+        result.error().message ==
+        "The structure is unstable: no bar gives stiffness to\n- the node 2 in rz (elements 1, 2)\n"
+        "(A rotation without stiffness: restrain it, or keep one beam at the node connected.)");
     // Restrained, it is a Gerber beam that stands.
     model.restraints.push_back({.nodes = NodeIds{{2}}, .dof = DofType::RZ, .value = 0.0});
     CHECK(fem::core::runLinearStatic(model).has_value());
@@ -591,10 +592,11 @@ TEST_CASE("a mechanism of warping names the node", "[core][analysis][beam][warpi
             {.elements = ElementIds{{1}}, .condition = fem::core::WarpingCondition::Free});
         const auto result = fem::core::runLinearStatic(model);
         REQUIRE_FALSE(result.has_value());
-        CHECK(result.error().message ==
-              "The structure is unstable: no bar gives stiffness to\n- the node 2 in rx\n"
-              "(A twist without stiffness where the warping of every beam is free: restrain "
-              "the warping at an end, as an end plate does, or make it continuous.)");
+        CHECK(
+            result.error().message ==
+            "The structure is unstable: no bar gives stiffness to\n- the node 2 in rx (element 1)\n"
+            "(A twist without stiffness where the warping of every beam is free: restrain "
+            "the warping at an end, as an end plate does, or make it continuous.)");
         // With an end plate at the root, the warping holds the twist.
         model.warpingEnds.front().end = fem::core::BarEnd::End;
         model.warpingEnds.push_back({.elements = ElementIds{{1}},

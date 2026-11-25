@@ -322,8 +322,9 @@ TEST_CASE("a node without stiffness in a direction", "[core][analysis]")
     model.restraints.push_back({.nodes = GroupRef{"base"}, .dof = DofType::W, .value = 0.0});
     const auto result = fem::core::runLinearStatic(model);
     REQUIRE_FALSE(result.has_value());
-    CHECK(result.error().message ==
-          "The structure is unstable: no bar gives stiffness to\n- the node 3 in w");
+    CHECK(
+        result.error().message ==
+        "The structure is unstable: no bar gives stiffness to\n- the node 3 in w (elements 2, 3)");
 }
 
 // REQ-007-15: a square without its diagonal folds.
@@ -343,7 +344,8 @@ TEST_CASE("a mechanism is reported with a node and a direction", "[core][analysi
     const std::string& message = result.error().message;
     INFO(message);
     CHECK(message.starts_with("The structure is a mechanism: the node "));
-    CHECK(message.ends_with(" can move without resistance (a support may be missing)."));
+    CHECK(message.ends_with(" can move without resistance, with the elements 2, 3, 4 (a support "
+                            "may be missing)."));
 
     // With the diagonal it stands.
     spec.bars.push_back({0, 2});
