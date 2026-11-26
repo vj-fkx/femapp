@@ -35,6 +35,8 @@ qt_add_executable(femapp WIN32 MACOSX_BUNDLE
     model_tree.hpp
     property_panel.cpp
     property_panel.hpp
+    results_model.cpp
+    results_model.hpp
     section_geometry.cpp
     section_geometry.hpp
     section_view.cpp

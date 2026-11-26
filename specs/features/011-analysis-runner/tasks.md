@@ -224,7 +224,7 @@ Regras:
     (`dataChanged`), sem reconstruir: a vista guarda a seleção e o que está
     aberto durante um Run all. O desfazer até o estado analisado volta a
     "current".
-- [ ] **T17** `ResultsModel`:
+- [x] **T17** `ResultsModel`:
   - testes primeiro: o número de linhas e os valores de cada tabela
     (deslocamentos, reações só nos nós apoiados, esforços nas duas
     pontas, modos), os cabeçalhos com as unidades, os ids das linhas
@@ -232,6 +232,15 @@ Regras:
   - depois o modelo virtual.
   Arquivos: `src/app/results_model.hpp/.cpp`,
   `tests/unit/app/test_results_model.cpp`. Cobre: 14, 15, N04.
+  - Feito: quatro tabelas (Displacements, Reactions, BarForces, Buckling),
+    lidas do resultado em `data()`. Só a lista das barras e o número de
+    colunas (empenamento, bimomento) são guardados a cada troca, para que
+    nenhuma célula percorra a malha.
+  - Mudança de design aprovada: `AnalysisResult::supported`, os nós com
+    alguma restrição, preenchido pelo `runCase` (o modelo não fica no
+    resultado). Coberto em `test_analysis.cpp`.
+  - Os modos de flambagem não têm unidade (normalizados como no `core`);
+    o fator de cada modo vem de `factor(mode)` para o seletor da T18.
 - [ ] **T18** O dock Results: a lista dos casos com resultado, a escolha
   da tabela e do modo, o aviso de desatualizado e a seleção levando ao
   `highlightIds`. Arquivos: `results_panel.hpp/.cpp`, `main_window.cpp`.

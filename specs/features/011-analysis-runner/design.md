@@ -157,6 +157,9 @@ struct AnalysisResult
     std::shared_ptr<const core::Mesh> mesh;
     CoreResult data;
     std::vector<BuildIssue> warnings; // REQ-011-05
+    // REQ-011-14: the nodes with a restrained dof (internal indices,
+    // sorted), for the table of the reactions.
+    std::vector<core::NodeIndex> supported;
 };
 
 // REQ-011-02, 05, 10: one case or combination: build (010), check, run.
@@ -445,7 +448,9 @@ O `analysis_text` monta as linhas com `tr()` e as unidades do documento
   tabelas:
   1. Displacements: id do nó, u, v, w, θx, θy, θz e, se houver, o
      empenamento;
-  2. Reactions: só os nós com algum GDL apoiado;
+  2. Reactions: só os nós com algum GDL apoiado, que o `runCase` guarda
+     em `AnalysisResult::supported` a partir das restrições do modelo
+     montado (o modelo não fica no resultado);
   3. Bar forces: id do elemento, ponta (start ou end) e N, Vy, Vz, T, My,
      Mz;
   4. Buckling: uma linha por modo e nó, mais um seletor de modo no painel.

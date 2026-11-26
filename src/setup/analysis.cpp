@@ -34,6 +34,21 @@ core::Expected<CoreResult> analyse(const core::Model& model, const AnalysisSetti
     });
 }
 
+// REQ-011-14: the nodes some restraint holds, sorted and unique.
+std::vector<core::NodeIndex> supportedNodes(const core::Model& model, const core::Mesh& mesh)
+{
+    std::vector<core::NodeIndex> nodes;
+    for (const core::Restraint& restraint : model.restraints) {
+        if (auto resolved = core::resolve(mesh, restraint.nodes)) {
+            nodes.insert(nodes.end(), resolved->begin(), resolved->end());
+        }
+    }
+    std::ranges::sort(nodes);
+    const auto [first, last] = std::ranges::unique(nodes);
+    nodes.erase(first, last);
+    return nodes;
+}
+
 } // namespace
 
 CaseOutcome runCase(const Document& document, const geom::Drawing& drawing, const MeshContext& mesh,
@@ -63,7 +78,9 @@ CaseOutcome runCase(const Document& document, const geom::Drawing& drawing, cons
                                               .meshGeneration = mesh.generation},
                                     .mesh = mesh.mesh,
                                     .data = std::move(*data),
-                                    .warnings = outcome.issues};
+                                    .warnings = outcome.issues,
+                                    .supported = mesh.mesh ? supportedNodes(built.model, *mesh.mesh)
+                                                           : std::vector<core::NodeIndex>{}};
     return outcome;
 }
 

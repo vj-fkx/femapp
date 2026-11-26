@@ -45,6 +45,9 @@ struct AnalysisResult
     std::shared_ptr<const core::Mesh> mesh;
     CoreResult data;
     std::vector<BuildIssue> warnings; // REQ-011-05
+    // REQ-011-14: the nodes with a restrained dof (internal indices,
+    // sorted), for the table of the reactions.
+    std::vector<core::NodeIndex> supported;
 };
 
 // REQ-011-02, 05, 10: one case or combination: build (010), check, run.

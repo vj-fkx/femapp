@@ -223,6 +223,17 @@ TEST_CASE("the three analyses of a case are those of the core", "[setup][analysi
                                           .meshGeneration = p.mesh.generation});
         CHECK(r.mesh == p.mesh.mesh);
         CHECK(r.warnings.empty());
+        // REQ-011-14: the three bases are the nodes held.
+        std::vector<c::NodeIndex> held;
+        for (const c::Restraint& restraint : model.restraints) {
+            const auto nodes = c::resolve(*p.mesh.mesh, restraint.nodes);
+            REQUIRE(nodes.has_value());
+            held.insert(held.end(), nodes->begin(), nodes->end());
+        }
+        std::ranges::sort(held);
+        held.erase(std::ranges::unique(held).begin(), held.end());
+        CHECK(held.size() == 3);
+        CHECK(r.supported == held);
         REQUIRE(std::holds_alternative<c::StaticResult>(r.data));
         const auto direct = c::runLinearStatic(model);
         REQUIRE(direct.has_value());
@@ -402,7 +413,8 @@ s::AnalysisResult resultFor(std::uint64_t item, double factor)
             .state = {},
             .mesh = nullptr,
             .data = std::move(data),
-            .warnings = {}};
+            .warnings = {},
+            .supported = {}};
 }
 
 const s::Extreme& extreme(const std::optional<s::Extreme>& value)
