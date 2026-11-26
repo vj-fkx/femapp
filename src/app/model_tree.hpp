@@ -60,13 +60,20 @@ public:
     [[nodiscard]] std::optional<Group> groupAt(const QModelIndex& index) const;
     // The index of the row of an item (invalid when not shown).
     [[nodiscard]] QModelIndex indexOf(setup::ItemId id) const;
-    // A short description of an item, as the tree shows it.
+    // A short description of an item, as the tree shows it; a load case or
+    // combination with a result says its type and whether it is current
+    // (REQ-011-16), e.g. "ULS = 1.35 G (linear · current)".
     [[nodiscard]] QString label(const setup::Item& item) const;
 
     // Rebuilt after every change of the document, the mesh or the drawing.
     void refresh();
 
 private:
+    // The text of the cases and combinations again (REQ-011-16).
+    void resultsChanged();
+    // " (linear · current)", empty without a result.
+    [[nodiscard]] QString resultText(setup::ItemId id) const;
+
     struct Node
     {
         int parent = -1;

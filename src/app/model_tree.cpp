@@ -1,5 +1,6 @@
 #include "model_tree.hpp"
 
+#include "analysis_text.hpp"
 #include "model_controller.hpp"
 
 #include <fem/setup/build.hpp>
@@ -67,6 +68,8 @@ ModelTree::ModelTree(ModelController* controller, QObject* parent)
 {
     connect(controller, &ModelController::documentChanged, this, &ModelTree::refresh);
     connect(controller, &ModelController::meshChanged, this, &ModelTree::refresh);
+    // REQ-011-16: the state of the results is in the text of the cases.
+    connect(controller, &ModelController::resultsChanged, this, &ModelTree::resultsChanged);
     // Drafting edits may erase or bring back entities (REQ-010-14).
     connect(controller->undoStack(), &QUndoStack::indexChanged, this, &ModelTree::refresh);
     refresh();
@@ -122,6 +125,30 @@ void ModelTree::refresh()
         addNode(top(groupOf(item)), groupOf(item), setup::idOf(item));
     }
     endResetModel();
+}
+
+void ModelTree::resultsChanged()
+{
+    // Only the text of the cases and combinations: no reset, so that the
+    // view keeps what is selected and expanded.
+    for (const Group group : {Group::LoadCases, Group::Combinations}) {
+        const QModelIndex parent = index(static_cast<int>(group), 0);
+        const int rows = rowCount(parent);
+        if (rows > 0) {
+            emit dataChanged(index(0, 0, parent), index(rows - 1, 0, parent), {Qt::DisplayRole});
+        }
+    }
+}
+
+QString ModelTree::resultText(setup::ItemId id) const
+{
+    const setup::AnalysisResult* result = m_controller->results().find(id);
+    if (result == nullptr) {
+        return {};
+    }
+    const bool current = setup::ResultSet::isCurrent(*result, m_controller->state());
+    return tr(" (%1 · %2)")
+        .arg(analysisTypeName(result->settings.type), current ? tr("current") : tr("out of date"));
 }
 
 QModelIndex ModelTree::index(int row, int column, const QModelIndex& parent) const
@@ -295,9 +322,10 @@ QString ModelTree::label(const setup::Item& item) const
                 return tr("Support %1 (%2)").arg(held.join(QLatin1Char(' ')), targets(i.targets));
             } else if constexpr (std::is_same_v<T, setup::LoadCase>) {
                 if (i.standard.empty()) {
-                    return text(i.name);
+                    return text(i.name) + resultText(i.id);
                 }
-                return tr("%1 [%2 %3]").arg(text(i.name), text(i.standard), text(i.category));
+                return tr("%1 [%2 %3]").arg(text(i.name), text(i.standard), text(i.category)) +
+                       resultText(i.id);
             } else if constexpr (std::is_same_v<T, setup::LoadItem>) {
                 QString kind = std::visit(
                     [](const auto& a) -> QString {
@@ -333,7 +361,8 @@ QString ModelTree::label(const setup::Item& item) const
                                                              c != nullptr ? text(setup::nameOf(*c))
                                                                           : QStringLiteral("?")));
                 }
-                return tr("%1 = %2").arg(text(i.name), terms.join(QStringLiteral(" + ")));
+                return tr("%1 = %2").arg(text(i.name), terms.join(QStringLiteral(" + "))) +
+                       resultText(i.id);
             } else {
                 return {};
             }

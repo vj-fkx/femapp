@@ -113,3 +113,58 @@ TEST_CASE("the rows of the model tree", "[app][model][tree]")
     undo.undo();
     CHECK(tree.rowCount(groupIndex(tree, Group::Bars)) == 0);
 }
+
+// Feature 011, T16 (design §5.5): REQ-011-16. The cases and combinations
+// with a result say its type and whether it is current.
+TEST_CASE("the state of the results in the model tree", "[app][model][tree][analysis]")
+{
+    const fem::geom::Drawing drawing;
+    QUndoStack undo;
+    fem::app::ModelController controller(&undo, drawing);
+    const ModelTree tree(&controller);
+    s::Document& ids = controller.documentForIds();
+    controller.push(
+        s::addItem(ids, s::LoadCase{.id = {}, .name = "G", .standard = {}, .category = {}}),
+        QStringLiteral("case"));
+    const s::ItemId dead = s::idOf(controller.document().items().back());
+    controller.push(
+        s::addItem(ids, s::Combination{.id = {}, .name = "ULS", .terms = {{dead, 1.35}}}),
+        QStringLiteral("combination"));
+    const s::ItemId uls = s::idOf(controller.document().items().back());
+    const QModelIndex caseRow = tree.index(0, 0, groupIndex(tree, Group::LoadCases));
+    const QModelIndex combinationRow = tree.index(0, 0, groupIndex(tree, Group::Combinations));
+    CHECK(textOf(caseRow) == "G");
+    CHECK(textOf(combinationRow) == "ULS = 1.35 G");
+
+    // A result of the state now: current. The rows are told, not rebuilt.
+    int changed = 0;
+    QObject::connect(&tree, &QAbstractItemModel::dataChanged, [&changed] { ++changed; });
+    const auto finish = [&controller](s::ItemId item, s::AnalysisType type) {
+        s::AnalysisResult result;
+        result.item = item;
+        result.settings.type = type;
+        result.state = controller.state();
+        controller.caseFinished(
+            s::CaseOutcome{.result = std::move(result), .issues = {}, .error = std::nullopt});
+    };
+    finish(dead, s::AnalysisType::Linear);
+    CHECK(changed == 2); // the cases and the combinations
+    CHECK(textOf(caseRow) == "G (linear · current)");
+    CHECK(textOf(combinationRow) == "ULS = 1.35 G");
+    finish(uls, s::AnalysisType::Buckling);
+    CHECK(textOf(combinationRow) == "ULS = 1.35 G (buckling · current)");
+
+    // An edit of the document puts them out of date; undone, they are
+    // current again (REQ-011-12).
+    controller.push(
+        s::addItem(ids, s::LoadCase{.id = {}, .name = "Q", .standard = {}, .category = {}}),
+        QStringLiteral("case"));
+    const QModelIndex cases = groupIndex(tree, Group::LoadCases);
+    REQUIRE(tree.rowCount(cases) == 2);
+    CHECK(textOf(tree.index(0, 0, cases)) == "G (linear · out of date)");
+    CHECK(textOf(tree.index(1, 0, cases)) == "Q");
+    CHECK(textOf(tree.index(0, 0, groupIndex(tree, Group::Combinations))) ==
+          "ULS = 1.35 G (buckling · out of date)");
+    undo.undo();
+    CHECK(textOf(tree.index(0, 0, groupIndex(tree, Group::LoadCases))) == "G (linear · current)");
+}

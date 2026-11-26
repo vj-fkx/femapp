@@ -215,10 +215,15 @@ Regras:
   análise; a ação Cancel mostra "Esc" no texto, sem atalho próprio, para
   não ficar ambígua com o Esc de Clear Selection). Sem teste unitário:
   coberto pelo roteiro T19. Cobre: 01, 05, 07, 08, 10, 13, 17.
-- [ ] **T16** O estado na árvore: o texto do caso e da combinação com o
+- [x] **T16** O estado na árvore: o texto do caso e da combinação com o
   tipo e "current"/"out of date", refeito em `resultsChanged`,
   `documentChanged` e `meshChanged`; testes no `ModelTree`. Arquivos:
   `model_tree.hpp/.cpp`, `tests/unit/app/test_model_tree.cpp`. Cobre: 16.
+  - Feito: o texto vem como "G (linear · current)". No `resultsChanged`, a
+    árvore só avisa a mudança dos textos dos casos e das combinações
+    (`dataChanged`), sem reconstruir: a vista guarda a seleção e o que está
+    aberto durante um Run all. O desfazer até o estado analisado volta a
+    "current".
 - [ ] **T17** `ResultsModel`:
   - testes primeiro: o número de linhas e os valores de cada tabela
     (deslocamentos, reações só nos nós apoiados, esforços nas duas
