@@ -195,6 +195,16 @@ add_executable(bench_frame perf/bench_frame.cpp)
 target_link_libraries(bench_frame PRIVATE fem::core)
 femapp_set_warnings(bench_frame)
 
+# NFR-011-01, 02: the interface while the analysis job runs, run by hand on
+# a Release build.
+add_executable(bench_analysis_job perf/bench_analysis_job.cpp
+    "${PROJECT_SOURCE_DIR}/src/app/analysis_job.cpp"
+    "${PROJECT_SOURCE_DIR}/src/app/analysis_job.hpp")
+set_target_properties(bench_analysis_job PROPERTIES AUTOMOC ON)
+target_include_directories(bench_analysis_job PRIVATE "${PROJECT_SOURCE_DIR}/src/app")
+target_link_libraries(bench_analysis_job PRIVATE fem::mesher fem::setup Qt6::Core)
+femapp_set_warnings(bench_analysis_job)
+
 # NFR-011-03: cost of the run control, run by hand on a Release build.
 add_executable(bench_run_control perf/bench_run_control.cpp)
 target_link_libraries(bench_run_control PRIVATE fem::core)

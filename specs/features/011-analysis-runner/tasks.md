@@ -188,12 +188,17 @@ Regras:
   - testes sem widgets.
   Arquivos: `src/app/analysis_text.hpp/.cpp`,
   `tests/unit/app/test_analysis_text.cpp`. Cobre: 07, 13.
-- [ ] **T14** O NFR da interface livre: um teste de perf (Release) roda a
+- [x] **T14** O NFR da interface livre: um teste de perf (Release) roda a
   análise linear do pórtico do `bench_line_mesh` pelo `AnalysisJob` e
   mede o maior intervalo entre os disparos de um timer de 10 ms na
   thread da interface: ≤ 100 ms. Também mede o tempo até liberar a
   thread depois do cancelamento na montagem. Arquivo:
   `tests/perf/bench_analysis_job.cpp`. Cobre: N01, N02.
+  *Medido em 2026-11-25 (Release, máquina do mantenedor): 102 546
+  entidades, 51 921 nós e 186 705 elementos; a análise linear da
+  combinação levou 186 s pelo job, com o maior intervalo do timer de
+  10 ms em 11,6 ms (limite 100 ms); cancelada na montagem, a thread ficou
+  livre 1,4 ms depois do `cancel()` (limite 1 s).*
 
 ## Fase 5 — App: interface
 
