@@ -8,6 +8,7 @@
 #include <QUndoStack>
 
 #include <utility>
+#include <vector>
 
 namespace fem::app {
 
@@ -198,8 +199,41 @@ void ModelController::meshImported(const std::shared_ptr<const render::MeshScene
 
 void ModelController::changed()
 {
+    // REQ-011-11: the results of the items that left the document go too.
+    std::vector<setup::ItemId> gone;
+    for (const setup::AnalysisResult& r : m_results.all()) {
+        if (m_document.find(r.item) == nullptr) {
+            gone.push_back(r.item);
+        }
+    }
+    for (const setup::ItemId item : gone) {
+        m_results.erase(item);
+    }
     emit documentChanged();
+    if (!gone.empty()) {
+        emit resultsChanged();
+    }
     scheduleSymbols();
+}
+
+void ModelController::setAnalysis(const setup::AnalysisSettings& settings)
+{
+    push(setup::changeAnalysis(m_document, settings), tr("analysis settings"));
+}
+
+setup::AnalysedState ModelController::state() const noexcept
+{
+    return {.documentRevision = m_document.revision(),
+            .drawingRevision = m_drawing.revision(),
+            .meshGeneration = m_mesh.generation};
+}
+
+void ModelController::caseFinished(const setup::CaseOutcome& outcome)
+{
+    if (outcome.result && m_document.find(outcome.result->item) != nullptr) {
+        m_results.put(*outcome.result);
+    }
+    emit resultsChanged();
 }
 
 } // namespace fem::app

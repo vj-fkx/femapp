@@ -174,7 +174,7 @@ Regras:
   passou para `tests/unit/app/test_application.hpp`, um só para o
   executável. O caso em andamento volta pelo `caseFinished` como
   cancelado. Cobre: 03, 04, 06, 07, 08, N02.
-- [ ] **T12** `ModelController`: dono do `ResultSet`:
+- [x] **T12** `ModelController`: dono do `ResultSet`:
   - `put` no `caseFinished` (só se o item existe), `erase` dos itens
     apagados, `resultsChanged()`, `push` das opções;
   - testes: os resultados chegam, um item apagado não guarda, a troca

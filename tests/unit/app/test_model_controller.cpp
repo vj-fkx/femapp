@@ -1,3 +1,4 @@
+#include "frame_document.hpp"
 #include "model_controller.hpp"
 
 #include <QUndoStack>
@@ -183,4 +184,96 @@ TEST_CASE("the targets of an assignment from the viewport selection", "[app][mod
     }
     CHECK(controller.meshGroups(1).size() == lines);
     CHECK(controller.meshGroups(3).empty());
+}
+
+namespace {
+
+// The frame of 010 in the document of a controller, as one edit, and the
+// outcome of its load case.
+struct ControlledFrame
+{
+    fem::setup::test::Frame frame;
+    fem::setup::test::Setup setup;
+};
+
+void fill(ControlledFrame& f, fem::app::ModelController& controller)
+{
+    fem::setup::test::drawFrame(f.frame);
+    fem::setup::test::prepare(f.setup, f.frame);
+    s::DocumentEdit edit;
+    for (const s::Item& item : f.setup.document.items()) {
+        edit.added.push_back(item);
+    }
+    controller.push(std::move(edit), QStringLiteral("frame"));
+}
+
+s::CaseOutcome outcomeOf(const ControlledFrame& f, const fem::app::ModelController& controller,
+                         s::ItemId item)
+{
+    return s::runCase(controller.document(), f.frame.drawing,
+                      fem::setup::test::meshOf(f.frame.drawing), item, {});
+}
+
+} // namespace
+
+// Feature 011, T12 (design §5.5): REQ-011-01, 11, 12.
+TEST_CASE("the results of the analyses are kept by the controller", "[app][model][analysis]")
+{
+    ControlledFrame f;
+    QUndoStack undo;
+    fem::app::ModelController controller(&undo, f.frame.drawing);
+    fill(f, controller);
+    int changes = 0;
+    QObject::connect(&controller, &fem::app::ModelController::resultsChanged,
+                     [&changes] { ++changes; });
+    const s::ItemId item = f.setup.loadCase;
+    CHECK(controller.results().all().empty());
+
+    const s::CaseOutcome outcome = outcomeOf(f, controller, item);
+    REQUIRE(outcome.result.has_value());
+    controller.caseFinished(outcome);
+    CHECK(changes == 1);
+    REQUIRE(controller.results().find(item) != nullptr);
+    // What the result was made from is the state of the controller, but
+    // for the mesh, which the test made apart.
+    const s::AnalysedState now = controller.state();
+    CHECK(now.documentRevision == controller.document().revision());
+    CHECK(now.drawingRevision == f.frame.drawing.revision());
+    CHECK(now.meshGeneration == controller.mesh().generation);
+    CHECK(controller.results().find(item)->state.documentRevision == now.documentRevision);
+
+    // A refusal or a failure keeps the result before (REQ-011-10).
+    controller.caseFinished(s::CaseOutcome{
+        .result = std::nullopt, .issues = {}, .error = fem::core::Error{.message = "x"}});
+    CHECK(changes == 2);
+    CHECK(controller.results().find(item) != nullptr);
+
+    // The item erased: its result goes; undone, it does not come back.
+    REQUIRE(controller.push(s::removeItem(controller.document(), item), QStringLiteral("erase")));
+    CHECK(controller.results().find(item) == nullptr);
+    CHECK(changes == 3);
+    undo.undo();
+    CHECK(controller.results().find(item) == nullptr);
+
+    // An outcome that arrives after its item was erased is not kept.
+    undo.redo();
+    controller.caseFinished(outcome);
+    CHECK(controller.results().all().empty());
+}
+
+TEST_CASE("a change of the analysis is one step of undo", "[app][model][analysis]")
+{
+    const Drawing drawing;
+    QUndoStack undo;
+    fem::app::ModelController controller(&undo, drawing);
+    const s::AnalysisSettings buckling{.type = s::AnalysisType::Buckling, .modes = 4};
+    controller.setAnalysis(buckling);
+    CHECK(controller.document().analysis() == buckling);
+    CHECK(undo.count() == 1);
+    controller.setAnalysis(buckling); // the same: nothing pushed
+    CHECK(undo.count() == 1);
+    undo.undo();
+    CHECK(controller.document().analysis() == s::AnalysisSettings{});
+    undo.redo();
+    CHECK(controller.document().analysis() == buckling);
 }

@@ -11,6 +11,7 @@
 #include <fem/render/mesh_scene.hpp>
 #include <fem/render/selection.hpp>
 #include <fem/render/symbols.hpp>
+#include <fem/setup/analysis.hpp>
 #include <fem/setup/build.hpp>
 #include <fem/setup/document.hpp>
 #include <fem/setup/editing.hpp>
@@ -78,6 +79,15 @@ public:
     // Builds them now (the deferred rebuild does this).
     void rebuildSymbols();
 
+    // REQ-011-01: the type and options of the analysis, as one step of undo
+    // (nothing when they are the same).
+    void setAnalysis(const setup::AnalysisSettings& settings);
+
+    // REQ-011-11, 12: the results of the analyses, one per case or
+    // combination, and the state now to tell whether each is current.
+    [[nodiscard]] const setup::ResultSet& results() const noexcept { return m_results; }
+    [[nodiscard]] setup::AnalysedState state() const noexcept;
+
     std::optional<QString> setSolidFromPolylines(setup::ItemId id,
                                                  std::span<const geom::EntityId> entities);
 
@@ -87,6 +97,10 @@ public slots:
     void meshGenerated(const std::shared_ptr<const fem::render::MeshScene>& scene,
                        std::shared_ptr<const fem::mesher::LineMeshMap> map, std::uint64_t revision);
     void meshImported(const std::shared_ptr<const fem::render::MeshScene>& scene);
+    // REQ-011-10, 11: an outcome of the analysis job. A result replaces the
+    // item's, if the item is still in the document; a refusal or a failure
+    // keeps the result before. resultsChanged() in every case.
+    void caseFinished(const fem::setup::CaseOutcome& outcome);
 
 signals:
     // After every apply, undo and redo of a document edit.
@@ -94,6 +108,7 @@ signals:
     void meshChanged();
     void refused(const fem::setup::EditRefusal& refusal);
     void symbolsChanged();
+    void resultsChanged();
 
 private:
     friend class DocumentUndoCommand;
@@ -103,6 +118,7 @@ private:
     const geom::Drawing& m_drawing;
     setup::Document m_document;
     setup::MeshContext m_mesh;
+    setup::ResultSet m_results;
     SymbolOptions m_symbolOptions;
     std::shared_ptr<const render::SymbolSet> m_symbols;
     QTimer m_symbolTimer;
