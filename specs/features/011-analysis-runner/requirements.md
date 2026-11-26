@@ -95,19 +95,19 @@ diagramas de esforços para a 013. Ambas leem os resultados guardados aqui.
 
 ## 5. Critérios de aceite
 
-- [ ] **AC-1** (REQ-011-01, 02, 03, 13) O pórtico 2×2 da 010 (T10), pelo
+- [x] **AC-1** (REQ-011-01, 02, 03, 13) O pórtico 2×2 da 010 (T10), pelo
   documento:
   - a análise linear dá os mesmos deslocamentos, reações e esforços que
     `runLinearStatic` chamado direto sobre o modelo montado, em 1e−12;
   - a segunda ordem e a flambagem dão os mesmos resultados que as
     funções do `core` correspondentes;
   - o resumo traz os valores certos.
-- [ ] **AC-2** (REQ-011-04, 11) Run all num documento com dois casos, uma
+- [x] **AC-2** (REQ-011-04, 11) Run all num documento com dois casos, uma
   combinação e um caso inválido:
   - três resultados guardados;
   - uma falha listada com o motivo;
   - a ordem dos casos respeitada.
-- [ ] **AC-3** (REQ-011-05, 10) Recusas:
+- [x] **AC-3** (REQ-011-05, 10) Recusas:
   - sem material, a conferência abre e nada roda;
   - um mecanismo dá a mensagem do `core` com o nó realçado e mantém o
     resultado anterior;
@@ -119,7 +119,7 @@ diagramas de esforços para a 013. Ambas leem os resultados guardados aqui.
     `idsInMessage` extrai;
   - a segunda ordem acima da carga crítica e a flambagem sem compressão
     falham com a mensagem do `core`.
-- [ ] **AC-4** (REQ-011-06, 07, 08, 09, NFR-011-01, 02) Execução:
+- [x] **AC-4** (REQ-011-06, 07, 08, 09, NFR-011-01, 02) Execução:
   - o laço de eventos segue respondendo durante a análise;
   - o progresso passa pelas etapas;
   - o cancelamento para o `core` dentro do prazo em cada ponto de
@@ -127,7 +127,7 @@ diagramas de esforços para a 013. Ambas leem os resultados guardados aqui.
   - um segundo pedido durante a execução é recusado;
   - sem retornos, os resultados do `core` são os mesmos de antes, bit a
     bit.
-- [ ] **AC-5** (REQ-011-12, 16) Desatualização:
+- [x] **AC-5** (REQ-011-12, 16) Desatualização:
   - editar uma carga, mover uma linha e gerar a malha de novo marcam os
     resultados como desatualizados;
   - desfazer a edição os torna atuais;
@@ -138,7 +138,7 @@ diagramas de esforços para a 013. Ambas leem os resultados guardados aqui.
   - selecionar linhas realça nós e barras;
   - 10⁵ linhas rolam sem travar;
   - Esc cancela.
-- [ ] **AC-7** (NFR-011-03, 05) O benchmark com e sem os retornos dentro de
+- [x] **AC-7** (NFR-011-03, 05) O benchmark com e sem os retornos dentro de
   2%, a cobertura do `core` ≥ 80% e o CI verde nas quatro plataformas.
 
 ## 6. Fora de escopo

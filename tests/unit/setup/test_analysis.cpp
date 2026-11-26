@@ -10,6 +10,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <cmath>
 #include <cstddef>
@@ -65,6 +66,25 @@ void same(const c::StaticResult& a, const c::StaticResult& b)
             CHECK(std::isnan(x)); // not a bar
         } else {
             CHECK(std::abs(x - y) <= 1e-12 * std::max(1.0, std::abs(y)));
+        }
+    }
+    // AC-1: the forces at both ends of every beam.
+    REQUIRE(a.beams.size() == b.beams.size());
+    for (std::size_t e = 0; e < a.beams.size(); ++e) {
+        const auto& beamA = a.beams[e];
+        const auto& beamB = b.beams[e];
+        REQUIRE(beamA.has_value() == beamB.has_value());
+        if (!beamA || !beamB) {
+            continue;
+        }
+        for (const bool start : {true, false}) {
+            const c::BeamForces& x = start ? beamA->start() : beamA->end();
+            const c::BeamForces& y = start ? beamB->start() : beamB->end();
+            const std::array<double, 6> fx{x.n, x.vy, x.vz, x.t, x.my, x.mz};
+            const std::array<double, 6> fy{y.n, y.vy, y.vz, y.t, y.my, y.mz};
+            for (std::size_t k = 0; k < fx.size(); ++k) {
+                CHECK(std::abs(fx.at(k) - fy.at(k)) <= 1e-12 * std::max(1.0, std::abs(fy.at(k))));
+            }
         }
     }
 }

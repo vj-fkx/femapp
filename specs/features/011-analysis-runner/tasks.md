@@ -298,7 +298,30 @@ Regras:
     - g++ 13 `-O2 -Werror`: os mesmos, limpos;
     - nenhum `#include` Qt em `core`, `geom`, `mesher` e `setup`.
   - O tidy do Linux roda no CI, na T90.
-- [ ] **T92** Conferir os sete critérios de aceite.
+- [x] **T92** Conferir os sete critérios de aceite.
+  - AC-1: `test_analysis.cpp` (as três análises iguais às do `core` em
+    1e−12; os esforços nas duas pontas das vigas entraram na comparação
+    agora) e os resumos (balanço à mão, equilíbrio do pórtico, flambagem).
+  - AC-2: `test_analysis_job.cpp` (dois casos, um inválido com os
+    problemas e uma combinação, em ordem) e `runAllText`.
+  - AC-3:
+    - Coberto por testes:
+      - recusa por material desconhecido e mecanismo (`test_analysis.cpp`);
+      - o resultado anterior mantido (`test_model_controller.cpp`);
+      - as mensagens da instabilidade (`test_instability.cpp`) e os ids
+        extraídos (`test_check_issues.cpp`).
+    - Fica para o roteiro T19 o que se vê na tela: o dock aberto e o nó
+      realçado.
+  - AC-4: `test_run_control.cpp` (etapas, cancelamento, bit a bit),
+    `test_analysis_job.cpp` (segundo pedido recusado, cancelamento em menos
+    de 1 s) e `bench_analysis_job` (maior intervalo do laço: 11,6 ms).
+  - AC-5: `test_analysis.cpp` (documento, desenho, malha, desfazer) e
+    `test_model_tree.cpp`.
+  - AC-6: **pendente**, depende do roteiro manual T19.
+  - AC-7:
+    - `bench_run_control`: −0,6% e −0,8%;
+    - cobertura ≥ 80% de `core`, `mesher` e `setup`, exigida pelo CI;
+    - CI 45822532117 verde nas quatro plataformas.
 - [ ] **T93** Atualizar `specs/roadmap.md` para `concluída`.
 
 ## Matriz de rastreabilidade
