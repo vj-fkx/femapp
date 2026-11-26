@@ -1,5 +1,7 @@
 qt_add_executable(femapp WIN32 MACOSX_BUNDLE
     main.cpp
+    analysis_job.cpp
+    analysis_job.hpp
     check_issues.cpp
     check_issues.hpp
     check_panel.cpp

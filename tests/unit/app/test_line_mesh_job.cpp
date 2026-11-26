@@ -1,4 +1,5 @@
 #include "line_mesh_job.hpp"
+#include "test_application.hpp"
 
 #include <QCoreApplication>
 #include <QEventLoop>
@@ -22,15 +23,7 @@ using fem::geom::Entity;
 using fem::geom::LineEntity;
 using fem::geom::Vec3;
 
-// One application for the whole executable.
-QCoreApplication& application()
-{
-    static int argc = 1;
-    static std::string name = "test_app";
-    static std::array<char*, 2> argv{name.data(), nullptr};
-    static QCoreApplication app(argc, argv.data());
-    return app;
-}
+using fem::app::test::application;
 
 void addLine(Drawing& drawing, const Vec3& a, const Vec3& b)
 {

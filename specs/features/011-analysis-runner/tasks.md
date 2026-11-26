@@ -159,7 +159,7 @@ Regras:
 
 ## Fase 4 — App: execução
 
-- [ ] **T11** `AnalysisJob` (design §5.4):
+- [x] **T11** `AnalysisJob` (design §5.4):
   - testes primeiro, com laço de eventos:
     - o Run all de dois casos, uma combinação e um caso inválido emite
       `caseFinished` na ordem, com três resultados e uma recusa, e depois
@@ -170,7 +170,10 @@ Regras:
     - `progress()` mostra o índice, o caso e a etapa;
   - depois o job, sobre `QThread::create`, como a 009.
   Arquivos: `src/app/analysis_job.hpp/.cpp`,
-  `tests/unit/app/test_analysis_job.cpp`. Cobre: 03, 04, 06, 07, 08, N02.
+  `tests/unit/app/test_analysis_job.cpp`; o `QCoreApplication` dos testes
+  passou para `tests/unit/app/test_application.hpp`, um só para o
+  executável. O caso em andamento volta pelo `caseFinished` como
+  cancelado. Cobre: 03, 04, 06, 07, 08, N02.
 - [ ] **T12** `ModelController`: dono do `ResultSet`:
   - `put` no `caseFinished` (só se o item existe), `erase` dos itens
     apagados, `resultsChanged()`, `push` das opções;

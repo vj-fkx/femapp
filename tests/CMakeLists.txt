@@ -203,6 +203,7 @@ femapp_set_warnings(bench_run_control)
 # REQ-004-03: command line parsing of the application, built on its own.
 # Feature 009: also the mesh job of the MESH command, with a QCoreApplication.
 add_executable(test_app
+    unit/app/test_analysis_job.cpp
     unit/app/test_check_issues.cpp
     unit/app/test_cli_options.cpp
     unit/app/test_fields.cpp
@@ -212,6 +213,8 @@ add_executable(test_app
     unit/app/test_model_tree.cpp
     unit/app/test_section_geometry.cpp
     unit/app/test_symbol_builder.cpp
+    "${PROJECT_SOURCE_DIR}/src/app/analysis_job.cpp"
+    "${PROJECT_SOURCE_DIR}/src/app/analysis_job.hpp"
     "${PROJECT_SOURCE_DIR}/src/app/check_issues.cpp"
     "${PROJECT_SOURCE_DIR}/src/app/cli_options.cpp"
     "${PROJECT_SOURCE_DIR}/src/app/fields.cpp"
@@ -225,7 +228,8 @@ add_executable(test_app
     "${PROJECT_SOURCE_DIR}/src/app/section_geometry.cpp"
     "${PROJECT_SOURCE_DIR}/src/app/symbol_builder.cpp")
 set_target_properties(test_app PROPERTIES AUTOMOC ON)
-target_include_directories(test_app PRIVATE "${PROJECT_SOURCE_DIR}/src/app")
+target_include_directories(test_app PRIVATE "${PROJECT_SOURCE_DIR}/src/app"
+                                            "${PROJECT_SOURCE_DIR}/tests/unit/setup")
 target_compile_features(test_app PRIVATE cxx_std_20)
 target_link_libraries(test_app PRIVATE fem::mesher fem::render fem::setup Qt6::Gui Catch2::Catch2WithMain)
 femapp_set_warnings(test_app)
