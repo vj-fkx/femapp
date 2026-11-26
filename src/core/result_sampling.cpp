@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <tuple>
 #include <utility>
 
@@ -51,7 +52,92 @@ std::vector<Station> stationsOf(const ResultFields& fields, std::size_t e, int p
     return beamStations(beam, perBeam, startLink, endLink);
 }
 
+constexpr double kNoValue = std::numeric_limits<double>::quiet_NaN();
+
+struct Motion
+{
+    Eigen::Vector3d displacement = Eigen::Vector3d::Zero();
+    Eigen::Vector3d rotation = Eigen::Vector3d::Zero();
+};
+
+Eigen::Vector3d nodal(std::span<const Eigen::Vector3d> values, NodeIndex node)
+{
+    const auto n = static_cast<std::size_t>(node);
+    return node >= 0 && n < values.size() ? values[n] : Eigen::Vector3d::Zero();
+}
+
+// The global displacement and rotation at a point of element e.
+Motion motionAt(const ResultFields& fields, std::size_t e, const Station& at)
+{
+    if (at.node >= 0) {
+        return {.displacement = nodal(fields.displacements, at.node),
+                .rotation = nodal(fields.rotations, at.node)};
+    }
+    if (isBeam(fields, e)) {
+        const BeamResult& beam = *fields.beams[e];
+        const Eigen::Matrix3d axes = beam.placementAt(at.x).axes;
+        const BeamPoint point = beam.at(at.x, at.side);
+        return {.displacement = axes * point.displacement, .rotation = axes * point.rotation};
+    }
+    // A truss: linear between its nodes.
+    const Mesh& mesh = *fields.mesh;
+    const auto nodes = mesh.elementNodes(static_cast<ElementIndex>(e));
+    const double length = (mesh.nodeCoordinates(nodes[1]) - mesh.nodeCoordinates(nodes[0])).norm();
+    const double t = length > 0.0 ? std::clamp(at.x / length, 0.0, 1.0) : 0.0;
+    return {.displacement = (1.0 - t) * nodal(fields.displacements, nodes[0]) +
+                            t * nodal(fields.displacements, nodes[1]),
+            .rotation = (1.0 - t) * nodal(fields.rotations, nodes[0]) +
+                        t * nodal(fields.rotations, nodes[1])};
+}
+
+double forceOf(const BeamForces& f, ResultQuantity quantity)
+{
+    switch (quantity) {
+    case ResultQuantity::N:
+        return f.n;
+    case ResultQuantity::Vy:
+        return f.vy;
+    case ResultQuantity::Vz:
+        return f.vz;
+    case ResultQuantity::T:
+        return f.t;
+    case ResultQuantity::My:
+        return f.my;
+    case ResultQuantity::Mz:
+        return f.mz;
+    default:
+        return kNoValue;
+    }
+}
+
+double motionOf(const Motion& m, ResultQuantity quantity)
+{
+    switch (quantity) {
+    case ResultQuantity::Ux:
+        return m.displacement.x();
+    case ResultQuantity::Uy:
+        return m.displacement.y();
+    case ResultQuantity::Uz:
+        return m.displacement.z();
+    case ResultQuantity::UMagnitude:
+        return m.displacement.norm();
+    case ResultQuantity::Rx:
+        return m.rotation.x();
+    case ResultQuantity::Ry:
+        return m.rotation.y();
+    case ResultQuantity::Rz:
+        return m.rotation.z();
+    default:
+        return kNoValue;
+    }
+}
+
 } // namespace
+
+bool isForce(ResultQuantity quantity) noexcept
+{
+    return quantity >= ResultQuantity::N;
+}
 
 ResultFields fieldsOf(const StaticResult& result)
 {
@@ -212,6 +298,76 @@ ShapeSamples sampleShape(const ResultFields& fields, const SampleOptions& option
         }
     }
     return out;
+}
+
+FieldSamples sampleField(const ResultFields& fields, const ShapeSamples& shape,
+                         ResultQuantity quantity, int threads)
+{
+    FieldSamples out;
+    out.quantity = quantity;
+    out.values.assign(shape.stations.size(), kNoValue);
+    tbb::task_arena arena(threads > 0 ? threads : tbb::task_arena::automatic);
+    arena.execute([&] {
+        tbb::parallel_for(tbb::blocked_range<std::size_t>(0, shape.bars.size()),
+                          [&](const tbb::blocked_range<std::size_t>& range) {
+                              for (std::size_t i = range.begin(); i != range.end(); ++i) {
+                                  const SampledBar& bar = shape.bars[i];
+                                  for (std::uint32_t k = 0; k < bar.count; ++k) {
+                                      const std::size_t at = bar.first + k;
+                                      out.values[at] = valueAt(fields, bar.element,
+                                                               shape.stations[at], quantity);
+                                  }
+                              }
+                          });
+    });
+    bool found = false;
+    for (std::size_t i = 0; i < out.values.size(); ++i) {
+        const double value = out.values[i];
+        if (!std::isfinite(value)) {
+            continue;
+        }
+        const auto sample = static_cast<std::uint32_t>(i);
+        if (!found || value < out.min.value) {
+            out.min = {.value = value, .sample = sample};
+        }
+        if (!found || value > out.max.value) {
+            out.max = {.value = value, .sample = sample};
+        }
+        found = true;
+    }
+    return out;
+}
+
+double valueAt(const ResultFields& fields, ElementIndex element, const Station& at,
+               ResultQuantity quantity)
+{
+    const auto e = static_cast<std::size_t>(element);
+    const bool beam = isBeam(fields, e);
+    if (!beam && !isTruss(fields, e)) {
+        return kNoValue;
+    }
+    if (!isForce(quantity)) {
+        return motionOf(motionAt(fields, e, at), quantity);
+    }
+    if (fields.mode) {
+        return kNoValue;
+    }
+    const std::optional<BeamResult>* result = beam ? &fields.beams[e] : nullptr;
+    if (result == nullptr || !result->has_value()) {
+        return quantity == ResultQuantity::N ? fields.axialForce[e] : 0.0;
+    }
+    // A rigid link takes the forces of the flexible end next to it, whose x
+    // its station has.
+    return forceOf((*result)->at(at.x, at.side).forces, quantity);
+}
+
+Eigen::Vector3d displacementAt(const ResultFields& fields, ElementIndex element, const Station& at)
+{
+    const auto e = static_cast<std::size_t>(element);
+    if (!isBeam(fields, e) && !isTruss(fields, e)) {
+        return Eigen::Vector3d::Zero();
+    }
+    return motionAt(fields, e, at).displacement;
 }
 
 } // namespace fem::core

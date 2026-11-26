@@ -59,7 +59,7 @@ Regras:
   testes. A ligação rígida é reconhecida pela distância entre o nó e a
   ponta flexível. As estações de nó (ligações e treliças) levam o
   deslocamento nodal.
-- [ ] **T03** A grandeza, os extremos e a consulta (design §5.3):
+- [x] **T03** A grandeza, os extremos e a consulta (design §5.3):
   - testes primeiro:
     - na viga biapoiada, Mz máximo = qL²/8 no meio em 1e−9 (AC-2);
     - Vy antes e depois de uma carga concentrada = `at(Before)` e
@@ -76,6 +76,9 @@ Regras:
     `displacementAt` e `isForce`.
   Arquivos: `result_sampling.hpp/.cpp`, `test_result_sampling.cpp`.
   Cobre: 09, 10, 17, 18.
+  *Feito:* sem valor (os esforços de um modo, um elemento que não é
+  barra), `valueAt` dá NaN. Na treliça, a consulta interpola os nós
+  linearmente.
 - [ ] **T04** [P] O fator automático e o determinismo:
   - testes primeiro: `autoScale` = 10% da maior dimensão sobre o maior
     deslocamento, em 1e−12; 1 sem deslocamento; a mesma `sampleShape` e

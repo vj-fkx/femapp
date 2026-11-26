@@ -357,3 +357,206 @@ TEST_CASE("the stations of the bars", "[core][result][sampling]")
         CHECK(shape.stations.size() == 17);
     }
 }
+
+// REQ-012-09, 17, AC-2: Mz along the simply supported beam: qL^2/8 in the
+// middle, the largest value.
+TEST_CASE("the bending moment of a simply supported beam", "[core][result][sampling]")
+{
+    using fem::core::ResultQuantity;
+    const fem::core::StaticResult result = fem::core::test::solve(simpleBeam());
+    const fem::core::ResultFields fields = fem::core::fieldsOf(result);
+    const fem::core::ShapeSamples shape = fem::core::sampleShape(fields, {.perBeam = 9});
+    const fem::core::FieldSamples mz = fem::core::sampleField(fields, shape, ResultQuantity::Mz);
+    CHECK(mz.quantity == ResultQuantity::Mz);
+    REQUIRE(mz.values.size() == 9);
+    const double expected = kQ * kSpan * kSpan / 8;
+    CHECK(mz.max.sample == 4);
+    CHECK(std::abs(mz.max.value - expected) <= 1e-9 * expected);
+    CHECK(std::abs(mz.min.value) <= 1e-9 * expected);
+    // The deflection: the smallest Uy, in the middle.
+    const fem::core::FieldSamples uy = fem::core::sampleField(fields, shape, ResultQuantity::Uy);
+    CHECK(uy.min.sample == 4);
+    CHECK(uy.min.value == shape.displacements[4].y());
+    // Nothing out of the plane: every value 0, the extremes at the first.
+    const fem::core::FieldSamples vz = fem::core::sampleField(fields, shape, ResultQuantity::Vz);
+    CHECK(vz.max.sample == 0);
+    CHECK(vz.min.sample == 0);
+    CHECK(vz.max.value == 0.0);
+}
+
+// REQ-012-10, AC-2: each side of a concentrated load has its own forces.
+TEST_CASE("the forces on both sides of a concentrated load", "[core][result][sampling]")
+{
+    const fem::core::StaticResult result = fem::core::test::solve(simpleBeam(0.3));
+    const fem::core::ResultFields fields = fem::core::fieldsOf(result);
+    const fem::core::ShapeSamples shape = fem::core::sampleShape(fields, {.perBeam = 9});
+    const fem::core::FieldSamples vy =
+        fem::core::sampleField(fields, shape, fem::core::ResultQuantity::Vy);
+    const double x = 0.3 * kSpan;
+    const auto here =
+        std::ranges::find_if(shape.stations, [&](const fem::core::Station& s) { return s.x == x; });
+    REQUIRE(here != shape.stations.end());
+    const auto i = static_cast<std::size_t>(here - shape.stations.begin());
+    const BeamResult& beam = fem::core::test::beamOf(result, 0);
+    CHECK(vy.values[i] == beam.at(x, fem::core::Side::Before).forces.vy);
+    CHECK(vy.values[i + 1] == beam.at(x, fem::core::Side::After).forces.vy);
+    CHECK(std::abs(std::abs(vy.values[i + 1] - vy.values[i]) - 2e4) <= 1e-9 * 2e4);
+}
+
+// REQ-012-10, AC-2: at a node of a frame, each bar keeps its own forces.
+TEST_CASE("the forces of a frame are not averaged at its nodes", "[core][result][sampling]")
+{
+    using namespace fem::core::test;
+    const TrussSpec spec{.nodes = {Vec(0, 0, 0), Vec(0, 3, 0), Vec(4, 3, 0)},
+                         .bars = {{0, 1}, {1, 2}},
+                         .lineGroups = {},
+                         .pointGroups = {}};
+    fem::core::Model model = beamModel(spec, ElementKind::Beam2D);
+    fixAll(model, {1, 3}, ElementKind::Beam2D);
+    model.nodalForces.push_back({.nodes = fem::core::NodeIds{{2}}, .force = Vec(5e3, -1e4, 0)});
+    const fem::core::StaticResult result = solve(model);
+    const fem::core::ResultFields fields = fem::core::fieldsOf(result);
+    const fem::core::ShapeSamples shape = fem::core::sampleShape(fields, {.perBeam = 5});
+    REQUIRE(shape.bars.size() == 2);
+    for (const auto quantity : {fem::core::ResultQuantity::N, fem::core::ResultQuantity::Mz}) {
+        const fem::core::FieldSamples field = fem::core::sampleField(fields, shape, quantity);
+        const std::size_t columnTop = shape.bars[0].first + shape.bars[0].count - 1;
+        const std::size_t beamStart = shape.bars[1].first;
+        const BeamResult& column = beamOf(result, 0);
+        const BeamResult& beam = beamOf(result, 1);
+        const bool axial = quantity == fem::core::ResultQuantity::N;
+        CHECK(field.values[columnTop] ==
+              (axial ? column.at(column.length()).forces.n : column.at(column.length()).forces.mz));
+        CHECK(field.values[beamStart] == (axial ? beam.at(0.0).forces.n : beam.at(0.0).forces.mz));
+    }
+    const fem::core::FieldSamples n =
+        fem::core::sampleField(fields, shape, fem::core::ResultQuantity::N);
+    CHECK(n.values[shape.bars[0].first + shape.bars[0].count - 1] != n.values[shape.bars[1].first]);
+}
+
+// REQ-012-09: displacements and rotations in global axes, whatever the
+// direction of the bar.
+TEST_CASE("the global quantities of a turned bar", "[core][result][sampling]")
+{
+    using namespace fem::core::test;
+    using fem::core::ResultQuantity;
+    const double angle = kPi / 6;
+    const TrussSpec spec{.nodes = {Vec(0, 0, 0), 3.0 * Vec(std::cos(angle), std::sin(angle), 0)},
+                         .bars = {{0, 1}},
+                         .lineGroups = {},
+                         .pointGroups = {}};
+    fem::core::Model model = beamModel(spec, ElementKind::Beam3D);
+    fixAll(model, {1}, ElementKind::Beam3D);
+    model.nodalForces.push_back({.nodes = fem::core::NodeIds{{2}},
+                                 .force = Vec(1e3, -2e3, -3e3),
+                                 .moment = Vec(100, 0, 50)});
+    const fem::core::StaticResult result = solve(model);
+    const fem::core::ResultFields fields = fem::core::fieldsOf(result);
+    const fem::core::ShapeSamples shape = fem::core::sampleShape(fields, {.perBeam = 5});
+    const std::size_t tip = shape.stations.size() - 1;
+    const Vec u = result.displacements[1];
+    const Vec r = result.rotations[1];
+    const auto value = [&](ResultQuantity q) {
+        return fem::core::sampleField(fields, shape, q).values[tip];
+    };
+    CHECK(std::abs(value(ResultQuantity::Ux) - u.x()) <= 1e-9 * u.norm());
+    CHECK(std::abs(value(ResultQuantity::Uy) - u.y()) <= 1e-9 * u.norm());
+    CHECK(std::abs(value(ResultQuantity::Uz) - u.z()) <= 1e-9 * u.norm());
+    CHECK(std::abs(value(ResultQuantity::UMagnitude) - u.norm()) <= 1e-9 * u.norm());
+    CHECK(std::abs(value(ResultQuantity::Rx) - r.x()) <= 1e-9 * r.norm());
+    CHECK(std::abs(value(ResultQuantity::Ry) - r.y()) <= 1e-9 * r.norm());
+    CHECK(std::abs(value(ResultQuantity::Rz) - r.z()) <= 1e-9 * r.norm());
+}
+
+// REQ-012-09: a truss has only N; a buckling mode has no forces.
+TEST_CASE("the quantities of trusses and of buckling modes", "[core][result][sampling]")
+{
+    using namespace fem::core::test;
+    using fem::core::ResultQuantity;
+    SECTION("a truss")
+    {
+        const TrussSpec spec{.nodes = {Vec(0, 0, 0), Vec(3, 4, 0), Vec(6, 0, 0)},
+                             .bars = {{0, 1}, {1, 2}, {0, 2}},
+                             .lineGroups = {},
+                             .pointGroups = {}};
+        fem::core::Model model = beamModel(spec, ElementKind::Truss2D);
+        restrain(model, {1}, {fem::core::DofType::U, fem::core::DofType::V});
+        restrain(model, {3}, {fem::core::DofType::V});
+        model.nodalForces.push_back({.nodes = fem::core::NodeIds{{2}}, .force = Vec(1e3, -2e3, 0)});
+        const fem::core::StaticResult result = solve(model);
+        const fem::core::ResultFields fields = fem::core::fieldsOf(result);
+        const fem::core::ShapeSamples shape = fem::core::sampleShape(fields);
+        const fem::core::FieldSamples n = fem::core::sampleField(fields, shape, ResultQuantity::N);
+        const fem::core::FieldSamples vy =
+            fem::core::sampleField(fields, shape, ResultQuantity::Vy);
+        for (std::size_t b = 0; b < 3; ++b) {
+            for (std::uint32_t k = 0; k < 2; ++k) {
+                CHECK(n.values[shape.bars[b].first + k] == result.axialForce[b]);
+                CHECK(vy.values[shape.bars[b].first + k] == 0.0);
+            }
+        }
+        // In the middle of a truss: linear between its nodes.
+        const Vec middle = fem::core::displacementAt(
+            fields, 0, fem::core::Station{.x = 2.5, .side = fem::core::Side::After, .node = -1});
+        CHECK(close(middle, (result.displacements[0] + result.displacements[1]) / 2, 1e-15,
+                    result.displacements[1].norm()));
+    }
+    SECTION("a buckling mode")
+    {
+        const TrussSpec spec{.nodes = {Vec(0, 0, 0), Vec(0, 3, 0), Vec(0, 6, 0)},
+                             .bars = {{0, 1}, {1, 2}},
+                             .lineGroups = {},
+                             .pointGroups = {}};
+        fem::core::Model model = beamModel(spec, ElementKind::Beam2D);
+        fixAll(model, {1}, ElementKind::Beam2D);
+        model.nodalForces.push_back({.nodes = fem::core::NodeIds{{3}}, .force = Vec(0, -1e3, 0)});
+        const fem::core::StaticResult base = solve(model);
+        auto buckling = fem::core::runLinearBuckling(model);
+        REQUIRE(buckling.has_value());
+        REQUIRE_FALSE(buckling->modes.empty());
+        const fem::core::BucklingMode& mode = buckling->modes.front();
+        const fem::core::ResultFields fields = fem::core::fieldsOf(base, mode);
+        CHECK(fields.mode);
+        const fem::core::ShapeSamples shape = fem::core::sampleShape(fields, {.perBeam = 5});
+        const fem::core::FieldSamples mz =
+            fem::core::sampleField(fields, shape, ResultQuantity::Mz);
+        CHECK(std::ranges::all_of(mz.values, [](double v) { return std::isnan(v); }));
+        CHECK(mz.max.value == 0.0);
+        CHECK(mz.max.sample == 0);
+        // The top moves sideways in the first mode.
+        const fem::core::FieldSamples ux =
+            fem::core::sampleField(fields, shape, ResultQuantity::Ux);
+        const std::size_t top = shape.stations.size() - 1;
+        CHECK(std::abs(ux.values[top] - mode.displacements[2].x()) <=
+              1e-9 * mode.displacements[2].norm());
+        CHECK(std::abs(mode.displacements[2].x()) > 0.0);
+    }
+}
+
+// REQ-012-18, AC-6: a point between the samples gives the value of the core
+// there, not that of a sample next to it.
+TEST_CASE("the value at a point of a bar", "[core][result][sampling]")
+{
+    using fem::core::ResultQuantity;
+    const fem::core::StaticResult result = fem::core::test::solve(simpleBeam());
+    const fem::core::ResultFields fields = fem::core::fieldsOf(result);
+    const fem::core::ShapeSamples shape = fem::core::sampleShape(fields, {.perBeam = 9});
+    const fem::core::FieldSamples mz = fem::core::sampleField(fields, shape, ResultQuantity::Mz);
+    const BeamResult& beam = fem::core::test::beamOf(result, 0);
+    const double x = 1.1; // between the samples at 0.75 and 1.5
+    const double value = fem::core::valueAt(
+        fields, 0, fem::core::Station{.x = x, .side = fem::core::Side::After, .node = -1},
+        ResultQuantity::Mz);
+    CHECK(value == beam.at(x).forces.mz);
+    CHECK(std::abs(value - kQ * x * (kSpan - x) / 2) <= 1e-9 * kQ * kSpan * kSpan);
+    CHECK(value != mz.values[1]);
+    CHECK(value != mz.values[2]);
+    CHECK(close(
+        fem::core::displacementAt(
+            fields, 0, fem::core::Station{.x = x, .side = fem::core::Side::After, .node = -1}),
+        globalDisplacement(beam, x), 1e-15, 1.0));
+    // An element that is not a bar has no value.
+    CHECK(std::isnan(fem::core::valueAt(
+        fields, 5, fem::core::Station{.x = 0.0, .side = fem::core::Side::After, .node = -1},
+        ResultQuantity::Ux)));
+}

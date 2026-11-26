@@ -36,6 +36,8 @@ enum class ResultQuantity : std::uint8_t {
     Mz, // internal forces, principal local axes (REQ-008-21)
 };
 inline constexpr int kResultQuantityCount = 13;
+// N, Vy, Vz, T, My, Mz.
+[[nodiscard]] bool isForce(ResultQuantity quantity) noexcept;
 
 // The response to draw: a static result or a buckling mode.
 struct ResultFields
@@ -106,5 +108,34 @@ struct SampleOptions
 // out. The same for any number of threads.
 [[nodiscard]] ShapeSamples sampleShape(const ResultFields& fields,
                                        const SampleOptions& options = {});
+
+struct Extreme
+{
+    double value = 0.0;
+    std::uint32_t sample = 0;
+};
+
+struct FieldSamples
+{
+    ResultQuantity quantity = ResultQuantity::UMagnitude;
+    std::vector<double> values; // per sample
+    Extreme min;                // the first sample of the smallest finite value
+    Extreme max;                // the first sample of the largest finite value
+};
+
+// REQ-012-09, 10, 17: the quantity at every sample of `shape` and its
+// extremes. Forces are per bar, never averaged at the nodes, and each side
+// of a concentrated load has its own; a rigid link takes the forces of the
+// flexible end next to it. NaN where there is no value (forces of a mode):
+// left out of the extremes, which are 0 at sample 0 without any value.
+[[nodiscard]] FieldSamples sampleField(const ResultFields& fields, const ShapeSamples& shape,
+                                       ResultQuantity quantity, int threads = 0);
+
+// REQ-012-18: the quantity and the global displacement at one point of a
+// bar, straight from the core (trusses: linear between their nodes).
+[[nodiscard]] double valueAt(const ResultFields& fields, ElementIndex element, const Station& at,
+                             ResultQuantity quantity);
+[[nodiscard]] Eigen::Vector3d displacementAt(const ResultFields& fields, ElementIndex element,
+                                             const Station& at);
 
 } // namespace fem::core
