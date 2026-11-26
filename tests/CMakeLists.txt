@@ -204,6 +204,7 @@ femapp_set_warnings(bench_run_control)
 # Feature 009: also the mesh job of the MESH command, with a QCoreApplication.
 add_executable(test_app
     unit/app/test_analysis_job.cpp
+    unit/app/test_analysis_text.cpp
     unit/app/test_check_issues.cpp
     unit/app/test_cli_options.cpp
     unit/app/test_fields.cpp
@@ -215,6 +216,8 @@ add_executable(test_app
     unit/app/test_symbol_builder.cpp
     "${PROJECT_SOURCE_DIR}/src/app/analysis_job.cpp"
     "${PROJECT_SOURCE_DIR}/src/app/analysis_job.hpp"
+    "${PROJECT_SOURCE_DIR}/src/app/analysis_text.cpp"
+    "${PROJECT_SOURCE_DIR}/src/app/analysis_text.hpp"
     "${PROJECT_SOURCE_DIR}/src/app/check_issues.cpp"
     "${PROJECT_SOURCE_DIR}/src/app/cli_options.cpp"
     "${PROJECT_SOURCE_DIR}/src/app/fields.cpp"

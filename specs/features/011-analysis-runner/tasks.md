@@ -181,7 +181,7 @@ Regras:
     das opções entra no desfazer.
   Arquivos: `model_controller.hpp/.cpp`,
   `tests/unit/app/test_model_controller.cpp`. Cobre: 01, 11, 12.
-- [ ] **T13** Textos do resumo e das etapas:
+- [x] **T13** Textos do resumo e das etapas:
   - `analysis_text`: as linhas do resumo nas unidades do documento, com
     os ids externos; o texto do progresso ("Analysing ULS (2 of 5):
     iteration 3, assembly 40%"); as falhas e o cancelamento;
