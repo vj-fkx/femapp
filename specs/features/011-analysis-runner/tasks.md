@@ -284,8 +284,15 @@ Regras:
 - [ ] **T90** [M] Build e testes verdes nos jobs do CI, inclusive a
   cobertura de `core`, `mesher` e `setup`; push com sua confirmação.
   Cobre: N05.
-- [ ] **T91** `clang-format` e `clang-tidy` sem pendências (também o do
+- [x] **T91** `clang-format` e `clang-tidy` sem pendências (também o do
   Linux); `core`, `geom`, `mesher` e `setup` sem headers Qt. Cobre: 09.
+  - Feito, no Windows:
+    - `clang-format --dry-run -Werror`: os 288 arquivos de `src` e `tests`,
+      sem diferença;
+    - `clang-tidy`: os `.cpp` tocados desde `647f1bb`, sem aviso;
+    - g++ 13 `-O2 -Werror`: os mesmos, limpos;
+    - nenhum `#include` Qt em `core`, `geom`, `mesher` e `setup`.
+  - O tidy do Linux roda no CI, na T90.
 - [ ] **T92** Conferir os sete critérios de aceite.
 - [ ] **T93** Atualizar `specs/roadmap.md` para `concluída`.
 
