@@ -1,6 +1,6 @@
 # Requisitos — 012 results-visualization
 
-Status: rascunho · Data: 2026-11-26
+Status: aprovado · Data: 2026-11-26
 
 ## 1. Contexto e objetivo
 
@@ -55,7 +55,7 @@ seção ficam para depois.
 | ID | Requisito | História |
 |----|-----------|----------|
 | REQ-012-05 | O sistema DEVE desenhar a configuração deformada: cada nó deslocado por fator × deslocamento. Dentro de cada viga, a linha DEVE seguir a deformada do `core` (`BeamResult::at`), amostrada em pontos ao longo da barra que incluem as pontas, o meio e os dois lados de cada carga concentrada no vão. As treliças são retas entre os nós. | US-1 |
-| REQ-012-06 | O fator de escala padrão DEVE ser automático: o maior deslocamento desenhado vale uma fração fixa da maior dimensão da caixa envolvente da malha. O usuário DEVE poder trocar o fator digitando um valor, voltar ao automático e usar a escala real (fator 1). O fator em uso DEVE ficar visível. | US-1 |
+| REQ-012-06 | O fator de escala padrão DEVE ser automático: o maior deslocamento desenhado vale 10% da maior dimensão da caixa envolvente da malha. O usuário DEVE poder trocar o fator digitando um valor, voltar ao automático e usar a escala real (fator 1). O fator em uso DEVE ficar visível. | US-1 |
 | REQ-012-07 | O sistema DEVE permitir mostrar, junto com a deformada, a configuração original em traço fino e cor neutra, e desligar a deformada (o mapa de cores fica então sobre a forma original). | US-1 |
 | REQ-012-08 | QUANDO o usuário trocar o fator de escala, O sistema DEVE redesenhar sem refazer nem reenviar a geometria das barras. | US-1, US-6 |
 
@@ -102,8 +102,8 @@ seção ficam para depois.
     antes da conversão para a GPU;
   - o meio da barra está entre os pontos e tem a flecha 5qL⁴/384EI em
     1e−9;
-  - o fator automático leva o maior deslocamento à fração fixada do
-    tamanho da malha.
+  - o fator automático leva o maior deslocamento a 10% da maior
+    dimensão da malha.
 - [ ] **AC-2** (REQ-012-09, 10, 11) Na mesma viga, colorida por Mz:
   - o máximo da legenda é qL²/8 em 1e−9;
   - numa viga com carga concentrada no vão, os dois lados da carga têm os
@@ -164,6 +164,7 @@ constituição §3 (renderização pela Qt RHI) e §5.2 (unidades sempre exibida
 - [x] Animação dos modos de flambagem: sim (decidido em 2026-11-26).
 - [x] Textos no viewport: reações, máximo e mínimo, e consulta (decidido em
   2026-11-26).
-- [ ] A fração do fator automático (proposta: 10% da maior dimensão da
-  caixa envolvente) e o número de pontos de amostragem por viga (proposta:
-  definido no design, ímpar para incluir o meio).
+- [x] O fator automático leva o maior deslocamento desenhado a 10% da
+  maior dimensão da caixa envolvente da malha (decidido em 2026-11-26). O
+  número de pontos de amostragem por viga é do design, ímpar para incluir o
+  meio.
