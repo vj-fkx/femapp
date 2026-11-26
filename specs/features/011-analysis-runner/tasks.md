@@ -323,6 +323,8 @@ Regras:
     - cobertura ≥ 80% de `core`, `mesher` e `setup`, exigida pelo CI;
     - CI 45822532117 verde nas quatro plataformas.
 - [ ] **T93** Atualizar `specs/roadmap.md` para `concluída`.
+  - Aguarda a T19: a 011 fica `implementando`, e o roteiro e as traduções
+    foram acrescentados às pendências do roadmap (2026-11-26).
 
 ## Matriz de rastreabilidade
 
