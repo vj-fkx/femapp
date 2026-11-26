@@ -30,6 +30,9 @@ public:
 public slots:
     // Checks the model now and lists what was found.
     void check();
+    // REQ-011-05, 10: the problems of an analysis of `name` (a refusal by the
+    // check, or the failure of the core as a problem of the core).
+    void showIssues(const QString& name, const std::vector<fem::setup::BuildIssue>& issues);
 
 signals:
     // A problem clicked: its item (a setup::ItemId, as quint64: the moc
@@ -40,6 +43,8 @@ signals:
     void idsRequested(const fem::app::NamedIds& ids);
 
 private:
+    void list(const QString& name, std::vector<setup::BuildIssue> issues);
+
     ModelController* m_controller = nullptr;
     const ModelTree* m_tree = nullptr;
     QLabel* m_summary = nullptr;

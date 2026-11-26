@@ -170,6 +170,9 @@ void DraftingController::enterText(const QString& text)
 
 void DraftingController::escape()
 {
+    if (m_escapeHandler && m_escapeHandler()) {
+        return;
+    }
     if (m_meshPrompt) {
         cancelMeshPrompt();
         return;

@@ -202,15 +202,19 @@ Regras:
 
 ## Fase 5 — App: interface
 
-- [ ] **T15** Menu Analysis e barra de status:
+- [x] **T15** Menu Analysis e barra de status:
   - Settings… (o diálogo do tipo e das opções), Run analysis (F5), Run
     all, Cancel (Esc só habilitado durante a execução);
   - o progresso pelo timer de 100 ms, a barra e o botão Cancel;
   - o resumo no console;
   - as falhas no console e na conferência, com o realce dos ids;
   - a recusa pela conferência abrindo o dock.
-  Arquivos: `analysis_settings_dialog.hpp/.cpp`, `main_window.hpp/.cpp`.
-  Cobre: 01, 05, 07, 08, 10, 13, 17.
+  Arquivos: `analysis_settings_dialog.hpp/.cpp`, `main_window.hpp/.cpp`;
+  também `check_panel` (`showIssues`, a lista de uma recusa ou falha) e
+  `drafting_controller` (`setEscapeHandler`: o Esc passa primeiro pela
+  análise; a ação Cancel mostra "Esc" no texto, sem atalho próprio, para
+  não ficar ambígua com o Esc de Clear Selection). Sem teste unitário:
+  coberto pelo roteiro T19. Cobre: 01, 05, 07, 08, 10, 13, 17.
 - [ ] **T16** O estado na árvore: o texto do caso e da combinação com o
   tipo e "current"/"out of date", refeito em `resultsChanged`,
   `documentChanged` e `meshChanged`; testes no `ModelTree`. Arquivos:

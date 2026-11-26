@@ -1,5 +1,8 @@
 #include "main_window.hpp"
 
+#include "analysis_job.hpp"
+#include "analysis_settings_dialog.hpp"
+#include "analysis_text.hpp"
 #include "check_panel.hpp"
 #include "command_line_widget.hpp"
 #include "drafting_controller.hpp"
@@ -40,11 +43,13 @@
 #include <QString>
 #include <QStringList>
 #include <QStyle>
+#include <QTimer>
 #include <QToolButton>
 #include <QTreeView>
 #include <QUndoStack>
 #include <QUrl>
 
+#include <algorithm>
 #include <array>
 #include <iostream>
 #include <string_view>
@@ -60,6 +65,8 @@ constexpr int kDefaultWidth = 1280;
 constexpr int kDefaultHeight = 800;
 constexpr int kFailureMessageMargin = 24;
 constexpr int kProgressWidth = 120;
+constexpr int kAnalysisProgressMs = 100; // REQ-011-07 (design §5.4)
+constexpr int kPercent = 100;
 
 // REQ-004-02: local files ending in .msh, in any case.
 QString droppedMeshFile(const QMimeData* data)
@@ -110,6 +117,7 @@ MainWindow::MainWindow(QWidget* parent)
     createViewMenu();
     createDraftingMenus();
     createModelMenu();
+    createAnalysisMenu();
 
     QMenu* helpMenu = menuBar()->addMenu(tr("&Help"));
     QAction* aboutAction = helpMenu->addAction(tr("&About femapp"), this, &MainWindow::showAbout);
@@ -557,6 +565,192 @@ void MainWindow::createModelMenu()
     connect(m_viewport, &render::Viewport::selectionChanged, this, selectionMoved);
     connect(m_viewport, &render::Viewport::drawingSelectionChanged, this, selectionMoved);
     m_model->rebuildSymbols();
+}
+
+void MainWindow::createAnalysisMenu()
+{
+    // NOLINTBEGIN(cppcoreguidelines-owning-memory): owned by their Qt parents.
+    m_analysis = new AnalysisJob(this);
+    m_analysisTimer = new QTimer(this);
+    m_analysisProgress = new QProgressBar(this);
+    m_analysisCancel = new QToolButton(this);
+    // NOLINTEND(cppcoreguidelines-owning-memory)
+    m_analysisProgress->setMaximumWidth(kProgressWidth);
+    m_analysisProgress->hide();
+    m_analysisCancel->setText(tr("Cancel"));
+    m_analysisCancel->setAutoRaise(true);
+    m_analysisCancel->hide();
+    statusBar()->addPermanentWidget(m_analysisProgress);
+    statusBar()->addPermanentWidget(m_analysisCancel);
+    m_analysisTimer->setInterval(kAnalysisProgressMs);
+
+    QMenu* menu = menuBar()->addMenu(tr("&Analysis"));
+    menu->addAction(tr("&Settings..."), this, &MainWindow::chooseAnalysis);
+    menu->addSeparator();
+    QAction* run = menu->addAction(tr("&Run analysis"), this, [this] {
+        const auto active = m_model->document().activeCase();
+        if (!active) {
+            statusBar()->showMessage(tr("No load case or combination to analyse."), 5000);
+            return;
+        }
+        runAnalysis({*active});
+    });
+    run->setShortcut(QKeySequence(Qt::Key_F5));
+    menu->addAction(tr("Run &all"), this, [this] {
+        // Every load case and combination, in the order of their ids.
+        std::vector<setup::ItemId> items;
+        for (const setup::Item& item : m_model->document().items()) {
+            if (std::holds_alternative<setup::LoadCase>(item) ||
+                std::holds_alternative<setup::Combination>(item)) {
+                items.push_back(setup::idOf(item));
+            }
+        }
+        if (items.empty()) {
+            statusBar()->showMessage(tr("No load case or combination to analyse."), 5000);
+            return;
+        }
+        runAnalysis(std::move(items));
+    });
+    // Esc cancels too, before the drawing sees it (the drafting controller
+    // asks first); the text of the action shows it.
+    m_cancelAnalysisAction = menu->addAction(tr("&Cancel analysis") + QStringLiteral("\tEsc"), this,
+                                             &MainWindow::cancelAnalysis);
+    m_cancelAnalysisAction->setEnabled(false);
+    m_drafting->setEscapeHandler([this] {
+        if (!m_analysis->isRunning()) {
+            return false;
+        }
+        cancelAnalysis();
+        return true;
+    });
+
+    connect(m_analysisCancel, &QToolButton::clicked, this, &MainWindow::cancelAnalysis);
+    connect(m_analysisTimer, &QTimer::timeout, this, &MainWindow::showAnalysisProgress);
+    connect(m_analysis, &AnalysisJob::caseFinished, this, &MainWindow::analysisCaseFinished);
+    connect(m_analysis, &AnalysisJob::finished, this, &MainWindow::analysisFinished);
+}
+
+void MainWindow::chooseAnalysis()
+{
+    AnalysisSettingsDialog dialog(m_model->document().analysis(), this);
+    if (dialog.exec() == QDialog::Accepted) {
+        m_model->setAnalysis(dialog.settings());
+    }
+}
+
+void MainWindow::runAnalysis(std::vector<setup::ItemId> items)
+{
+    // REQ-011-07: one run at a time.
+    if (m_analysis->isRunning()) {
+        statusBar()->showMessage(analysisAlreadyRunning(), 5000);
+        return;
+    }
+    m_runItems = items;
+    m_runIndex = 0;
+    m_runAnalysed = 0;
+    m_runNotAnalysed.clear();
+    if (!m_analysis->start(m_model->document(), m_model->drawing(), m_model->mesh(),
+                           std::move(items))) {
+        statusBar()->showMessage(analysisAlreadyRunning(), 5000);
+        return;
+    }
+    m_cancelAnalysisAction->setEnabled(true);
+    m_analysisCancel->show();
+    m_analysisProgress->setRange(0, 0);
+    m_analysisProgress->show();
+    m_analysisTimer->start();
+    showAnalysisProgress();
+}
+
+void MainWindow::cancelAnalysis()
+{
+    if (m_analysis->isRunning()) {
+        m_analysis->cancel();
+        statusBar()->showMessage(tr("Cancelling the analysis..."));
+    }
+}
+
+void MainWindow::showAnalysisProgress()
+{
+    if (!m_analysis->isRunning()) {
+        return;
+    }
+    const AnalysisJob::Progress p = m_analysis->progress();
+    statusBar()->showMessage(
+        progressText(caseName(m_model->document(), p.item), p.index, p.count, p.core, p.building));
+    // Determinate when the fraction of the stage is known.
+    if (!p.building && p.core.fraction >= 0.0) {
+        m_analysisProgress->setRange(0, kPercent);
+        m_analysisProgress->setValue(static_cast<int>(kPercent * p.core.fraction));
+    } else {
+        m_analysisProgress->setRange(0, 0);
+    }
+}
+
+void MainWindow::analysisCaseFinished(const setup::CaseOutcome& outcome)
+{
+    const setup::ItemId item =
+        m_runIndex < m_runItems.size() ? m_runItems[m_runIndex] : setup::ItemId{};
+    ++m_runIndex;
+    const QString name = caseName(m_model->document(), item);
+    m_model->caseFinished(outcome);
+    const auto console = [this](const QString& line) {
+        if (m_commandLine) {
+            m_commandLine->appendHistory(line);
+        }
+    };
+    if (outcome.result) {
+        // REQ-011-13: the summary; the warnings of the check after it.
+        ++m_runAnalysed;
+        for (const QString& line :
+             summaryLines(name, *outcome.result, m_model->document().units())) {
+            console(line);
+        }
+        for (const setup::BuildIssue& warning : outcome.result->warnings) {
+            console(tr("Warning: %1").arg(issueText(warning)));
+        }
+        return;
+    }
+    m_runNotAnalysed << name;
+    if (outcome.error) {
+        console(failureText(name, *outcome.error));
+        if (outcome.error->cancelled) {
+            return;
+        }
+        // REQ-011-10: in the check as a problem of the core, and what it
+        // names shown in the mesh.
+        m_check->showIssues(name, {setup::BuildIssue{.severity = setup::Severity::Error,
+                                                     .kind = setup::IssueKind::Core,
+                                                     .item = std::nullopt,
+                                                     .detail = outcome.error->message}});
+        m_checkDock->show();
+        m_checkDock->raise();
+        const NamedIds ids = idsInMessage(outcome.error->message);
+        if (!ids.elements.empty() || !ids.nodes.empty()) {
+            highlightIds(ids);
+        }
+        return;
+    }
+    // REQ-011-05: refused by the check, which opens with its problems.
+    const auto errors = std::ranges::count_if(outcome.issues, [](const setup::BuildIssue& i) {
+        return i.severity == setup::Severity::Error;
+    });
+    console(refusedText(name, static_cast<int>(errors)));
+    m_check->showIssues(name, outcome.issues);
+    m_checkDock->show();
+    m_checkDock->raise();
+}
+
+void MainWindow::analysisFinished(bool cancelled)
+{
+    m_analysisTimer->stop();
+    m_analysisProgress->hide();
+    m_analysisCancel->hide();
+    m_cancelAnalysisAction->setEnabled(false);
+    if (m_runItems.size() > 1 && m_commandLine) {
+        m_commandLine->appendHistory(runAllText(m_runAnalysed, m_runNotAnalysed, cancelled));
+    }
+    statusBar()->showMessage(cancelled ? tr("Analysis cancelled.") : tr("Analysis done."), 5000);
 }
 
 void MainWindow::checkModel()

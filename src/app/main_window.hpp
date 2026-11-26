@@ -5,6 +5,7 @@
 #include "symbol_builder.hpp"
 
 #include <fem/render/display_options.hpp>
+#include <fem/setup/analysis.hpp>
 #include <fem/setup/document.hpp>
 
 #include <QList>
@@ -13,7 +14,9 @@
 #include <QString>
 #include <QStringList>
 
+#include <cstddef>
 #include <memory>
+#include <vector>
 
 class QDockWidget;
 
@@ -23,6 +26,8 @@ class QLabel;
 class QModelIndex;
 class QPoint;
 class QProgressBar;
+class QTimer;
+class QToolButton;
 class QTreeView;
 
 namespace fem::render {
@@ -32,6 +37,7 @@ class Viewport;
 
 namespace fem::app {
 
+class AnalysisJob;
 class CommandLineWidget;
 class DraftingController;
 class ModelController;
@@ -116,6 +122,16 @@ private:
     void activateItem(const QModelIndex& index);
     void highlightTargets(const QModelIndex& index);
     void showMessage(const QString& title, const QString& text, bool error);
+    // Feature 011: the Analysis menu, the progress on the status bar and
+    // what each case gives in the console and the check (REQ-011-01, 03 to
+    // 08, 10, 13, 17).
+    void createAnalysisMenu();
+    void chooseAnalysis();
+    void runAnalysis(std::vector<setup::ItemId> items);
+    void cancelAnalysis();
+    void showAnalysisProgress();
+    void analysisCaseFinished(const setup::CaseOutcome& outcome);
+    void analysisFinished(bool cancelled);
 
     QPointer<render::Viewport> m_viewport;
     QList<QAction*> m_viewActions;
@@ -135,6 +151,16 @@ private:
     CheckPanel* m_check = nullptr;
     QDockWidget* m_checkDock = nullptr;
     QLabel* m_units = nullptr;
+    // Feature 011: the analysis job and the run in progress.
+    AnalysisJob* m_analysis = nullptr;
+    QTimer* m_analysisTimer = nullptr;
+    QProgressBar* m_analysisProgress = nullptr;
+    QToolButton* m_analysisCancel = nullptr;
+    QAction* m_cancelAnalysisAction = nullptr;
+    std::vector<setup::ItemId> m_runItems;
+    std::size_t m_runIndex = 0;
+    int m_runAnalysed = 0;
+    QStringList m_runNotAnalysed;
     bool m_quietMessages = false;
 };
 

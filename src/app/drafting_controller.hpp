@@ -12,8 +12,10 @@
 #include <QString>
 
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <optional>
+#include <utility>
 
 class QUndoStack;
 
@@ -45,6 +47,9 @@ public:
     [[nodiscard]] const geom::DraftingSettings& settings() const noexcept { return m_settings; }
     [[nodiscard]] const geom::Drawing& drawing() const noexcept { return *m_drawing; }
     [[nodiscard]] bool isCommandActive() const noexcept { return m_session.isActive(); }
+    // REQ-011-17: asked first on Esc; true when it took the key (the
+    // cancel of a running analysis), and the drawing does not see it.
+    void setEscapeHandler(std::function<bool()> handler) { m_escapeHandler = std::move(handler); }
 
 public slots:
     // Menus, toolbar and shortcuts.
@@ -78,6 +83,7 @@ signals:
                        std::shared_ptr<const fem::mesher::LineMeshMap> map, std::uint64_t revision);
 
 private:
+    std::function<bool()> m_escapeHandler;
     void cursorMoved(render::Vec2 pixel);
     void pointRequested(render::Vec2 pixel);
     void drawingSelectionChanged();

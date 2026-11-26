@@ -13,6 +13,8 @@
 #include <QTreeWidget>
 #include <QVBoxLayout>
 
+#include <utility>
+
 namespace fem::app {
 
 CheckPanel::CheckPanel(ModelController* controller, const ModelTree* tree, QWidget* parent)
@@ -64,8 +66,22 @@ void CheckPanel::check()
 {
     const setup::Document& document = m_controller->document();
     const auto active = document.activeCase();
-    m_issues = setup::checkModel(document, m_controller->drawing(), m_controller->mesh(),
-                                 {.item = active.value_or(setup::ItemId{})});
+    const setup::Item* load = active ? document.find(*active) : nullptr;
+    const QString loadName =
+        load != nullptr ? QString::fromStdString(setup::nameOf(*load)) : tr("no load case");
+    list(loadName, setup::checkModel(document, m_controller->drawing(), m_controller->mesh(),
+                                     {.item = active.value_or(setup::ItemId{})}));
+}
+
+void CheckPanel::showIssues(const QString& name, const std::vector<setup::BuildIssue>& issues)
+{
+    list(name, issues);
+}
+
+void CheckPanel::list(const QString& name, std::vector<setup::BuildIssue> issues)
+{
+    const setup::Document& document = m_controller->document();
+    m_issues = std::move(issues);
     m_list->clear();
     int errors = 0;
     int warnings = 0;
@@ -86,14 +102,11 @@ void CheckPanel::check()
         row->setIcon(0, error ? errorIcon : warningIcon);
         row->setToolTip(1, issueText(issue));
     }
-    const setup::Item* load = active ? document.find(*active) : nullptr;
-    const QString loadName =
-        load != nullptr ? QString::fromStdString(setup::nameOf(*load)) : tr("no load case");
     if (m_issues.empty()) {
-        m_summary->setText(tr("%1: no problems found.").arg(loadName));
+        m_summary->setText(tr("%1: no problems found.").arg(name));
     } else {
         m_summary->setText(
-            tr("%1: %2 error(s), %3 warning(s).").arg(loadName).arg(errors).arg(warnings));
+            tr("%1: %2 error(s), %3 warning(s).").arg(name).arg(errors).arg(warnings));
     }
 }
 
