@@ -281,9 +281,14 @@ Regras:
       o `AnalysisRunner` planejado pelo `AnalysisJob`, o menu, a árvore e o
       dock Results.
     - README: a seção do menu Analysis.
-- [ ] **T90** [M] Build e testes verdes nos jobs do CI, inclusive a
+- [x] **T90** [M] Build e testes verdes nos jobs do CI, inclusive a
   cobertura de `core`, `mesher` e `setup`; push com sua confirmação.
   Cobre: N05.
+  - Feito: o push de `2d594b2` falhou só no clang-tidy do linux-clang
+    (dois acessos a optional em `test_run_control.cpp`, que o tidy 19 não
+    aceita). Corrigido em `3a9ee7f`, o CI 45822532117 passou em todos os
+    jobs: format, linux-gcc, linux-clang (com o tidy), windows, macos e
+    coverage.
 - [x] **T91** `clang-format` e `clang-tidy` sem pendências (também o do
   Linux); `core`, `geom`, `mesher` e `setup` sem headers Qt. Cobre: 09.
   - Feito, no Windows:
