@@ -131,9 +131,12 @@ void checkIdentical(const StaticResult& a, const StaticResult& b)
         CHECK(same(a.axialForce[e], b.axialForce[e]));
         CHECK(same(a.stress[e], b.stress[e]));
         REQUIRE(a.beams[e].has_value() == b.beams[e].has_value());
-        if (a.beams[e] && b.beams[e]) {
-            const fem::core::BeamResult& x = *a.beams[e];
-            const fem::core::BeamResult& y = *b.beams[e];
+        // References, so that clang-tidy 19 (Linux) sees the checks.
+        const auto& beamA = a.beams[e];
+        const auto& beamB = b.beams[e];
+        if (beamA && beamB) {
+            const fem::core::BeamResult& x = *beamA;
+            const fem::core::BeamResult& y = *beamB;
             for (int k = 0; k <= 4; ++k) {
                 const double s = x.length() * k / 4.0;
                 CHECK(same(x.at(s).forces, y.at(s).forces));
