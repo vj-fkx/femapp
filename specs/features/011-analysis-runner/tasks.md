@@ -272,9 +272,15 @@ Regras:
      interface responde durante a análise; 10⁵ linhas rolam no dock.
   7. Esc sem análise rodando: cancela o comando do desenho, como antes.
   Cobre: 14 a 17, N01, N04.
-- [ ] **T20** Documentação: `architecture.md` (o `RunControl` no `core`,
+- [x] **T20** Documentação: `architecture.md` (o `RunControl` no `core`,
   a execução e os resultados no `setup` e no `app`, a revisão que volta
   com o desfazer) e o README (o menu Analysis). Cobre: 17.
+  - Feito:
+    - `architecture.md`: o `RunControl` no §3; a execução no §3c (opções,
+      revisões que voltam, `runCase`, `ResultSet`, `summarize`); o §5 troca
+      o `AnalysisRunner` planejado pelo `AnalysisJob`, o menu, a árvore e o
+      dock Results.
+    - README: a seção do menu Analysis.
 - [ ] **T90** [M] Build e testes verdes nos jobs do CI, inclusive a
   cobertura de `core`, `mesher` e `setup`; push com sua confirmação.
   Cobre: N05.

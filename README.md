@@ -177,6 +177,34 @@ A árvore Model, à esquerda, mostra tudo isso e a malha. Um duplo clique ativa
 um caso, e o menu de contexto renomeia, duplica, copia cargas e apaga. Os
 textos do menu Model ficam em inglês por ora.
 
+### A análise (menu Analysis)
+
+Com o modelo pronto, o menu **Analysis** roda a análise (feature 011):
+
+- **Settings…** escolhe o tipo, para todos os casos: linear, segunda
+  ordem (com a tolerância e o máximo de iterações) ou flambagem linear
+  (com o número de modos).
+- **Run analysis** (F5) analisa o caso ou a combinação ativa. **Run all**
+  analisa todos, em ordem.
+- **Durante a análise:** a barra de status mostra a etapa e o progresso, e
+  a interface continua respondendo. **Cancel**, o botão da barra ou o Esc
+  interrompem a análise. As edições feitas enquanto ela roda não a
+  atingem.
+- **O resultado de cada caso:**
+  - o console recebe um resumo com os maiores deslocamentos e esforços, o
+    equilíbrio das reações e, na flambagem, os fatores;
+  - um caso com erros na conferência não roda: o dock Check abre com os
+    problemas;
+  - uma falha da análise, como um mecanismo, aparece no console e na
+    conferência, com os nós e elementos citados realçados.
+- **O dock Results** (Show Results) mostra as tabelas do caso escolhido:
+  deslocamentos, reações, esforços nas barras ou modos de flambagem.
+  Selecionar linhas realça os nós e as barras no viewport.
+- **Atual ou desatualizado:** a árvore mostra, ao lado de cada caso, o
+  tipo do resultado e se ele ainda vale ("linear · current"). Qualquer
+  edição o deixa "out of date"; desfazer até o estado analisado volta a
+  "current".
+
 Para malhas grandes (centenas de milhares de elementos ou mais), use o build
 de Release (`cmake --preset release` e `cmake --build --preset release`): o
 build `dev` é de depuração e chega a ser dez vezes mais lento. O

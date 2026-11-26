@@ -213,6 +213,17 @@ Conceitos principais:
   `ModalAnalysis`, `TransientAnalysis`; orquestram montagem → solução →
   recuperação de resultados, reportam progresso e aceitam cancelamento por
   `std::stop_token`.
+- **`RunControl`** (feito na 011, ADR 0011, `run_control.hpp`) — no lugar
+  do `std::stop_token`, as análises estáticas linear e de segunda ordem e a
+  flambagem recebem um controle opcional:
+  - uma bandeira atômica de cancelamento, lida entre as etapas, por bloco
+    de elementos na montagem e na recuperação, e a cada iteração. No pior
+    caso, cancelar espera o fim de uma fatoração;
+  - um retorno de progresso com a etapa (montagem, fatoração, solução,
+    recuperação, iteração), a fração conhecida e a iteração.
+  Cancelada, a análise volta com um `Error` marcado `cancelled`, sem
+  resultado. Sem controle, nada muda, e o custo dele é medido pelo
+  `bench_run_control`.
 - **`ResultSet`** — campos nodais/elementares nomeados, por passo de tempo ou modo
   (deslocamento, tensão, von Mises, esforços de barra, temperatura, fluxo…).
 
@@ -340,6 +351,26 @@ Qt) guarda o que o usuário prepara sobre o desenho e a malha, e monta dele o
   soma ponderada das ações. Os problemas voltam como `BuildIssue` com o
   item. `checkModel` acrescenta os do `core::validate`.
 
+**Feature 011 (execução da análise):**
+
+- **Opções** (`analysis_settings.hpp`): o tipo (linear, segunda ordem,
+  flambagem), a tolerância, as iterações e os modos ficam no `Document`.
+  Mudá-las é uma edição desfeita como as outras.
+- **Revisões que voltam**: `Document` e `Drawing` dão uma revisão nova a
+  cada edição, e o desfazer devolve a revisão de antes. Um resultado guarda
+  o `AnalysedState`, com as revisões do documento e do desenho e a geração
+  da malha. Ele está atual enquanto esse estado é o de agora, sem
+  comparar conteúdo. Desfazer até o estado analisado o torna atual de novo.
+- **`runCase`** (`analysis.hpp`): monta o modelo do caso ou da combinação
+  e confere. Com algum erro, recusa e devolve os problemas. Senão, roda a
+  análise das opções com o `RunControl`. O `AnalysisResult` traz o
+  resultado do `core`, a malha, os avisos e os nós apoiados.
+- **`ResultSet`**: um resultado por caso ou combinação, em ordem de id.
+  Uma falha mantém o resultado anterior, que fica desatualizado.
+- **`summarize`**: os extremos de deslocamento, rotação e esforços, com os
+  ids externos, as somas das reações e das cargas, as iterações e os
+  fatores de flambagem.
+
 ## 4. Renderização (`render`)
 
 - **`Viewport`** (`QRhiWidget`) — dono do `QRhi`, do laço de render e dos eventos de entrada.
@@ -406,10 +437,28 @@ Qt) guarda o que o usuário prepara sobre o desenho e a malha, e monta dele o
   - O dock da conferência lista os problemas da montagem e os do
     `core::validate` com a gravidade e o item. Um clique seleciona o item ou
     realça os elementos e nós citados.
-- **`MeshRunner`**: mesma mecânica do `AnalysisRunner`, para os geradores de malha.
-- **`AnalysisRunner`**: executa `core::Analysis` em thread de trabalho; comunica
-  progresso/conclusão por sinais Qt (conexão enfileirada). A UI nunca acessa o
-  `Model` enquanto o solver o lê — o runner recebe um instantâneo imutável.
+- **Análise (feature 011)**:
+  - O `AnalysisJob` roda os casos pedidos, um a um, numa `QThread`, sobre
+    cópias do documento e do desenho feitas ao iniciar. Edições feitas
+    durante a análise não a atingem. Os resultados voltam por sinal
+    enfileirado (`caseFinished`, depois `finished`). O progresso fica em
+    atômicos lidos por um temporizador de 100 ms da interface, e o cancelamento liga a
+    bandeira do `RunControl`. Só há uma análise por vez.
+  - O `ModelController` guarda o `ResultSet` e emite `resultsChanged`. O
+    resultado de um item apagado sai com ele.
+  - O menu Analysis tem Settings, Run analysis (F5), Run all, Cancel e
+    Show Results. A barra de status mostra o progresso e um botão de
+    cancelar. O Esc cancela antes de chegar ao comando do desenho. O
+    console recebe o resumo de cada caso; recusas e falhas vão também ao
+    dock da conferência, com os nós e elementos citados realçados.
+  - A árvore mostra em cada caso e combinação o tipo do resultado e se está
+    atual ("linear · current", "buckling · out of date").
+  - O dock Results usa um `ResultsModel` virtual (`QAbstractTableModel`),
+    que lê o resultado ao desenhar cada célula. As tabelas são
+    deslocamentos, reações dos nós apoiados, esforços nas duas pontas das
+    barras e os modos de flambagem, com as unidades do documento.
+    Selecionar linhas realça os nós ou elementos no viewport.
+- **`MeshRunner`**: mesma mecânica do `AnalysisJob`, para os geradores de malha.
 - Internacionalização com `tr()` + arquivos `.ts`.
 
 ## 6. Arquivos (`io`)
