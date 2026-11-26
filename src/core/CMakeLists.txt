@@ -30,6 +30,7 @@ femapp_add_module(core
         model.cpp
         model_validation.cpp
         quadrature.cpp
+        result_sampling.cpp
         section.cpp
         section_mesh.cpp
         section_solid.cpp

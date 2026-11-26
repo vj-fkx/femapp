@@ -38,7 +38,7 @@ Regras:
   `isoBeamAt` (`isoPlacement`). Na `Line3`, a metade do comprimento cai no
   nó do meio só em 1e−6, porque o comprimento da parábola é integrado
   numericamente no `core`.
-- [ ] **T02** As estações e a forma (design §5.2):
+- [x] **T02** As estações e a forma (design §5.2):
   - testes primeiro:
     - **viga biapoiada com carga q (AC-1):** as amostras são
       `placementAt` e `axes · at().displacement` em 1e−12, e o meio tem a
@@ -55,6 +55,10 @@ Regras:
   Arquivos: `core/include/fem/core/result_sampling.hpp`,
   `result_sampling.cpp`, `core/CMakeLists.txt`, `test_result_sampling.cpp`.
   Cobre: 05, 10.
+  *Feito:* `samplesPerBeam` e `beamStations` ficaram públicas para os
+  testes. A ligação rígida é reconhecida pela distância entre o nó e a
+  ponta flexível. As estações de nó (ligações e treliças) levam o
+  deslocamento nodal.
 - [ ] **T03** A grandeza, os extremos e a consulta (design §5.3):
   - testes primeiro:
     - na viga biapoiada, Mz máximo = qL²/8 no meio em 1e−9 (AC-2);
