@@ -12,6 +12,7 @@
 #include "model_dialogs.hpp"
 #include "model_tree.hpp"
 #include "property_panel.hpp"
+#include "results_panel.hpp"
 #include "section_geometry.hpp"
 
 #include <fem/core/version.hpp>
@@ -455,6 +456,17 @@ void MainWindow::createModelUi()
     connect(m_check, &CheckPanel::itemRequested, this,
             [this](quint64 id) { selectItem(static_cast<setup::ItemId>(id)); });
     connect(m_check, &CheckPanel::idsRequested, this, &MainWindow::highlightIds);
+    // REQ-011-14, 15: the results, on the right with the properties.
+    // NOLINTBEGIN(cppcoreguidelines-owning-memory): owned by their Qt parents.
+    m_results = new ResultsPanel(m_model, this);
+    m_resultsDock = new QDockWidget(tr("Results"), this);
+    // NOLINTEND(cppcoreguidelines-owning-memory)
+    m_resultsDock->setObjectName(QStringLiteral("results"));
+    m_resultsDock->setWidget(m_results);
+    addDockWidget(Qt::RightDockWidgetArea, m_resultsDock);
+    tabifyDockWidget(properties, m_resultsDock);
+    properties->raise();
+    connect(m_results, &ResultsPanel::idsRequested, this, &MainWindow::highlightIds);
     // REQ-010-02: the unit system always in sight.
     statusBar()->addPermanentWidget(m_units);
     connect(m_model, &ModelController::documentChanged, this, &MainWindow::showUnits);
@@ -616,6 +628,11 @@ void MainWindow::createAnalysisMenu()
     m_cancelAnalysisAction = menu->addAction(tr("&Cancel analysis") + QStringLiteral("\tEsc"), this,
                                              &MainWindow::cancelAnalysis);
     m_cancelAnalysisAction->setEnabled(false);
+    menu->addSeparator();
+    menu->addAction(tr("Show &Results"), this, [this] {
+        m_resultsDock->show();
+        m_resultsDock->raise();
+    });
     m_drafting->setEscapeHandler([this] {
         if (!m_analysis->isRunning()) {
             return false;
@@ -702,6 +719,7 @@ void MainWindow::analysisCaseFinished(const setup::CaseOutcome& outcome)
     if (outcome.result) {
         // REQ-011-13: the summary; the warnings of the check after it.
         ++m_runAnalysed;
+        m_results->showItem(item);
         for (const QString& line :
              summaryLines(name, *outcome.result, m_model->document().units())) {
             console(line);
@@ -749,6 +767,10 @@ void MainWindow::analysisFinished(bool cancelled)
     m_cancelAnalysisAction->setEnabled(false);
     if (m_runItems.size() > 1 && m_commandLine) {
         m_commandLine->appendHistory(runAllText(m_runAnalysed, m_runNotAnalysed, cancelled));
+    }
+    if (m_runAnalysed > 0) {
+        m_resultsDock->show();
+        m_resultsDock->raise();
     }
     statusBar()->showMessage(cancelled ? tr("Analysis cancelled.") : tr("Analysis done."), 5000);
 }

@@ -38,6 +38,7 @@ class Viewport;
 namespace fem::app {
 
 class AnalysisJob;
+class ResultsPanel;
 class CommandLineWidget;
 class DraftingController;
 class ModelController;
@@ -157,6 +158,8 @@ private:
     QProgressBar* m_analysisProgress = nullptr;
     QToolButton* m_analysisCancel = nullptr;
     QAction* m_cancelAnalysisAction = nullptr;
+    ResultsPanel* m_results = nullptr; // REQ-011-14
+    QDockWidget* m_resultsDock = nullptr;
     std::vector<setup::ItemId> m_runItems;
     std::size_t m_runIndex = 0;
     int m_runAnalysed = 0;

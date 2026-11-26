@@ -241,10 +241,20 @@ Regras:
     resultado). Coberto em `test_analysis.cpp`.
   - Os modos de flambagem não têm unidade (normalizados como no `core`);
     o fator de cada modo vem de `factor(mode)` para o seletor da T18.
-- [ ] **T18** O dock Results: a lista dos casos com resultado, a escolha
+- [x] **T18** O dock Results: a lista dos casos com resultado, a escolha
   da tabela e do modo, o aviso de desatualizado e a seleção levando ao
   `highlightIds`. Arquivos: `results_panel.hpp/.cpp`, `main_window.cpp`.
   Cobre: 14, 15, 16.
+  - Feito: o dock fica em aba com Properties, à direita. Ele mostra a
+    lista dos casos com resultado, a tabela e, na flambagem, os modos com
+    o fator ("Mode 1: factor 3.2"). Um aviso aparece enquanto o resultado
+    está desatualizado.
+  - O painel é refeito a cada mudança dos resultados, do documento, da
+    malha ou do desfazer, e entrega o resultado de novo ao modelo.
+  - O Run all mostra o dock ao fim, com o último caso analisado. O menu
+    Analysis ganhou "Show Results".
+  - Sem teste automático do widget; o roteiro T19 cobre o uso. Os testes
+    de fumaça abrem a janela com o dock.
 
 ## Fase 6 — Fechamento
 
