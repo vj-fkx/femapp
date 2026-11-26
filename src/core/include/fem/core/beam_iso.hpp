@@ -102,6 +102,11 @@ private:
                                   const ElementNodes& nodes, std::span<const double> nodeValues,
                                   double s);
 
+// Feature 012 (design 012 §5.1): the point of the flexible curve at the arc
+// length s and the local principal axes there, those of isoBeamAt.
+[[nodiscard]] BeamPlacement isoPlacement(const IsoBeamData& data, ElementKind kind,
+                                         const ElementNodes& nodes, double s);
+
 // REQ-008b-16: fails when the curve folds on itself or the reference is
 // parallel to it at a point of the integration.
 [[nodiscard]] Expected<void> isoCheck(const IsoBeamData& data, ElementKind kind,

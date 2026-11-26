@@ -761,6 +761,7 @@ std::optional<BeamResult> StaticProblem::internalMode(ElementIndex element) cons
     data.length = exactLength(beam, x1, x2);
     data.axes = beam.axes;
     data.beam = beam;
+    data.origin = x1 + beam.offsets[0];
     data.exact = true;
     data.planar = m_kindOf[e] == ElementKind::Beam2D;
     data.ends = mode->ends;
@@ -906,6 +907,7 @@ Expected<StaticResult> StaticProblem::recover(const Eigen::VectorXd& values, boo
             data.length = beams.length[e];
             data.axes = beams.data[e].axes;
             data.beam = beams.data[e];
+            data.origin = elementNodes.x[0] + beams.data[e].offsets[0];
             data.planar = kindOf[e] == ElementKind::Beam2D;
             IsoBeamData iso = beams.iso[e];
             if (!loaded) {
@@ -935,6 +937,7 @@ Expected<StaticResult> StaticProblem::recover(const Eigen::VectorXd& values, boo
             data.axes = beams.data[e].axes;
             data.beam = beams.data[e];
             data.loads = loaded ? beams.loads[e] : none;
+            data.origin = x1 + beams.data[e].offsets[0];
             data.exact = true;
             data.planar = kindOf[e] == ElementKind::Beam2D;
             StateBarVector endLoads;
@@ -961,6 +964,7 @@ Expected<StaticResult> StaticProblem::recover(const Eigen::VectorXd& values, boo
             data.axes = beams.data[e].axes;
             data.beam = beams.data[e];
             data.loads = beams.loads[e];
+            data.origin = mesh.nodeCoordinates(nodes[0]) + beams.data[e].offsets[0];
             data.displacements = ends.displacements;
             endForces(beams.data[e], ends.forces, data.start, data.end);
             const double n = data.start.n;

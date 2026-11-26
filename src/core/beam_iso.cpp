@@ -700,6 +700,19 @@ Expected<void> IsoBeamElement::compute(const ElementNodes& nodes, ElementIndex e
     return {};
 }
 
+BeamPlacement isoPlacement(const IsoBeamData& data, ElementKind kind, const ElementNodes& nodes,
+                           double s)
+{
+    const IsoNodes x = isoNodes(data.beam, nodes);
+    BeamPlacement out;
+    const auto here = pointAt(x, data, kind, isoParameter(x, s));
+    if (here) {
+        out.position = here->x;
+        out.axes = here->axes;
+    }
+    return out;
+}
+
 BeamPoint isoBeamAt(const IsoBeamData& data, ElementKind kind, const ElementNodes& nodes,
                     std::span<const double> nodeValues, double s)
 {

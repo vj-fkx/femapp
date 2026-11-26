@@ -1,6 +1,6 @@
 # Tarefas — 012 results-visualization
 
-Status: rascunho
+Status: em andamento
 Design: [design.md](design.md) · Requisitos: [requirements.md](requirements.md)
 
 Regras:
@@ -18,7 +18,7 @@ Regras:
 
 ## Fase 1 — `core`: onde fica cada ponto e a amostragem
 
-- [ ] **T01** A posição de um ponto da barra (design §5.1):
+- [x] **T01** A posição de um ponto da barra (design §5.1):
   - testes primeiro:
     - `placementAt(0)` e `placementAt(length)` são os nós mais os
       `offsets`, numa viga reta com e sem excentricidade, em 1e−12;
@@ -33,6 +33,11 @@ Regras:
   `static_analysis.cpp`, `stability_analysis.cpp` (ou onde o `BeamResult`
   da flambagem é montado), `beam_iso.cpp`,
   `tests/unit/core/test_result_sampling.cpp`. Cobre: 05.
+  *Feito:* os arcos exatos têm a posição em forma fechada (a rotação
+  integrada, Rodrigues), e as `Line3` usam o mesmo `pointAt` de
+  `isoBeamAt` (`isoPlacement`). Na `Line3`, a metade do comprimento cai no
+  nó do meio só em 1e−6, porque o comprimento da parábola é integrado
+  numericamente no `core`.
 - [ ] **T02** As estações e a forma (design §5.2):
   - testes primeiro:
     - **viga biapoiada com carga q (AC-1):** as amostras são

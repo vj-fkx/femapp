@@ -6,6 +6,7 @@
 #include <Eigen/Core>
 #include <cstdint>
 #include <memory>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -40,6 +41,13 @@ struct BeamPoint
     double warping = 0.0; // REQ-008d-08: the rate of twist, with warping
 };
 
+// Feature 012 (REQ-012-05): where a point of the centroid axis of a bar is.
+struct BeamPlacement
+{
+    Eigen::Vector3d position = Eigen::Vector3d::Zero(); // global
+    Eigen::Matrix3d axes = Eigen::Matrix3d::Identity(); // principal, columns, global
+};
+
 // At a concentrated load: the value just before or just after it.
 enum class Side : std::uint8_t { Before, After };
 
@@ -72,6 +80,9 @@ public:
         std::shared_ptr<const IsoBeamData> iso;
         ElementNodes isoNodes;
         std::vector<double> isoValues;
+        // Feature 012: the global position of the start of the flexible
+        // length (the start node moved by offsets[0]).
+        Eigen::Vector3d origin = Eigen::Vector3d::Zero();
     };
 
     explicit BeamResult(Data data);
@@ -85,6 +96,17 @@ public:
     // span loads within the theory; approximate on an elastic foundation
     // (REQ-008-15).
     [[nodiscard]] BeamPoint at(double x, Side side = Side::After) const;
+
+    // REQ-012-05 (design 012 §5.1): the point at x and the principal axes
+    // there, in which at() gives the displacements. Straight bars: on the
+    // line from origin(), the axes constant; arcs: on the circle, the axes
+    // turned with it; isoparametric bars: on the flexible curve.
+    [[nodiscard]] BeamPlacement placementAt(double x) const;
+    [[nodiscard]] const Eigen::Vector3d& origin() const { return m_data.origin; }
+    // The concentrated span loads and, in a buckling mode, the junctions of
+    // the parts: where the values jump or the shape has a kink.
+    [[nodiscard]] std::span<const SpanPoint> concentrated() const { return m_data.loads.points; }
+    [[nodiscard]] std::span<const double> junctions() const { return m_data.junctions; }
 
 private:
     Data m_data;

@@ -136,6 +136,36 @@ BeamResult::BeamResult(Data data)
     : m_data(std::move(data))
 {}
 
+BeamPlacement BeamResult::placementAt(double x) const
+{
+    if (m_data.iso) {
+        return isoPlacement(*m_data.iso, m_data.planar ? ElementKind::Beam2D : ElementKind::Beam3D,
+                            m_data.isoNodes, x);
+    }
+    const BeamData& beam = m_data.beam;
+    BeamPlacement out;
+    const double rate = beam.curvature.norm();
+    const bool arc = m_data.exact && beam.arcLength > 0.0 && rate > 0.0;
+    if (!arc) {
+        out.position = m_data.origin + x * m_data.axes.col(0);
+        out.axes = m_data.axes;
+        return out;
+    }
+    // An arc: the axes turn at the constant rate `curvature` (in the local
+    // axes), and the position is the integral of the tangent, the rotation
+    // integrated in closed form (Rodrigues).
+    Eigen::Matrix3d k;
+    const Eigen::Vector3d axis = beam.curvature / rate;
+    k << 0.0, -axis.z(), axis.y(), axis.z(), 0.0, -axis.x(), -axis.y(), axis.x(), 0.0;
+    const double angle = rate * x;
+    const Eigen::Matrix3d integral = x * Eigen::Matrix3d::Identity() +
+                                     (1.0 - std::cos(angle)) / rate * k +
+                                     (x - std::sin(angle) / rate) * k * k;
+    out.position = m_data.origin + m_data.axes * (integral * Eigen::Vector3d::UnitX());
+    out.axes = arcAxesAt(m_data.axes, beam.curvature, x);
+    return out;
+}
+
 BeamPoint BeamResult::at(double x, Side side) const
 {
     if (m_data.exact) {
