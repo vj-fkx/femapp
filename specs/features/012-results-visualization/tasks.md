@@ -163,7 +163,7 @@ Regras:
   `FrameParams` (o viewport passa a preenchê-lo na T10). O backend `Null`
   confere a gravação dos quadros, não o desenho; as cores na tela ficam
   para o roteiro T19.
-- [ ] **T10** O viewport:
+- [x] **T10** O viewport:
   - `setResultScene`, `setResultValues`, `setResultDisplay`,
     `setResultsShown`, `resultsShown`;
   - a animação: o `QElapsedTimer`, um quadro novo a cada vsync enquanto
@@ -177,6 +177,12 @@ Regras:
     alterna os passes.
   Arquivos: `render/include/fem/render/viewport.hpp`, `viewport.cpp`,
   `test_scene_renderer.cpp`. Cobre: 01, 08, 15, 18.
+  *Feito:* `animatedScale` é uma função pura (`result_display.cpp`),
+  testada em t = 0, T/4, T/2 e 3T/4. Um clique fora da forma emite
+  `resultPickMissed`; a janela de seleção continua na malha original. Não
+  há teste de widget do viewport (o `test_render` só tem
+  `QGuiApplication`): a alternância dos passes é a do teste do renderer
+  (T09), e o resto fica para o roteiro T19.
 - [ ] **T11** A sobreposição de textos (design §5.6):
   - testes primeiro, numa função pura de disposição: os rótulos
     projetados com a escala do quadro; a prioridade consulta > extremos >

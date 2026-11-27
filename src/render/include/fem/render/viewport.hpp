@@ -6,6 +6,9 @@
 #include <fem/render/camera.hpp>
 #include <fem/render/display_options.hpp>
 #include <fem/render/mesh_scene.hpp>
+#include <fem/render/result_display.hpp>
+#include <fem/render/result_picker.hpp>
+#include <fem/render/result_scene.hpp>
 #include <fem/render/selection.hpp>
 #include <fem/render/symbols.hpp>
 
@@ -111,6 +114,23 @@ public:
     // drawing entities whatever the target.
     void setCommandSelection(bool on);
 
+    // REQ-012-01, 02: the result shown (nullptr: none) and its values (two
+    // per segment, render::segmentValues); drawn in place of the mesh while
+    // resultsShown().
+    void setResultScene(std::shared_ptr<const ResultScene> scene,
+                        std::shared_ptr<const std::vector<float>> values);
+    // REQ-012-13: the values of another quantity; the geometry stays.
+    void setResultValues(std::shared_ptr<const std::vector<float>> values);
+    // REQ-012-06 to 15: uniforms only (REQ-012-08); starts the clock of the
+    // animation when it starts playing.
+    void setResultDisplay(const ResultDisplay& display);
+    [[nodiscard]] const ResultDisplay& resultDisplay() const;
+    void setResultsShown(bool shown);
+    [[nodiscard]] bool resultsShown() const;
+    [[nodiscard]] const std::shared_ptr<const ResultScene>& resultScene() const;
+    // REQ-012-15: the factor of the last frame drawn.
+    [[nodiscard]] double animatedScale() const;
+
 public slots:
     void setGridVisible(bool visible);
     void setAxesVisible(bool visible);
@@ -152,6 +172,9 @@ signals:
     void drawingSelectionChanged();
     // REQ-005-07: right button released without dragging.
     void rightClicked(fem::render::Vec2 pixel);
+    // REQ-012-18: a click on the result shown, and a click off it.
+    void resultPicked(const fem::render::ResultPick& pick);
+    void resultPickMissed();
 
 protected:
     void initialize(QRhiCommandBuffer* commandBuffer) override;
@@ -172,6 +195,8 @@ private:
     void finishIsolatedPick(const QPointF& releasePosition, bool remove);
     void finishDrawingPick(const QPointF& releasePosition, bool remove);
     void drawingSelectionEdited();
+    // REQ-012-18: a click in the result display; false when it is not shown.
+    bool finishResultPick(const QPointF& releasePosition, bool remove);
 
     class Impl;
     std::unique_ptr<Impl> m_impl;

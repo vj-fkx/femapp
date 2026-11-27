@@ -18,6 +18,7 @@ femapp_add_module(render
         mesh_picker.cpp
         pick_util.hpp
         mesh_scene.cpp
+        result_display.cpp
         result_layer.cpp
         result_layer.hpp
         result_picker.cpp

@@ -26,4 +26,9 @@ struct ResultDisplay
     bool playing = false;
 };
 
+// REQ-012-15: the factor drawn `seconds` after the animation started: the
+// factor itself when it does not play; 0 to f, f (1 - cos(2 pi t / T)) / 2,
+// for Static; -f to f, f sin(2 pi t / T), for Mode.
+[[nodiscard]] double animatedScale(const ResultDisplay& display, double seconds) noexcept;
+
 } // namespace fem::render

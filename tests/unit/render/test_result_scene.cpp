@@ -2,6 +2,7 @@
 
 #include <fem/core/mesh_builder.hpp>
 #include <fem/render/camera.hpp>
+#include <fem/render/result_display.hpp>
 #include <fem/render/result_picker.hpp>
 #include <fem/render/result_scene.hpp>
 
@@ -206,4 +207,32 @@ TEST_CASE("a click on the shape of a result", "[render][result]")
             fem::render::pickResult(*scene, 0.0, camera, toPixel(camera, Vec(0.5, 1.5, 0.0)))
                 .has_value());
     }
+}
+
+// REQ-012-15: the factor over time: 0 to f for a static result, -f to f
+// for a mode; the factor itself when the animation does not play.
+TEST_CASE("the animated scale factor", "[render][result]")
+{
+    using fem::render::Animation;
+    fem::render::ResultDisplay display;
+    display.scale = 40.0;
+    display.period = 2.0;
+    display.animation = Animation::Static;
+    display.playing = false;
+    CHECK(fem::render::animatedScale(display, 0.7) == 40.0);
+    display.playing = true;
+    CHECK(std::abs(fem::render::animatedScale(display, 0.0)) <= 1e-12);
+    CHECK(std::abs(fem::render::animatedScale(display, 0.5) - 20.0) <= 1e-12);
+    CHECK(std::abs(fem::render::animatedScale(display, 1.0) - 40.0) <= 1e-12);
+    CHECK(std::abs(fem::render::animatedScale(display, 2.0)) <= 1e-12);
+    display.animation = Animation::Mode;
+    CHECK(std::abs(fem::render::animatedScale(display, 0.0)) <= 1e-12);
+    CHECK(std::abs(fem::render::animatedScale(display, 0.5) - 40.0) <= 1e-12);
+    CHECK(std::abs(fem::render::animatedScale(display, 1.0)) <= 1e-12);
+    CHECK(std::abs(fem::render::animatedScale(display, 1.5) + 40.0) <= 1e-12);
+    display.animation = Animation::Off;
+    CHECK(fem::render::animatedScale(display, 1.5) == 40.0);
+    display.animation = Animation::Mode;
+    display.period = 0.0;
+    CHECK(fem::render::animatedScale(display, 1.5) == 40.0);
 }

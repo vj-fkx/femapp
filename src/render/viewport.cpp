@@ -6,6 +6,7 @@
 #include <fem/render/mesh_picker.hpp>
 #include <fem/render/viewport.hpp>
 
+#include <QElapsedTimer>
 #include <QGuiApplication>
 #include <QLoggingCategory>
 #include <QMouseEvent>
@@ -112,6 +113,7 @@ public:
     bool isolated = false;
     bool commandSelection = false; // REQ-005-27: a command asks for objects
     bool symbolsVisible = true;    // REQ-010-22
+    bool resultsShown = false;     // REQ-012-01
     SelectionTarget selectionTarget = SelectionTarget::Drawing;
     MouseMode mouseMode = MouseMode::Select;
     QPointF pressPosition;
@@ -130,6 +132,23 @@ public:
     std::uint64_t symbolsVersion = 0;
     geom::Preview preview;
     std::uint64_t previewVersion = 0;
+
+    // Feature 012: the result, its values and how it is drawn.
+    std::shared_ptr<const ResultScene> resultScene;
+    std::shared_ptr<const std::vector<float>> resultValues;
+    std::uint64_t resultSceneVersion = 0;
+    std::uint64_t resultValueVersion = 0;
+    ResultDisplay resultDisplay;
+    QElapsedTimer animationClock; // REQ-012-15
+    double frameScale = 1.0;      // the factor of the last frame
+
+    // REQ-011-15: the selection shows on the result when it is on the mesh
+    // shown.
+    [[nodiscard]] bool resultOnMesh() const
+    {
+        return resultScene && scene && resultScene->mesh() == scene->sharedMesh();
+    }
+    [[nodiscard]] bool drawsResult() const { return resultsShown && resultScene != nullptr; }
 
     // Where the left button gestures go.
     [[nodiscard]] bool selectsDrawing() const
@@ -459,6 +478,9 @@ void Viewport::rebuildIsolation()
 
 void Viewport::finishPick(const QPointF& releasePosition, bool remove)
 {
+    if (finishResultPick(releasePosition, remove)) {
+        return;
+    }
     if (m_impl->selectsDrawing()) {
         finishDrawingPick(releasePosition, remove);
         return;
@@ -620,6 +642,15 @@ void Viewport::render(QRhiCommandBuffer* commandBuffer)
         }
     }
     mesh.selection = &m_impl->selection;
+    // REQ-012-15: the factor of this frame.
+    const bool animating = m_impl->drawsResult() && m_impl->resultDisplay.playing &&
+                           m_impl->resultDisplay.animation != Animation::Off;
+    if (animating && !m_impl->animationClock.isValid()) {
+        m_impl->animationClock.start();
+    }
+    m_impl->frameScale = fem::render::animatedScale(
+        m_impl->resultDisplay,
+        animating ? static_cast<double>(m_impl->animationClock.elapsed()) / 1000.0 : 0.0);
     const FrameParams params{.camera = &m_impl->camera,
                              .pixelSize = renderTarget()->pixelSize(),
                              .devicePixelRatio = devicePixelRatioF(),
@@ -634,8 +665,16 @@ void Viewport::render(QRhiCommandBuffer* commandBuffer)
                              .symbols = {.symbols = m_impl->symbols.get(),
                                          .version = m_impl->symbolsVersion,
                                          .visible = m_impl->symbolsVisible},
-                             .results = {},
-                             .resultsShown = false};
+                             .results = {.scene = m_impl->resultScene.get(),
+                                         .sceneVersion = m_impl->resultSceneVersion,
+                                         .values = m_impl->resultValues.get(),
+                                         .valueVersion = m_impl->resultValueVersion,
+                                         .selection = &m_impl->selection,
+                                         .selectionVersion = m_impl->colorVersion,
+                                         .highlight = m_impl->resultOnMesh(),
+                                         .display = m_impl->resultDisplay,
+                                         .scale = m_impl->frameScale},
+                             .resultsShown = m_impl->resultsShown};
     if (!m_impl->renderer.render(commandBuffer, renderTarget(), params)) {
         tryNextBackend(m_impl->renderer.errorString());
         return;
@@ -643,6 +682,9 @@ void Viewport::render(QRhiCommandBuffer* commandBuffer)
 
     ++m_impl->frameCount;
     emit frameRendered();
+    if (animating) {
+        update(); // the next frame of the animation
+    }
     if (m_impl->scene && m_impl->shownSceneVersion != m_impl->sceneVersion) {
         m_impl->shownSceneVersion = m_impl->sceneVersion;
         emit sceneShown();
@@ -966,6 +1008,96 @@ void Viewport::finishDrawingPick(const QPointF& releasePosition, bool remove)
         }
     }
     drawingSelectionEdited();
+}
+
+bool Viewport::finishResultPick(const QPointF& releasePosition, bool remove)
+{
+    // A window selects on the original mesh, as without the result.
+    if (!m_impl->drawsResult() || m_impl->rectangle) {
+        return false;
+    }
+    m_impl->camera.setViewportSize(width(), height());
+    const auto pick = pickResult(*m_impl->resultScene, m_impl->frameScale, m_impl->camera,
+                                 toVec2(releasePosition), kPickTolerancePx);
+    if (!pick) {
+        emit resultPickMissed();
+        return true;
+    }
+    // REQ-012-18 (design §6): the click also selects the node or the bar,
+    // when the result is on the mesh shown.
+    if (m_impl->resultOnMesh()) {
+        SelectionItems items;
+        if (pick->node >= 0) {
+            items[SelectionKind::Node].push_back(pick->node);
+        } else {
+            items[SelectionKind::Element].push_back(pick->element);
+        }
+        if (remove) {
+            m_impl->selection.remove(items);
+        } else {
+            m_impl->selection.add(items);
+        }
+        selectionEdited();
+    }
+    emit resultPicked(*pick);
+    return true;
+}
+
+void Viewport::setResultScene(std::shared_ptr<const ResultScene> scene,
+                              std::shared_ptr<const std::vector<float>> values)
+{
+    m_impl->resultScene = std::move(scene);
+    m_impl->resultValues = std::move(values);
+    ++m_impl->resultSceneVersion;
+    ++m_impl->resultValueVersion;
+    update();
+}
+
+void Viewport::setResultValues(std::shared_ptr<const std::vector<float>> values)
+{
+    m_impl->resultValues = std::move(values);
+    ++m_impl->resultValueVersion;
+    update();
+}
+
+void Viewport::setResultDisplay(const ResultDisplay& display)
+{
+    const bool starts = display.playing && !m_impl->resultDisplay.playing;
+    m_impl->resultDisplay = display;
+    if (starts || !display.playing) {
+        m_impl->animationClock.invalidate();
+    }
+    update();
+}
+
+const ResultDisplay& Viewport::resultDisplay() const
+{
+    return m_impl->resultDisplay;
+}
+
+void Viewport::setResultsShown(bool shown)
+{
+    if (m_impl->resultsShown == shown) {
+        return;
+    }
+    m_impl->resultsShown = shown;
+    m_impl->animationClock.invalidate();
+    update();
+}
+
+bool Viewport::resultsShown() const
+{
+    return m_impl->resultsShown;
+}
+
+const std::shared_ptr<const ResultScene>& Viewport::resultScene() const
+{
+    return m_impl->resultScene;
+}
+
+double Viewport::animatedScale() const
+{
+    return m_impl->frameScale;
 }
 
 } // namespace fem::render
