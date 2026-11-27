@@ -7,12 +7,14 @@
 
 #include <fem/core/result_sampling.hpp>
 #include <fem/render/result_display.hpp>
+#include <fem/render/result_picker.hpp>
 #include <fem/setup/analysis.hpp>
 #include <fem/setup/units.hpp>
 
 #include <QString>
 
 #include <cstdint>
+#include <optional>
 #include <vector>
 
 namespace fem::app {
@@ -64,5 +66,31 @@ struct ResultDisplaySettings
 [[nodiscard]] render::ResultDisplay displayFor(const ResultDisplaySettings& settings,
                                                const core::FieldSamples& field, double autoScale,
                                                bool buckling);
+
+// REQ-012-02, 11, 14, 16, 17, 18 (design §5.6): what the texts are made
+// from.
+struct AnnotationInput
+{
+    const setup::AnalysisResult* result = nullptr;
+    int mode = 0; // a buckling mode
+    const core::ResultFields* fields = nullptr;
+    const core::ShapeSamples* shape = nullptr;
+    const core::FieldSamples* field = nullptr;
+    ResultDisplaySettings settings;
+    render::ResultDisplay display; // the range and the factor shown
+    setup::UnitSystem units = setup::UnitSystem::NewtonMetre;
+    QString caseName;
+    bool current = true; // REQ-012-02
+    std::optional<render::ResultPick> query;
+};
+
+// The legend (with colors), the headline (the case, the factor, the mode
+// and its factor, the warning), and the labels: the query, the extremes
+// and the reactions of the supported nodes, each as the user chose.
+[[nodiscard]] render::ResultAnnotations annotationsFor(const AnnotationInput& in);
+
+// The static result of a linear or second-order result; nothing for a
+// buckling one.
+[[nodiscard]] const core::StaticResult* staticOf(const setup::AnalysisResult& result);
 
 } // namespace fem::app

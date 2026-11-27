@@ -47,13 +47,14 @@ struct ResultFields
     std::span<const Eigen::Vector3d> rotations;     // per node
     std::span<const std::optional<BeamResult>> beams;
     // Per element, NaN for elements that are not bars: finite marks the
-    // trusses (bars without a beam result).
+    // trusses (bars without a beam result). Empty for a mode.
     std::span<const double> axialForce;
-    bool mode = false; // a buckling mode: no internal forces
+    // A buckling mode: no internal forces, and the trusses are its line
+    // elements without a beam result.
+    bool mode = false;
 };
 [[nodiscard]] ResultFields fieldsOf(const StaticResult& result);
-// The mode's shape; the bars are those of the static result it came from.
-[[nodiscard]] ResultFields fieldsOf(const StaticResult& base, const BucklingMode& mode);
+[[nodiscard]] ResultFields fieldsOf(std::shared_ptr<const Mesh> mesh, const BucklingMode& mode);
 
 // A point of a bar: x from the start of its flexible length (from the start
 // node for a truss) and the side of a concentrated load there. `node` is
@@ -137,6 +138,9 @@ struct FieldSamples
                              ResultQuantity quantity);
 [[nodiscard]] Eigen::Vector3d displacementAt(const ResultFields& fields, ElementIndex element,
                                              const Station& at);
+// REQ-012-18: where that point is (the node of a node station).
+[[nodiscard]] Eigen::Vector3d positionAt(const ResultFields& fields, ElementIndex element,
+                                         const Station& at);
 
 // REQ-012-06: the factor that makes the largest displacement of the samples
 // kAutoScaleFraction of the largest side of their bounds; 1 when nothing

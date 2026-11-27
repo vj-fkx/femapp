@@ -1,3 +1,4 @@
+#include <fem/core/element_type.hpp>
 #include <fem/core/result_sampling.hpp>
 
 #include <tbb/blocked_range.h>
@@ -23,8 +24,16 @@ bool linked(const Eigen::Vector3d& node, const Eigen::Vector3d& flexibleEnd, dou
 
 bool isTruss(const ResultFields& fields, std::size_t e)
 {
-    return e < fields.axialForce.size() && std::isfinite(fields.axialForce[e]) &&
-           (e >= fields.beams.size() || !fields.beams[e]);
+    const bool beam = e < fields.beams.size() && fields.beams[e].has_value();
+    if (beam || !fields.mesh || e >= static_cast<std::size_t>(fields.mesh->elementCount())) {
+        return false;
+    }
+    if (fields.mode) {
+        // A mode keeps no axial forces: its line elements without a beam.
+        const auto type = fields.mesh->elementType(static_cast<ElementIndex>(e));
+        return elementTypeInfo(type).dimension == 1;
+    }
+    return e < fields.axialForce.size() && std::isfinite(fields.axialForce[e]);
 }
 
 bool isBeam(const ResultFields& fields, std::size_t e)
@@ -149,13 +158,13 @@ ResultFields fieldsOf(const StaticResult& result)
                         .mode = false};
 }
 
-ResultFields fieldsOf(const StaticResult& base, const BucklingMode& mode)
+ResultFields fieldsOf(std::shared_ptr<const Mesh> mesh, const BucklingMode& mode)
 {
-    return ResultFields{.mesh = base.mesh,
+    return ResultFields{.mesh = std::move(mesh),
                         .displacements = mode.displacements,
                         .rotations = mode.rotations,
                         .beams = mode.beams,
-                        .axialForce = base.axialForce,
+                        .axialForce = {},
                         .mode = true};
 }
 
@@ -359,6 +368,32 @@ double valueAt(const ResultFields& fields, ElementIndex element, const Station& 
     // A rigid link takes the forces of the flexible end next to it, whose x
     // its station has.
     return forceOf((*result)->at(at.x, at.side).forces, quantity);
+}
+
+Eigen::Vector3d positionAt(const ResultFields& fields, ElementIndex element, const Station& at)
+{
+    const auto e = static_cast<std::size_t>(element);
+    if (!fields.mesh) {
+        return Eigen::Vector3d::Zero();
+    }
+    const Mesh& mesh = *fields.mesh;
+    if (at.node >= 0) {
+        return mesh.nodeCoordinates(at.node);
+    }
+    if (e < fields.beams.size()) {
+        if (const std::optional<BeamResult>& beam = fields.beams[e]; beam.has_value()) {
+            return beam->placementAt(at.x).position;
+        }
+    }
+    if (!isTruss(fields, e)) {
+        return Eigen::Vector3d::Zero();
+    }
+    const auto nodes = mesh.elementNodes(element);
+    const Eigen::Vector3d a = mesh.nodeCoordinates(nodes[0]);
+    const Eigen::Vector3d b = mesh.nodeCoordinates(nodes[1]);
+    const double length = (b - a).norm();
+    const double t = length > 0.0 ? std::clamp(at.x / length, 0.0, 1.0) : 0.0;
+    return (1.0 - t) * a + t * b;
 }
 
 Eigen::Vector3d displacementAt(const ResultFields& fields, ElementIndex element, const Station& at)

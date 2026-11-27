@@ -219,7 +219,7 @@ Regras:
   Cobre: 06, 09, 11, 12, 15, 19.
   *Feito:* também `isBuckling` e `quantityTitle` ("Mz [kN·m]", "θz [rad]",
   "u (normalized)"), que a legenda e a barra de opções usam.
-- [ ] **T13** Os textos (`annotationsFor`):
+- [x] **T13** Os textos (`annotationsFor`):
   - testes primeiro:
     - **reações no pórtico 2×2 da 010:** os componentes, os valores com
       as unidades do documento, e a soma igual à carga aplicada em 1e−9
@@ -232,6 +232,11 @@ Regras:
   - depois `AnnotationInput` e `annotationsFor`.
   Arquivos: `result_display_settings.hpp/.cpp`, `test_result_display.cpp`.
   Cobre: 02, 14, 16, 17, 18, 19.
+  *Feito:* o resultado de flambagem guardado no `setup` não traz o
+  estático de base, então `fieldsOf` de um modo passou a receber a malha,
+  e num modo as treliças são os elementos de linha sem `BeamResult`
+  (design §4 anotado). O `core` ganhou `positionAt`, para o rótulo da
+  consulta, e o `app`, `staticOf`.
 - [ ] **T14** [P] O dock Results:
   - um delegate com `formatResult` nas tabelas (teste: o texto da célula
     é o de `formatResult`);

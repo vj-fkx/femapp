@@ -116,7 +116,10 @@ struct ResultFields
     std::span<const double> axialForce;             // per element; empty for a mode
 };
 [[nodiscard]] ResultFields fieldsOf(const StaticResult& result);
-[[nodiscard]] ResultFields fieldsOf(const StaticResult& base, const BucklingMode& mode);
+[[nodiscard]] ResultFields fieldsOf(std::shared_ptr<const Mesh> mesh, const BucklingMode& mode);
+// (Alterado na T13: o resultado de flambagem guardado no setup não tem o
+// estático de base; num modo, as treliças são os elementos de linha sem
+// BeamResult.)
 
 // A point of a bar: x from the start of its flexible length, the side of a
 // concentrated load, and whether it is the bar's node (rigid links, §5.2).

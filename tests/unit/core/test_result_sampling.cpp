@@ -515,7 +515,7 @@ TEST_CASE("the quantities of trusses and of buckling modes", "[core][result][sam
         REQUIRE(buckling.has_value());
         REQUIRE_FALSE(buckling->modes.empty());
         const fem::core::BucklingMode& mode = buckling->modes.front();
-        const fem::core::ResultFields fields = fem::core::fieldsOf(base, mode);
+        const fem::core::ResultFields fields = fem::core::fieldsOf(base.mesh, mode);
         CHECK(fields.mode);
         const fem::core::ShapeSamples shape = fem::core::sampleShape(fields, {.perBeam = 5});
         const fem::core::FieldSamples mz =
