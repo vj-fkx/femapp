@@ -247,7 +247,7 @@ Regras:
   que o delegate do dock usa; o `test_app` não liga Qt Widgets, então o
   sinal `resultChosen` é exercitado pelo `ResultView` (T16) e pelo roteiro
   T19.
-- [ ] **T15** [P] Os símbolos na exibição de resultados:
+- [x] **T15** [P] Os símbolos na exibição de resultados:
   - testes primeiro: com `loadsShown = false`, os apoios continuam e as
     cargas somem; `reactionSymbols` dá as setas e os arcos do resultado
     nos nós apoiados, no sentido da reação;
@@ -255,6 +255,10 @@ Regras:
     `ModelController`.
   Arquivos: `app/symbol_builder.hpp/.cpp`, `model_controller.*`,
   `tests/unit/app/test_symbol_builder.cpp`. Cobre: 03, 16.
+  *Feito:* `SymbolOptions` ganhou `loadsShown` e as reações, e
+  `buildSymbols` as aplica no fim. O `ModelController` não mudou: ele já
+  repassa as `SymbolOptions` (`setSymbolOptions`), que o `ResultView` (T16)
+  vai preencher.
 - [ ] **T16** O `ResultView` (design §6):
   - o trabalho na `QThread` (forma, grandeza, cena e valores), com
     gerações e um trabalho por vez;

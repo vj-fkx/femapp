@@ -1,3 +1,4 @@
+#include "frame_document.hpp"
 #include "symbol_builder.hpp"
 
 #include <fem/mesher/line_mesher.hpp>
@@ -7,6 +8,7 @@
 
 #include <cmath>
 #include <memory>
+#include <variant>
 #include <vector>
 
 // Feature 010, T21 (design §5.6): REQ-010-09, 22. The symbols of the
@@ -130,10 +132,18 @@ TEST_CASE("the symbols of a model before MESH", "[app][symbols]")
 
     // REQ-010-09: the axes of all the beams, or of the selected one.
     const auto all = fem::app::buildSymbols(p.document, p.drawing, {},
-                                            {.axes = fem::app::AxesShown::All, .axesOf = {}});
+                                            {.axes = fem::app::AxesShown::All,
+                                             .axesOf = {},
+                                             .loadsShown = true,
+                                             .reactionForces = {},
+                                             .reactionMoments = {}});
     CHECK(all.axes.size() == 2);
-    const auto one = fem::app::buildSymbols(
-        p.document, p.drawing, {}, {.axes = fem::app::AxesShown::Selected, .axesOf = on({p.beam})});
+    const auto one = fem::app::buildSymbols(p.document, p.drawing, {},
+                                            {.axes = fem::app::AxesShown::Selected,
+                                             .axesOf = on({p.beam}),
+                                             .loadsShown = true,
+                                             .reactionForces = {},
+                                             .reactionMoments = {}});
     REQUIRE(one.axes.size() == 1);
     CHECK(one.axes.front().at == Vec3(2, 3, 0));
     CHECK((one.axes.front().axes.col(0) - Vec3::UnitX()).norm() <= 1e-12);
@@ -152,7 +162,11 @@ TEST_CASE("the symbols of a model on its mesh, for a combination", "[app][symbol
     mesh.drawingRevision = p.drawing.revision();
 
     const auto set = fem::app::buildSymbols(p.document, p.drawing, mesh,
-                                            {.axes = fem::app::AxesShown::All, .axesOf = {}});
+                                            {.axes = fem::app::AxesShown::All,
+                                             .axesOf = {},
+                                             .loadsShown = true,
+                                             .reactionForces = {},
+                                             .reactionMoments = {}});
     REQUIRE(set.supports.size() == 1);
     CHECK(set.supports.front().at == Vec3(0, 0, 0));
     REQUIRE(set.forces.size() == 1);
@@ -180,4 +194,52 @@ TEST_CASE("the symbols of a model on its mesh, for a combination", "[app][symbol
     const auto beforeMesh = fem::app::buildSymbols(d, p.drawing, {}, {});
     REQUIRE(beforeMesh.distributed.size() == 1);
     CHECK((beforeMesh.distributed.front().startValue - Vec3(0, -3, 0)).norm() <= 1e-12);
+}
+
+// REQ-012-03, 16: while a result is shown, the loads go, the supports stay,
+// and the reactions come in their sense, the arrows ending at the nodes.
+TEST_CASE("the symbols while a result is shown", "[app][symbols]")
+{
+    fem::setup::test::Frame frame;
+    fem::setup::test::Setup setup;
+    fem::setup::test::drawFrame(frame);
+    fem::setup::test::prepare(setup, frame);
+    const s::MeshContext mesh = fem::setup::test::meshOf(frame.drawing);
+    const auto outcome = s::runCase(setup.document, frame.drawing, mesh, setup.loadCase, {});
+    REQUIRE(outcome.result.has_value());
+    const s::AnalysisResult& result = outcome.result.value_or(s::AnalysisResult{});
+    const auto* solved = std::get_if<c::StaticResult>(&result.data);
+    REQUIRE(solved != nullptr);
+
+    const fem::app::ReactionSymbols reactions = fem::app::reactionSymbols(result);
+    // Three fixed bases of a 2D frame: Fx, Fy and Mz at each.
+    CHECK(reactions.forces.size() == 6);
+    CHECK(reactions.moments.size() == 3);
+    Vec3 sum = Vec3::Zero();
+    for (const auto& f : reactions.forces) {
+        sum += f.vector;
+        CHECK(std::abs(f.at.y()) == 0.0); // at the bases
+    }
+    Vec3 total = Vec3::Zero();
+    for (const c::NodeIndex node : result.supported) {
+        total += solved->reactions[static_cast<std::size_t>(node)];
+    }
+    CHECK((sum - total).norm() <= 1e-12 * total.norm());
+    CHECK((sum + solved->appliedForce).norm() <= 1e-9 * solved->appliedForce.norm());
+
+    fem::app::SymbolOptions options;
+    options.loadsShown = false;
+    options.reactionForces = reactions.forces;
+    options.reactionMoments = reactions.moments;
+    const auto shown = fem::app::buildSymbols(setup.document, frame.drawing, mesh, options);
+    CHECK(shown.supports.size() == 3);
+    CHECK(shown.forces.empty());
+    CHECK(shown.moments.empty());
+    CHECK(shown.distributed.empty());
+    CHECK(shown.reactionForces.size() == 6);
+    CHECK(shown.reactionMoments.size() == 3);
+    // Without the result: the load again, no reactions.
+    const auto model = fem::app::buildSymbols(setup.document, frame.drawing, mesh, {});
+    CHECK(model.forces.size() == 1);
+    CHECK(model.reactionForces.empty());
 }

@@ -1,10 +1,14 @@
 #include "symbol_builder.hpp"
 
+#include "result_display_settings.hpp"
+
 #include <fem/core/beam_element.hpp>
 #include <fem/core/dof_map.hpp>
 #include <fem/core/element_type.hpp>
 
 #include <algorithm>
+#include <cmath>
+#include <cstddef>
 #include <map>
 #include <set>
 #include <unordered_map>
@@ -383,8 +387,57 @@ render::SymbolSet onDrawing(const setup::Document& document, const geom::Drawing
 render::SymbolSet buildSymbols(const setup::Document& document, const geom::Drawing& drawing,
                                const setup::MeshContext& mesh, const SymbolOptions& options)
 {
-    return mesh.mesh ? onMesh(document, drawing, mesh, options)
-                     : onDrawing(document, drawing, options);
+    render::SymbolSet set = mesh.mesh ? onMesh(document, drawing, mesh, options)
+                                      : onDrawing(document, drawing, options);
+    if (!options.loadsShown) {
+        set.forces.clear();
+        set.moments.clear();
+        set.distributed.clear();
+    }
+    set.reactionForces = options.reactionForces;
+    set.reactionMoments = options.reactionMoments;
+    return set;
+}
+
+ReactionSymbols reactionSymbols(const setup::AnalysisResult& result)
+{
+    ReactionSymbols out;
+    const core::StaticResult* solved = staticOf(result);
+    if (solved == nullptr || !result.mesh) {
+        return out;
+    }
+    double largestForce = 0.0;
+    double largestMoment = 0.0;
+    for (const core::NodeIndex node : result.supported) {
+        const auto n = static_cast<std::size_t>(node);
+        if (n < solved->reactions.size()) {
+            largestForce = std::max(largestForce, solved->reactions[n].cwiseAbs().maxCoeff());
+        }
+        if (n < solved->reactionMoments.size()) {
+            largestMoment =
+                std::max(largestMoment, solved->reactionMoments[n].cwiseAbs().maxCoeff());
+        }
+    }
+    constexpr double kNegligible = 1e-9;
+    for (const core::NodeIndex node : result.supported) {
+        const auto n = static_cast<std::size_t>(node);
+        const Eigen::Vector3d at = result.mesh->nodeCoordinates(node);
+        for (int k = 0; k < 3; ++k) {
+            if (n < solved->reactions.size()) {
+                const double v = solved->reactions[n](k);
+                if (std::abs(v) > kNegligible * largestForce) {
+                    out.forces.push_back({.at = at, .vector = v * Eigen::Vector3d::Unit(k)});
+                }
+            }
+            if (n < solved->reactionMoments.size()) {
+                const double v = solved->reactionMoments[n](k);
+                if (std::abs(v) > kNegligible * largestMoment) {
+                    out.moments.push_back({.at = at, .axis = v * Eigen::Vector3d::Unit(k)});
+                }
+            }
+        }
+    }
+    return out;
 }
 
 } // namespace fem::app
