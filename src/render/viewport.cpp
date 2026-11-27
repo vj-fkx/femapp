@@ -633,7 +633,9 @@ void Viewport::render(QRhiCommandBuffer* commandBuffer)
                                          .previewVersion = m_impl->previewVersion},
                              .symbols = {.symbols = m_impl->symbols.get(),
                                          .version = m_impl->symbolsVersion,
-                                         .visible = m_impl->symbolsVisible}};
+                                         .visible = m_impl->symbolsVisible},
+                             .results = {},
+                             .resultsShown = false};
     if (!m_impl->renderer.render(commandBuffer, renderTarget(), params)) {
         tryNextBackend(m_impl->renderer.errorString());
         return;

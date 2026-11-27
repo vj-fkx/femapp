@@ -2,6 +2,7 @@
 
 #include "drawing_gpu.hpp"
 #include "mesh_gpu.hpp"
+#include "result_layer.hpp"
 #include "symbol_layer.hpp"
 
 #include <fem/render/camera.hpp>
@@ -34,6 +35,10 @@ struct FrameParams
     MeshFrame mesh;       // REQ-004-09: the mesh, if any
     DrawingFrame drawing; // REQ-005-33: the drawing, if any
     SymbolFrame symbols;  // REQ-010-22: supports, loads and local axes
+    // REQ-012-01: with `resultsShown` and a result scene, the result is
+    // drawn instead of the mesh.
+    ResultFrame results;
+    bool resultsShown = false;
 };
 
 // Owns the GPU resources of the viewport and draws a frame into any render
@@ -64,6 +69,12 @@ public:
 
     void release();
 
+    // For the tests (REQ-012-08, 13): the result buffers sent so far.
+    [[nodiscard]] ResultLayer::Uploads resultUploads() const noexcept
+    {
+        return m_results.uploads();
+    }
+
 private:
     [[nodiscard]] bool createGrid(QRhiRenderPassDescriptor* renderPass, int sampleCount,
                                   QRhiResourceUpdateBatch* updates);
@@ -79,6 +90,7 @@ private:
     MeshGpu m_mesh;
     DrawingGpu m_drawing;
     SymbolLayer m_symbols;
+    ResultLayer m_results;
     QString m_error;
     // Uploads of static data recorded by initialize(), submitted with the
     // first frame. Owned by the QRhi until then.

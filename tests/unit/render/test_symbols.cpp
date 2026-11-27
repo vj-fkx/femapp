@@ -203,7 +203,9 @@ TEST_CASE("the symbol pass draws with the Null backend", "[render][symbols]")
                  .showAxes = false,
                  .mesh = {},
                  .drawing = {},
-                 .symbols = {.symbols = symbols, .version = ++version, .visible = visible}});
+                 .symbols = {.symbols = symbols, .version = ++version, .visible = visible},
+                 .results = {},
+                 .resultsShown = false});
             INFO(renderer.errorString().toStdString());
             CHECK(rendered);
             CHECK(rhi->endOffscreenFrame() == QRhi::FrameOpSuccess);

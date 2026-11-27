@@ -75,7 +75,8 @@ bool SceneRenderer::initialize(QRhi* rhi, QRhiRenderPassDescriptor* renderPass, 
                          createLabels(renderPass, sampleCount, updates) &&
                          m_mesh.create(rhi, renderPass, sampleCount, &m_error) &&
                          m_drawing.create(rhi, renderPass, sampleCount, &m_error) &&
-                         m_symbols.create(rhi, renderPass, sampleCount, &m_error);
+                         m_symbols.create(rhi, renderPass, sampleCount, &m_error) &&
+                         m_results.create(rhi, renderPass, sampleCount, &m_error);
     if (!created) {
         updates->release();
         release();
@@ -393,7 +394,10 @@ bool SceneRenderer::render(QRhiCommandBuffer* commandBuffer, QRhiRenderTarget* t
         !m_drawing.prepare(updates, params.drawing, *params.camera, params.pixelSize,
                            params.devicePixelRatio, &m_error) ||
         !m_symbols.prepare(updates, params.symbols, *params.camera, params.pixelSize,
-                           params.devicePixelRatio, &m_error)) {
+                           params.devicePixelRatio, &m_error) ||
+        (params.resultsShown &&
+         !m_results.prepare(updates, params.results, *params.camera, params.pixelSize,
+                            params.devicePixelRatio, &m_error))) {
         updates->release();
         return false;
     }
@@ -404,7 +408,12 @@ bool SceneRenderer::render(QRhiCommandBuffer* commandBuffer, QRhiRenderTarget* t
 
     commandBuffer->beginPass(target, kBackgroundColor, {1.0F, 0}, updates);
 
-    m_mesh.draw(commandBuffer, sceneViewport, params.mesh.display);
+    // REQ-012-01: the result in place of the mesh.
+    if (params.resultsShown && params.results.scene != nullptr) {
+        m_results.draw(commandBuffer, sceneViewport);
+    } else {
+        m_mesh.draw(commandBuffer, sceneViewport, params.mesh.display);
+    }
 
     {
         commandBuffer->setGraphicsPipeline(m_gridPipeline.get());
@@ -449,6 +458,7 @@ void SceneRenderer::release()
     m_mesh.release();
     m_drawing.release();
     m_symbols.release();
+    m_results.release();
     if (m_pendingUpdates != nullptr) {
         m_pendingUpdates->release();
         m_pendingUpdates = nullptr;

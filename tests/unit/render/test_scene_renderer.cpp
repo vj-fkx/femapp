@@ -3,10 +3,14 @@
 #include "mesh_fixtures.hpp"
 #include "scene_renderer.hpp"
 
+#include <fem/core/mesh_builder.hpp>
+#include <fem/core/result_sampling.hpp>
 #include <fem/geom/commands.hpp>
 #include <fem/geom/drawing.hpp>
 #include <fem/render/camera.hpp>
 #include <fem/render/mesh_scene.hpp>
+#include <fem/render/result_display.hpp>
+#include <fem/render/result_scene.hpp>
 #include <fem/render/selection.hpp>
 
 #include <QGuiApplication>
@@ -113,7 +117,9 @@ TEST_CASE("scene renderer draws frames with the Null backend", "[render][rendere
                                    .showAxes = variant.showAxes,
                                    .mesh = {},
                                    .drawing = {},
-                                   .symbols = {}}));
+                                   .symbols = {},
+                                   .results = {},
+                                   .resultsShown = false}));
             CHECK(rhi->endOffscreenFrame() == QRhi::FrameOpSuccess);
             camera.orbit(40.0, 15.0);
         }
@@ -178,7 +184,9 @@ TEST_CASE("scene renderer draws frames with the Null backend", "[render][rendere
                                                        .showAxes = true,
                                                        .mesh = frame,
                                                        .drawing = {},
-                                                       .symbols = {}});
+                                                       .symbols = {},
+                                                       .results = {},
+                                                       .resultsShown = false});
                 INFO(renderer.errorString().toStdString());
                 CHECK(rendered);
                 CHECK(rhi->endOffscreenFrame() == QRhi::FrameOpSuccess);
@@ -221,7 +229,9 @@ TEST_CASE("scene renderer draws frames with the Null backend", "[render][rendere
                                                    .showAxes = true,
                                                    .mesh = {},
                                                    .drawing = drawingFrame,
-                                                   .symbols = {}});
+                                                   .symbols = {},
+                                                   .results = {},
+                                                   .resultsShown = false});
             INFO(renderer.errorString().toStdString());
             CHECK(rendered);
             CHECK(rhi->endOffscreenFrame() == QRhi::FrameOpSuccess);
@@ -233,4 +243,144 @@ TEST_CASE("scene renderer draws frames with the Null backend", "[render][rendere
         // It can be set up again after a release (e.g. a new QRhi).
         REQUIRE(renderer.initialize(rhi.get(), renderPass.get(), 1));
     }
+}
+
+namespace {
+
+// Two bars, (0, 0)-(2, 0) and (2, 0)-(2, 2), three samples each.
+std::shared_ptr<const fem::render::ResultScene> twoBarResult()
+{
+    using Vec = Eigen::Vector3d;
+    fem::core::MeshBuilder builder;
+    REQUIRE(builder.addNode(1, Vec(0, 0, 0)).has_value());
+    REQUIRE(builder.addNode(2, Vec(2, 0, 0)).has_value());
+    REQUIRE(builder.addNode(3, Vec(2, 2, 0)).has_value());
+    const std::vector<fem::core::ExternalId> a = {1, 2};
+    const std::vector<fem::core::ExternalId> b = {2, 3};
+    REQUIRE(builder.addElement(fem::core::ElementType::Line2, 1, a).has_value());
+    REQUIRE(builder.addElement(fem::core::ElementType::Line2, 2, b).has_value());
+    auto built = builder.build();
+    REQUIRE(built.has_value());
+    const auto mesh = std::make_shared<const fem::core::Mesh>(std::move(*built));
+    fem::core::ShapeSamples shape;
+    shape.bars = {{.element = 0, .first = 0, .count = 3}, {.element = 1, .first = 3, .count = 3}};
+    for (const double x : {0.0, 1.0, 2.0, 0.0, 1.0, 2.0}) {
+        shape.stations.push_back({.x = x, .side = fem::core::Side::After, .node = -1});
+    }
+    shape.positions = {Vec(0, 0, 0), Vec(1, 0, 0), Vec(2, 0, 0),
+                       Vec(2, 0, 0), Vec(2, 1, 0), Vec(2, 2, 0)};
+    shape.displacements.assign(6, Vec(0.0, -0.01, 0.0));
+    shape.bounds = {.min = Vec(0, 0, 0), .max = Vec(2, 2, 0), .empty = false};
+    return fem::render::buildResultScene(shape, mesh);
+}
+
+} // namespace
+
+// REQ-012-05, 07, 08, 09, 12, 13, NFR-012-03: the result pass records
+// frames with the Null backend; the scale, the range and the bands are
+// uniforms, so they send nothing; new values send only the values.
+TEST_CASE("the result pass draws with the Null backend", "[render][renderer][result]")
+{
+    ensureGuiApplication();
+    QRhiNullInitParams initParams;
+    const std::unique_ptr<QRhi> rhi(QRhi::create(QRhi::Null, &initParams));
+    REQUIRE(rhi != nullptr);
+    const QSize size(320, 240);
+    const std::unique_ptr<QRhiTexture> color(
+        rhi->newTexture(QRhiTexture::RGBA8, size, 1, QRhiTexture::RenderTarget));
+    REQUIRE(color->create());
+    const std::unique_ptr<QRhiRenderBuffer> depth(
+        rhi->newRenderBuffer(QRhiRenderBuffer::DepthStencil, size, 1));
+    REQUIRE(depth->create());
+    const std::unique_ptr<QRhiTextureRenderTarget> target(rhi->newTextureRenderTarget(
+        QRhiTextureRenderTargetDescription(QRhiColorAttachment(color.get()), depth.get())));
+    const std::unique_ptr<QRhiRenderPassDescriptor> renderPass(
+        target->newCompatibleRenderPassDescriptor());
+    target->setRenderPassDescriptor(renderPass.get());
+    REQUIRE(target->create());
+
+    fem::render::Camera camera;
+    camera.setViewportSize(size.width(), size.height());
+    fem::render::SceneRenderer renderer;
+    const bool initialized = renderer.initialize(rhi.get(), renderPass.get(), 1);
+    INFO(renderer.errorString().toStdString());
+    REQUIRE(initialized);
+
+    const auto scene = twoBarResult();
+    REQUIRE(scene->segmentStarts().size() == 4);
+    const std::vector<float> first = {0, 1, 1, 2, 2, 3, 3, 4};
+    const std::vector<float> second = {4, 3, 3, 2, 2, 1, 1, 0};
+    fem::render::Selection selection;
+    fem::render::SelectionItems items;
+    items[fem::render::SelectionKind::Element] = {1};
+    items[fem::render::SelectionKind::Node] = {2};
+    selection.add(items);
+
+    const auto frame = [&](const fem::render::ResultDisplay& display,
+                           const std::vector<float>* values, std::uint64_t valueVersion,
+                           bool shown) {
+        QRhiCommandBuffer* commandBuffer = nullptr;
+        REQUIRE(rhi->beginOffscreenFrame(&commandBuffer) == QRhi::FrameOpSuccess);
+        const bool rendered = renderer.render(commandBuffer, target.get(),
+                                              {.camera = &camera,
+                                               .pixelSize = size,
+                                               .devicePixelRatio = 1.0,
+                                               .showGrid = true,
+                                               .showAxes = false,
+                                               .mesh = {},
+                                               .drawing = {},
+                                               .symbols = {},
+                                               .results = {.scene = scene.get(),
+                                                           .sceneVersion = 1,
+                                                           .values = values,
+                                                           .valueVersion = valueVersion,
+                                                           .selection = &selection,
+                                                           .selectionVersion = 1,
+                                                           .highlight = true,
+                                                           .display = display,
+                                                           .scale = display.scale},
+                                               .resultsShown = shown});
+        INFO(renderer.errorString().toStdString());
+        CHECK(rendered);
+        CHECK(rhi->endOffscreenFrame() == QRhi::FrameOpSuccess);
+    };
+
+    fem::render::ResultDisplay display;
+    display.min = 0.0;
+    display.max = 4.0;
+    frame(display, &first, 1, true);
+    const auto sent = renderer.resultUploads();
+    CHECK(sent.geometry == 1);
+    CHECK(sent.values == 1);
+    CHECK(sent.flags == 1);
+
+    // REQ-012-07, 08, 12: the original under the deformed shape, another
+    // scale, bands, a fixed range, no colors: nothing sent again.
+    display.original = true;
+    display.scale = 50.0;
+    frame(display, &first, 1, true);
+    display.bands = 5;
+    display.min = 1.0;
+    display.max = 3.0;
+    frame(display, &first, 1, true);
+    display.colored = false;
+    display.deformed = false;
+    frame(display, &first, 1, true);
+    CHECK(renderer.resultUploads().geometry == 1);
+    CHECK(renderer.resultUploads().values == 1);
+    CHECK(renderer.resultUploads().flags == 1);
+
+    // REQ-012-13: another quantity sends the values only.
+    display.colored = true;
+    frame(display, &second, 2, true);
+    CHECK(renderer.resultUploads().geometry == 1);
+    CHECK(renderer.resultUploads().values == 2);
+    CHECK(renderer.resultUploads().flags == 1);
+
+    // Hidden: the mesh pass instead, and the result kept for later.
+    frame(display, &second, 2, false);
+    frame(display, &second, 2, true);
+    CHECK(renderer.resultUploads().geometry == 1);
+    CHECK(renderer.resultUploads().values == 2);
+    renderer.release();
 }

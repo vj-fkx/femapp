@@ -18,6 +18,8 @@ femapp_add_module(render
         mesh_picker.cpp
         pick_util.hpp
         mesh_scene.cpp
+        result_layer.cpp
+        result_layer.hpp
         result_picker.cpp
         result_scene.cpp
         rhi_util.cpp
@@ -66,5 +68,9 @@ qt_add_shaders(fem_render "fem_render_shaders"
         shaders/mesh_point.vert
         shaders/mesh_point.frag
         shaders/mesh_segment.vert
+        shaders/result_line.vert
+        shaders/result_line.frag
+        shaders/result_point.vert
+        shaders/result_point.frag
         shaders/symbol.vert
         shaders/symbol.frag)

@@ -141,7 +141,7 @@ Regras:
 
 ## Fase 3 — `render` na GPU e no viewport
 
-- [ ] **T09** A camada de resultados (design §5.5):
+- [x] **T09** A camada de resultados (design §5.5):
   - `ResultDisplay`, `ResultLayer` e os shaders `result_line.vert`,
     `result_line.frag` e `result_point.vert`:
     - os buffers de geometria, valores e bandeiras;
@@ -158,6 +158,11 @@ Regras:
   `scene_renderer.hpp/.cpp`, `render/CMakeLists.txt`,
   `tests/unit/render/test_scene_renderer.cpp`. Cobre: 05, 07, 08, 09,
   12, 13, N03.
+  *Feito:* dois blocos de uniformes (a forma original e a colorida), um
+  `result_point.frag` para os nós realçados, e o `ResultFrame` no
+  `FrameParams` (o viewport passa a preenchê-lo na T10). O backend `Null`
+  confere a gravação dos quadros, não o desenho; as cores na tela ficam
+  para o roteiro T19.
 - [ ] **T10** O viewport:
   - `setResultScene`, `setResultValues`, `setResultDisplay`,
     `setResultsShown`, `resultsShown`;
