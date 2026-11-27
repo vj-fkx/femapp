@@ -12,6 +12,8 @@
 #include "model_dialogs.hpp"
 #include "model_tree.hpp"
 #include "property_panel.hpp"
+#include "result_display_bar.hpp"
+#include "result_view.hpp"
 #include "results_panel.hpp"
 #include "section_geometry.hpp"
 
@@ -38,6 +40,7 @@
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QMimeData>
+#include <QPointer>
 #include <QProgressBar>
 #include <QSignalBlocker>
 #include <QStatusBar>
@@ -49,6 +52,8 @@
 #include <QTreeView>
 #include <QUndoStack>
 #include <QUrl>
+#include <QVBoxLayout>
+#include <QWidget>
 
 #include <algorithm>
 #include <array>
@@ -307,6 +312,18 @@ void MainWindow::createViewMenu()
     axes->setChecked(m_viewport->isAxesVisible());
     connect(axes, &QAction::toggled, m_viewport, &render::Viewport::setAxesVisible);
     m_viewActions.append(axes);
+
+    // REQ-012-01: the result in place of the mesh.
+    viewMenu->addSeparator();
+    m_showResultsAction = viewMenu->addAction(tr("Show &Results in Viewport"));
+    m_showResultsAction->setCheckable(true);
+    m_showResultsAction->setEnabled(m_resultView != nullptr && m_resultView->isAvailable());
+    connect(m_showResultsAction, &QAction::toggled, this, [this](bool on) {
+        if (m_resultView != nullptr) {
+            m_resultView->setShown(on);
+        }
+    });
+    m_viewActions.append(m_showResultsAction);
 }
 
 void MainWindow::createEditMenu()
@@ -460,13 +477,21 @@ void MainWindow::createModelUi()
     // NOLINTBEGIN(cppcoreguidelines-owning-memory): owned by their Qt parents.
     m_results = new ResultsPanel(m_model, this);
     m_resultsDock = new QDockWidget(tr("Results"), this);
+    // Feature 012: the options of the display at the top of the dock.
+    auto* resultsPage = new QWidget(this);
+    auto* resultsLayout = new QVBoxLayout(resultsPage);
+    m_resultBar = new ResultDisplayBar(resultsPage);
     // NOLINTEND(cppcoreguidelines-owning-memory)
+    resultsLayout->setContentsMargins(0, 0, 0, 0);
+    resultsLayout->addWidget(m_resultBar);
+    resultsLayout->addWidget(m_results, 1);
     m_resultsDock->setObjectName(QStringLiteral("results"));
-    m_resultsDock->setWidget(m_results);
+    m_resultsDock->setWidget(resultsPage);
     addDockWidget(Qt::RightDockWidgetArea, m_resultsDock);
     tabifyDockWidget(properties, m_resultsDock);
     properties->raise();
     connect(m_results, &ResultsPanel::idsRequested, this, &MainWindow::highlightIds);
+    createResultDisplay();
     // REQ-010-02: the unit system always in sight.
     statusBar()->addPermanentWidget(m_units);
     connect(m_model, &ModelController::documentChanged, this, &MainWindow::showUnits);
@@ -807,10 +832,94 @@ void MainWindow::highlightIds(const NamedIds& ids)
     }
 }
 
+// Defined here, where ResultSink is complete.
+MainWindow::~MainWindow() = default;
+
+void MainWindow::createResultDisplay()
+{
+    // The viewport may go (no graphics backend): the sink then does nothing.
+    class ViewportSink : public ResultSink
+    {
+    public:
+        explicit ViewportSink(render::Viewport* viewport)
+            : m_viewport(viewport)
+        {}
+        void setResultScene(std::shared_ptr<const render::ResultScene> scene,
+                            std::shared_ptr<const std::vector<float>> values) override
+        {
+            if (m_viewport) {
+                m_viewport->setResultScene(std::move(scene), std::move(values));
+            }
+        }
+        void setResultValues(std::shared_ptr<const std::vector<float>> values) override
+        {
+            if (m_viewport) {
+                m_viewport->setResultValues(std::move(values));
+            }
+        }
+        void setResultDisplay(const render::ResultDisplay& display) override
+        {
+            if (m_viewport) {
+                m_viewport->setResultDisplay(display);
+            }
+        }
+        void setResultAnnotations(render::ResultAnnotations annotations) override
+        {
+            if (m_viewport) {
+                m_viewport->setResultAnnotations(std::move(annotations));
+            }
+        }
+        void setResultsShown(bool shown) override
+        {
+            if (m_viewport) {
+                m_viewport->setResultsShown(shown);
+            }
+        }
+
+    private:
+        QPointer<render::Viewport> m_viewport;
+    };
+
+    m_resultSink = std::make_unique<ViewportSink>(m_viewport);
+    // NOLINTNEXTLINE(cppcoreguidelines-owning-memory): owned by this window.
+    m_resultView = new ResultView(m_model, m_resultSink.get(), this);
+    m_resultBar->setSettings(m_resultView->settings());
+    connect(m_resultBar, &ResultDisplayBar::settingsChanged, m_resultView,
+            &ResultView::setSettings);
+    connect(m_resultBar, &ResultDisplayBar::shownRequested, m_resultView, &ResultView::setShown);
+    connect(m_resultView, &ResultView::shownChanged, this, [this](bool shown) {
+        m_resultBar->setShownState(shown);
+        if (m_showResultsAction != nullptr) {
+            const QSignalBlocker block(m_showResultsAction);
+            m_showResultsAction->setChecked(shown);
+        }
+    });
+    connect(m_resultView, &ResultView::availabilityChanged, this, [this](bool available) {
+        m_resultBar->setAvailable(available);
+        if (m_showResultsAction != nullptr) {
+            m_showResultsAction->setEnabled(available && m_viewport != nullptr);
+        }
+    });
+    // REQ-012-04: the result chosen in the dock, and the quantities it offers.
+    connect(m_results, &ResultsPanel::resultChosen, this, [this](setup::ItemId item, int mode) {
+        if (const setup::AnalysisResult* result = m_model->results().find(item)) {
+            m_resultBar->setQuantities(quantitiesOf(*result));
+        }
+        m_resultView->showResult(item, mode);
+    });
+    // REQ-012-18: the point clicked on the result.
+    connect(m_viewport, &render::Viewport::resultPicked, this,
+            [this](const render::ResultPick& pick) { m_resultView->setQuery(pick); });
+    connect(m_viewport, &render::Viewport::resultPickMissed, this,
+            [this] { m_resultView->setQuery(std::nullopt); });
+}
+
 void MainWindow::showLocalAxes(AxesShown shown)
 {
-    SymbolOptions options;
+    // The rest of the options (the display of a result) stays.
+    SymbolOptions options = m_model->symbolOptions();
     options.axes = shown;
+    options.axesOf = {};
     if (shown == AxesShown::Selected) {
         options.axesOf = selectedTargets();
     }

@@ -110,6 +110,7 @@ void ResultView::setShown(bool shown)
     m_shown = shown;
     m_sink->setResultsShown(shown);
     updateSymbols();
+    emit shownChanged(shown);
     if (shown) {
         const setup::AnalysisResult* result = chosen();
         const bool same = m_prepared && result != nullptr && m_prepared->mode == m_mode &&

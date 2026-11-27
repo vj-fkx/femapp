@@ -39,6 +39,9 @@ namespace fem::app {
 
 class AnalysisJob;
 class ResultsPanel;
+class ResultDisplayBar;
+class ResultSink;
+class ResultView;
 class CommandLineWidget;
 class DraftingController;
 class ModelController;
@@ -53,6 +56,11 @@ class MainWindow : public QMainWindow
 
 public:
     explicit MainWindow(QWidget* parent = nullptr);
+    ~MainWindow() override;
+    MainWindow(const MainWindow&) = delete;
+    MainWindow& operator=(const MainWindow&) = delete;
+    MainWindow(MainWindow&&) = delete;
+    MainWindow& operator=(MainWindow&&) = delete;
 
     // False when no graphics backend could be initialized and the window shows
     // a message in place of the 3D viewport.
@@ -107,6 +115,7 @@ private:
     // REQ-010-16: a load in the active load case.
     void addLoad(LoadKind kind, const QString& title);
     // REQ-010-09: the local axes shown, of the selection or of all.
+    void createResultDisplay();
     void showLocalAxes(AxesShown shown);
     // REQ-010-21: the check of the model in its dock, and what a problem of
     // the core names shown in the mesh.
@@ -160,6 +169,11 @@ private:
     QAction* m_cancelAnalysisAction = nullptr;
     ResultsPanel* m_results = nullptr; // REQ-011-14
     QDockWidget* m_resultsDock = nullptr;
+    // Feature 012: the display of a result in the viewport.
+    ResultDisplayBar* m_resultBar = nullptr;
+    std::unique_ptr<ResultSink> m_resultSink;
+    ResultView* m_resultView = nullptr;
+    QAction* m_showResultsAction = nullptr;
     std::vector<setup::ItemId> m_runItems;
     std::size_t m_runIndex = 0;
     int m_runAnalysed = 0;

@@ -280,7 +280,7 @@ Regras:
   trocam por uma falsa. O trabalho da thread é `prepareResult` ou
   `revalueResult`, sobre uma cópia do resultado. Um pedido feito durante um
   trabalho espera o fim dele; o trabalho de um pedido antigo é descartado.
-- [ ] **T17** A interface:
+- [x] **T17** A interface:
   - a `ResultDisplayBar` no dock Results: a grandeza (com "None"), a
     escala (campo, Auto, Real), deformada, original, faixas (contínuo ou
     N), faixa fixada (min e max), reações, extremos, tocar e pausar, e a
@@ -292,6 +292,12 @@ Regras:
   Arquivos: `app/result_display_bar.hpp/.cpp`, `main_window.hpp/.cpp`,
   `results_panel.cpp`, `tests/unit/app/test_result_view.cpp`. Cobre: 01,
   06, 07, 11, 12, 15, 16, 17.
+  *Feito:* a barra tem também "Show in viewport", que liga e desliga a
+  exibição junto com o menu. O teste da barra está num executável novo,
+  `test_app_widgets` (Qt Widgets, plataforma offscreen), porque o
+  `test_app` não liga widgets. A `MainWindow` liga o `ResultView` ao
+  `Viewport` por um adaptador (`ResultSink`), e `showLocalAxes` passou a
+  manter o resto das `SymbolOptions`.
 - [ ] **T18** O benchmark da preparação:
   - o `ResultView` com o pórtico do `bench_line_mesh` em Release: o maior
     intervalo do laço de eventos ≤ 100 ms e a preparação ≤ 2 s;

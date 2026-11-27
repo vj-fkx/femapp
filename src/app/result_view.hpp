@@ -101,6 +101,7 @@ public:
 
 signals:
     void availabilityChanged(bool available);
+    void shownChanged(bool shown);
     // The scene or the values of the last request are with the viewport.
     void ready();
 

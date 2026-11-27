@@ -260,6 +260,20 @@ target_link_libraries(test_app PRIVATE fem::mesher fem::render fem::setup Qt6::G
 femapp_set_warnings(test_app)
 catch_discover_tests(test_app DISCOVERY_MODE PRE_TEST)
 
+# Feature 012: the widgets of the app, on the offscreen platform.
+add_executable(test_app_widgets
+    unit/app_widgets/test_result_display_bar.cpp
+    "${PROJECT_SOURCE_DIR}/src/app/result_display_bar.cpp"
+    "${PROJECT_SOURCE_DIR}/src/app/result_display_bar.hpp"
+    "${PROJECT_SOURCE_DIR}/src/app/result_display_settings.cpp")
+set_target_properties(test_app_widgets PROPERTIES AUTOMOC ON)
+target_include_directories(test_app_widgets PRIVATE "${PROJECT_SOURCE_DIR}/src/app")
+target_compile_features(test_app_widgets PRIVATE cxx_std_20)
+target_link_libraries(test_app_widgets PRIVATE fem::render fem::setup Qt6::Widgets
+                                               Catch2::Catch2WithMain)
+femapp_set_warnings(test_app_widgets)
+catch_discover_tests(test_app_widgets DISCOVERY_MODE PRE_TEST)
+
 # REQ-004-31: the viewport shows a real mesh, here with the Null backend.
 add_test(NAME femapp_smoke_mesh
     COMMAND femapp --smoke-test "${PROJECT_SOURCE_DIR}/tests/data/gmsh/box_tet4.msh")
