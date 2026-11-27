@@ -1,11 +1,14 @@
-// Feature 012 (design §5.5): the scene of a result, ready for the GPU.
+// Feature 012 (design Â§5.5): the scene of a result, ready for the GPU.
 
 #include <fem/core/mesh_builder.hpp>
+#include <fem/render/camera.hpp>
+#include <fem/render/result_picker.hpp>
 #include <fem/render/result_scene.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
 #include <Eigen/Core>
+#include <Eigen/Geometry>
 #include <cmath>
 #include <cstdint>
 #include <memory>
@@ -118,4 +121,89 @@ TEST_CASE("the scene of an empty result", "[render][result]")
     CHECK(scene->segmentStarts().empty());
     CHECK(scene->nodeSamples().empty());
     CHECK(scene->gpuBytes() == 0);
+}
+
+namespace {
+
+constexpr int kWidth = 800;
+constexpr int kHeight = 600;
+
+// Looking down on the XY plane, the bars filling the view.
+fem::render::Camera topCamera()
+{
+    fem::render::Camera camera;
+    camera.setViewportSize(kWidth, kHeight);
+    camera.setProjection(fem::render::Projection::Orthographic);
+    camera.setStandardView(fem::render::StandardView::Top);
+    camera.fit({.min = Vec(-0.5, -0.5, 0), .max = Vec(2.5, 2.5, 0)});
+    return camera;
+}
+
+fem::render::Vec2 toPixel(const fem::render::Camera& camera, const Vec& world)
+{
+    const Eigen::Vector4d clip =
+        camera.projectionMatrix() * camera.viewMatrix() * world.homogeneous();
+    return {(clip.x() / clip.w() + 1.0) * 0.5 * kWidth,
+            (1.0 - clip.y() / clip.w()) * 0.5 * kHeight};
+}
+
+} // namespace
+
+// REQ-012-18: a click on the shape drawn gives the bar and the point of it,
+// or the node.
+TEST_CASE("a click on the shape of a result", "[render][result]")
+{
+    const auto scene = fem::render::buildResultScene(samples(), twoBars());
+    const fem::render::Camera camera = topCamera();
+    SECTION("the original shape: the bar and x along the segment")
+    {
+        const auto pick =
+            fem::render::pickResult(*scene, 0.0, camera, toPixel(camera, Vec(1.5, 0.0, 0.0)));
+        REQUIRE(pick.has_value());
+        const fem::render::ResultPick hit = pick.value_or(fem::render::ResultPick{});
+        CHECK(hit.element == 0);
+        CHECK(hit.node == -1);
+        CHECK(std::abs(hit.station.x - 1.5) <= 1e-6 * 1.5);
+        CHECK(hit.station.node == -1);
+    }
+    SECTION("the deformed shape: where it is drawn, not where the bar was")
+    {
+        // Samples 2 and 3 moved by 10 x (0, -0.02) and 10 x (0, -0.03).
+        const auto pick =
+            fem::render::pickResult(*scene, 10.0, camera, toPixel(camera, Vec(1.5, -0.25, 0.0)));
+        REQUIRE(pick.has_value());
+        const fem::render::ResultPick hit = pick.value_or(fem::render::ResultPick{});
+        CHECK(hit.element == 0);
+        CHECK(std::abs(hit.station.x - 1.5) <= 1e-6 * 1.5);
+        CHECK_FALSE(
+            fem::render::pickResult(*scene, 10.0, camera, toPixel(camera, Vec(1.5, 0.0, 0.0)))
+                .has_value());
+    }
+    SECTION("a node within the tolerance wins over the segments")
+    {
+        const auto pick = fem::render::pickResult(
+            *scene, 0.0, camera, toPixel(camera, Vec(2.0, 0.0, 0.0)) + fem::render::Vec2(3, 2));
+        REQUIRE(pick.has_value());
+        const fem::render::ResultPick hit = pick.value_or(fem::render::ResultPick{});
+        CHECK(hit.node == 1);
+        CHECK(hit.element == 0);
+        CHECK(hit.station.x == 2.0);
+    }
+    SECTION("the second bar, through its rigid link")
+    {
+        const auto pick =
+            fem::render::pickResult(*scene, 0.0, camera, toPixel(camera, Vec(2.0, 1.0, 0.0)));
+        REQUIRE(pick.has_value());
+        const fem::render::ResultPick hit = pick.value_or(fem::render::ResultPick{});
+        CHECK(hit.element == 1);
+        CHECK(hit.node == -1);
+        // From 0 at (2, 0.1) to 2 at (2, 2).
+        CHECK(std::abs(hit.station.x - 2.0 * 0.9 / 1.9) <= 1e-6);
+    }
+    SECTION("far from everything: nothing")
+    {
+        CHECK_FALSE(
+            fem::render::pickResult(*scene, 0.0, camera, toPixel(camera, Vec(0.5, 1.5, 0.0)))
+                .has_value());
+    }
 }

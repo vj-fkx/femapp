@@ -117,7 +117,7 @@ Regras:
   *Feito:* 60 bytes por segmento (`kSegmentGpuBytes`). O nó de cada ponta
   de barra aponta a primeira amostra nele, e a amostra do nó de uma
   ligação rígida é a ponta da barra.
-- [ ] **T07** O clique sobre a forma desenhada:
+- [x] **T07** O clique sobre a forma desenhada:
   - testes primeiro: um clique no meio de um segmento deformado dá a
     barra e o x interpolado (1e−6 relativo); com escala 0, a forma
     original; um nó dentro da tolerância ganha do segmento; um clique
@@ -125,6 +125,9 @@ Regras:
   - depois `ResultPick` e `pickResult`.
   Arquivos: `render/include/fem/render/result_picker.hpp`,
   `result_picker.cpp`, `test_result_scene.cpp`. Cobre: 18.
+  *Feito:* o nó devolve também a barra da sua amostra e a estação dela; o
+  clique numa ligação rígida dá o x da ponta flexível (0 ou o
+  comprimento).
 - [ ] **T08** [P] As reações nos símbolos:
   - testes primeiro: `instancesOf` gera as setas e os arcos de
     `reactionForces` e `reactionMoments` na cor das reações, com a seta
