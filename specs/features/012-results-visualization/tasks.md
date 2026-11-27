@@ -259,7 +259,7 @@ Regras:
   `buildSymbols` as aplica no fim. O `ModelController` não mudou: ele já
   repassa as `SymbolOptions` (`setSymbolOptions`), que o `ResultView` (T16)
   vai preencher.
-- [ ] **T16** O `ResultView` (design §6):
+- [x] **T16** O `ResultView` (design §6):
   - o trabalho na `QThread` (forma, grandeza, cena e valores), com
     gerações e um trabalho por vez;
   - a ligação com o viewport e com os símbolos;
@@ -275,6 +275,11 @@ Regras:
     - um pedido velho que chega depois de um novo é descartado.
   Arquivos: `app/result_view.hpp/.cpp`,
   `tests/unit/app/test_result_view.cpp`. Cobre: 01, 02, 04, 08, 13.
+  *Feito:* o `ResultView` fala com o viewport por uma interface pequena
+  (`ResultSink`), que a `MainWindow` liga ao `Viewport` na T17 e os testes
+  trocam por uma falsa. O trabalho da thread é `prepareResult` ou
+  `revalueResult`, sobre uma cópia do resultado. Um pedido feito durante um
+  trabalho espera o fim dele; o trabalho de um pedido antigo é descartado.
 - [ ] **T17** A interface:
   - a `ResultDisplayBar` no dock Results: a grandeza (com "None"), a
     escala (campo, Auto, Real), deformada, original, faixas (contínuo ou
