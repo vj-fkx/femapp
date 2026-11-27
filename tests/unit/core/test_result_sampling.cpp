@@ -560,3 +560,81 @@ TEST_CASE("the value at a point of a bar", "[core][result][sampling]")
         fields, 5, fem::core::Station{.x = 0.0, .side = fem::core::Side::After, .node = -1},
         ResultQuantity::Ux)));
 }
+
+// REQ-012-06, AC-1: the automatic factor makes the largest displacement 10%
+// of the largest side of the bars.
+TEST_CASE("the automatic scale factor", "[core][result][sampling]")
+{
+    const fem::core::StaticResult result = fem::core::test::solve(simpleBeam());
+    const fem::core::ShapeSamples shape =
+        fem::core::sampleShape(fem::core::fieldsOf(result), {.perBeam = 9, .threads = 0});
+    const double largest = shape.displacements[4].norm(); // the middle
+    const double factor = fem::core::autoScale(shape);
+    CHECK(std::abs(factor - 0.1 * kSpan / largest) <= 1e-12 * factor);
+    CHECK(std::abs(factor * largest - 0.1 * kSpan) <= 1e-12 * kSpan);
+
+    fem::core::ShapeSamples still;
+    still.positions = {Vec(0, 0, 0), Vec(2, 0, 0)};
+    still.displacements = {Vec::Zero(), Vec::Zero()};
+    still.bounds = {.min = Vec(0, 0, 0), .max = Vec(2, 0, 0), .empty = false};
+    CHECK(fem::core::autoScale(still) == 1.0);
+    still.displacements[1] = Vec(0, 1e-3, 0);
+    CHECK(std::abs(fem::core::autoScale(still) - 200.0) <= 1e-12 * 200.0);
+    CHECK(fem::core::autoScale(fem::core::ShapeSamples{}) == 1.0);
+}
+
+// NFR-012-02: the samples are the same with one thread and with all.
+TEST_CASE("the samples do not depend on the threads", "[core][result][sampling]")
+{
+    using namespace fem::core::test;
+    // A frame of 40 bays: columns and beams, a load on every beam.
+    TrussSpec spec{.nodes = {}, .bars = {}, .lineGroups = {}, .pointGroups = {}};
+    constexpr int kBays = 40;
+    for (int i = 0; i <= kBays; ++i) {
+        spec.nodes.emplace_back(3.0 * i, 0.0, 0.0);
+        spec.nodes.emplace_back(3.0 * i, 4.0, 0.0);
+    }
+    for (int i = 0; i <= kBays; ++i) {
+        spec.bars.push_back({2 * i, 2 * i + 1});
+        if (i < kBays) {
+            spec.bars.push_back({2 * i + 1, 2 * i + 3});
+        }
+    }
+    fem::core::Model model = beamModel(spec, ElementKind::Beam2D);
+    for (int i = 0; i <= kBays; ++i) {
+        fixAll(model, {static_cast<fem::core::ExternalId>(2 * i + 1)}, ElementKind::Beam2D);
+    }
+    fem::core::ElementIds beams;
+    for (std::size_t j = 0; j < spec.bars.size(); ++j) {
+        if (j % 2 == 1) {
+            beams.ids.push_back(static_cast<fem::core::ExternalId>(j) + 1);
+        }
+    }
+    model.distributedLoads.push_back(
+        {.elements = beams, .startValue = Vec(0, -kQ, 0), .endValue = Vec(0, -kQ, 0)});
+    model.concentratedLoads.push_back(
+        {.elements = beams, .force = Vec(1e3, -2e3, 0), .at = {.value = 0.3, .fraction = true}});
+    model.nodalForces.push_back({.nodes = fem::core::NodeIds{{2}}, .force = Vec(5e3, 0, 0)});
+    const fem::core::StaticResult result = solve(model);
+    const fem::core::ResultFields fields = fem::core::fieldsOf(result);
+    const fem::core::ShapeSamples one =
+        fem::core::sampleShape(fields, {.perBeam = 0, .threads = 1});
+    const fem::core::ShapeSamples all =
+        fem::core::sampleShape(fields, {.perBeam = 0, .threads = 0});
+    REQUIRE(one.positions.size() == all.positions.size());
+    CHECK(one.positions == all.positions);
+    CHECK(one.displacements == all.displacements);
+    REQUIRE(one.bars.size() == all.bars.size());
+    for (std::size_t b = 0; b < one.bars.size(); ++b) {
+        CHECK(one.bars[b].first == all.bars[b].first);
+        CHECK(one.bars[b].count == all.bars[b].count);
+    }
+    for (const auto quantity :
+         {fem::core::ResultQuantity::UMagnitude, fem::core::ResultQuantity::Mz}) {
+        const fem::core::FieldSamples a = fem::core::sampleField(fields, one, quantity, 1);
+        const fem::core::FieldSamples b = fem::core::sampleField(fields, all, quantity, 0);
+        CHECK(a.values == b.values);
+        CHECK(a.max.sample == b.max.sample);
+        CHECK(a.min.sample == b.min.sample);
+    }
+}

@@ -138,4 +138,10 @@ struct FieldSamples
 [[nodiscard]] Eigen::Vector3d displacementAt(const ResultFields& fields, ElementIndex element,
                                              const Station& at);
 
+// REQ-012-06: the factor that makes the largest displacement of the samples
+// kAutoScaleFraction of the largest side of their bounds; 1 when nothing
+// moves or there is no size.
+inline constexpr double kAutoScaleFraction = 0.1;
+[[nodiscard]] double autoScale(const ShapeSamples& shape) noexcept;
+
 } // namespace fem::core

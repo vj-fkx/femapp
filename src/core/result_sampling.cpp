@@ -370,4 +370,20 @@ Eigen::Vector3d displacementAt(const ResultFields& fields, ElementIndex element,
     return motionAt(fields, e, at).displacement;
 }
 
+double autoScale(const ShapeSamples& shape) noexcept
+{
+    double largest = 0.0;
+    for (const Eigen::Vector3d& d : shape.displacements) {
+        const double size = d.norm();
+        if (std::isfinite(size)) {
+            largest = std::max(largest, size);
+        }
+    }
+    const double side = shape.bounds.empty ? 0.0 : (shape.bounds.max - shape.bounds.min).maxCoeff();
+    if (!(largest > 0.0) || !(side > 0.0)) {
+        return 1.0;
+    }
+    return kAutoScaleFraction * side / largest;
+}
+
 } // namespace fem::core

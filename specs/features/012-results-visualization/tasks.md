@@ -79,13 +79,15 @@ Regras:
   *Feito:* sem valor (os esforços de um modo, um elemento que não é
   barra), `valueAt` dá NaN. Na treliça, a consulta interpola os nós
   linearmente.
-- [ ] **T04** [P] O fator automático e o determinismo:
+- [x] **T04** [P] O fator automático e o determinismo:
   - testes primeiro: `autoScale` = 10% da maior dimensão sobre o maior
     deslocamento, em 1e−12; 1 sem deslocamento; a mesma `sampleShape` e
     a mesma `sampleField` com 1 thread e com todas, bit a bit;
   - depois `kAutoScaleFraction` e `autoScale`.
   Arquivos: `result_sampling.hpp/.cpp`, `test_result_sampling.cpp`.
   Cobre: 06, N02.
+  *Feito:* o determinismo é conferido num pórtico de 40 vãos, com
+  cargas distribuídas e concentradas, na forma e nos valores.
 
 ## Fase 2 — `render` sem GPU
 
