@@ -91,7 +91,7 @@ Regras:
 
 ## Fase 2 — `render` sem GPU
 
-- [ ] **T05** A escala de cores (design §5.5):
+- [x] **T05** A escala de cores (design §5.5):
   - testes primeiro: as cores das pontas e do meio; com N faixas, há
     exatamente N cores; um valor no limite cai na faixa de cima, e o
     máximo na última; fora da faixa, as cores das pontas (AC-3); a
@@ -100,6 +100,8 @@ Regras:
   Arquivos: `render/include/fem/render/colormap.hpp`, `colormap.cpp`,
   `render/CMakeLists.txt`, `tests/unit/render/test_colormap.cpp`,
   `tests/CMakeLists.txt`. Cobre: 11, 12.
+  *Feito:* `noValueColor()` (a cor 1D da 004) para os valores que não são
+  finitos, e faixa vazia (min = max) dá a cor do mínimo.
 - [ ] **T06** [P] A cena de resultados:
   - testes primeiro:
     - o número de segmentos; os segmentos de comprimento zero (os dois

@@ -8,6 +8,7 @@ femapp_add_module(render
         axis_labels.hpp
         backend.cpp
         camera.cpp
+        colormap.cpp
         drawing_gpu.cpp
         drawing_gpu.hpp
         drawing_picker.cpp
