@@ -183,7 +183,7 @@ Regras:
   há teste de widget do viewport (o `test_render` só tem
   `QGuiApplication`): a alternância dos passes é a do teste do renderer
   (T09), e o resto fica para o roteiro T19.
-- [ ] **T11** A sobreposição de textos (design §5.6):
+- [x] **T11** A sobreposição de textos (design §5.6):
   - testes primeiro, numa função pura de disposição: os rótulos
     projetados com a escala do quadro; a prioridade consulta > extremos >
     reações; um rótulo que cobriria outro é pulado; os rótulos fora da
@@ -195,6 +195,11 @@ Regras:
   Arquivos: `result_display.hpp`, `result_overlay.hpp/.cpp`, `viewport.cpp`,
   `tests/unit/render/test_result_overlay.cpp`. Cobre: 02, 11, 14, 16, 17,
   18.
+  *Feito:* `legendTicks` e `placeLabels` são as funções puras testadas; o
+  `ResultOverlay` pinta a legenda (a barra em `valueColor`, as cores do
+  shader), o cabeçalho (a última linha em laranja quando é aviso) e os
+  rótulos, e é repintado depois de cada quadro com a câmera e o fator
+  dele. A pintura em si fica para o roteiro T19.
 
 ## Fase 4 — App
 

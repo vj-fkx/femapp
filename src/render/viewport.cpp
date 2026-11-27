@@ -1,3 +1,4 @@
+#include "result_overlay.hpp"
 #include "scene_renderer.hpp"
 #include "selection_overlay.hpp"
 
@@ -118,6 +119,7 @@ public:
     MouseMode mouseMode = MouseMode::Select;
     QPointF pressPosition;
     SelectionOverlay* overlay = nullptr;
+    ResultOverlay* resultOverlay = nullptr; // Feature 012
 
     // REQ-004-37: only the selection shown, as a part of its own (on while
     // `isolated`).
@@ -191,6 +193,8 @@ Viewport::Viewport(QWidget* parent)
     setAutoFillBackground(true);
     // NOLINTNEXTLINE(cppcoreguidelines-owning-memory): owned by its Qt parent.
     m_impl->overlay = new SelectionOverlay(this);
+    // NOLINTNEXTLINE(cppcoreguidelines-owning-memory): owned by its Qt parent.
+    m_impl->resultOverlay = new ResultOverlay(this);
     // REQ-005-24: the cursor position is followed for the status bar and the
     // drafting commands, also without a button pressed.
     setMouseTracking(true);
@@ -681,6 +685,8 @@ void Viewport::render(QRhiCommandBuffer* commandBuffer)
     }
 
     ++m_impl->frameCount;
+    // Feature 012: the texts of the result follow this frame.
+    m_impl->resultOverlay->setFrame(m_impl->camera, m_impl->frameScale, m_impl->drawsResult());
     emit frameRendered();
     if (animating) {
         update(); // the next frame of the animation
@@ -1098,6 +1104,11 @@ const std::shared_ptr<const ResultScene>& Viewport::resultScene() const
 double Viewport::animatedScale() const
 {
     return m_impl->frameScale;
+}
+
+void Viewport::setResultAnnotations(ResultAnnotations annotations)
+{
+    m_impl->resultOverlay->setAnnotations(std::move(annotations));
 }
 
 } // namespace fem::render

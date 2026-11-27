@@ -21,6 +21,8 @@ femapp_add_module(render
         result_display.cpp
         result_layer.cpp
         result_layer.hpp
+        result_overlay.cpp
+        result_overlay.hpp
         result_picker.cpp
         result_scene.cpp
         rhi_util.cpp

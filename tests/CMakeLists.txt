@@ -113,6 +113,7 @@ femapp_add_test(render SOURCES
     test_grid_spacing.cpp
     test_mesh_picker.cpp
     test_mesh_scene.cpp
+    test_result_overlay.cpp
     test_result_scene.cpp
     test_scene_renderer.cpp
     test_symbols.cpp)

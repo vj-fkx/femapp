@@ -130,6 +130,8 @@ public:
     [[nodiscard]] const std::shared_ptr<const ResultScene>& resultScene() const;
     // REQ-012-15: the factor of the last frame drawn.
     [[nodiscard]] double animatedScale() const;
+    // REQ-012-02, 11, 14, 16, 17, 18: the texts drawn over the result.
+    void setResultAnnotations(fem::render::ResultAnnotations annotations);
 
 public slots:
     void setGridVisible(bool visible);
