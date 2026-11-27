@@ -345,8 +345,12 @@ Regras:
   serializa um `enum class` de `unsigned long` no Linux), e quatro acessos
   a `optional` que o clang-tidy 19 do Linux recusa. Uma rodada caiu no
   macOS por um 504 do GitHub no vcpkg, fora do nosso código.*
-- [ ] **T91** `clang-format` e `clang-tidy` sem pendências; `core` sem
+- [x] **T91** `clang-format` e `clang-tidy` sem pendências; `core` sem
   headers do Qt (`check_no_qt_includes`)
+  *Conferido em 2026-11-27: `clang-format --dry-run -Werror` limpo nos 56
+  arquivos C++ alterados pela 012; `clang-tidy` local sem avisos nos 34
+  `.cpp`, e o clang-tidy 19 do CI (linux-clang) verde; `check_no_qt_includes`
+  passa, e `core`, `geom`, `mesher` e `setup` não incluem Qt.*
 - [ ] **T92** Conferir todos os critérios de aceite de `requirements.md`
 - [ ] **T93** Atualizar `specs/roadmap.md` (status) e documentação afetada
 
