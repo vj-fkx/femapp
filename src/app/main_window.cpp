@@ -901,7 +901,8 @@ void MainWindow::createResultDisplay()
         }
     });
     // REQ-012-04: the result chosen in the dock, and the quantities it offers.
-    connect(m_results, &ResultsPanel::resultChosen, this, [this](setup::ItemId item, int mode) {
+    connect(m_results, &ResultsPanel::resultChosen, this, [this](quint64 id, int mode) {
+        const auto item = static_cast<setup::ItemId>(id);
         if (const setup::AnalysisResult* result = m_model->results().find(item)) {
             m_resultBar->setQuantities(quantitiesOf(*result));
         }

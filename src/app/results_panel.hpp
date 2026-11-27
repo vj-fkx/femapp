@@ -33,9 +33,10 @@ public:
 signals:
     // REQ-011-15: the nodes or elements of the rows selected.
     void idsRequested(const fem::app::NamedIds& ids);
-    // REQ-012-04: the result shown changed: its item and, for buckling,
-    // the mode (0 otherwise).
-    void resultChosen(fem::setup::ItemId item, int mode);
+    // REQ-012-04: the result shown changed: its item (a setup::ItemId; a
+    // plain integer for the meta-type system on every platform) and, for
+    // buckling, the mode (0 otherwise).
+    void resultChosen(quint64 item, int mode);
 
 private:
     // The list, the table and the warning again: after every change of the

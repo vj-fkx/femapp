@@ -167,7 +167,8 @@ void ResultsPanel::emitChosen()
 {
     const std::optional<setup::ItemId> item = currentItem(m_cases);
     if (item && m_controller->results().find(*item) != nullptr) {
-        emit resultChosen(*item, m_model->modeCount() > 0 ? m_model->mode() : 0);
+        emit resultChosen(static_cast<quint64>(*item),
+                          m_model->modeCount() > 0 ? m_model->mode() : 0);
     }
 }
 
