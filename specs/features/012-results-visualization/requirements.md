@@ -96,7 +96,7 @@ seção ficam para depois.
 
 ## 5. Critérios de aceite
 
-- [ ] **AC-1** (REQ-012-05, 06) Viga biapoiada com carga uniforme q, pelo
+- [x] **AC-1** (REQ-012-05, 06) Viga biapoiada com carga uniforme q, pelo
   documento:
   - os pontos da deformada são os de `BeamResult::at` em 1e−12 relativo,
     antes da conversão para a GPU;
@@ -104,26 +104,26 @@ seção ficam para depois.
     1e−9;
   - o fator automático leva o maior deslocamento a 10% da maior
     dimensão da malha.
-- [ ] **AC-2** (REQ-012-09, 10, 11) Na mesma viga, colorida por Mz:
+- [x] **AC-2** (REQ-012-09, 10, 11) Na mesma viga, colorida por Mz:
   - o máximo da legenda é qL²/8 em 1e−9;
   - numa viga com carga concentrada no vão, os dois lados da carga têm os
     valores de `Side::Before` e `Side::After` de Vy;
   - num pórtico, as barras de um mesmo nó mantêm os seus esforços, sem
     média.
-- [ ] **AC-3** (REQ-012-11, 12) Faixa fixada pelo usuário: os valores fora
+- [x] **AC-3** (REQ-012-11, 12) Faixa fixada pelo usuário: os valores fora
   dela recebem as cores das pontas; com N faixas, há exatamente N cores, e
   um valor no limite entre faixas cai numa delas de forma determinada.
-- [ ] **AC-4** (REQ-012-14, 15) No pilar engastado e livre, o modo 1 é
+- [x] **AC-4** (REQ-012-14, 15) No pilar engastado e livre, o modo 1 é
   mostrado com o seu fator, que é o do `core`, e a animação oscila entre
   −f e +f sem refazer a geometria.
-- [ ] **AC-5** (REQ-012-16, 19) No pórtico 2×2 da 010, as reações
+- [x] **AC-5** (REQ-012-16, 19) No pórtico 2×2 da 010, as reações
   desenhadas são as do resultado, com os valores e as unidades do
   documento, e a soma delas equilibra a carga aplicada (como o resumo da
   011).
-- [ ] **AC-6** (REQ-012-17, 18) As marcas de máximo e mínimo ficam nos
+- [x] **AC-6** (REQ-012-17, 18) As marcas de máximo e mínimo ficam nos
   pontos certos, com o id; a consulta num ponto do vão devolve o valor de
   `BeamResult::at` naquele x, e não o da amostra mais próxima.
-- [ ] **AC-7** (REQ-012-02, 04, 08, 13) Desatualização e trocas:
+- [x] **AC-7** (REQ-012-02, 04, 08, 13) Desatualização e trocas:
   - editar o modelo mostra o aviso no viewport, e o desenho continua sobre
     a malha analisada;
   - trocar de caso mantém a grandeza e a escala do usuário;
@@ -132,7 +132,7 @@ seção ficam para depois.
   manual): ligar e desligar a exibição, a deformada sobre a original, as
   cores contínuas e em faixas, a animação, as reações e a consulta pelo
   clique; 30 FPS com o pórtico grande.
-- [ ] **AC-9** (NFR-012-02, 03, 04) Os testes sem GPU, o teste de fumaça
+- [x] **AC-9** (NFR-012-02, 03, 04) Os testes sem GPU, o teste de fumaça
   com o backend `Null`, o tempo de preparação, o tamanho dos buffers e o
   CI verde nas quatro plataformas.
 

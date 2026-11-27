@@ -351,7 +351,35 @@ Regras:
   arquivos C++ alterados pela 012; `clang-tidy` local sem avisos nos 34
   `.cpp`, e o clang-tidy 19 do CI (linux-clang) verde; `check_no_qt_includes`
   passa, e `core`, `geom`, `mesher` e `setup` não incluem Qt.*
-- [ ] **T92** Conferir todos os critérios de aceite de `requirements.md`
+- [x] **T92** Conferir todos os critérios de aceite de `requirements.md`
+  *Conferido em 2026-11-27:*
+  - *AC-1: `test_result_sampling.cpp` ("the deformed shape of a simply
+    supported beam": as amostras são as do `core` em 1e−12, a flecha
+    5qL⁴/384EI em 1e−9; "the automatic scale factor": 10% em 1e−12).*
+  - *AC-2: `test_result_sampling.cpp` (Mz máximo qL²/8 em 1e−9; Vy antes
+    e depois da carga = `Side::Before`/`After`; um nó de pórtico sem
+    média).*
+  - *AC-3: `test_colormap.cpp` (N faixas, N cores; o limite na faixa de
+    cima; fora da faixa, as pontas).*
+  - *AC-4: o modo 1 do pilar engastado e livre na amostragem
+    (`test_result_sampling.cpp`, o topo desloca-se de lado); o fator no
+    cabeçalho é o do `core` (`test_result_display.cpp`, num modo do pórtico
+    da 010); a animação de −f a +f (`animatedScale`) é só um uniforme, sem
+    reenviar a geometria (`test_scene_renderer.cpp`).*
+  - *AC-5: `test_result_display.cpp` e `test_symbol_builder.cpp` (as
+    reações do pórtico 2×2 com os valores e as unidades do documento; a
+    soma equilibra a carga em 1e−9).*
+  - *AC-6: `test_result_display.cpp` (máximo e mínimo na amostra certa,
+    com o id) e `test_result_sampling.cpp` (`valueAt` num x entre as
+    amostras = `at(x)`).*
+  - *AC-7: `test_result_view.cpp` (o aviso ao editar, sobre a mesma cena;
+    trocar de caso mantém a grandeza e a escala; escala, faixas e original
+    sem trabalho; a grandeza só refaz os valores).*
+  - *AC-8: pendente, o roteiro manual T19 (com o NFR-012-01, 30 FPS).*
+  - *AC-9: os testes sem GPU; o teste de fumaça com o backend `Null`;
+    `gpuBytes` ≤ 64 B por amostra (48 no pórtico grande); a preparação
+    em 0,115 s com a interface parada no máximo 17,1 ms
+    (`bench_result_view`, T18); o CI verde (T90).*
 - [ ] **T93** Atualizar `specs/roadmap.md` (status) e documentação afetada
 
 ## Matriz de rastreabilidade
