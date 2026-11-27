@@ -226,6 +226,26 @@ Conceitos principais:
   `bench_run_control`.
 - **`ResultSet`** — campos nodais/elementares nomeados, por passo de tempo ou modo
   (deslocamento, tensão, von Mises, esforços de barra, temperatura, fluxo…).
+- **Onde fica cada ponto da barra** (feito na 012): o `BeamResult` guarda a
+  origem do comprimento flexível, e `placementAt(x)` dá a posição e os
+  eixos principais em x. Nas barras retas, é a linha a partir da origem.
+  Nos arcos, é o círculo, com a rotação integrada em forma fechada. Nas
+  `Line3`, é a curva flexível, com os eixos de `isoBeamAt`.
+- **Amostragem de resultados** (feita na 012, `result_sampling.hpp`):
+  - `sampleShape` dá as estações de cada barra e a deformada global nelas.
+    As estações são pontos uniformes, ímpares e com o meio; os dois lados
+    de cada carga concentrada; as junções de um modo; e o nó de cada
+    ligação rígida. Os pontos por viga vêm de um orçamento de 10⁶ amostras
+    (17 a 5). As treliças têm só os dois nós;
+  - `sampleField` dá uma grandeza em cada amostra (deslocamentos e
+    rotações globais; esforços por barra, sem média nos nós) e os
+    extremos;
+  - `valueAt`, `displacementAt` e `positionAt` avaliam um ponto qualquer;
+  - `autoScale` dá o fator que leva o maior deslocamento a 10% do tamanho.
+
+  Os laços são paralelos (oneTBB), e o resultado não depende do número de
+  threads. Num modo de flambagem, as treliças são os elementos de linha
+  sem `BeamResult`.
 
 ## 3a. Geometria (`geom`)
 
@@ -366,7 +386,10 @@ Qt) guarda o que o usuário prepara sobre o desenho e a malha, e monta dele o
   análise das opções com o `RunControl`. O `AnalysisResult` traz o
   resultado do `core`, a malha, os avisos e os nós apoiados.
 - **`ResultSet`**: um resultado por caso ou combinação, em ordem de id.
-  Uma falha mantém o resultado anterior, que fica desatualizado.
+  Uma falha mantém o resultado anterior, que fica desatualizado. Cada
+  resultado fica num `shared_ptr` (`share`): a exibição da 012 o usa sem
+  copiá-lo, e ele continua vivo para ela quando uma nova análise o
+  substitui.
 - **`summarize`**: os extremos de deslocamento, rotação e esforços, com os
   ids externos, as somas das reações e das cargas, as iterações e os
   fatores de flambagem.
@@ -387,9 +410,22 @@ Qt) guarda o que o usuário prepara sobre o desenho e a malha, e monta dele o
   instância dele (posição, base, tamanho em pixels). O vertex shader escala o
   molde pelo `w` do clip para manter o tamanho na tela. Há um draw por molde,
   por cima do modelo. O `Viewport` recebe o `SymbolSet` por `setSymbols`.
-- **Resultados**: escalar por vértice + textura 1D de colormap, mapeada no
-  fragment shader; deformada = posição + escala × deslocamento no vertex shader
-  (sem reenviar a malha).
+- **Resultados** (feito na 012):
+  - **Cena.** A `ResultScene` guarda as amostras do `core` em float, a
+    partir do centro das barras, com um segmento entre amostras
+    consecutivas de cada barra. Os dois lados de uma carga não geram
+    segmento. São 60 bytes por segmento na GPU.
+  - **Desenho.** A `ResultLayer` desenha os segmentos como quads de tela
+    (3 px), com posição + escala × deslocamento no vertex shader. A cor sai
+    do valor de cada ponta e da faixa, contínua ou em faixas, por uma
+    textura 256×1 da escala azul→vermelho. A forma original vem embaixo,
+    fina e neutra, e os nós selecionados por cima.
+  - **O que é reenviado.** A escala, a faixa, as faixas e a animação são
+    uniformes. Trocar a grandeza reenvia só os valores.
+  - **No viewport.** O resultado é desenhado no lugar da malha. O clique
+    vai para `pickResult`, sobre a forma desenhada, e os textos (legenda,
+    cabeçalho, rótulos de consulta, extremos e reações) são pintados com
+    `QPainter` pela `ResultOverlay`, depois de cada quadro.
 - **Seleção (picking)**: calculada na CPU pela `MeshPicker` — raio contra os
   triângulos visíveis no clique, projeção dos vértices em janela e cruzamento
   (ADR 0003, feature 004). Itens selecionáveis, combináveis: elementos, faces e
@@ -399,7 +435,10 @@ Qt) guarda o que o usuário prepara sobre o desenho e a malha, e monta dele o
   opcional; diagramas de esforços como geometria gerada sobre os elementos.
 - **Elementos quadráticos**: faces subdivididas na geração dos buffers para
   mostrar a curvatura.
-- **Animação**: modos e passos de tempo interpolados no vertex shader.
+- **Animação**: modos e passos de tempo interpolados no vertex shader. Na
+  012, a escala de cada quadro é `animatedScale` (de 0 a f num caso
+  estático, de −f a +f num modo), e o viewport pede um quadro novo a cada
+  vsync enquanto toca.
 - Backends: Windows → D3D11 (D3D12 opcional); macOS → Metal; Linux → Vulkan,
   com fallback OpenGL. Sobreposição por variável de ambiente `FEM_RHI_BACKEND`.
 
@@ -458,6 +497,23 @@ Qt) guarda o que o usuário prepara sobre o desenho e a malha, e monta dele o
     deslocamentos, reações dos nós apoiados, esforços nas duas pontas das
     barras e os modos de flambagem, com as unidades do documento.
     Selecionar linhas realça os nós ou elementos no viewport.
+- **Exibição de resultados (feature 012)**:
+  - **`ResultView`.** Segue o resultado escolhido no dock Results (o caso
+    ou a combinação e o modo). Prepara a amostragem, a cena e os valores
+    numa `QThread`, sobre o resultado compartilhado; o trabalho de um
+    pedido antigo é descartado. Ao viewport, passa só o que mudou, por uma
+    interface pequena (`ResultSink`).
+  - **Textos.** `annotationsFor` monta a legenda, o cabeçalho (caso,
+    escala, modo e fator, aviso de desatualizado) e os rótulos, nas
+    unidades do documento. O dock e o viewport usam o mesmo formato dos
+    números (`formatResult`).
+  - **Símbolos.** O `ModelController` guarda os símbolos do modelo prontos.
+    Com a exibição ligada, `withResults` tira as cargas e põe as reações
+    sobre eles, sem refazê-los.
+  - **Interface.** O dock Results tem uma barra de opções: mostrar no
+    viewport, a grandeza, a escala, deformada e original, faixas, faixa
+    fixada, reações, extremos e animação. O menu View tem Show Results in
+    Viewport.
 - **`MeshRunner`**: mesma mecânica do `AnalysisJob`, para os geradores de malha.
 - Internacionalização com `tr()` + arquivos `.ts`.
 

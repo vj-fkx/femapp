@@ -205,6 +205,31 @@ Com o modelo pronto, o menu **Analysis** roda a análise (feature 011):
   edição o deixa "out of date"; desfazer até o estado analisado volta a
   "current".
 
+### Os resultados no viewport
+
+Depois de uma análise, o resultado escolhido no dock Results pode ser
+desenhado no lugar da malha (feature 012). Para isso, marque **Show in
+viewport** no alto do dock ou use View ▸ **Show Results in Viewport**.
+
+- **Deformada:** cada barra é desenhada curva, como o núcleo a calcula. A
+  escala é automática (o maior deslocamento vale 10% do tamanho da
+  estrutura), mas pode ser a do usuário (**User**) ou a real (**Real**). A
+  forma original pode aparecer por baixo (**Original**).
+- **Cores:** a grandeza escolhida colore as barras: deslocamentos (u, v,
+  w, |u|), rotações ou esforços (N, Vy, Vz, T, My, Mz), com legenda e
+  unidades. As cores podem ser contínuas ou em faixas (**Bands**), e a
+  faixa pode ser fixada (**Fixed range**). **None** desliga as cores.
+- **Flambagem:** o modo e o seu fator aparecem no alto do viewport. **Play**
+  anima o modo, ou a deformada de um caso estático.
+- **Valores:** as reações aparecem como setas com os valores, e o máximo e
+  o mínimo da grandeza ficam marcados. Um clique numa barra ou num nó
+  mostra o valor ali.
+- **Desatualizado:** se o modelo mudar depois da análise, um aviso em
+  laranja aparece no alto do viewport.
+
+O `bench_result_view` mede a preparação de um resultado com o pórtico de
+cerca de 10⁵ barras: `build/release/bin/bench_result_view`.
+
 Para malhas grandes (centenas de milhares de elementos ou mais), use o build
 de Release (`cmake --preset release` e `cmake --build --preset release`): o
 build `dev` é de depuração e chega a ser dez vezes mais lento. O

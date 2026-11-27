@@ -329,10 +329,12 @@ Regras:
   - trocar de caso e de modo no dock;
   - 30 FPS ao orbitar e animando o pórtico grande.
   Adiado para a sessão de testes manuais, como os da 009 a 011.
-- [ ] **T20** [P] Documentação: `architecture.md` (§3: `placementAt` e
+- [x] **T20** [P] Documentação: `architecture.md` (§3: `placementAt` e
   `result_sampling`; §4: a camada de resultados, a sobreposição e a
   animação; §5: o `ResultView`) e a seção do `README.md` sobre a
   exibição de resultados.
+  *Feito:* também o `ResultSet` compartilhado na §3c e o
+  `bench_result_view` no README.
 
 ## Fase 5 — Fechamento
 
