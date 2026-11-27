@@ -136,6 +136,14 @@ QString formatResult(double value)
     return QLocale().toString(value, 'g', kDigits);
 }
 
+QString cellText(const QVariant& value)
+{
+    if (value.typeId() == QMetaType::Double || value.typeId() == QMetaType::Float) {
+        return formatResult(value.toDouble());
+    }
+    return value.toString();
+}
+
 render::ResultDisplay displayFor(const ResultDisplaySettings& settings,
                                  const core::FieldSamples& field, double autoScale, bool buckling)
 {

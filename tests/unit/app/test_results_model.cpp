@@ -1,4 +1,5 @@
 #include "frame_document.hpp"
+#include "result_display_settings.hpp"
 #include "results_model.hpp"
 
 #include <fem/core/stability_analysis.hpp>
@@ -253,4 +254,22 @@ TEST_CASE("selected rows give the nodes or the elements", "[app][results]")
     model.setTable(Table::Reactions);
     const fem::app::NamedIds held = model.idsOf({model.index(0, 0)});
     CHECK(held.nodes == std::vector<c::ExternalId>{mesh.nodeId(result.supported.front())});
+}
+
+// REQ-012-19: the cells of the tables show their numbers as the viewport.
+TEST_CASE("the text of the cells of the result tables", "[app][results]")
+{
+    Analysed a;
+    analyse(a);
+    ResultsModel model;
+    model.setResult(&got(a), a.setup.document.units());
+    model.setTable(Table::Displacements);
+    REQUIRE(model.rowCount() > 0);
+    for (int column = 1; column < model.columnCount(); ++column) {
+        const QVariant value = model.data(model.index(0, column), Qt::DisplayRole);
+        CHECK(fem::app::cellText(value) == fem::app::formatResult(value.toDouble()));
+    }
+    // The id column is not a double: its own text.
+    const QVariant id = model.data(model.index(0, 0), Qt::DisplayRole);
+    CHECK(fem::app::cellText(id) == id.toString());
 }

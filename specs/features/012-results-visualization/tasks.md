@@ -237,12 +237,16 @@ Regras:
   e num modo as treliças são os elementos de linha sem `BeamResult`
   (design §4 anotado). O `core` ganhou `positionAt`, para o rótulo da
   consulta, e o `app`, `staticOf`.
-- [ ] **T14** [P] O dock Results:
+- [x] **T14** [P] O dock Results:
   - um delegate com `formatResult` nas tabelas (teste: o texto da célula
     é o de `formatResult`);
   - o sinal `resultChosen(item, mode)` quando muda o caso ou o modo.
   Arquivos: `app/results_panel.hpp/.cpp`, `results_model.*` (se preciso),
   `tests/unit/app/test_results_model.cpp`. Cobre: 04, 19.
+  *Feito:* o texto de cada célula vem de `cellText` (sem widgets, testada),
+  que o delegate do dock usa; o `test_app` não liga Qt Widgets, então o
+  sinal `resultChosen` é exercitado pelo `ResultView` (T16) e pelo roteiro
+  T19.
 - [ ] **T15** [P] Os símbolos na exibição de resultados:
   - testes primeiro: com `loadsShown = false`, os apoios continuam e as
     cargas somem; `reactionSymbols` dá as setas e os arcos do resultado

@@ -12,6 +12,7 @@
 #include <fem/setup/units.hpp>
 
 #include <QString>
+#include <QVariant>
 
 #include <cstdint>
 #include <optional>
@@ -58,6 +59,8 @@ struct ResultDisplaySettings
 
 // REQ-012-19: one number format for the tables and the viewport.
 [[nodiscard]] QString formatResult(double value);
+// The text of a cell of the result tables: numbers by formatResult.
+[[nodiscard]] QString cellText(const QVariant& value);
 
 // REQ-012-06, 07, 09, 11, 12, 15: the options of the frames: the factor
 // (automatic, the user's or 1), the range (the extremes of `field`, or the

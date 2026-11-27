@@ -2,6 +2,7 @@
 
 #include "analysis_text.hpp"
 #include "model_controller.hpp"
+#include "result_display_settings.hpp"
 #include "results_model.hpp"
 
 #include <QComboBox>
@@ -10,6 +11,7 @@
 #include <QItemSelectionModel>
 #include <QLabel>
 #include <QSignalBlocker>
+#include <QStyledItemDelegate>
 #include <QTableView>
 #include <QUndoStack>
 #include <QVBoxLayout>
@@ -34,6 +36,19 @@ QString tableName(ResultsModel::Table table)
     }
     return {};
 }
+
+// REQ-012-19: the numbers of the tables as in the viewport.
+class ResultsDelegate : public QStyledItemDelegate
+{
+public:
+    using QStyledItemDelegate::QStyledItemDelegate;
+
+    [[nodiscard]] QString displayText(const QVariant& value,
+                                      const QLocale& /*locale*/) const override
+    {
+        return cellText(value);
+    }
+};
 
 // The item of the current entry of the list of cases.
 std::optional<setup::ItemId> currentItem(const QComboBox* cases)
@@ -76,6 +91,8 @@ ResultsPanel::ResultsPanel(ModelController* controller, QWidget* parent)
     // NFR-011-04: a virtual model, rows of one height so that the view
     // need not measure them.
     m_view->setModel(m_model);
+    // NOLINTNEXTLINE(cppcoreguidelines-owning-memory): owned by the view.
+    m_view->setItemDelegate(new ResultsDelegate(m_view));
     m_view->setSelectionBehavior(QAbstractItemView::SelectRows);
     m_view->setSelectionMode(QAbstractItemView::ExtendedSelection);
     m_view->setEditTriggers(QAbstractItemView::NoEditTriggers);
@@ -94,6 +111,7 @@ ResultsPanel::ResultsPanel(ModelController* controller, QWidget* parent)
     connect(m_modes, &QComboBox::currentIndexChanged, this, [this](int index) {
         if (index >= 0) {
             m_model->setMode(index);
+            emitChosen();
         }
     });
     connect(m_view->selectionModel(), &QItemSelectionModel::selectionChanged, this,
@@ -142,6 +160,15 @@ void ResultsPanel::showResult()
     m_stale->setVisible(result != nullptr &&
                         !setup::ResultSet::isCurrent(*result, m_controller->state()));
     fillTables();
+    emitChosen();
+}
+
+void ResultsPanel::emitChosen()
+{
+    const std::optional<setup::ItemId> item = currentItem(m_cases);
+    if (item && m_controller->results().find(*item) != nullptr) {
+        emit resultChosen(*item, m_model->modeCount() > 0 ? m_model->mode() : 0);
+    }
 }
 
 void ResultsPanel::fillTables()
