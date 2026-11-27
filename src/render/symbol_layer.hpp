@@ -48,6 +48,10 @@ struct MoldVertex
 enum class Mold : std::uint8_t { Fixed, Pinned, Roller, Generic, Arrow, Arc, Triad, Link };
 inline constexpr std::size_t kMoldCount = 8;
 
+// REQ-012-16: the color of the reactions (lime, apart from the green of the
+// supports and the red of the forces).
+inline constexpr Rgba kReactionColor = 120U | (230U << 8U) | (60U << 16U) | (0xFFU << 24U);
+
 // Pairs of vertices (lines).
 [[nodiscard]] const std::vector<MoldVertex>& moldVertices(Mold mold);
 

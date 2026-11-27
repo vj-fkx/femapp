@@ -56,11 +56,15 @@ struct SymbolSet
     std::vector<MomentSymbol> moments;
     std::vector<DistributedSymbol> distributed;
     std::vector<AxesSymbol> axes;
+    // REQ-012-16: the reactions of a result, in their own color: forces
+    // ending at the node, in the sense of the reaction, and moments.
+    std::vector<ArrowSymbol> reactionForces;
+    std::vector<MomentSymbol> reactionMoments;
 
     [[nodiscard]] bool empty() const noexcept
     {
         return supports.empty() && forces.empty() && moments.empty() && distributed.empty() &&
-               axes.empty();
+               axes.empty() && reactionForces.empty() && reactionMoments.empty();
     }
 };
 

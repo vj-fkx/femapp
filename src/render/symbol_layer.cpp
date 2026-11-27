@@ -268,6 +268,20 @@ SymbolInstances instancesOf(const SymbolSet& set, const Eigen::Vector3d& origin)
                                     kMomentColor));
         }
     }
+    for (const ArrowSymbol& f : set.reactionForces) {
+        if (f.vector.norm() > 0.0) {
+            out.at(index(Mold::Arrow))
+                .push_back(instance(f.at - origin, basisAlong(f.vector.normalized()), kForceSize,
+                                    kReactionColor));
+        }
+    }
+    for (const MomentSymbol& m : set.reactionMoments) {
+        if (m.axis.norm() > 0.0) {
+            out.at(index(Mold::Arc))
+                .push_back(instance(m.at - origin, basisAlong(m.axis.normalized()), kMomentSize,
+                                    kReactionColor));
+        }
+    }
     // Distributed: the arrows as long as their value over the largest.
     double largest = 0.0;
     for (const DistributedSymbol& d : set.distributed) {

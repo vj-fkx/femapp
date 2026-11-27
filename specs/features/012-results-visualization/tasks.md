@@ -128,13 +128,16 @@ Regras:
   *Feito:* o nó devolve também a barra da sua amostra e a estação dela; o
   clique numa ligação rígida dá o x da ponta flexível (0 ou o
   comprimento).
-- [ ] **T08** [P] As reações nos símbolos:
+- [x] **T08** [P] As reações nos símbolos:
   - testes primeiro: `instancesOf` gera as setas e os arcos de
     `reactionForces` e `reactionMoments` na cor das reações, com a seta
     terminando no nó;
   - depois os campos no `SymbolSet` e a cor em `symbol_layer.cpp`.
   Arquivos: `render/include/fem/render/symbols.hpp`, `symbol_layer.cpp`,
   `tests/unit/render/test_symbols.cpp`. Cobre: 16.
+  *Feito:* a cor das reações é um verde-limão (`kReactionColor`), para não
+  confundir com o verde dos apoios nem com o vermelho das forças (o
+  design dizia só "verde").
 
 ## Fase 3 — `render` na GPU e no viewport
 

@@ -128,6 +128,32 @@ TEST_CASE("the instances of a symbol set", "[render][symbols]")
     }
 }
 
+// REQ-012-16: the reactions of a result: arrows ending at the node, in the
+// sense of the reaction, and arcs, in their own color.
+TEST_CASE("the reactions of a result as symbols", "[render][symbols]")
+{
+    r::SymbolSet set;
+    CHECK(set.empty());
+    set.forces = {{.at = Vector3d(2, 3, 0), .vector = Vector3d(0, -10, 0)}};
+    set.reactionForces = {{.at = Vector3d(0, 0, 0), .vector = Vector3d(0, 25, 0)},
+                          {.at = Vector3d(4, 0, 0), .vector = Vector3d::Zero()}}; // not drawn
+    set.reactionMoments = {{.at = Vector3d(0, 0, 0), .axis = Vector3d(0, 0, -3)}};
+    CHECK_FALSE(set.empty());
+    const d::SymbolInstances all = d::instancesOf(set, Vector3d::Zero());
+    const auto& arrows = all.at(static_cast<std::size_t>(d::Mold::Arrow));
+    REQUIRE(arrows.size() == 2);
+    const d::SymbolInstance& reaction = arrows.back();
+    CHECK(reaction.color == d::kReactionColor);
+    CHECK(arrows.front().color != d::kReactionColor);
+    // The arrow ends at the node and points up, the sense of the reaction.
+    CHECK(reaction.at == std::array<float, 3>{0.0F, 0.0F, 0.0F});
+    CHECK(reaction.x == std::array<float, 3>{0.0F, 1.0F, 0.0F});
+    const auto& arcs = all.at(static_cast<std::size_t>(d::Mold::Arc));
+    REQUIRE(arcs.size() == 1);
+    CHECK(arcs.front().color == d::kReactionColor);
+    CHECK(arcs.front().x == std::array<float, 3>{0.0F, 0.0F, -1.0F});
+}
+
 TEST_CASE("the symbol pass draws with the Null backend", "[render][symbols]")
 {
     fem::render::test::ensureGuiApplication();
