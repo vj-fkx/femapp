@@ -381,6 +381,10 @@ Regras:
     em 0,115 s com a interface parada no máximo 17,1 ms
     (`bench_result_view`, T18); o CI verde (T90).*
 - [ ] **T93** Atualizar `specs/roadmap.md` (status) e documentação afetada
+  *Aguarda a T19. Feito por ora: a 012 fica em `implementando`, e o
+  roadmap lista a 012 T19 (com o AC-8 e o NFR-012-01) e as traduções
+  pt_BR da 012 nas pendências; a documentação (arquitetura e README) é a
+  da T20.*
 
 ## Matriz de rastreabilidade
 
