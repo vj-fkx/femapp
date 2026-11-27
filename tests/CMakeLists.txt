@@ -226,6 +226,7 @@ add_executable(test_app
     unit/app/test_line_mesh_text.cpp
     unit/app/test_model_controller.cpp
     unit/app/test_model_tree.cpp
+    unit/app/test_result_display.cpp
     unit/app/test_results_model.cpp
     unit/app/test_section_geometry.cpp
     unit/app/test_symbol_builder.cpp
@@ -243,6 +244,7 @@ add_executable(test_app
     "${PROJECT_SOURCE_DIR}/src/app/model_controller.hpp"
     "${PROJECT_SOURCE_DIR}/src/app/model_tree.cpp"
     "${PROJECT_SOURCE_DIR}/src/app/model_tree.hpp"
+    "${PROJECT_SOURCE_DIR}/src/app/result_display_settings.cpp"
     "${PROJECT_SOURCE_DIR}/src/app/results_model.cpp"
     "${PROJECT_SOURCE_DIR}/src/app/results_model.hpp"
     "${PROJECT_SOURCE_DIR}/src/app/section_geometry.cpp"

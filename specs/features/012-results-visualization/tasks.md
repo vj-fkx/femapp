@@ -203,7 +203,7 @@ Regras:
 
 ## Fase 4 — App
 
-- [ ] **T12** As opções e as grandezas, sem widgets (design §5.7):
+- [x] **T12** As opções e as grandezas, sem widgets (design §5.7):
   - testes primeiro:
     - `quantitiesOf`: 13 grandezas num resultado estático, 7 na
       flambagem; `shownQuantity` volta a |u| quando um esforço é pedido
@@ -217,6 +217,8 @@ Regras:
   Arquivos: `app/result_display_settings.hpp/.cpp`, `app/CMakeLists.txt`,
   `tests/unit/app/test_result_display.cpp`, `tests/CMakeLists.txt`.
   Cobre: 06, 09, 11, 12, 15, 19.
+  *Feito:* também `isBuckling` e `quantityTitle` ("Mz [kN·m]", "θz [rad]",
+  "u (normalized)"), que a legenda e a barra de opções usam.
 - [ ] **T13** Os textos (`annotationsFor`):
   - testes primeiro:
     - **reações no pórtico 2×2 da 010:** os componentes, os valores com
