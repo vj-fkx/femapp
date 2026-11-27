@@ -102,7 +102,7 @@ Regras:
   `tests/CMakeLists.txt`. Cobre: 11, 12.
   *Feito:* `noValueColor()` (a cor 1D da 004) para os valores que não são
   finitos, e faixa vazia (min = max) dá a cor do mínimo.
-- [ ] **T06** [P] A cena de resultados:
+- [x] **T06** [P] A cena de resultados:
   - testes primeiro:
     - o número de segmentos; os segmentos de comprimento zero (os dois
       lados de uma carga) pulados; o elemento de cada segmento;
@@ -114,6 +114,9 @@ Regras:
   Arquivos: `render/include/fem/render/result_scene.hpp`,
   `result_scene.cpp`, `tests/unit/render/test_result_scene.cpp`.
   Cobre: 05, 10, N04.
+  *Feito:* 60 bytes por segmento (`kSegmentGpuBytes`). O nó de cada ponta
+  de barra aponta a primeira amostra nele, e a amostra do nó de uma
+  ligação rígida é a ponta da barra.
 - [ ] **T07** O clique sobre a forma desenhada:
   - testes primeiro: um clique no meio de um segmento deformado dá a
     barra e o x interpolado (1e−6 relativo); com escala 0, a forma
