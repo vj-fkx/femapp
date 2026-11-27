@@ -209,6 +209,23 @@ target_include_directories(bench_analysis_job PRIVATE "${PROJECT_SOURCE_DIR}/src
 target_link_libraries(bench_analysis_job PRIVATE fem::mesher fem::setup Qt6::Core)
 femapp_set_warnings(bench_analysis_job)
 
+# NFR-012-02: the preparation of a result for the viewport against the
+# interface, run by hand on a Release build.
+add_executable(bench_result_view perf/bench_result_view.cpp
+    "${PROJECT_SOURCE_DIR}/src/app/analysis_text.cpp"
+    "${PROJECT_SOURCE_DIR}/src/app/check_issues.cpp"
+    "${PROJECT_SOURCE_DIR}/src/app/model_controller.cpp"
+    "${PROJECT_SOURCE_DIR}/src/app/model_controller.hpp"
+    "${PROJECT_SOURCE_DIR}/src/app/result_display_settings.cpp"
+    "${PROJECT_SOURCE_DIR}/src/app/result_view.cpp"
+    "${PROJECT_SOURCE_DIR}/src/app/result_view.hpp"
+    "${PROJECT_SOURCE_DIR}/src/app/section_geometry.cpp"
+    "${PROJECT_SOURCE_DIR}/src/app/symbol_builder.cpp")
+set_target_properties(bench_result_view PROPERTIES AUTOMOC ON)
+target_include_directories(bench_result_view PRIVATE "${PROJECT_SOURCE_DIR}/src/app")
+target_link_libraries(bench_result_view PRIVATE fem::mesher fem::render fem::setup Qt6::Gui)
+femapp_set_warnings(bench_result_view)
+
 # NFR-011-03: cost of the run control, run by hand on a Release build.
 add_executable(bench_run_control perf/bench_run_control.cpp)
 target_link_libraries(bench_run_control PRIVATE fem::core)

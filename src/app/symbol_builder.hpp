@@ -39,6 +39,12 @@ struct SymbolOptions
                                              const setup::MeshContext& mesh,
                                              const SymbolOptions& options);
 
+// REQ-012-03, 16: the symbols of the model `base` (built with the loads and
+// without reactions) as the display of a result shows them: without the
+// loads when they are hidden, with the reactions. No rebuild of the model.
+[[nodiscard]] render::SymbolSet withResults(const render::SymbolSet& base,
+                                            const SymbolOptions& options);
+
 // REQ-012-16: the reactions of a linear or second-order result at its
 // supported nodes: one arrow per force component and one arc per moment
 // component that is not negligible (1e-9 of the largest of its kind), in

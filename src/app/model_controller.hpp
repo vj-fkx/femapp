@@ -121,6 +121,9 @@ private:
     setup::ResultSet m_results;
     SymbolOptions m_symbolOptions;
     std::shared_ptr<const render::SymbolSet> m_symbols;
+    // The symbols of the model with the loads and without reactions: the
+    // display of a result changes only what it shows of them (012).
+    std::shared_ptr<const render::SymbolSet> m_modelSymbols;
     QTimer m_symbolTimer;
     void scheduleSymbols();
 };

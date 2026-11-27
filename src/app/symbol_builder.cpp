@@ -387,12 +387,20 @@ render::SymbolSet onDrawing(const setup::Document& document, const geom::Drawing
 render::SymbolSet buildSymbols(const setup::Document& document, const geom::Drawing& drawing,
                                const setup::MeshContext& mesh, const SymbolOptions& options)
 {
-    render::SymbolSet set = mesh.mesh ? onMesh(document, drawing, mesh, options)
-                                      : onDrawing(document, drawing, options);
-    if (!options.loadsShown) {
-        set.forces.clear();
-        set.moments.clear();
-        set.distributed.clear();
+    const render::SymbolSet base = mesh.mesh ? onMesh(document, drawing, mesh, options)
+                                             : onDrawing(document, drawing, options);
+    return withResults(base, options);
+}
+
+render::SymbolSet withResults(const render::SymbolSet& base, const SymbolOptions& options)
+{
+    render::SymbolSet set;
+    set.supports = base.supports;
+    set.axes = base.axes;
+    if (options.loadsShown) {
+        set.forces = base.forces;
+        set.moments = base.moments;
+        set.distributed = base.distributed;
     }
     set.reactionForces = options.reactionForces;
     set.reactionMoments = options.reactionMoments;

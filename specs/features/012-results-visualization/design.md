@@ -572,9 +572,16 @@ Clique ─► Viewport (pickResult com animatedScale) ─resultPicked─► Resu
 - Cada pedido tem um número de geração. O resultado de um trabalho velho é
   descartado ao chegar. Só um trabalho roda por vez, e um pedido que chega
   durante ele espera o fim e roda o último.
-- O trabalho usa um `shared_ptr` do `ResultSet` copiado ao iniciar (os
-  resultados são imutáveis depois de guardados). Uma nova análise durante o
-  trabalho não o atinge.
+- O trabalho compartilha o resultado guardado (`ResultSet::share`, um
+  `shared_ptr`), sem copiá-lo: os resultados são imutáveis depois de
+  guardados, e uma nova análise durante o trabalho só troca o ponteiro no
+  `ResultSet`. *(Alterado em 2026-11-27, na T18: a cópia levava 118 ms na
+  thread da interface com o pórtico do benchmark.)*
+- Ligar e desligar a exibição muda só o que se mostra dos símbolos do
+  modelo (sem as cargas, com as reações): o `ModelController` guarda os
+  símbolos do modelo prontos e aplica `withResults` sobre eles, sem
+  refazê-los. *(Acrescentado em 2026-11-27, na T18: refazer os símbolos
+  levava 132 ms na thread da interface.)*
 - **Seleção.** Na exibição de resultados, o clique esquerdo consulta e
   seleciona o nó ou o elemento clicado. A seleção por janela continua
   usando a malha original. O realce só aparece se a malha do resultado for

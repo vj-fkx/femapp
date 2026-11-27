@@ -55,7 +55,17 @@ ModelController::ModelController(QUndoStack* undo, const geom::Drawing& drawing,
 
 void ModelController::setSymbolOptions(SymbolOptions options)
 {
+    const bool sameModel =
+        options.axes == m_symbolOptions.axes && options.axesOf == m_symbolOptions.axesOf;
     m_symbolOptions = std::move(options);
+    // Feature 012 (NFR-012-02): only the loads or the reactions changed: no
+    // rebuild of the model's symbols, unless one is due anyway.
+    if (sameModel && m_modelSymbols && !m_symbolTimer.isActive()) {
+        m_symbols = std::make_shared<const render::SymbolSet>(
+            withResults(*m_modelSymbols, m_symbolOptions));
+        emit symbolsChanged();
+        return;
+    }
     scheduleSymbols();
 }
 
@@ -68,8 +78,14 @@ void ModelController::scheduleSymbols()
 void ModelController::rebuildSymbols()
 {
     m_symbolTimer.stop();
-    m_symbols = std::make_shared<const render::SymbolSet>(
-        buildSymbols(m_document, m_drawing, m_mesh, m_symbolOptions));
+    SymbolOptions model = m_symbolOptions;
+    model.loadsShown = true;
+    model.reactionForces.clear();
+    model.reactionMoments.clear();
+    m_modelSymbols = std::make_shared<const render::SymbolSet>(
+        buildSymbols(m_document, m_drawing, m_mesh, model));
+    m_symbols =
+        std::make_shared<const render::SymbolSet>(withResults(*m_modelSymbols, m_symbolOptions));
     emit symbolsChanged();
 }
 

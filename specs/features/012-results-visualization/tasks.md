@@ -298,13 +298,29 @@ Regras:
   `test_app` não liga widgets. A `MainWindow` liga o `ResultView` ao
   `Viewport` por um adaptador (`ResultSink`), e `showLocalAxes` passou a
   manter o resto das `SymbolOptions`.
-- [ ] **T18** O benchmark da preparação:
+- [x] **T18** O benchmark da preparação:
   - o `ResultView` com o pórtico do `bench_line_mesh` em Release: o maior
     intervalo do laço de eventos ≤ 100 ms e a preparação ≤ 2 s;
   - se falhar, o `at(span<const Station>)` do risco do design §10, com
     uma nova medida.
-  Arquivos: `tests/bench/bench_result_view.cpp`, `tests/CMakeLists.txt`.
-  Cobre: N02.
+  Arquivos: `tests/perf/bench_result_view.cpp`,
+  `tests/perf/analysis_building.hpp` (o pórtico, agora comum com o
+  `bench_analysis_job`), `tests/CMakeLists.txt`. Cobre: N02.
+  *Medido em 2026-11-27 (Release, máquina do mantenedor): 102 546
+  entidades, 51 921 nós e 186 705 elementos; 929 880 amostras e 743 904
+  segmentos, 44,6 MB na GPU (48 bytes por amostra).*
+  - *Primeira medida: a preparação levava 0,28 s, mas a thread da
+    interface parava 273 ms (limite 100 ms): a cópia do resultado
+    (118 ms) e a reconstrução dos símbolos do modelo (132 ms) rodavam
+    nela.*
+  - *Mudança aprovada pelo mantenedor: o `ResultSet` guarda cada
+    resultado num `shared_ptr` e o `ResultView` o compartilha
+    (`ResultSet::share`), sem copiar; o `ModelController` guarda os
+    símbolos do modelo prontos e aplica a exibição do resultado sobre eles
+    (`withResults`), sem refazê-los (design §6).*
+  - *Depois: mostrar o resultado leva 0,115 s, com o maior intervalo do
+    timer de 10 ms em 17,1 ms; trocar a grandeza, 0,032 s e 9,9 ms
+    (limites 2 s e 100 ms).*
 - [ ] **T19** [M] Roteiro manual (AC-8, N01):
   - ligar e desligar a exibição; a deformada sobre a original;
   - as cores contínuas e em faixas, e a faixa fixada;

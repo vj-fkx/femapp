@@ -216,8 +216,9 @@ void ResultView::start(Job job)
     if (job == Job::Whole || !m_prepared) {
         ++m_sceneBuilds;
         job = Job::Whole;
-        // A copy: the analysis may replace the result while this runs.
-        auto copy = std::make_shared<const setup::AnalysisResult>(*result);
+        // Shared: the analysis may replace it here while this runs.
+        const std::shared_ptr<const setup::AnalysisResult> copy =
+            m_controller->results().share(*m_item);
         const int mode = m_mode;
         thread = QThread::create(
             [out, copy, mode, quantity] { *out = prepareResult(copy, mode, quantity); });

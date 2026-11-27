@@ -18,6 +18,7 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <ranges>
 #include <span>
 #include <string>
 #include <variant>
@@ -72,7 +73,15 @@ public:
     void put(AnalysisResult result); // replaces the item's
     void erase(ItemId item);         // the item left the document
     [[nodiscard]] const AnalysisResult* find(ItemId item) const;
-    [[nodiscard]] std::span<const AnalysisResult> all() const noexcept { return m_results; }
+    // Feature 012 (design §6): the result itself, shared, without a copy; it
+    // stays alive for its holder when a new analysis replaces it here.
+    [[nodiscard]] std::shared_ptr<const AnalysisResult> share(ItemId item) const;
+    // The results, sorted by item.
+    [[nodiscard]] auto all() const
+    {
+        return m_results | std::views::transform(
+                               [](const auto& result) -> const AnalysisResult& { return *result; });
+    }
     // Current while the state analysed is the state now: undoing back to it
     // makes a result current again (a redo gives new revisions: design §5.3).
     [[nodiscard]] static bool isCurrent(const AnalysisResult& result,
@@ -82,7 +91,7 @@ public:
     }
 
 private:
-    std::vector<AnalysisResult> m_results; // sorted by item
+    std::vector<std::shared_ptr<const AnalysisResult>> m_results; // sorted by item
 };
 
 // REQ-011-13: the numbers of the summary; the app writes them. A value is

@@ -84,28 +84,44 @@ CaseOutcome runCase(const Document& document, const geom::Drawing& drawing, cons
     return outcome;
 }
 
+namespace {
+
+ItemId itemOf(const std::shared_ptr<const AnalysisResult>& result)
+{
+    return result->item;
+}
+
+} // namespace
+
 void ResultSet::put(AnalysisResult result)
 {
-    const auto at = std::ranges::lower_bound(m_results, result.item, {}, &AnalysisResult::item);
-    if (at != m_results.end() && at->item == result.item) {
-        *at = std::move(result);
+    const ItemId item = result.item;
+    auto shared = std::make_shared<const AnalysisResult>(std::move(result));
+    const auto at = std::ranges::lower_bound(m_results, item, {}, itemOf);
+    if (at != m_results.end() && (*at)->item == item) {
+        *at = std::move(shared);
     } else {
-        m_results.insert(at, std::move(result));
+        m_results.insert(at, std::move(shared));
     }
 }
 
 void ResultSet::erase(ItemId item)
 {
-    const auto at = std::ranges::lower_bound(m_results, item, {}, &AnalysisResult::item);
-    if (at != m_results.end() && at->item == item) {
+    const auto at = std::ranges::lower_bound(m_results, item, {}, itemOf);
+    if (at != m_results.end() && (*at)->item == item) {
         m_results.erase(at);
     }
 }
 
+std::shared_ptr<const AnalysisResult> ResultSet::share(ItemId item) const
+{
+    const auto at = std::ranges::lower_bound(m_results, item, {}, itemOf);
+    return at != m_results.end() && (*at)->item == item ? *at : nullptr;
+}
+
 const AnalysisResult* ResultSet::find(ItemId item) const
 {
-    const auto at = std::ranges::lower_bound(m_results, item, {}, &AnalysisResult::item);
-    return at != m_results.end() && at->item == item ? &*at : nullptr;
+    return share(item).get();
 }
 
 namespace {
