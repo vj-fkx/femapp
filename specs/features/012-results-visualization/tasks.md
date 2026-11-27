@@ -338,7 +338,13 @@ Regras:
 
 ## Fase 5 — Fechamento
 
-- [ ] **T90** Build e testes verdes nos presets das três plataformas (CI)
+- [x] **T90** Build e testes verdes nos presets das três plataformas (CI)
+  *CI verde em `8247884` (run 46052073958): Windows, macOS, Linux gcc e
+  clang (com o clang-tidy), cobertura e formatação. Duas correções antes:
+  o sinal `resultChosen` passou a levar o item como `quint64` (o moc não
+  serializa um `enum class` de `unsigned long` no Linux), e quatro acessos
+  a `optional` que o clang-tidy 19 do Linux recusa. Uma rodada caiu no
+  macOS por um 504 do GitHub no vcpkg, fora do nosso código.*
 - [ ] **T91** `clang-format` e `clang-tidy` sem pendências; `core` sem
   headers do Qt (`check_no_qt_includes`)
 - [ ] **T92** Conferir todos os critérios de aceite de `requirements.md`
