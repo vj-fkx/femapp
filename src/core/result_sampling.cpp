@@ -41,6 +41,17 @@ bool isBeam(const ResultFields& fields, std::size_t e)
     return e < fields.beams.size() && fields.beams[e].has_value();
 }
 
+// The beam result of element e, or nullptr (checked without a second
+// access to the optional).
+const BeamResult* beamOf(const ResultFields& fields, std::size_t e)
+{
+    if (e >= fields.beams.size()) {
+        return nullptr;
+    }
+    const std::optional<BeamResult>& beam = fields.beams[e];
+    return beam.has_value() ? &beam.value() : nullptr;
+}
+
 // The stations of element e and where they are, before the shape.
 std::vector<Station> stationsOf(const ResultFields& fields, std::size_t e, int perBeam)
 {
@@ -53,7 +64,11 @@ std::vector<Station> stationsOf(const ResultFields& fields, std::size_t e, int p
         return {Station{.x = 0.0, .side = Side::After, .node = nodes[0]},
                 Station{.x = (b - a).norm(), .side = Side::After, .node = nodes[1]}};
     }
-    const BeamResult& beam = *fields.beams[e];
+    const BeamResult* found = beamOf(fields, e);
+    if (found == nullptr) {
+        return {};
+    }
+    const BeamResult& beam = *found;
     const double scale = std::max({1.0, a.norm(), b.norm()});
     const NodeIndex startLink = linked(a, beam.placementAt(0.0).position, scale) ? nodes[0] : -1;
     const NodeIndex endLink =
@@ -82,8 +97,8 @@ Motion motionAt(const ResultFields& fields, std::size_t e, const Station& at)
         return {.displacement = nodal(fields.displacements, at.node),
                 .rotation = nodal(fields.rotations, at.node)};
     }
-    if (isBeam(fields, e)) {
-        const BeamResult& beam = *fields.beams[e];
+    if (const BeamResult* found = beamOf(fields, e)) {
+        const BeamResult& beam = *found;
         const Eigen::Matrix3d axes = beam.placementAt(at.x).axes;
         const BeamPoint point = beam.at(at.x, at.side);
         return {.displacement = axes * point.displacement, .rotation = axes * point.rotation};
@@ -287,7 +302,11 @@ ShapeSamples sampleShape(const ResultFields& fields, const SampleOptions& option
                                                                       : Eigen::Vector3d::Zero();
                                           continue;
                                       }
-                                      const BeamResult& beam = *fields.beams[e];
+                                      const BeamResult* found = beamOf(fields, e);
+                                      if (found == nullptr) {
+                                          continue;
+                                      }
+                                      const BeamResult& beam = *found;
                                       const BeamPlacement placement = beam.placementAt(station.x);
                                       out.positions[at] = placement.position;
                                       out.displacements[at] =

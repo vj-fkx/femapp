@@ -200,7 +200,7 @@ fem::app::AnnotationInput inputOf(const Shown& a)
     in.shape = &a.shape;
     in.field = &a.field;
     in.units = a.setup.document.units();
-    in.display = fem::app::displayFor(in.settings, a.field, 25.0, fem::app::isBuckling(*a.result));
+    in.display = fem::app::displayFor(in.settings, a.field, 25.0, fem::app::isBuckling(got(a)));
     in.caseName = QStringLiteral("lateral (linear)");
     return in;
 }

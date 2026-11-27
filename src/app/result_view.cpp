@@ -218,7 +218,7 @@ void ResultView::start(Job job)
         job = Job::Whole;
         // Shared: the analysis may replace it here while this runs.
         const std::shared_ptr<const setup::AnalysisResult> copy =
-            m_controller->results().share(*m_item);
+            m_controller->results().share(result->item);
         const int mode = m_mode;
         thread = QThread::create(
             [out, copy, mode, quantity] { *out = prepareResult(copy, mode, quantity); });
